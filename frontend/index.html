@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cubito</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        background: #0a0e12;
+        color: #9fef00;
+        font-family: 'SF Mono', ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
+        overflow: hidden;
+      }
+      #app {
+        height: 100%;
+      }
+      #hud {
+        position: fixed;
+        top: 12px;
+        left: 16px;
+        font-size: 12px;
+        line-height: 1.6;
+        pointer-events: none;
+        text-shadow: 0 0 8px rgba(159, 239, 0, 0.35);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="hud"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

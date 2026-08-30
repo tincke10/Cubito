@@ -1,0 +1,3 @@
+# Marks frontend/ as its own pnpm workspace root so installs here never
+# traverse up into the engine's workspace (same pattern as upstream mobile/).
+packages: []
