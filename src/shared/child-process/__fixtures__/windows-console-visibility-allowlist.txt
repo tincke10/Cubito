@@ -51,7 +51,6 @@ main/startup/ensure-virtual-display.ts
 main/startup/packaged-cli-entry-redirect.ts
 main/startup/windows-install-dir-acl-probe.ts
 main/win32-utils.ts
-main/window/clipboard-ipc-handlers.ts
 main/workspace-space-analysis.ts
 main/wsl-availability.ts
 main/wsl-unc-delete.ts

@@ -32,4 +32,3 @@ main/rate-limits/codex-fetcher.ts
 main/wsl-availability.ts
 main/wsl-unc-delete.ts
 main/wsl.ts
-renderer/src/components/settings/TerminalWindowsShellSection.tsx
