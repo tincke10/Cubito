@@ -1,0 +1,66 @@
+name: Cubito CI
+
+# Backend-logic gates for the fork: the runtime must build and run without
+# Electron, and its unit suite must stay green. Frontend CI is added
+# separately once the 3D client stabilizes.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cubito-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  electron-ratchet:
+    name: runtime stays electron-free
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/install-node-dependencies
+        with:
+          native-runtime: none
+
+      # The load-bearing guardrail inherited from upstream: bundles the
+      # runtime entry points and fails if any module imports electron.
+      - name: Check runtime Electron ratchet
+        run: node config/scripts/check-runtime-electron-ratchet.mjs
+
+  orcad-smoke:
+    name: orcad build + terminal smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/install-node-dependencies
+        with:
+          native-runtime: node
+
+      # Builds the CLI and the orcad bundle, boots orcad headless, and runs a
+      # real terminal round-trip against it. This is the fork's extraction
+      # test: if a change couples the runtime back to the desktop shell, this
+      # job screams.
+      - name: Build orcad and run terminal smoke
+        run: pnpm smoke:orcad-terminal
+
+  unit-tests:
+    name: engine unit tests
+    uses: ./.github/workflows/unit-tests.yml
+    with:
+      node_versions: '["24"]'
