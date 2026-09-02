@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { createGraphStore } from './graph-store'
+import { describe, expect, it, vi } from 'vitest'
+import { createSceneStore } from './scene-store'
 import { syncWorktreeGraph } from './sync-worktree-graph'
 import type { RuntimeGateway } from './ports/runtime-gateway'
 import type { RawWorktreeRecord } from '../domain/worktree-graph/build-graph'
@@ -26,7 +26,7 @@ const records: RawWorktreeRecord[] = [
 describe('syncWorktreeGraph', () => {
   it('loads worktrees through the gateway into the store', async () => {
     const gateway: RuntimeGateway = { listWorktrees: async () => records }
-    const store = createGraphStore()
+    const store = createSceneStore()
     await syncWorktreeGraph(gateway, store, () => 1234)
     const state = store.get()
     expect(state.sync).toEqual({ state: 'synced', at: 1234 })
@@ -36,7 +36,7 @@ describe('syncWorktreeGraph', () => {
 
   it('marks the store syncing while the fetch is in flight', async () => {
     let observed: string | null = null
-    const store = createGraphStore()
+    const store = createSceneStore()
     const gateway: RuntimeGateway = {
       listWorktrees: async () => {
         observed = store.get().sync.state
@@ -48,7 +48,7 @@ describe('syncWorktreeGraph', () => {
   })
 
   it('records a failure without clobbering the previous graph', async () => {
-    const store = createGraphStore()
+    const store = createSceneStore()
     await syncWorktreeGraph({ listWorktrees: async () => records }, store, () => 1)
     const failing: RuntimeGateway = {
       listWorktrees: async () => {
@@ -59,5 +59,94 @@ describe('syncWorktreeGraph', () => {
     const state = store.get()
     expect(state.sync).toEqual({ state: 'error', code: 'runtime_unavailable', message: 'boom' })
     expect(state.graph.nodes.size).toBe(2)
+  })
+
+  it('never calls store.set — only store.update', async () => {
+    const store = createSceneStore()
+    const setSpy = vi.spyOn(store, 'set')
+    await syncWorktreeGraph({ listWorktrees: async () => records }, store, () => 1)
+    const failing: RuntimeGateway = {
+      listWorktrees: async () => {
+        throw new Error('boom')
+      }
+    }
+    await syncWorktreeGraph(failing, store, () => 2)
+    expect(setSpy).not.toHaveBeenCalled()
+  })
+
+  describe('selection survives sync (regression)', () => {
+    it('through the success path, when the selected node is still present', async () => {
+      const store = createSceneStore()
+      store.update({ selection: { selectedId: 'repo::/b' } })
+      await syncWorktreeGraph({ listWorktrees: async () => records }, store, () => 1)
+      expect(store.get().selection.selectedId).toBe('repo::/b')
+    })
+
+    it('through the error path', async () => {
+      const store = createSceneStore()
+      await syncWorktreeGraph({ listWorktrees: async () => records }, store, () => 1)
+      store.update({ selection: { selectedId: 'repo::/b' } })
+      const failing: RuntimeGateway = {
+        listWorktrees: async () => {
+          throw new Error('boom')
+        }
+      }
+      await syncWorktreeGraph(failing, store, () => 2)
+      expect(store.get().selection.selectedId).toBe('repo::/b')
+    })
+  })
+
+  describe('vanished-node fallback', () => {
+    it('reconciles to the surviving parent when the selected leaf disappears', async () => {
+      const store = createSceneStore()
+      await syncWorktreeGraph({ listWorktrees: async () => records }, store, () => 1)
+      store.update({ selection: { selectedId: 'repo::/b' } })
+
+      // repo::/b is gone; repo::/a's raw childWorktreeIds still names it (stale-until-next-sync),
+      // which is exactly the data reconcileSelection's ancestor-walk relies on.
+      const afterRemoval: RawWorktreeRecord[] = [
+        {
+          id: 'repo::/a',
+          branch: 'refs/heads/main',
+          parentWorktreeId: null,
+          childWorktreeIds: ['repo::/b'],
+          workspaceStatus: 'in-progress',
+          git: { path: '/a', isMainWorktree: true }
+        }
+      ]
+      await syncWorktreeGraph({ listWorktrees: async () => afterRemoval }, store, () => 2)
+      expect(store.get().selection.selectedId).toBe('repo::/a')
+    })
+
+    it('falls back to initialSelection when no surviving ancestor reference remains', async () => {
+      const store = createSceneStore()
+      await syncWorktreeGraph({ listWorktrees: async () => records }, store, () => 1)
+      store.update({ selection: { selectedId: 'repo::/b' } })
+
+      // The whole subtree (parent + child) vanished in one sync — no surviving node
+      // references repo::/b any more, so there is no ancestor to walk to.
+      const unrelatedRoot: RawWorktreeRecord[] = [
+        {
+          id: 'repo::/c',
+          branch: 'refs/heads/main',
+          parentWorktreeId: null,
+          childWorktreeIds: [],
+          workspaceStatus: 'in-progress',
+          git: { path: '/c', isMainWorktree: true }
+        }
+      ]
+      await syncWorktreeGraph({ listWorktrees: async () => unrelatedRoot }, store, () => 2)
+      expect(store.get().selection.selectedId).toBe('repo::/c')
+    })
+
+    it('never throws and never leaves selection dangling on a vanished id', async () => {
+      const store = createSceneStore()
+      await syncWorktreeGraph({ listWorktrees: async () => records }, store, () => 1)
+      store.update({ selection: { selectedId: 'repo::/b' } })
+      await syncWorktreeGraph({ listWorktrees: async () => [] }, store, () => 2)
+      const state = store.get()
+      expect(state.selection.selectedId).toBeNull()
+      expect(state.graph.nodes.has('repo::/b')).toBe(false)
+    })
   })
 })

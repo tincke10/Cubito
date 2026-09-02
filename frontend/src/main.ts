@@ -1,4 +1,4 @@
-import { createGraphStore } from './application/graph-store'
+import { createSceneStore } from './application/scene-store'
 import { syncWorktreeGraph } from './application/sync-worktree-graph'
 import { createScene } from './presentation/scene/create-scene'
 import { createGraphView } from './presentation/scene/graph-view'
@@ -54,7 +54,7 @@ if (!container || !hud) {
 
 const { scene } = createScene(container)
 const graphView = createGraphView(scene)
-const store = createGraphStore()
+const store = createSceneStore()
 
 store.subscribe((state) => {
   graphView.update(state.graph)

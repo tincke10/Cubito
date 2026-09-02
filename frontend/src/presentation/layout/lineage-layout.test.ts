@@ -1,65 +1,49 @@
 import { describe, expect, it } from 'vitest'
 import { layoutByLineage } from './lineage-layout'
-import { buildWorktreeGraph } from '../../domain/worktree-graph/build-graph'
-import type { RawWorktreeRecord } from '../../domain/worktree-graph/build-graph'
+import { layoutByIsoLineage } from './iso-lineage-layout'
+import { inertActivity } from '../../domain/worktree-graph/node-activity'
+import type { WorktreeGraph, WorktreeNode } from '../../domain/worktree-graph/types'
 
-const record = (
-  id: string,
-  parent: string | null,
-  isMain = false
-): RawWorktreeRecord => ({
-  id,
-  branch: `refs/heads/${id}`,
-  parentWorktreeId: parent,
-  childWorktreeIds: [],
-  workspaceStatus: 'in-progress',
-  git: { path: `/${id}`, isMainWorktree: isMain }
+const node = (overrides: Partial<WorktreeNode> & Pick<WorktreeNode, 'id'>): WorktreeNode => ({
+  branch: `refs/heads/${overrides.id}`,
+  path: `/path/${overrides.id}`,
+  status: 'in-progress',
+  isMain: false,
+  kind: 'worktree',
+  parentId: null,
+  childIds: [],
+  activity: inertActivity(),
+  ...overrides
 })
 
-describe('layoutByLineage', () => {
-  it('places a single root at the origin', () => {
-    const graph = buildWorktreeGraph([record('root', null, true)])
-    const positions = layoutByLineage(graph, { radius: 10 })
-    expect(positions.get('root')).toEqual({ x: 0, y: 0, z: 0 })
-  })
+const graphOf = (nodes: readonly WorktreeNode[]): WorktreeGraph => ({
+  nodes: new Map(nodes.map((n) => [n.id, n])),
+  edges: [],
+  rootIds: nodes.filter((n) => n.parentId === null).map((n) => n.id)
+})
 
-  it('places children on a ring one radius away from their parent', () => {
-    const graph = buildWorktreeGraph([
-      record('root', null, true),
-      record('a', 'root'),
-      record('b', 'root')
+/**
+ * `layoutByLineage` is a compatibility shim kept only because `scene/graph-view.ts`
+ * still imports it (see lineage-layout.ts docstring). Its real behavior now lives in,
+ * and is fully tested by, `iso-lineage-layout.test.ts` — this file only proves the
+ * shim delegates correctly and ignores its legacy `radius` option.
+ */
+describe('layoutByLineage (compatibility shim over layoutByIsoLineage)', () => {
+  it('delegates to layoutByIsoLineage regardless of the legacy radius option', () => {
+    const graph = graphOf([
+      node({ id: 'root', isMain: true, kind: 'root', childIds: ['a', 'b'] }),
+      node({ id: 'a', parentId: 'root' }),
+      node({ id: 'b', parentId: 'root' })
     ])
-    const positions = layoutByLineage(graph, { radius: 10 })
-    for (const id of ['a', 'b']) {
-      const p = positions.get(id)
-      expect(p).toBeDefined()
-      const distance = Math.hypot(p!.x, p!.y, p!.z)
-      expect(distance).toBeCloseTo(10, 5)
-    }
+    expect(layoutByLineage(graph, { radius: 999 })).toEqual(layoutByIsoLineage(graph))
+    expect(layoutByLineage(graph, { radius: 1 })).toEqual(layoutByIsoLineage(graph))
   })
 
-  it('gives siblings distinct positions', () => {
-    const graph = buildWorktreeGraph([
-      record('root', null, true),
-      record('a', 'root'),
-      record('b', 'root')
-    ])
-    const positions = layoutByLineage(graph, { radius: 10 })
-    expect(positions.get('a')).not.toEqual(positions.get('b'))
-  })
-
-  it('is deterministic for the same graph', () => {
-    const rows = [record('root', null, true), record('a', 'root'), record('b', 'a')]
-    const first = layoutByLineage(buildWorktreeGraph(rows), { radius: 8 })
-    const second = layoutByLineage(buildWorktreeGraph(rows), { radius: 8 })
-    expect(first).toEqual(second)
-  })
-
-  it('assigns every node a position, including extra roots', () => {
-    const graph = buildWorktreeGraph([
-      record('root', null, true),
-      record('island', null),
-      record('a', 'root')
+  it('still assigns every node a position, keeping graph-view.ts working unmodified', () => {
+    const graph = graphOf([
+      node({ id: 'root', isMain: true, kind: 'root', childIds: ['a'] }),
+      node({ id: 'island', kind: 'root' }),
+      node({ id: 'a', parentId: 'root' })
     ])
     const positions = layoutByLineage(graph, { radius: 10 })
     expect(positions.size).toBe(3)
