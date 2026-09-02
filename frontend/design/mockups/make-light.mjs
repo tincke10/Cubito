@@ -7,7 +7,7 @@ const SCENES = [
 ]
 
 // Reglas contextuales primero (texto/tinta), mapas globales después.
-const RULES = [
+export const RULES = [
   // glow de texto fuera; tintas en HTML
   [/text-shadow: 0 0 8px rgba\(159, 239, 0, 0\.35\)/g, 'text-shadow: none'],
   [/a:hover \{ color: #b7ff33; \}/g, 'a:hover { color: #3a6900; }'],
