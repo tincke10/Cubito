@@ -8,6 +8,7 @@ import {
   MAX_RADIUS,
   MIN_RADIUS,
   NODE_HEIGHT,
+  ORBIT_DAMPING,
   NODE_SIZE,
   REFERENCE_HALF_HEIGHT,
   ROOT_MIN_ELEVATION,
@@ -49,5 +50,6 @@ describe('scene-metrics', () => {
     expect(FIT_MIN_RADIUS).toBe(6)
     expect(MIN_RADIUS).toBe(3)
     expect(MAX_RADIUS).toBe(60)
+    expect(ORBIT_DAMPING).toBe(0.08)
   })
 })

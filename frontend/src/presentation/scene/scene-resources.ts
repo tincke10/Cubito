@@ -1,5 +1,4 @@
 import * as THREE from 'three'
-import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js'
 import { radialAlphaTexels } from '../theme/glow-falloff'
 import { NODE_HEIGHT, NODE_SIZE } from '../theme/scene-metrics'
 
@@ -16,19 +15,28 @@ export type SceneResources = {
   readonly cubeGeometry: THREE.BoxGeometry
   readonly wireGeometry: THREE.EdgesGeometry
   readonly shadowGeometry: THREE.CircleGeometry
-  readonly ringGeometry: LineSegmentsGeometry
+  readonly ringGeometry: THREE.BufferGeometry
   readonly glowTexture: THREE.DataTexture
   readonly dotTexture: THREE.DataTexture
   dispose(): void
 }
 
 const alphaTexture = (size: number, sigmaTexels: number): THREE.DataTexture => {
-  const texture = new THREE.DataTexture(radialAlphaTexels(size, sigmaTexels), size, size, THREE.AlphaFormat)
+  // WebGL2 texStorage2D rejects unsized AlphaFormat: expand to white RGBA
+  const alpha = radialAlphaTexels(size, sigmaTexels)
+  const rgba = new Uint8Array(alpha.length * 4)
+  for (let i = 0; i < alpha.length; i += 1) {
+    rgba[i * 4] = 255
+    rgba[i * 4 + 1] = 255
+    rgba[i * 4 + 2] = 255
+    rgba[i * 4 + 3] = alpha[i] ?? 0
+  }
+  const texture = new THREE.DataTexture(rgba, size, size, THREE.RGBAFormat)
   texture.needsUpdate = true
   return texture
 }
 
-/** Unit-radius ring made of disconnected segments (`LineSegmentsGeometry`), scaled per-node in node-mesh.ts. */
+/** Unit-radius ground ring as XZ-plane segment pairs; `LineSegmentsGeometry` would need `LineSegments2` to render. */
 const unitRingPositions = (segments: number): Float32Array => {
   const positions = new Float32Array(segments * 2 * 3)
   const twoPi = Math.PI * 2
@@ -52,8 +60,8 @@ export const createSceneResources = (): SceneResources => {
   const cubeGeometry = new THREE.BoxGeometry(NODE_SIZE, NODE_HEIGHT, NODE_SIZE)
   const wireGeometry = new THREE.EdgesGeometry(cubeGeometry)
   const shadowGeometry = new THREE.CircleGeometry(1, SHADOW_DISC_SEGMENTS)
-  const ringGeometry = new LineSegmentsGeometry()
-  ringGeometry.setPositions(unitRingPositions(RING_SEGMENTS))
+  const ringGeometry = new THREE.BufferGeometry()
+  ringGeometry.setAttribute('position', new THREE.BufferAttribute(unitRingPositions(RING_SEGMENTS), 3))
   const glowTexture = alphaTexture(GLOW_TEXTURE_SIZE, GLOW_TEXTURE_SIGMA_TEXELS)
   const dotTexture = alphaTexture(DOT_TEXTURE_SIZE, DOT_TEXTURE_SIGMA_TEXELS)
 

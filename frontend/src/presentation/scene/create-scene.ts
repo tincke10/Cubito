@@ -4,10 +4,10 @@ import { CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
 import type { ScenePalette } from '../theme/scene-palette'
 import {
   CAMERA_DISTANCE,
-  GRID_FADE_RADIUS,
   MAX_POLAR_DEG,
   MAX_RADIUS,
   MIN_POLAR_DEG,
+  ORBIT_DAMPING,
   MIN_RADIUS,
   REFERENCE_HALF_HEIGHT
 } from '../theme/scene-metrics'
@@ -45,7 +45,6 @@ export function createScene(container: HTMLElement, palette: ScenePalette): Cubi
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(palette.background)
   // Horizon fade tied to the grid's own fade radius so the two never disagree.
-  scene.fog = new THREE.FogExp2(palette.background, 1 / GRID_FADE_RADIUS)
 
   const width = container.clientWidth
   const height = container.clientHeight
@@ -77,6 +76,7 @@ export function createScene(container: HTMLElement, palette: ScenePalette): Cubi
 
   const controls = new OrbitControls(camera, renderer.domElement)
   controls.enableDamping = true
+  controls.dampingFactor = ORBIT_DAMPING
   controls.screenSpacePanning = false
   controls.minPolarAngle = THREE.MathUtils.degToRad(MIN_POLAR_DEG)
   controls.maxPolarAngle = THREE.MathUtils.degToRad(MAX_POLAR_DEG)

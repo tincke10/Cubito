@@ -35,7 +35,8 @@ const PURITY_EXCEPTIONS: Record<string, readonly string[]> = {
   // how many segments a disc is tessellated into), not mockup-measured visual tuning values,
   // so they are not `scene-metrics.ts` material. Follow-up if that judgement flips: move the
   // six named constants into scene-metrics.ts and shrink this list to the stride literals.
-  'scene/scene-resources.ts': ['4', '5', '6', '16', '32', '48', '64']
+  // 255 = opaque byte for the RGBA expansion WebGL2 requires; not a visual tuning value
+  'scene/scene-resources.ts': ['4', '5', '6', '16', '32', '48', '64', '255']
 }
 
 const NUMERIC_ALLOWLIST = new Set(['0', '1', '2', '3', '-1', '0.5'])

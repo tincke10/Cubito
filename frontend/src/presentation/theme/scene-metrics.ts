@@ -53,6 +53,7 @@ export const FIT_MIN_RADIUS = 6
 export const MIN_RADIUS = 3
 export const MAX_RADIUS = 60
 export const FOCUS_DURATION_MS = 420
+export const ORBIT_DAMPING = 0.08
 export const MIN_POLAR_DEG = 15
 export const MAX_POLAR_DEG = 80 // never dip below the ground plane
 export const MS_PER_SECOND = 1000 // FOCUS_DURATION_MS is milliseconds; camera clock ticks in seconds
