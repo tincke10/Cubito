@@ -1,5 +1,9 @@
 import { createSceneStore } from './application/scene-store'
 import { syncWorktreeGraph } from './application/sync-worktree-graph'
+import { createLiveWorktreeSync } from './application/live-worktree-sync'
+import { decidePairingEntry } from './application/pairing-entry-decision'
+import { connectOrcad } from './infrastructure/rpc/connect-orcad'
+import { consumePairingFragment } from './infrastructure/rpc/pairing-fragment'
 import type { RuntimeGateway } from './application/ports/runtime-gateway'
 import type { RawWorktreeRecord } from './domain/worktree-graph/build-graph'
 import { frameAll } from './presentation/camera/camera-framing'
@@ -123,4 +127,18 @@ store.subscribe((state) => {
   }
 })
 
-void syncWorktreeGraph(demoGateway, store)
+const pairingEntry = decidePairingEntry(consumePairingFragment())
+if (pairingEntry.kind === 'connect') {
+  createLiveWorktreeSync({
+    connect: () => connectOrcad(pairingEntry.offer),
+    store,
+    isDocumentHidden: () => document.hidden,
+    onVisibilityChange: (cb) => {
+      document.addEventListener('visibilitychange', cb)
+      return () => document.removeEventListener('visibilitychange', cb)
+    }
+  }).start()
+} else {
+  store.update({ connection: { state: 'down', reason: pairingEntry.reason } })
+  void syncWorktreeGraph(demoGateway, store) // `pnpm dev` stays usable with no container
+}

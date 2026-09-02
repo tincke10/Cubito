@@ -1,0 +1,114 @@
+import { afterEach, describe, expect, it } from 'vitest'
+import { WebSocketServer } from 'ws'
+import { connectOrcad } from './connect-orcad'
+import { startFakeOrcadServer, type FakeOrcadServer } from './fake-orcad-server'
+import type { PairingOffer } from './pairing-offer'
+
+function offerFor(server: FakeOrcadServer): PairingOffer {
+  return { v: 2, endpoint: server.endpoint, deviceToken: server.deviceToken, publicKeyB64: server.serverPublicKeyB64 }
+}
+
+describe('connectOrcad', () => {
+  const servers: FakeOrcadServer[] = []
+  const closers: (() => Promise<void>)[] = []
+
+  afterEach(async () => {
+    await Promise.all(servers.splice(0).map((server) => server.close()))
+    await Promise.all(closers.splice(0).map((close) => close()))
+  })
+
+  it('lists worktrees in the shape buildWorktreeGraph consumes (CO-304)', async () => {
+    const record = {
+      id: 'w1',
+      branch: 'refs/heads/main',
+      parentWorktreeId: null,
+      childWorktreeIds: [],
+      workspaceStatus: 'in-progress',
+      git: { path: '/repo', isMainWorktree: true }
+    }
+    const server = await startFakeOrcadServer({ handleRequest: () => ({ ok: true, result: { worktrees: [record] } }) })
+    servers.push(server)
+
+    const connection = await connectOrcad(offerFor(server))
+    try {
+      await expect(connection.gateway.listWorktrees()).resolves.toEqual([record])
+    } finally {
+      connection.close()
+    }
+  })
+
+  it('sends the auth frame carrying the offer deviceToken', async () => {
+    const server = await startFakeOrcadServer()
+    servers.push(server)
+
+    const connection = await connectOrcad(offerFor(server))
+    connection.close()
+
+    expect(server.authFrames).toEqual([{ type: 'e2ee_auth', deviceToken: server.deviceToken, clientCapabilities: [] }])
+  })
+
+  it('surfaces runtimeId on the connection once the first call resolves', async () => {
+    const server = await startFakeOrcadServer({ runtimeId: 'rt-99' })
+    servers.push(server)
+
+    const connection = await connectOrcad(offerFor(server))
+    try {
+      expect(connection.runtimeId).toBeUndefined()
+      await connection.gateway.listWorktrees()
+      expect(connection.runtimeId).toBe('rt-99')
+    } finally {
+      connection.close()
+    }
+  })
+
+  it('propagates close()/onClose() from the underlying transport', async () => {
+    const server = await startFakeOrcadServer()
+    servers.push(server)
+
+    const connection = await connectOrcad(offerFor(server))
+    const closed = new Promise<string>((resolve) => connection.onClose((reason) => resolve(reason)))
+    server.closeActiveConnections(1000, 'bye')
+
+    await expect(closed).resolves.toBe('connection_closed')
+  })
+
+  it('a caller-initiated close() is a no-op beyond closing the socket (no onClose double-fire required)', async () => {
+    const server = await startFakeOrcadServer()
+    servers.push(server)
+
+    const connection = await connectOrcad(offerFor(server))
+    let closeCount = 0
+    connection.onClose(() => {
+      closeCount += 1
+    })
+    connection.close()
+    connection.close()
+    await new Promise((resolve) => setTimeout(resolve, 20))
+
+    expect(closeCount).toBeLessThanOrEqual(1)
+  })
+
+  it('rejects with remote_runtime_unavailable if no handshake response arrives within timeoutMs', async () => {
+    const wss = new WebSocketServer({ port: 0 })
+    await new Promise<void>((resolve) => wss.once('listening', resolve))
+    closers.push(
+      () =>
+        new Promise<void>((resolve) => {
+          // The client's own socket never got the chance to close (the handshake never
+          // resolves), so force-terminate leftover connections before shutting the server down.
+          for (const client of wss.clients) client.terminate()
+          wss.close(() => resolve())
+        })
+    )
+    const address = wss.address()
+    const port = typeof address === 'object' && address !== null ? address.port : 0
+    const offer: PairingOffer = {
+      v: 2,
+      endpoint: `ws://127.0.0.1:${port}`,
+      deviceToken: 'tok',
+      publicKeyB64: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
+    }
+
+    await expect(connectOrcad(offer, { timeoutMs: 50 })).rejects.toMatchObject({ code: 'remote_runtime_unavailable' })
+  })
+})
