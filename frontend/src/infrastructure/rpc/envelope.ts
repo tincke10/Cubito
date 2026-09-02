@@ -8,7 +8,7 @@
 
 export type RpcRequestFrame = {
   id: string
-  authToken: string
+  deviceToken: string
   method: string
   params?: unknown
 }
@@ -37,7 +37,7 @@ export type DecodedRpcFrame =
 export function encodeRpcRequest(request: RpcRequestFrame): string {
   const frame: Record<string, unknown> = {
     id: request.id,
-    authToken: request.authToken,
+    deviceToken: request.deviceToken,
     method: request.method
   }
   if (request.params !== undefined) {

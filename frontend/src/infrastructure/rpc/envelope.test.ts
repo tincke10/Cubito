@@ -2,24 +2,33 @@ import { describe, expect, it } from 'vitest'
 import { decodeRpcFrame, encodeRpcRequest } from './envelope'
 
 describe('encodeRpcRequest', () => {
-  it('serializes id, authToken, method and params', () => {
+  it('serializes id, deviceToken, method and params', () => {
     const raw = encodeRpcRequest({
       id: 'req-1',
-      authToken: 'tok',
+      deviceToken: 'tok',
       method: 'worktree.list',
       params: { repoId: 'r1' }
     })
     expect(JSON.parse(raw)).toEqual({
       id: 'req-1',
-      authToken: 'tok',
+      deviceToken: 'tok',
       method: 'worktree.list',
       params: { repoId: 'r1' }
     })
   })
 
   it('omits params when not provided', () => {
-    const raw = encodeRpcRequest({ id: 'req-2', authToken: 'tok', method: 'session.status' })
-    expect(JSON.parse(raw)).toEqual({ id: 'req-2', authToken: 'tok', method: 'session.status' })
+    const raw = encodeRpcRequest({ id: 'req-2', deviceToken: 'tok', method: 'session.status' })
+    expect(JSON.parse(raw)).toEqual({ id: 'req-2', deviceToken: 'tok', method: 'session.status' })
+  })
+
+  // CO-301/CO-302 regression: the WS dispatcher (runtime-rpc.ts:1690-1738) reads `deviceToken`,
+  // not `authToken` — that field is the unrelated unix-socket shared token.
+  it('sends deviceToken, not authToken, on every call envelope', () => {
+    const raw = encodeRpcRequest({ id: 'req-3', deviceToken: 'tok', method: 'worktree.list' })
+    const parsed = JSON.parse(raw)
+    expect(parsed.deviceToken).toBe('tok')
+    expect(parsed.authToken).toBeUndefined()
   })
 })
 

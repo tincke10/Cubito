@@ -8,8 +8,9 @@ export type SyncStatus =
   | { state: 'error'; code: string; message: string }
 
 export type ConnectionState =
+  | { state: 'connecting' }
   | { state: 'connected'; runtimeId: string }
-  | { state: 'reconnecting' }
+  | { state: 'reconnecting'; attempt: number; nextRetryInMs: number }
   | { state: 'down'; reason: string }
 
 export type SceneState = {

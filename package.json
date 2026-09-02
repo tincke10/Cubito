@@ -30,6 +30,8 @@
     "check:reliability-gates": "node config/scripts/check-reliability-gates.mjs",
     "check:max-lines-ratchet": "node config/scripts/check-max-lines-ratchet.mjs",
     "check:runtime-electron-ratchet": "node config/scripts/check-runtime-electron-ratchet.mjs",
+    "vectors:orcad-wire": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=DEP0205 config/scripts/generate-orcad-wire-vectors.mjs",
+    "vectors:orcad-wire:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=DEP0205 config/scripts/generate-orcad-wire-vectors.mjs --check",
     "build:orcad": "node config/scripts/build-orcad.mjs",
     "build:orcad-prebuilds": "node config/scripts/build-orcad-prebuilds.mjs",
     "smoke:orcad-terminal": "node config/scripts/ensure-native-runtime.mjs --runtime=node && pnpm run build:cli && pnpm run build:orcad && node config/scripts/runtime-serve-terminal-smoke.mjs --target orcad",

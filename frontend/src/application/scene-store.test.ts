@@ -63,6 +63,19 @@ describe('createSceneStore', () => {
     expect(next.connection).toEqual({ state: 'connected', runtimeId: 'rt-1' })
   })
 
+  it('round-trips the connecting and reconnecting connection states', () => {
+    const store = createSceneStore()
+
+    store.update({ connection: { state: 'connecting' } })
+    expect(store.get().connection).toEqual({ state: 'connecting' })
+
+    store.update({ connection: { state: 'reconnecting', attempt: 3, nextRetryInMs: 2000 } })
+    expect(store.get().connection).toEqual({ state: 'reconnecting', attempt: 3, nextRetryInMs: 2000 })
+
+    store.set({ ...store.get(), connection: { state: 'connecting' } })
+    expect(store.get().connection).toEqual({ state: 'connecting' })
+  })
+
   it('has no counters field anywhere on SceneState', () => {
     const store = createSceneStore()
     const state = store.get()

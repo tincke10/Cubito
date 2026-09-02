@@ -15,6 +15,9 @@ export type HudModel = {
 
 const connectionLabel = (connection: ConnectionState): string => {
   switch (connection.state) {
+    // TODO(P5.4): placeholder copy — final 'connecting' label owned by hud-model P5.4 task.
+    case 'connecting':
+      return 'TODO: connecting'
     case 'connected':
       return `conectado · runtime ${connection.runtimeId}`
     case 'reconnecting':
@@ -26,6 +29,9 @@ const connectionLabel = (connection: ConnectionState): string => {
 
 const connectionDotColor = (connection: ConnectionState): ConnectionDotTone => {
   switch (connection.state) {
+    // TODO(P5.4): final dot tone for 'connecting' owned by hud-model P5.4 task.
+    case 'connecting':
+      return 'amber'
     case 'connected':
       return 'accent'
     case 'reconnecting':

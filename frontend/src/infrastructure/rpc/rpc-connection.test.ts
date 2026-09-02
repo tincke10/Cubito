@@ -46,7 +46,7 @@ describe('RpcConnection', () => {
     transport = createFakeTransport()
     ids = ['id-1', 'id-2', 'id-3']
     connection = new RpcConnection(transport, {
-      authToken: 'tok',
+      deviceToken: 'tok',
       timeoutMs: 5000,
       generateId: () => ids.shift() ?? 'id-overflow'
     })
@@ -56,11 +56,11 @@ describe('RpcConnection', () => {
     vi.useRealTimers()
   })
 
-  it('sends an encoded request with the auth token', async () => {
+  it('sends an encoded request with the device token', async () => {
     const pending = connection.call('worktree.list', { repoId: 'r' })
     expect(JSON.parse(transport.sent[0] ?? '')).toEqual({
       id: 'id-1',
-      authToken: 'tok',
+      deviceToken: 'tok',
       method: 'worktree.list',
       params: { repoId: 'r' }
     })
@@ -107,5 +107,35 @@ describe('RpcConnection', () => {
     transport.close('gone')
     await expect(first).rejects.toMatchObject({ code: 'connection_closed' })
     await expect(second).rejects.toMatchObject({ code: 'connection_closed' })
+  })
+
+  // CO-206 regression: today's handleFrame has no `kind === 'keepalive'` branch at all —
+  // keepalives are silently dropped and pending timers never refresh.
+  it('keepalive refreshes the pending call timeout', async () => {
+    const pending = connection.call('slow.method')
+    await vi.advanceTimersByTimeAsync(4999)
+    transport.receive(JSON.stringify({ _keepalive: true }))
+    await vi.advanceTimersByTimeAsync(4999)
+    transport.receive(success('id-1', 'finally'))
+    await expect(pending).resolves.toMatchObject({ result: 'finally' })
+  })
+
+  it('a keepalive refreshes every pending call timeout, not just the newest', async () => {
+    const first = connection.call('a')
+    const second = connection.call('b')
+    await vi.advanceTimersByTimeAsync(4999)
+    transport.receive(JSON.stringify({ _keepalive: true }))
+    await vi.advanceTimersByTimeAsync(4999)
+    transport.receive(success('id-1', 'first-result'))
+    transport.receive(success('id-2', 'second-result'))
+    await expect(first).resolves.toMatchObject({ result: 'first-result' })
+    await expect(second).resolves.toMatchObject({ result: 'second-result' })
+  })
+
+  it('never sends authToken on the wire', async () => {
+    connection.call('worktree.list')
+    const parsed = JSON.parse(transport.sent[0] ?? '')
+    expect(parsed.deviceToken).toBe('tok')
+    expect(parsed.authToken).toBeUndefined()
   })
 })

@@ -27,10 +27,11 @@ type PendingCall = {
   resolve(response: RpcSuccessFrame): void
   reject(error: RpcCallError): void
   timer: ReturnType<typeof setTimeout>
+  method: string
 }
 
 export type RpcConnectionOptions = {
-  authToken: string
+  deviceToken: string
   timeoutMs?: number
   generateId?: () => string
 }
@@ -43,14 +44,14 @@ const DEFAULT_TIMEOUT_MS = 30_000
  */
 export class RpcConnection {
   private readonly transport: RpcTransport
-  private readonly authToken: string
+  private readonly deviceToken: string
   private readonly timeoutMs: number
   private readonly generateId: () => string
   private readonly pending = new Map<string, PendingCall>()
 
   constructor(transport: RpcTransport, options: RpcConnectionOptions) {
     this.transport = transport
-    this.authToken = options.authToken
+    this.deviceToken = options.deviceToken
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
     this.generateId = options.generateId ?? (() => crypto.randomUUID())
     transport.onMessage((raw) => this.handleFrame(raw))
@@ -60,18 +61,15 @@ export class RpcConnection {
   call<TResult = unknown>(method: string, params?: unknown): Promise<RpcSuccessFrame & { result: TResult }> {
     const id = this.generateId()
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(id)
-        reject(new RpcCallError('rpc_timeout', `No response for ${method} within ${this.timeoutMs}ms.`))
-      }, this.timeoutMs)
       this.pending.set(id, {
         resolve: (response) => resolve(response as RpcSuccessFrame & { result: TResult }),
         reject,
-        timer
+        timer: this.startTimeoutTimer(id, method, reject),
+        method
       })
       const request: Parameters<typeof encodeRpcRequest>[0] = {
         id,
-        authToken: this.authToken,
+        deviceToken: this.deviceToken,
         method
       }
       if (params !== undefined) {
@@ -81,8 +79,23 @@ export class RpcConnection {
     })
   }
 
+  private startTimeoutTimer(
+    id: string,
+    method: string,
+    reject: (error: RpcCallError) => void
+  ): ReturnType<typeof setTimeout> {
+    return setTimeout(() => {
+      this.pending.delete(id)
+      reject(new RpcCallError('rpc_timeout', `No response for ${method} within ${this.timeoutMs}ms.`))
+    }, this.timeoutMs)
+  }
+
   private handleFrame(raw: string): void {
     const frame = decodeRpcFrame(raw)
+    if (frame.kind === 'keepalive') {
+      this.refreshPendingTimeouts()
+      return
+    }
     if (frame.kind !== 'response') {
       return
     }
@@ -97,6 +110,15 @@ export class RpcConnection {
     } else {
       const { code, message, data } = frame.response.error
       pending.reject(new RpcCallError(code, message, data))
+    }
+  }
+
+  // CO-206 regression: a keepalive refreshes EVERY pending call's timer, not just the newest —
+  // browser setTimeout handles have no .refresh(), so each timer is cleared and re-armed.
+  private refreshPendingTimeouts(): void {
+    for (const [id, pending] of this.pending.entries()) {
+      clearTimeout(pending.timer)
+      pending.timer = this.startTimeoutTimer(id, pending.method, pending.reject)
     }
   }
 

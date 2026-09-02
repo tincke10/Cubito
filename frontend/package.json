@@ -14,14 +14,18 @@
     "lint": "oxlint -c .oxlintrc.json --disable-nested-config src"
   },
   "dependencies": {
-    "three": "^0.180.0"
+    "three": "^0.180.0",
+    "tweetnacl": "^1.0.3"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
     "@types/three": "^0.180.0",
+    "@types/ws": "^8.18.1",
     "oxlint": "1.15.0",
     "typescript": "^5.9.2",
     "vite": "^7.1.0",
-    "vitest": "^3.2.0"
+    "vitest": "^3.2.0",
+    "ws": "^8.21.3",
+    "zod": "4.4.3"
   }
 }

@@ -24,7 +24,10 @@ describe('hudModel', () => {
   })
 
   it('connection.label shows a reconnecting-specific label', () => {
-    const model = hudModel(baseState({ connection: { state: 'reconnecting' } }), { isMac: true })
+    const model = hudModel(
+      baseState({ connection: { state: 'reconnecting', attempt: 1, nextRetryInMs: 500 } }),
+      { isMac: true }
+    )
     expect(model.connection.label.toLowerCase()).toContain('reconect')
   })
 
@@ -39,7 +42,10 @@ describe('hudModel', () => {
     const connected = hudModel(baseState({ connection: { state: 'connected', runtimeId: 'x' } }), {
       isMac: true
     })
-    const reconnecting = hudModel(baseState({ connection: { state: 'reconnecting' } }), { isMac: true })
+    const reconnecting = hudModel(
+      baseState({ connection: { state: 'reconnecting', attempt: 1, nextRetryInMs: 500 } }),
+      { isMac: true }
+    )
     const down = hudModel(baseState({ connection: { state: 'down', reason: 'x' } }), { isMac: true })
 
     expect(connected.connection.dotColor).not.toBe(reconnecting.connection.dotColor)
