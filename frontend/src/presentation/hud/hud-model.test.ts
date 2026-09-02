@@ -16,6 +16,24 @@ const baseState = (overrides: Partial<SceneState> = {}): SceneState => ({
 })
 
 describe('hudModel', () => {
+  it('connection.label shows the connecting label', () => {
+    const model = hudModel(baseState({ connection: { state: 'connecting' } }), { isMac: true })
+    expect(model.connection.label).toBe('conectando…')
+  })
+
+  it('connection.dotColor is amber while connecting', () => {
+    const model = hudModel(baseState({ connection: { state: 'connecting' } }), { isMac: true })
+    expect(model.connection.dotColor).toBe('amber')
+  })
+
+  it('connection.label includes the attempt number when reconnecting', () => {
+    const model = hudModel(
+      baseState({ connection: { state: 'reconnecting', attempt: 3, nextRetryInMs: 2000 } }),
+      { isMac: true }
+    )
+    expect(model.connection.label).toBe('reconectando… · intento 3')
+  })
+
   it('connection.label includes the runtime id when connected', () => {
     const model = hudModel(baseState({ connection: { state: 'connected', runtimeId: '4f2a9c' } }), {
       isMac: true

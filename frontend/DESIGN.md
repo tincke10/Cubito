@@ -137,7 +137,9 @@ Cada nodo comunica su estado sin abrir nada:
    decide el límite).
 4. **Autenticación**: conexión local por unix socket vía bridge, o WebSocket
    con pairing (E2EE). El primer arranque necesita un flujo de
-   conexión/pairing — pantalla inevitable.
+   conexión/pairing — pantalla inevitable. Runbook manual para validar la
+   conexión contra un orcad real en Docker:
+   [`../docs/reference/cubito-orcad-connection.md`](../docs/reference/cubito-orcad-connection.md).
 5. **El grafo puede ser grande**: el layout de referencia de upstream
    (agent-map: packing, clustering, declutter de labels) es portable desde la
    historia del repo (`git show a1f198be:src/renderer/src/components/dashboard-popout/`).
