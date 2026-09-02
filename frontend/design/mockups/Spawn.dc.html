@@ -1,0 +1,147 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&amp;display=swap">
+  <style>
+    body { margin: 0; background: #0a0e12; }
+    a { color: #9fef00; } a:hover { color: #b7ff33; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .pulse { animation: pulse 1.6s ease-in-out infinite; }
+  </style>
+</helmet>
+<div style="position: relative; width: 1440px; height: 900px; overflow: hidden; background: #0a0e12; font-family: 'Fira Code', 'SF Mono', ui-monospace, monospace">
+  <svg width="1440" height="900" viewBox="0 0 1440 900" style="position: absolute; inset: 0">
+    <defs>
+      <pattern id="isogrid" width="68" height="34" patternUnits="userSpaceOnUse">
+        <path d="M0 17 L34 0 L68 17 M0 17 L34 34 L68 17" fill="none" stroke="#10231a" stroke-width="1"></path>
+      </pattern>
+      <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
+        <feGaussianBlur stdDeviation="7" result="b"></feGaussianBlur>
+        <feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge>
+      </filter>
+      <linearGradient id="gridFade" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#ffffff" stop-opacity="0.12"></stop>
+        <stop offset="0.55" stop-color="#ffffff" stop-opacity="0.65"></stop>
+        <stop offset="1" stop-color="#ffffff" stop-opacity="1"></stop>
+      </linearGradient>
+      <mask id="gridMask"><rect width="1440" height="900" fill="url(#gridFade)"></rect></mask>
+      <filter id="soft" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="4"></feGaussianBlur></filter>
+    </defs>
+    <rect width="1440" height="900" fill="url(#isogrid)" opacity="0.55" mask="url(#gridMask)"></rect>
+
+    <g filter="url(#soft)">
+      <ellipse cx="440" cy="482" rx="60" ry="13" fill="#000000" opacity="0.4"></ellipse>
+      <ellipse cx="640" cy="762" rx="38" ry="10" fill="#000000" opacity="0.4"></ellipse>
+    </g>
+
+    <line x1="640" y1="720" x2="440" y2="430" stroke="#3a5f3a" stroke-width="1.5" opacity="0.8"></line>
+
+    <!-- main abajo -->
+    <g transform="translate(640,684) scale(0.9)" filter="url(#glow)" opacity="0.8">
+      <polygon points="0,0 34,17 0,34 -34,17" fill="#b7ff33"></polygon>
+      <polygon points="-34,17 0,34 0,72 -34,55" fill="#567f00"></polygon>
+      <polygon points="34,17 0,34 0,72 34,55" fill="#85c400"></polygon>
+    </g>
+    <text x="640" y="782" text-anchor="middle" font-size="11" fill="#6b7a85" font-family="'Fira Code', ui-monospace, monospace">main</text>
+
+    <!-- nodo seleccionado con menú radial -->
+    <ellipse cx="440" cy="465" rx="70" ry="20" fill="none" stroke="#9fef00" stroke-width="1.5" filter="url(#glow)"></ellipse>
+    <g transform="translate(440,350) scale(1.4)" filter="url(#glow)">
+      <polygon points="0,0 34,17 0,34 -34,17" fill="#7ecbff"></polygon>
+      <polygon points="-34,17 0,34 0,72 -34,55" fill="#17557f"></polygon>
+      <polygon points="34,17 0,34 0,72 34,55" fill="#2ea8ff"></polygon>
+    </g>
+    <text x="440" y="556" text-anchor="middle" font-size="13" font-weight="500" fill="#c8d3da" font-family="'Fira Code', ui-monospace, monospace">cubito/auth-retry</text>
+
+    <!-- menú radial -->
+    <line x1="530" y1="334" x2="600" y2="283" stroke="#1b2833" stroke-width="1"></line>
+    <line x1="545" y1="412" x2="640" y2="422" stroke="#1b2833" stroke-width="1"></line>
+    <line x1="520" y1="472" x2="586" y2="531" stroke="#1b2833" stroke-width="1"></line>
+    <line x1="360" y1="334" x2="290" y2="275" stroke="#1b2833" stroke-width="1"></line>
+
+    <!-- chip: spawn hijo (activo) -->
+    <circle cx="628" cy="262" r="27" fill="#0d1319" stroke="#9fef00" stroke-width="1.5" filter="url(#glow)"></circle>
+    <path d="M628 252 v20 M618 262 h20" stroke="#9fef00" stroke-width="2" fill="none"></path>
+    <text x="668" y="258" font-size="12" font-weight="500" fill="#9fef00" font-family="'Fira Code', ui-monospace, monospace">spawn hijo</text>
+    <text x="668" y="274" font-size="10" fill="#6b7a85" font-family="'Fira Code', ui-monospace, monospace">[s]</text>
+
+    <!-- chip: fan-out -->
+    <circle cx="672" cy="426" r="27" fill="#0d1319" stroke="#1b2833" stroke-width="1"></circle>
+    <path d="M662 436 L672 416 M672 436 L672 416 M682 436 L672 416" stroke="#8fa3ad" stroke-width="1.6" fill="none"></path>
+    <text x="712" y="422" font-size="12" fill="#8fa3ad" font-family="'Fira Code', ui-monospace, monospace">fan-out</text>
+    <text x="712" y="438" font-size="10" fill="#6b7a85" font-family="'Fira Code', ui-monospace, monospace">[F]</text>
+
+    <!-- chip: terminal -->
+    <circle cx="614" cy="556" r="27" fill="#0d1319" stroke="#1b2833" stroke-width="1"></circle>
+    <path d="M602 548 l8 8 l-8 8 M616 564 h12" stroke="#8fa3ad" stroke-width="1.6" fill="none"></path>
+    <text x="654" y="552" font-size="12" fill="#8fa3ad" font-family="'Fira Code', ui-monospace, monospace">terminal</text>
+    <text x="654" y="568" font-size="10" fill="#6b7a85" font-family="'Fira Code', ui-monospace, monospace">[t]</text>
+
+    <!-- chip: archivar -->
+    <circle cx="262" cy="252" r="27" fill="#0d1319" stroke="#1b2833" stroke-width="1"></circle>
+    <path d="M252 246 h20 v14 h-20 z M258 252 h8" stroke="#8fa3ad" stroke-width="1.4" fill="none"></path>
+    <text x="140" y="248" font-size="12" fill="#8fa3ad" font-family="'Fira Code', ui-monospace, monospace">archivar</text>
+    <text x="140" y="264" font-size="10" fill="#6b7a85" font-family="'Fira Code', ui-monospace, monospace">[a]</text>
+
+    <!-- conector chip activo -> formulario -->
+    <polyline points="638,286 700,322 804,302" fill="none" stroke="#9fef00" stroke-width="1" opacity="0.5" stroke-dasharray="4 4"></polyline>
+  </svg>
+
+  <!-- formulario de spawn -->
+  <div style="position: absolute; left: 804px; top: 150px; width: 420px; box-sizing: border-box; background: linear-gradient(180deg, #0e141c, #0c1117); border: 1px solid #24313c; border-radius: 6px; padding: 22px; box-shadow: 0 28px 72px rgba(0, 0, 0, 0.65), 0 0 32px rgba(159, 239, 0, 0.05)">
+    <div style="font-size: 13px; font-weight: 500; color: #c8d3da">spawn hijo <span style="color: #6b7a85">· desde cubito/auth-retry</span></div>
+
+    <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 18px">
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <div style="font-size: 10px; color: #6b7a85; letter-spacing: 0.08em">NOMBRE</div>
+        <div style="display: flex; align-items: center; gap: 2px; height: 40px; padding: 0 12px; background: #0a0e12; border: 1px solid #9fef00; border-radius: 4px; box-shadow: 0 0 12px rgba(159, 239, 0, 0.15)">
+          <span style="font-size: 12.5px; color: #4a5a64">cubito/</span>
+          <span style="font-size: 12.5px; color: #c8d3da">auth-retry-tests</span>
+          <span class="pulse" style="font-size: 12.5px; color: #9fef00">█</span>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 12px">
+        <div style="display: flex; flex-direction: column; gap: 6px; flex-grow: 1">
+          <div style="font-size: 10px; color: #6b7a85; letter-spacing: 0.08em">AGENTE</div>
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 40px; padding: 0 12px; background: #0a0e12; border: 1px solid #24313c; border-radius: 4px">
+            <span style="font-size: 12.5px; color: #c8d3da">claude</span>
+            <span style="font-size: 10px; color: #4a5a64">▾</span>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px; flex-grow: 1">
+          <div style="font-size: 10px; color: #6b7a85; letter-spacing: 0.08em">BASE</div>
+          <div style="display: flex; align-items: center; justify-content: space-between; height: 40px; padding: 0 12px; background: #0a0e12; border: 1px solid #24313c; border-radius: 4px">
+            <span style="font-size: 12.5px; color: #c8d3da">main</span>
+            <span style="font-size: 10px; color: #4a5a64">▾</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <div style="font-size: 10px; color: #6b7a85; letter-spacing: 0.08em">PROMPT · OPCIONAL</div>
+        <div style="height: 84px; padding: 10px 12px; box-sizing: border-box; background: #0a0e12; border: 1px solid #24313c; border-radius: 4px; font-size: 12px; line-height: 1.6; color: #8fa3ad">escribí los tests de reintento del flujo de auth, cubriendo timeout y backoff</div>
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-top: 4px">
+        <div style="display: flex; align-items: center; justify-content: center; height: 40px; flex-grow: 1; background: #9fef00; color: #0a0e12; border-radius: 4px; font-size: 12.5px; font-weight: 600">crear worktree</div>
+        <div style="display: flex; align-items: center; justify-content: center; height: 40px; width: 110px; border: 1px solid #24313c; color: #8fa3ad; border-radius: 4px; font-size: 12.5px">cancelar</div>
+      </div>
+      <div style="font-size: 10px; color: #4a5a64; text-align: right">⏎ crear · esc cancelar</div>
+    </div>
+  </div>
+
+  <div style="position: absolute; top: 14px; left: 18px; font-size: 12px; line-height: 1.7; text-shadow: 0 0 8px rgba(159, 239, 0, 0.35)">
+    <div style="color: #9fef00">● conectado · runtime 4f2a9c</div>
+    <div style="color: #6b7a85; text-shadow: none">repo Cubito · base main</div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

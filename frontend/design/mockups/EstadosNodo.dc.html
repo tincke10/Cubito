@@ -1,0 +1,112 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&amp;display=swap">
+  <style>
+    body { margin: 0; background: #0a0e12; }
+    a { color: #9fef00; } a:hover { color: #b7ff33; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .pulse { animation: pulse 1.6s ease-in-out infinite; }
+  </style>
+</helmet>
+<div style="width: 1000px; height: 780px; box-sizing: border-box; background: #0a0e12; padding: 28px 32px; font-family: 'Fira Code', 'SF Mono', ui-monospace, monospace">
+  <div style="font-size: 16px; font-weight: 500; color: #9fef00; text-shadow: 0 0 8px rgba(159, 239, 0, 0.35)">Nodos</div>
+  <div style="font-size: 11px; color: #6b7a85; margin-top: 4px">tipos y estados — la escena respira sin abrir nada</div>
+
+  <div style="font-size: 10px; letter-spacing: 0.12em; color: #4a5a64; margin-top: 18px">TIPOS DE NODO</div>
+  <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; margin-top: 10px">
+
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 5px; background: #0d1319; border: 1px solid #1b2833; border-radius: 4px; padding: 12px 10px">
+      <svg width="100" height="86" viewBox="0 0 100 86"><defs><filter id="t1" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="5" result="b"></feGaussianBlur><feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge></filter></defs><g transform="translate(50,10) scale(0.8)" filter="url(#t1)"><polygon points="0,0 34,17 0,34 -34,17" fill="#b7ff33"></polygon><polygon points="-34,17 0,34 0,72 -34,55" fill="#567f00"></polygon><polygon points="34,17 0,34 0,72 34,55" fill="#85c400"></polygon></g></svg>
+      <div style="font-size: 11.5px; font-weight: 500; color: #9fef00">raíz · main</div>
+      <div style="font-size: 10px; color: #6b7a85; text-align: center; line-height: 1.5">el worktree principal del repo</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 5px; background: #0d1319; border: 1px solid #1b2833; border-radius: 4px; padding: 12px 10px">
+      <svg width="100" height="86" viewBox="0 0 100 86"><defs><filter id="t2" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="5" result="b"></feGaussianBlur><feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge></filter></defs><g transform="translate(50,10) scale(0.8)" filter="url(#t2)"><polygon points="0,0 34,17 0,34 -34,17" fill="#7ecbff"></polygon><polygon points="-34,17 0,34 0,72 -34,55" fill="#17557f"></polygon><polygon points="34,17 0,34 0,72 34,55" fill="#2ea8ff"></polygon></g></svg>
+      <div style="font-size: 11.5px; font-weight: 500; color: #c8d3da">worktree</div>
+      <div style="font-size: 10px; color: #6b7a85; text-align: center; line-height: 1.5">checkout aislado con branch propio</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 5px; background: #0d1319; border: 1px solid #1b2833; border-radius: 4px; padding: 12px 10px">
+      <svg width="100" height="86" viewBox="0 0 100 86"><rect x="4" y="26" width="92" height="34" rx="4" fill="#0a0e12" stroke="#24313c"></rect><text x="14" y="47" font-size="9" font-weight="600" fill="#6b7a85" font-family="'Fira Code', ui-monospace, monospace">GET</text><text x="44" y="47" font-size="10.5" fill="#8fa3ad" font-family="'Fira Code', ui-monospace, monospace">/auth</text></svg>
+      <div style="font-size: 11.5px; font-weight: 500; color: #c8d3da">endpoint</div>
+      <div style="font-size: 10px; color: #6b7a85; text-align: center; line-height: 1.5">sistema en vivo: ruta de la API</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 5px; background: #0d1319; border: 1px solid #1b2833; border-radius: 4px; padding: 12px 10px">
+      <svg width="100" height="86" viewBox="0 0 100 86"><rect x="4" y="26" width="92" height="34" rx="4" fill="#0a0e12" stroke="#24313c"></rect><text x="50" y="47" text-anchor="middle" font-size="10.5" fill="#8fa3ad" font-family="'Fira Code', ui-monospace, monospace">service</text></svg>
+      <div style="font-size: 11.5px; font-weight: 500; color: #c8d3da">servicio</div>
+      <div style="font-size: 10px; color: #6b7a85; text-align: center; line-height: 1.5">sistema en vivo: módulo interno</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 5px; background: #0d1319; border: 1px solid #1b2833; border-radius: 4px; padding: 12px 10px">
+      <svg width="100" height="86" viewBox="0 0 100 86"><path d="M24 28 v34 a26 8 0 0 0 52 0 v-34" fill="#0a0e12" stroke="#24313c"></path><ellipse cx="50" cy="28" rx="26" ry="8" fill="#0a0e12" stroke="#24313c"></ellipse><text x="50" y="54" text-anchor="middle" font-size="10.5" fill="#8fa3ad" font-family="'Fira Code', ui-monospace, monospace">db</text></svg>
+      <div style="font-size: 11.5px; font-weight: 500; color: #c8d3da">db</div>
+      <div style="font-size: 10px; color: #6b7a85; text-align: center; line-height: 1.5">sistema en vivo: recurso de datos</div>
+    </div>
+
+  </div>
+
+  <div style="font-size: 10px; letter-spacing: 0.12em; color: #4a5a64; margin-top: 18px">ESTADOS DEL WORKTREE</div>
+  <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-top: 10px">
+
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; background: #0d1319; border: 1px solid #1b2833; border-radius: 4px; padding: 14px 12px">
+      <svg width="120" height="104" viewBox="0 0 120 104"><g transform="translate(60,14)"><polygon points="0,0 34,17 0,34 -34,17" fill="#3d4b57"></polygon><polygon points="-34,17 0,34 0,72 -34,55" fill="#1d262e"></polygon><polygon points="34,17 0,34 0,72 34,55" fill="#2c3945"></polygon></g></svg>
+      <div style="font-size: 12px; font-weight: 500; color: #c8d3da">idle</div>
+      <div style="font-size: 10.5px; color: #6b7a85; text-align: center; line-height: 1.5">apagado, sin glow — no reclama atención</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; background: #0d1319; border: 1px solid #1b2833; border-radius: 4px; padding: 14px 12px">
+      <svg width="120" height="104" viewBox="0 0 120 104"><defs><filter id="g1" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="6" result="b"></feGaussianBlur><feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge></filter></defs><g transform="translate(60,14)" filter="url(#g1)"><polygon points="0,0 34,17 0,34 -34,17" fill="#7ecbff"></polygon><polygon points="-34,17 0,34 0,72 -34,55" fill="#17557f"></polygon><polygon points="34,17 0,34 0,72 34,55" fill="#2ea8ff"></polygon></g></svg>
+      <div style="font-size: 12px; font-weight: 500; color: #c8d3da">agente trabajando</div>
+      <div style="font-size: 10.5px; color: #6b7a85; text-align: center; line-height: 1.5">glow azul constante + flujo animado en la arista</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; background: #0d1319; border: 1px solid rgba(255, 176, 0, 0.35); border-radius: 4px; padding: 14px 12px">
+      <svg width="120" height="104" viewBox="0 0 120 104"><defs><filter id="g2" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="6" result="b"></feGaussianBlur><feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge></filter></defs><g class="pulse"><g transform="translate(60,14)" filter="url(#g2)"><polygon points="0,0 34,17 0,34 -34,17" fill="#ffcb52"></polygon><polygon points="-34,17 0,34 0,72 -34,55" fill="#8f5c00"></polygon><polygon points="34,17 0,34 0,72 34,55" fill="#e8a200"></polygon></g><text x="98" y="24" font-size="16" font-weight="600" fill="#ffb000" font-family="'Fira Code', ui-monospace, monospace">?</text></g></svg>
+      <div style="font-size: 12px; font-weight: 500; color: #ffb000">esperando input</div>
+      <div style="font-size: 10.5px; color: #b58200; text-align: center; line-height: 1.5">pulso ámbar + callout + contador HUD — imposible de ignorar</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; background: #0d1319; border: 1px solid #1b2833; border-radius: 4px; padding: 14px 12px">
+      <svg width="120" height="104" viewBox="0 0 120 104"><g transform="translate(60,14)"><polygon points="0,0 34,17 0,34 -34,17" fill="#7ecbff"></polygon><polygon points="-34,17 0,34 0,72 -34,55" fill="#17557f"></polygon><polygon points="34,17 0,34 0,72 34,55" fill="#2ea8ff"></polygon></g><text x="60" y="100" text-anchor="middle" font-size="11" fill="#e8a200" font-family="'Fira Code', ui-monospace, monospace">+412 −38</text></svg>
+      <div style="font-size: 12px; font-weight: 500; color: #c8d3da">sucio</div>
+      <div style="font-size: 10.5px; color: #6b7a85; text-align: center; line-height: 1.5">diff contra base visible en el label</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; background: #0d1319; border: 1px solid #1b2833; border-radius: 4px; padding: 14px 12px">
+      <svg width="120" height="104" viewBox="0 0 120 104"><defs><filter id="g3" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="4" result="b"></feGaussianBlur><feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge></filter></defs><g transform="translate(60,14)"><polygon points="0,0 34,17 0,34 -34,17" fill="#7ecbff"></polygon><polygon points="-34,17 0,34 0,72 -34,55" fill="#17557f"></polygon><polygon points="34,17 0,34 0,72 34,55" fill="#2ea8ff"></polygon></g><circle cx="100" cy="16" r="4" fill="#9fef00" filter="url(#g3)" class="pulse"></circle></svg>
+      <div style="font-size: 12px; font-weight: 500; color: #c8d3da">no leído</div>
+      <div style="font-size: 10.5px; color: #6b7a85; text-align: center; line-height: 1.5">punto verde: actividad que no viste</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; background: #0d1319; border: 1px solid #1b2833; border-radius: 4px; padding: 14px 12px">
+      <svg width="120" height="104" viewBox="0 0 120 104"><g transform="translate(60,14)" opacity="0.8"><polygon points="0,0 34,17 0,34 -34,17" fill="none" stroke="#2ea8ff" stroke-dasharray="5 4"></polygon><polygon points="-34,17 0,34 0,72 -34,55" fill="none" stroke="#2ea8ff" stroke-dasharray="5 4"></polygon><polygon points="34,17 0,34 0,72 34,55" fill="none" stroke="#2ea8ff" stroke-dasharray="5 4"></polygon></g><text x="60" y="100" text-anchor="middle" font-size="11" fill="#2ea8ff" font-family="'Fira Code', ui-monospace, monospace">checkout 40%</text></svg>
+      <div style="font-size: 12px; font-weight: 500; color: #c8d3da">naciendo</div>
+      <div style="font-size: 10.5px; color: #6b7a85; text-align: center; line-height: 1.5">wireframe + progreso emitido por el engine</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; background: #0d1319; border: 1px solid #1b2833; border-radius: 4px; padding: 14px 12px">
+      <svg width="120" height="104" viewBox="0 0 120 104"><g transform="translate(60,14)" opacity="0.5"><polygon points="0,0 34,17 0,34 -34,17" fill="none" stroke="#3d4b57" stroke-dasharray="4 3"></polygon><polygon points="-34,17 0,34 0,72 -34,55" fill="none" stroke="#3d4b57" stroke-dasharray="4 3"></polygon><polygon points="34,17 0,34 0,72 34,55" fill="none" stroke="#3d4b57" stroke-dasharray="4 3"></polygon></g></svg>
+      <div style="font-size: 12px; font-weight: 500; color: #c8d3da">archivado</div>
+      <div style="font-size: 10.5px; color: #6b7a85; text-align: center; line-height: 1.5">translúcido, arista punteada — fuera del flujo</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; background: #0d1319; border: 1px solid #1b2833; border-radius: 4px; padding: 14px 12px">
+      <svg width="120" height="112" viewBox="0 0 120 112"><defs><filter id="g4" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="3" result="b"></feGaussianBlur><feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge></filter></defs><ellipse cx="60" cy="96" rx="48" ry="10" fill="none" stroke="#9fef00" stroke-width="1.5" filter="url(#g4)"></ellipse><g transform="translate(60,14)"><polygon points="0,0 34,17 0,34 -34,17" fill="#7ecbff"></polygon><polygon points="-34,17 0,34 0,72 -34,55" fill="#17557f"></polygon><polygon points="34,17 0,34 0,72 34,55" fill="#2ea8ff"></polygon></g></svg>
+      <div style="font-size: 12px; font-weight: 500; color: #9fef00">seleccionado</div>
+      <div style="font-size: 10.5px; color: #6b7a85; text-align: center; line-height: 1.5">anillo verde + label iluminado — foco de cámara y teclado</div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

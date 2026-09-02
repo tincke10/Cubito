@@ -1,0 +1,154 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&amp;display=swap">
+  <style>
+    body { margin: 0; background: #f2f5f0; }
+    a { color: #4d8a00; } a:hover { color: #3a6900; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    @keyframes flow { to { stroke-dashoffset: -24; } }
+    .pulse { animation: pulse 1.6s ease-in-out infinite; }
+    .flow { animation: flow 1.2s linear infinite; }
+  </style>
+</helmet>
+<div style="position: relative; width: 1440px; height: 900px; overflow: hidden; background: #f2f5f0; font-family: 'Fira Code', 'SF Mono', ui-monospace, monospace">
+  <svg width="1440" height="900" viewBox="0 0 1440 900" style="position: absolute; inset: 0">
+    <defs>
+      <pattern id="isogrid" width="68" height="34" patternUnits="userSpaceOnUse">
+        <path d="M0 17 L34 0 L68 17 M0 17 L34 34 L68 17" fill="none" stroke="#d9e2d2" stroke-width="1"></path>
+      </pattern>
+      <radialGradient id="haloActivo" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#4d8a00" stop-opacity="0.09"></stop>
+        <stop offset="100%" stop-color="#4d8a00" stop-opacity="0"></stop>
+      </radialGradient>
+      <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
+        <feGaussianBlur stdDeviation="7" result="b"></feGaussianBlur>
+        <feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge>
+      </filter>
+      <linearGradient id="gridFade" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#ffffff" stop-opacity="0.12"></stop>
+        <stop offset="0.55" stop-color="#ffffff" stop-opacity="0.65"></stop>
+        <stop offset="1" stop-color="#ffffff" stop-opacity="1"></stop>
+      </linearGradient>
+      <mask id="gridMask"><rect width="1440" height="900" fill="url(#gridFade)"></rect></mask>
+      <filter id="soft" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="4"></feGaussianBlur></filter>
+    </defs>
+    <rect width="1440" height="900" fill="url(#isogrid)" opacity="0.55" mask="url(#gridMask)"></rect>
+
+    <g filter="url(#soft)">
+      <ellipse cx="430" cy="470" rx="40" ry="10" fill="#43555f" opacity="0.4"></ellipse>
+      <ellipse cx="300" cy="372" rx="32" ry="8" fill="#43555f" opacity="0.38"></ellipse>
+      <ellipse cx="560" cy="372" rx="32" ry="8" fill="#43555f" opacity="0.38"></ellipse>
+      <ellipse cx="560" cy="552" rx="32" ry="8" fill="#43555f" opacity="0.38"></ellipse>
+      <ellipse cx="430" cy="624" rx="30" ry="8" fill="#43555f" opacity="0.35"></ellipse>
+      <ellipse cx="1060" cy="294" rx="28" ry="7" fill="#43555f" opacity="0.35"></ellipse>
+      <ellipse cx="980" cy="396" rx="24" ry="6" fill="#43555f" opacity="0.35"></ellipse>
+      <ellipse cx="1170" cy="416" rx="24" ry="6" fill="#43555f" opacity="0.35"></ellipse>
+      <ellipse cx="1050" cy="708" rx="24" ry="6" fill="#43555f" opacity="0.3"></ellipse>
+    </g>
+
+    <!-- isla Cubito (proyecto activo) -->
+    <ellipse cx="430" cy="440" rx="280" ry="200" fill="url(#haloActivo)"></ellipse>
+    <ellipse cx="430" cy="440" rx="260" ry="190" fill="none" stroke="#dbe3e8" stroke-width="1" stroke-dasharray="3 6"></ellipse>
+
+    <line x1="430" y1="416" x2="300" y2="329" stroke="#2ea8ff" stroke-width="1.5" stroke-dasharray="6 6" opacity="0.5" class="flow"></line>
+    <line x1="430" y1="416" x2="560" y2="329" stroke="#2ea8ff" stroke-width="1.5" stroke-dasharray="6 6" opacity="0.5" class="flow"></line>
+    <line x1="430" y1="416" x2="430" y2="589" stroke="#7c997c" stroke-width="1.5" opacity="0.8"></line>
+    <line x1="430" y1="416" x2="560" y2="514" stroke="#7c997c" stroke-width="1.5" opacity="0.8"></line>
+    <line x1="430" y1="416" x2="300" y2="509" stroke="#7c997c" stroke-width="1" stroke-dasharray="2 5" opacity="0.35"></line>
+
+    <g transform="translate(430,380)" filter="url(#glow)">
+      <polygon points="0,0 34,17 0,34 -34,17" fill="#b7ff33"></polygon>
+      <polygon points="-34,17 0,34 0,72 -34,55" fill="#567f00"></polygon>
+      <polygon points="34,17 0,34 0,72 34,55" fill="#85c400"></polygon>
+    </g>
+    <g transform="translate(300,300) scale(0.8)" filter="url(#glow)">
+      <polygon points="0,0 34,17 0,34 -34,17" fill="#8fd0ff"></polygon>
+      <polygon points="-34,17 0,34 0,72 -34,55" fill="#1273b8"></polygon>
+      <polygon points="34,17 0,34 0,72 34,55" fill="#2ea8ff"></polygon>
+    </g>
+    <g transform="translate(560,300) scale(0.8)" filter="url(#glow)">
+      <polygon points="0,0 34,17 0,34 -34,17" fill="#8fd0ff"></polygon>
+      <polygon points="-34,17 0,34 0,72 -34,55" fill="#1273b8"></polygon>
+      <polygon points="34,17 0,34 0,72 34,55" fill="#2ea8ff"></polygon>
+    </g>
+    <g transform="translate(430,560) scale(0.8)">
+      <polygon points="0,0 34,17 0,34 -34,17" fill="#cdd7dd"></polygon>
+      <polygon points="-34,17 0,34 0,72 -34,55" fill="#8d9ba5"></polygon>
+      <polygon points="34,17 0,34 0,72 34,55" fill="#aebac2"></polygon>
+    </g>
+    <g class="pulse">
+      <g transform="translate(560,480) scale(0.8)" filter="url(#glow)">
+        <polygon points="0,0 34,17 0,34 -34,17" fill="#ffcb52"></polygon>
+        <polygon points="-34,17 0,34 0,72 -34,55" fill="#8f5c00"></polygon>
+        <polygon points="34,17 0,34 0,72 34,55" fill="#e8a200"></polygon>
+      </g>
+    </g>
+    <g transform="translate(300,480) scale(0.8)" opacity="0.5">
+      <polygon points="0,0 34,17 0,34 -34,17" fill="none" stroke="#9aa7b0" stroke-dasharray="4 3"></polygon>
+      <polygon points="-34,17 0,34 0,72 -34,55" fill="none" stroke="#9aa7b0" stroke-dasharray="4 3"></polygon>
+      <polygon points="34,17 0,34 0,72 34,55" fill="none" stroke="#9aa7b0" stroke-dasharray="4 3"></polygon>
+    </g>
+    <text x="430" y="682" text-anchor="middle" font-size="14" font-weight="500" fill="#4d8a00" font-family="'Fira Code', ui-monospace, monospace">Cubito · activo</text>
+    <text x="430" y="702" text-anchor="middle" font-size="11" fill="#5c6b75" font-family="'Fira Code', ui-monospace, monospace">6 nodos · 2 agentes activos</text>
+
+    <!-- isla api-gateway (con un agente esperando) -->
+    <ellipse cx="1060" cy="310" rx="210" ry="140" fill="none" stroke="#dbe3e8" stroke-width="1" stroke-dasharray="3 6"></ellipse>
+
+    <line x1="1060" y1="255" x2="980" y2="366" stroke="#7c997c" stroke-width="1.5" opacity="0.8"></line>
+    <line x1="1060" y1="255" x2="1170" y2="382" stroke="#2ea8ff" stroke-width="1.5" stroke-dasharray="6 6" opacity="0.5" class="flow"></line>
+
+    <g transform="translate(1060,230) scale(0.7)" filter="url(#glow)" opacity="0.85">
+      <polygon points="0,0 34,17 0,34 -34,17" fill="#b7ff33"></polygon>
+      <polygon points="-34,17 0,34 0,72 -34,55" fill="#567f00"></polygon>
+      <polygon points="34,17 0,34 0,72 34,55" fill="#85c400"></polygon>
+    </g>
+    <g class="pulse">
+      <g transform="translate(980,340) scale(0.6)" filter="url(#glow)">
+        <polygon points="0,0 34,17 0,34 -34,17" fill="#ffcb52"></polygon>
+        <polygon points="-34,17 0,34 0,72 -34,55" fill="#8f5c00"></polygon>
+        <polygon points="34,17 0,34 0,72 34,55" fill="#e8a200"></polygon>
+      </g>
+    </g>
+    <text x="980" y="412" text-anchor="middle" font-size="10" fill="#a36b00" font-family="'Fira Code', ui-monospace, monospace" class="pulse">esperando input</text>
+    <g transform="translate(1170,360) scale(0.6)" filter="url(#glow)">
+      <polygon points="0,0 34,17 0,34 -34,17" fill="#8fd0ff"></polygon>
+      <polygon points="-34,17 0,34 0,72 -34,55" fill="#1273b8"></polygon>
+      <polygon points="34,17 0,34 0,72 34,55" fill="#2ea8ff"></polygon>
+    </g>
+    <text x="1060" y="482" text-anchor="middle" font-size="13" fill="#23313a" font-family="'Fira Code', ui-monospace, monospace">api-gateway</text>
+    <text x="1060" y="500" text-anchor="middle" font-size="10.5" fill="#5c6b75" font-family="'Fira Code', ui-monospace, monospace">3 nodos · 1 agente activo</text>
+
+    <!-- isla blog (dormida) -->
+    <ellipse cx="1050" cy="700" rx="110" ry="70" fill="none" stroke="#dbe3e8" stroke-width="1" stroke-dasharray="3 6"></ellipse>
+    <g transform="translate(1050,660) scale(0.6)" opacity="0.7">
+      <polygon points="0,0 34,17 0,34 -34,17" fill="#cdd7dd"></polygon>
+      <polygon points="-34,17 0,34 0,72 -34,55" fill="#8d9ba5"></polygon>
+      <polygon points="34,17 0,34 0,72 34,55" fill="#aebac2"></polygon>
+    </g>
+    <text x="1050" y="792" text-anchor="middle" font-size="12" fill="#5c6b75" font-family="'Fira Code', ui-monospace, monospace">blog</text>
+    <text x="1050" y="810" text-anchor="middle" font-size="10.5" fill="#8a97a0" font-family="'Fira Code', ui-monospace, monospace">1 nodo · sin actividad</text>
+  </svg>
+
+  <!-- HUD -->
+  <div style="position: absolute; top: 14px; left: 18px; font-size: 12px; line-height: 1.7; text-shadow: none">
+    <div style="color: #4d8a00">● conectado · runtime 4f2a9c</div>
+    <div style="color: #5c6b75; text-shadow: none">3 proyectos · 10 nodos · 3 agentes activos</div>
+    <div style="color: #5c6b75; text-shadow: none"><span class="pulse" style="color: #a36b00">2 esperando input</span> · Cubito y api-gateway</div>
+  </div>
+
+  <!-- barra de teclado -->
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; padding: 12px 18px; font-size: 11px; color: #8a97a0; background: linear-gradient(transparent, rgba(242, 245, 240, 0.92))">
+    <div><span style="color: #3c4c56">[⌘P]</span> proyectos&nbsp;&nbsp;&nbsp;<span style="color: #3c4c56">[⇥]</span> siguiente isla&nbsp;&nbsp;&nbsp;<span style="color: #3c4c56">[⏎]</span> entrar a la isla&nbsp;&nbsp;&nbsp;<span style="color: #3c4c56">[v]</span> ver todo</div>
+    <div>vista galaxia — todos los repos en la misma escena</div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

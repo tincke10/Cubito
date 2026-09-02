@@ -1,0 +1,144 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&amp;display=swap">
+  <style>
+    body { margin: 0; background: #0a0e12; }
+    a { color: #9fef00; } a:hover { color: #b7ff33; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .pulse { animation: pulse 1.6s ease-in-out infinite; }
+  </style>
+</helmet>
+<div style="position: relative; width: 1440px; height: 900px; overflow: hidden; background: #0a0e12; font-family: 'Fira Code', 'SF Mono', ui-monospace, monospace">
+
+  <!-- galaxia atenuada detrás -->
+  <svg width="1440" height="900" viewBox="0 0 1440 900" style="position: absolute; inset: 0; opacity: 0.3">
+    <defs>
+      <pattern id="isogrid" width="68" height="34" patternUnits="userSpaceOnUse">
+        <path d="M0 17 L34 0 L68 17 M0 17 L34 34 L68 17" fill="none" stroke="#10231a" stroke-width="1"></path>
+      </pattern>
+      <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
+        <feGaussianBlur stdDeviation="7" result="b"></feGaussianBlur>
+        <feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge>
+      </filter>
+    </defs>
+    <rect width="1440" height="900" fill="url(#isogrid)" opacity="0.5"></rect>
+    <line x1="430" y1="416" x2="300" y2="329" stroke="#2ea8ff" stroke-width="1.5" stroke-dasharray="6 6" opacity="0.5"></line>
+    <line x1="430" y1="416" x2="560" y2="329" stroke="#2ea8ff" stroke-width="1.5" stroke-dasharray="6 6" opacity="0.5"></line>
+    <line x1="430" y1="416" x2="430" y2="589" stroke="#3a5f3a" stroke-width="1.5" opacity="0.8"></line>
+    <line x1="430" y1="416" x2="560" y2="514" stroke="#3a5f3a" stroke-width="1.5" opacity="0.8"></line>
+    <line x1="430" y1="416" x2="300" y2="509" stroke="#3a5f3a" stroke-width="1" stroke-dasharray="2 5" opacity="0.35"></line>
+    <line x1="1060" y1="255" x2="980" y2="366" stroke="#3a5f3a" stroke-width="1.5" opacity="0.8"></line>
+    <line x1="1060" y1="255" x2="1170" y2="382" stroke="#2ea8ff" stroke-width="1.5" stroke-dasharray="6 6" opacity="0.5"></line>
+    <g transform="translate(430,380)" filter="url(#glow)">
+      <polygon points="0,0 34,17 0,34 -34,17" fill="#b7ff33"></polygon>
+      <polygon points="-34,17 0,34 0,72 -34,55" fill="#567f00"></polygon>
+      <polygon points="34,17 0,34 0,72 34,55" fill="#85c400"></polygon>
+    </g>
+    <g transform="translate(300,300) scale(0.8)" filter="url(#glow)">
+      <polygon points="0,0 34,17 0,34 -34,17" fill="#7ecbff"></polygon>
+      <polygon points="-34,17 0,34 0,72 -34,55" fill="#17557f"></polygon>
+      <polygon points="34,17 0,34 0,72 34,55" fill="#2ea8ff"></polygon>
+    </g>
+    <g transform="translate(560,300) scale(0.8)" filter="url(#glow)">
+      <polygon points="0,0 34,17 0,34 -34,17" fill="#7ecbff"></polygon>
+      <polygon points="-34,17 0,34 0,72 -34,55" fill="#17557f"></polygon>
+      <polygon points="34,17 0,34 0,72 34,55" fill="#2ea8ff"></polygon>
+    </g>
+    <g transform="translate(560,480) scale(0.8)" filter="url(#glow)">
+      <polygon points="0,0 34,17 0,34 -34,17" fill="#ffcb52"></polygon>
+      <polygon points="-34,17 0,34 0,72 -34,55" fill="#8f5c00"></polygon>
+      <polygon points="34,17 0,34 0,72 34,55" fill="#e8a200"></polygon>
+    </g>
+    <g transform="translate(300,480) scale(0.8)" opacity="0.5">
+      <polygon points="0,0 34,17 0,34 -34,17" fill="none" stroke="#3d4b57" stroke-dasharray="4 3"></polygon>
+      <polygon points="-34,17 0,34 0,72 -34,55" fill="none" stroke="#3d4b57" stroke-dasharray="4 3"></polygon>
+      <polygon points="34,17 0,34 0,72 34,55" fill="none" stroke="#3d4b57" stroke-dasharray="4 3"></polygon>
+    </g>
+    <g transform="translate(430,560) scale(0.8)">
+      <polygon points="0,0 34,17 0,34 -34,17" fill="#3d4b57"></polygon>
+      <polygon points="-34,17 0,34 0,72 -34,55" fill="#1d262e"></polygon>
+      <polygon points="34,17 0,34 0,72 34,55" fill="#2c3945"></polygon>
+    </g>
+    <g transform="translate(1060,230) scale(0.7)" filter="url(#glow)">
+      <polygon points="0,0 34,17 0,34 -34,17" fill="#b7ff33"></polygon>
+      <polygon points="-34,17 0,34 0,72 -34,55" fill="#567f00"></polygon>
+      <polygon points="34,17 0,34 0,72 34,55" fill="#85c400"></polygon>
+    </g>
+    <g transform="translate(980,340) scale(0.6)" filter="url(#glow)">
+      <polygon points="0,0 34,17 0,34 -34,17" fill="#ffcb52"></polygon>
+      <polygon points="-34,17 0,34 0,72 -34,55" fill="#8f5c00"></polygon>
+      <polygon points="34,17 0,34 0,72 34,55" fill="#e8a200"></polygon>
+    </g>
+    <g transform="translate(1170,360) scale(0.6)" filter="url(#glow)">
+      <polygon points="0,0 34,17 0,34 -34,17" fill="#7ecbff"></polygon>
+      <polygon points="-34,17 0,34 0,72 -34,55" fill="#17557f"></polygon>
+      <polygon points="34,17 0,34 0,72 34,55" fill="#2ea8ff"></polygon>
+    </g>
+    <g transform="translate(1050,660) scale(0.6)">
+      <polygon points="0,0 34,17 0,34 -34,17" fill="#3d4b57"></polygon>
+      <polygon points="-34,17 0,34 0,72 -34,55" fill="#1d262e"></polygon>
+      <polygon points="34,17 0,34 0,72 34,55" fill="#2c3945"></polygon>
+    </g>
+  </svg>
+  <div style="position: absolute; inset: 0; background: rgba(6, 9, 12, 0.55)"></div>
+
+  <!-- selector de proyecto (⌘P) -->
+  <div style="position: relative; width: 680px; margin: 130px auto 0; background: linear-gradient(180deg, #0e141c, #0c1117); border: 1px solid #24313c; border-radius: 8px; overflow: hidden; box-shadow: 0 32px 96px rgba(0, 0, 0, 0.7), 0 0 40px rgba(159, 239, 0, 0.05)">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 16px 18px; border-bottom: 1px solid #1b2833">
+      <span style="color: #9fef00; font-size: 14px">›</span>
+      <span class="pulse" style="color: #9fef00; font-size: 14px">█</span>
+      <span style="color: #4a5a64; font-size: 12.5px">buscar proyecto…</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 64px; padding: 0 18px; background: rgba(159, 239, 0, 0.07)">
+        <div style="display: flex; flex-direction: column; gap: 3px">
+          <div style="font-size: 13px; font-weight: 500; color: #c8d3da">Cubito</div>
+          <div style="font-size: 10.5px; color: #4a5a64">~/MyThings/Cubito</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px">
+          <span style="font-size: 11px; color: #6b7a85">6 nodos · 2 agentes activos</span>
+          <span class="pulse" style="font-size: 10px; color: #ffb000; border: 1px solid rgba(255, 176, 0, 0.4); border-radius: 3px; padding: 2px 8px">1 esperando input</span>
+          <span style="font-size: 10px; color: #9fef00; border: 1px solid rgba(159, 239, 0, 0.4); border-radius: 3px; padding: 2px 8px">activo</span>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 64px; padding: 0 18px">
+        <div style="display: flex; flex-direction: column; gap: 3px">
+          <div style="font-size: 13px; color: #8fa3ad">api-gateway</div>
+          <div style="font-size: 10.5px; color: #4a5a64">~/MyThings/api-gateway</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px">
+          <span style="font-size: 11px; color: #6b7a85">3 nodos · 1 agente activo</span>
+          <span class="pulse" style="font-size: 10px; color: #ffb000; border: 1px solid rgba(255, 176, 0, 0.4); border-radius: 3px; padding: 2px 8px">1 esperando input</span>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 64px; padding: 0 18px">
+        <div style="display: flex; flex-direction: column; gap: 3px">
+          <div style="font-size: 13px; color: #8fa3ad">blog</div>
+          <div style="font-size: 10.5px; color: #4a5a64">~/MyThings/blog</div>
+        </div>
+        <span style="font-size: 11px; color: #6b7a85">1 nodo</span>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 18px; border-top: 1px solid #1b2833">
+        <span style="font-size: 13px; color: #9fef00">+</span>
+        <span style="font-size: 12.5px; color: #8fa3ad">agregar repo</span>
+        <span style="font-size: 10.5px; color: #4a5a64">— ruta local o URL de git</span>
+      </div>
+    </div>
+
+    <div style="padding: 10px 18px; border-top: 1px solid #1b2833; font-size: 10.5px; color: #4a5a64">↑↓ navegar · ⏎ activar proyecto · esc cerrar</div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

@@ -1,0 +1,139 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&amp;display=swap">
+  <style>
+    body { margin: 0; background: #0a0e12; }
+    a { color: #9fef00; } a:hover { color: #b7ff33; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    @keyframes flow { to { stroke-dashoffset: -24; } }
+    .pulse { animation: pulse 1.6s ease-in-out infinite; }
+    .flow { animation: flow 1.2s linear infinite; }
+  </style>
+</helmet>
+<div style="position: relative; width: 1440px; height: 900px; overflow: hidden; background: #0a0e12; font-family: 'Fira Code', 'SF Mono', ui-monospace, monospace">
+  <svg width="1440" height="900" viewBox="0 0 1440 900" style="position: absolute; inset: 0">
+    <defs>
+      <pattern id="isogrid" width="68" height="34" patternUnits="userSpaceOnUse">
+        <path d="M0 17 L34 0 L68 17 M0 17 L34 34 L68 17" fill="none" stroke="#10231a" stroke-width="1"></path>
+      </pattern>
+      <radialGradient id="vignette" cx="50%" cy="45%" r="70%">
+        <stop offset="55%" stop-color="#0a0e12" stop-opacity="0"></stop>
+        <stop offset="100%" stop-color="#05080b" stop-opacity="0.9"></stop>
+      </radialGradient>
+      <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
+        <feGaussianBlur stdDeviation="7" result="b"></feGaussianBlur>
+        <feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge>
+      </filter>
+      <linearGradient id="gridFade" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#ffffff" stop-opacity="0.12"></stop>
+        <stop offset="0.55" stop-color="#ffffff" stop-opacity="0.65"></stop>
+        <stop offset="1" stop-color="#ffffff" stop-opacity="1"></stop>
+      </linearGradient>
+      <mask id="gridMask"><rect width="1440" height="900" fill="url(#gridFade)"></rect></mask>
+      <filter id="soft" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="4"></feGaussianBlur></filter>
+    </defs>
+
+    <rect width="1440" height="900" fill="url(#isogrid)" opacity="0.55" mask="url(#gridMask)"></rect>
+    <rect width="1440" height="900" fill="url(#vignette)"></rect>
+
+    <!-- sombras de piso: los nodos activos flotan alto, los idle casi tocan el suelo -->
+    <g filter="url(#soft)">
+      <ellipse cx="690" cy="512" rx="44" ry="11" fill="#000000" opacity="0.45"></ellipse>
+      <ellipse cx="400" cy="354" rx="40" ry="10" fill="#000000" opacity="0.4"></ellipse>
+      <ellipse cx="215" cy="202" rx="30" ry="8" fill="#000000" opacity="0.32"></ellipse>
+      <ellipse cx="985" cy="344" rx="40" ry="10" fill="#000000" opacity="0.4"></ellipse>
+      <ellipse cx="470" cy="710" rx="36" ry="9" fill="#000000" opacity="0.4"></ellipse>
+    </g>
+
+    <!-- aristas (linaje padre -> hijo) -->
+    <line x1="690" y1="456" x2="400" y2="296" stroke="#2ea8ff" stroke-width="1.5" stroke-dasharray="6 6" opacity="0.5" class="flow"></line>
+    <line x1="400" y1="296" x2="215" y2="159" stroke="#2ea8ff" stroke-width="1.5" stroke-dasharray="6 6" opacity="0.5" class="flow"></line>
+    <line x1="690" y1="456" x2="985" y2="286" stroke="#3a5f3a" stroke-width="1.5" opacity="0.8"></line>
+    <line x1="690" y1="456" x2="470" y2="666" stroke="#3a5f3a" stroke-width="1.5" opacity="0.8"></line>
+    <line x1="690" y1="456" x2="950" y2="686" stroke="#3a5f3a" stroke-width="1" stroke-dasharray="2 5" opacity="0.35"></line>
+
+    <!-- main (raíz, verde) -->
+    <g transform="translate(690,420)" filter="url(#glow)">
+      <polygon points="0,0 34,17 0,34 -34,17" fill="#b7ff33"></polygon>
+      <polygon points="-34,17 0,34 0,72 -34,55" fill="#567f00"></polygon>
+      <polygon points="34,17 0,34 0,72 34,55" fill="#85c400"></polygon>
+    </g>
+    <text x="690" y="538" text-anchor="middle" font-size="12" font-weight="500" fill="#9fef00" font-family="'Fira Code', ui-monospace, monospace">main</text>
+
+    <!-- agente trabajando (azul, glow) + no leído -->
+    <g transform="translate(400,260)" filter="url(#glow)">
+      <polygon points="0,0 34,17 0,34 -34,17" fill="#7ecbff"></polygon>
+      <polygon points="-34,17 0,34 0,72 -34,55" fill="#17557f"></polygon>
+      <polygon points="34,17 0,34 0,72 34,55" fill="#2ea8ff"></polygon>
+    </g>
+    <circle cx="442" cy="262" r="4" fill="#9fef00" filter="url(#glow)" class="pulse"></circle>
+    <text x="400" y="380" text-anchor="middle" font-size="11" fill="#6b7a85" font-family="'Fira Code', ui-monospace, monospace">cubito/auth-retry</text>
+    <text x="400" y="396" text-anchor="middle" font-size="10" fill="#2ea8ff" font-family="'Fira Code', ui-monospace, monospace">claude · trabajando</text>
+
+    <!-- nieto trabajando (escala menor) -->
+    <g transform="translate(215,130) scale(0.8)" filter="url(#glow)">
+      <polygon points="0,0 34,17 0,34 -34,17" fill="#7ecbff"></polygon>
+      <polygon points="-34,17 0,34 0,72 -34,55" fill="#17557f"></polygon>
+      <polygon points="34,17 0,34 0,72 34,55" fill="#2ea8ff"></polygon>
+    </g>
+    <text x="215" y="215" text-anchor="middle" font-size="10" fill="#6b7a85" font-family="'Fira Code', ui-monospace, monospace">cubito/auth-retry-tests</text>
+
+    <!-- esperando input (ámbar, pulsa) + sucio -->
+    <g class="pulse">
+      <g transform="translate(985,250)" filter="url(#glow)">
+        <polygon points="0,0 34,17 0,34 -34,17" fill="#ffcb52"></polygon>
+        <polygon points="-34,17 0,34 0,72 -34,55" fill="#8f5c00"></polygon>
+        <polygon points="34,17 0,34 0,72 34,55" fill="#e8a200"></polygon>
+      </g>
+    </g>
+    <text x="985" y="370" text-anchor="middle" font-size="11" fill="#6b7a85" font-family="'Fira Code', ui-monospace, monospace">cubito/refactor-store</text>
+    <text x="985" y="386" text-anchor="middle" font-size="10" fill="#e8a200" font-family="'Fira Code', ui-monospace, monospace">+412 −38</text>
+
+    <!-- callout esperando input -->
+    <polyline points="1012,264 1048,196" fill="none" stroke="#ffb000" stroke-width="1" opacity="0.7"></polyline>
+    <g class="pulse">
+      <rect x="1048" y="140" width="308" height="58" fill="#ffb000" fill-opacity="0.06" stroke="#ffb000" stroke-opacity="0.8" rx="3"></rect>
+      <text x="1064" y="164" font-size="13" font-weight="500" fill="#ffb000" font-family="'Fira Code', ui-monospace, monospace">? claude esperando input</text>
+      <text x="1064" y="184" font-size="11" fill="#b58200" font-family="'Fira Code', ui-monospace, monospace">⏎ abrir terminal y responder</text>
+    </g>
+
+    <!-- idle (apagado) -->
+    <g transform="translate(470,630)">
+      <polygon points="0,0 34,17 0,34 -34,17" fill="#3d4b57"></polygon>
+      <polygon points="-34,17 0,34 0,72 -34,55" fill="#1d262e"></polygon>
+      <polygon points="34,17 0,34 0,72 34,55" fill="#2c3945"></polygon>
+    </g>
+    <text x="470" y="732" text-anchor="middle" font-size="11" fill="#4a5a64" font-family="'Fira Code', ui-monospace, monospace">cubito/docs-pass</text>
+
+    <!-- archivado (wireframe) -->
+    <g transform="translate(950,650)" opacity="0.5">
+      <polygon points="0,0 34,17 0,34 -34,17" fill="none" stroke="#3d4b57" stroke-dasharray="4 3"></polygon>
+      <polygon points="-34,17 0,34 0,72 -34,55" fill="none" stroke="#3d4b57" stroke-dasharray="4 3"></polygon>
+      <polygon points="34,17 0,34 0,72 34,55" fill="none" stroke="#3d4b57" stroke-dasharray="4 3"></polygon>
+    </g>
+    <text x="950" y="752" text-anchor="middle" font-size="11" fill="#3d4b57" font-family="'Fira Code', ui-monospace, monospace">cubito/spike-webgpu · archivado</text>
+  </svg>
+
+  <!-- HUD -->
+  <div style="position: absolute; top: 14px; left: 18px; font-size: 12px; line-height: 1.7; text-shadow: 0 0 8px rgba(159, 239, 0, 0.35)">
+    <div style="color: #9fef00">● conectado · runtime 4f2a9c</div>
+    <div style="color: #6b7a85; text-shadow: none">repo Cubito · base main</div>
+    <div style="color: #6b7a85; text-shadow: none">6 nodos · 2 agentes activos · <span class="pulse" style="color: #ffb000">1 esperando input</span></div>
+  </div>
+
+  <!-- barra de teclado -->
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; padding: 12px 18px; font-size: 11px; color: #4a5a64; background: linear-gradient(transparent, rgba(10, 14, 18, 0.92))">
+    <div><span style="color: #8fa3ad">[hjkl]</span> navegar&nbsp;&nbsp;&nbsp;<span style="color: #8fa3ad">[f]</span> focus&nbsp;&nbsp;&nbsp;<span style="color: #8fa3ad">[v]</span> ver todo&nbsp;&nbsp;&nbsp;<span style="color: #8fa3ad">[s]</span> spawn&nbsp;&nbsp;&nbsp;<span style="color: #8fa3ad">[⌘K]</span> paleta</div>
+    <div>órbita: arrastrar · zoom: rueda</div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

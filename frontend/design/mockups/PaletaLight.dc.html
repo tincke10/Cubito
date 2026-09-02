@@ -1,0 +1,97 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&amp;display=swap">
+  <style>
+    body { margin: 0; background: #f2f5f0; }
+    a { color: #4d8a00; } a:hover { color: #3a6900; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .pulse { animation: pulse 1.6s ease-in-out infinite; }
+  </style>
+</helmet>
+<div style="position: relative; width: 1440px; height: 900px; overflow: hidden; background: #f2f5f0; font-family: 'Fira Code', 'SF Mono', ui-monospace, monospace">
+
+  <!-- escena atenuada detrás -->
+  <svg width="1440" height="900" viewBox="0 0 1440 900" style="position: absolute; inset: 0; opacity: 0.35">
+    <defs>
+      <pattern id="isogrid" width="68" height="34" patternUnits="userSpaceOnUse">
+        <path d="M0 17 L34 0 L68 17 M0 17 L34 34 L68 17" fill="none" stroke="#d9e2d2" stroke-width="1"></path>
+      </pattern>
+      <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
+        <feGaussianBlur stdDeviation="7" result="b"></feGaussianBlur>
+        <feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge>
+      </filter>
+    </defs>
+    <rect width="1440" height="900" fill="url(#isogrid)" opacity="0.5"></rect>
+    <line x1="690" y1="456" x2="400" y2="296" stroke="#2ea8ff" stroke-width="1.5" stroke-dasharray="6 6" opacity="0.6"></line>
+    <line x1="690" y1="456" x2="985" y2="286" stroke="#7c997c" stroke-width="1.5"></line>
+    <line x1="690" y1="456" x2="470" y2="666" stroke="#7c997c" stroke-width="1.5"></line>
+    <g transform="translate(690,420)" filter="url(#glow)">
+      <polygon points="0,0 34,17 0,34 -34,17" fill="#b7ff33"></polygon>
+      <polygon points="-34,17 0,34 0,72 -34,55" fill="#567f00"></polygon>
+      <polygon points="34,17 0,34 0,72 34,55" fill="#85c400"></polygon>
+    </g>
+    <g transform="translate(400,260)" filter="url(#glow)">
+      <polygon points="0,0 34,17 0,34 -34,17" fill="#8fd0ff"></polygon>
+      <polygon points="-34,17 0,34 0,72 -34,55" fill="#1273b8"></polygon>
+      <polygon points="34,17 0,34 0,72 34,55" fill="#2ea8ff"></polygon>
+    </g>
+    <g transform="translate(985,250)">
+      <polygon points="0,0 34,17 0,34 -34,17" fill="#ffcb52"></polygon>
+      <polygon points="-34,17 0,34 0,72 -34,55" fill="#8f5c00"></polygon>
+      <polygon points="34,17 0,34 0,72 34,55" fill="#e8a200"></polygon>
+    </g>
+    <g transform="translate(470,630)">
+      <polygon points="0,0 34,17 0,34 -34,17" fill="#cdd7dd"></polygon>
+      <polygon points="-34,17 0,34 0,72 -34,55" fill="#8d9ba5"></polygon>
+      <polygon points="34,17 0,34 0,72 34,55" fill="#aebac2"></polygon>
+    </g>
+  </svg>
+  <div style="position: absolute; inset: 0; background: rgba(236, 241, 236, 0.6)"></div>
+
+  <!-- paleta ⌘K -->
+  <div style="position: relative; width: 640px; margin: 150px auto 0; background: linear-gradient(180deg, #ffffff, #f7fafc); border: 1px solid #cfd8de; border-radius: 8px; overflow: hidden; box-shadow: 0 32px 96px rgba(35, 49, 58, 0.15), 0 0 40px rgba(77, 138, 0, 0.10)">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 16px 18px; border-bottom: 1px solid #dbe3e8">
+      <span style="color: #4d8a00; font-size: 14px">›</span>
+      <span class="pulse" style="color: #4d8a00; font-size: 14px">█</span>
+      <span style="color: #8a97a0; font-size: 12.5px">escribí un comando…</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column">
+      <div style="display: flex; align-items: center; justify-content: space-between; height: 48px; padding: 0 18px; background: rgba(77, 138, 0, 0.10)">
+        <div style="font-size: 12.5px; color: #23313a">fan-out desde cubito/auth-retry</div>
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span style="font-size: 11px; color: #8a97a0">5 × claude</span>
+          <span style="font-size: 10px; color: #5c6b75; border: 1px solid #cfd8de; border-radius: 3px; padding: 2px 6px">⏎</span>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: space-between; height: 48px; padding: 0 18px">
+        <div style="font-size: 12.5px; color: #3c4c56">spawn hijo desde cubito/auth-retry</div>
+        <span style="font-size: 10px; color: #5c6b75; border: 1px solid #cfd8de; border-radius: 3px; padding: 2px 6px">s</span>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: space-between; height: 48px; padding: 0 18px">
+        <div style="font-size: 12.5px; color: #3c4c56">focus main</div>
+        <span style="font-size: 10px; color: #5c6b75; border: 1px solid #cfd8de; border-radius: 3px; padding: 2px 6px">f</span>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: space-between; height: 48px; padding: 0 18px">
+        <div style="font-size: 12.5px; color: #3c4c56">ver todo el grafo</div>
+        <span style="font-size: 10px; color: #5c6b75; border: 1px solid #cfd8de; border-radius: 3px; padding: 2px 6px">v</span>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: space-between; height: 48px; padding: 0 18px">
+        <div style="font-size: 12.5px; color: #3c4c56">abrir terminal del nodo</div>
+        <span style="font-size: 10px; color: #5c6b75; border: 1px solid #cfd8de; border-radius: 3px; padding: 2px 6px">t</span>
+      </div>
+    </div>
+
+    <div style="padding: 10px 18px; border-top: 1px solid #dbe3e8; font-size: 10.5px; color: #8a97a0">↑↓ navegar · ⏎ ejecutar · esc cerrar</div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

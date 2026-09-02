@@ -1,0 +1,80 @@
+{
+  "pages": [
+    { "id": "dark", "name": "Dark" },
+    { "id": "light", "name": "Light" }
+  ],
+  "artboards": [
+    { "file": "Main.dc.html", "title": "Escena principal", "x": 0, "y": 0, "w": 1440, "h": 900, "page": "dark" },
+    { "file": "EstadosNodo.dc.html", "title": "Nodos y estados", "x": 1560, "y": 120, "w": 1000, "h": 780, "page": "dark" },
+    { "file": "TerminalHUD.dc.html", "title": "Terminal — Opción A (panel HUD)", "x": 0, "y": 1060, "w": 1440, "h": 900, "page": "dark" },
+    { "file": "TerminalEscena.dc.html", "title": "Terminal — Opción B (en escena)", "x": 1560, "y": 1060, "w": 1440, "h": 900, "page": "dark" },
+    { "file": "Spawn.dc.html", "title": "Spawn hijo", "x": 0, "y": 2120, "w": 1440, "h": 900, "page": "dark" },
+    { "file": "Fanout.dc.html", "title": "Fan-out (la camada)", "x": 1560, "y": 2120, "w": 1440, "h": 900, "page": "dark" },
+    { "file": "Paleta.dc.html", "title": "Paleta de comandos", "x": 0, "y": 3180, "w": 1440, "h": 900, "page": "dark" },
+    { "file": "Proyectos.dc.html", "title": "Proyectos — vista galaxia", "x": 0, "y": 4240, "w": 1440, "h": 900, "page": "dark" },
+    { "file": "SelectorProyecto.dc.html", "title": "Selector de proyecto", "x": 1560, "y": 4240, "w": 1440, "h": 900, "page": "dark" },
+    { "file": "VistaSistema.dc.html", "title": "Sistema en vivo", "x": 0, "y": 5300, "w": 1440, "h": 900, "page": "dark" },
+
+    { "file": "MainLight.dc.html", "title": "Escena principal", "x": 0, "y": 0, "w": 1440, "h": 900, "page": "light" },
+    { "file": "EstadosNodoLight.dc.html", "title": "Nodos y estados", "x": 1560, "y": 120, "w": 1000, "h": 780, "page": "light" },
+    { "file": "TerminalHUDLight.dc.html", "title": "Terminal — Opción A (panel HUD)", "x": 0, "y": 1060, "w": 1440, "h": 900, "page": "light" },
+    { "file": "TerminalEscenaLight.dc.html", "title": "Terminal — Opción B (en escena)", "x": 1560, "y": 1060, "w": 1440, "h": 900, "page": "light" },
+    { "file": "SpawnLight.dc.html", "title": "Spawn hijo", "x": 0, "y": 2120, "w": 1440, "h": 900, "page": "light" },
+    { "file": "FanoutLight.dc.html", "title": "Fan-out (la camada)", "x": 1560, "y": 2120, "w": 1440, "h": 900, "page": "light" },
+    { "file": "PaletaLight.dc.html", "title": "Paleta de comandos", "x": 0, "y": 3180, "w": 1440, "h": 900, "page": "light" },
+    { "file": "ProyectosLight.dc.html", "title": "Proyectos — vista galaxia", "x": 0, "y": 4240, "w": 1440, "h": 900, "page": "light" },
+    { "file": "SelectorProyectoLight.dc.html", "title": "Selector de proyecto", "x": 1560, "y": 4240, "w": 1440, "h": 900, "page": "light" },
+    { "file": "VistaSistemaLight.dc.html", "title": "Sistema en vivo", "x": 0, "y": 5300, "w": 1440, "h": 900, "page": "light" }
+  ],
+  "annotations": [
+    {
+      "id": "direccion",
+      "x": -420,
+      "y": 0,
+      "w": 340,
+      "page": "dark",
+      "text": "Dirección: fosforescente/terminal — tokens reales de frontend/index.html (#0a0e12, #9fef00, #2ea8ff, aristas #3a5f3a, monospace). Mockups estáticos para decidir — no es diseño final."
+    },
+    {
+      "id": "pregunta-terminal",
+      "x": -420,
+      "y": 1060,
+      "w": 340,
+      "page": "dark",
+      "text": "Pregunta abierta 1 — ¿dónde vive el terminal?\nA (panel HUD): legible, escala a varias terminales, cero pelea con el contexto WebGL.\nB (en escena): inmersivo, habilita LOD semántico (lejos = estado, cerca = terminal), pero cuesta render y legibilidad en ángulo.\nPropuesta: B al acercarse + pin a panel A."
+    },
+    {
+      "id": "espera-y-fanout",
+      "x": -420,
+      "y": 2120,
+      "w": 340,
+      "page": "dark",
+      "text": "Pregunta 2 — esperando input: pulso ámbar + callout + contador en el HUD. Es EL estado del producto.\nPregunta 3 — eje Z: los mockups asumen grafo plano en espacio 3D navegable; sigue abierta.\nPregunta 4 — el fan-out se agrupa como camada en órbita alrededor del padre, con halo compartido.\nPregunta 5 — spawn: menú radial sobre el nodo + tecla [s]; la paleta ⌘K es la vía paralela."
+    },
+    {
+      "id": "multi-repo",
+      "x": -420,
+      "y": 4240,
+      "w": 340,
+      "page": "dark",
+      "text": "Multi-repo (fase 2, §3.3) — propuesta: islas en la MISMA escena, no escenas separadas. La razón: la atención cruza proyectos — los esperando-input ámbar se ven desde cualquier isla y suman en el HUD, estén en el proyecto que estén.\n⌘P cambia de proyecto; agregar repo vive en el selector (repo.list / repo.add). Solo la isla activa carga terminales; las demás muestran estado agregado."
+    },
+    {
+      "id": "vista-sistema",
+      "x": -420,
+      "y": 5300,
+      "w": 340,
+      "page": "dark",
+      "text": "Sistema en vivo — el grafo de LO QUE el agente construye dentro del worktree: endpoints, servicios, DB. Se arma parseando el código del worktree (routes / OpenAPI) y se actualiza en vivo con cada edición; el feed de la derecha es el laburo del LLM en tiempo real, y el camino que está tocando se ilumina. Es un modo [x] del nodo enfocado, hermano de la vista terminal.\n[requiere trabajo de engine]: watcher de archivos + parser del grafo de sistema — el RPC de orcad hoy no lo expone. El mock usa una API HTTP como ejemplo; el mismo modo aplica a otros dominios (módulos, pantallas, jobs)."
+    },
+    {
+      "id": "tema-light",
+      "x": -420,
+      "y": 0,
+      "w": 340,
+      "page": "light",
+      "text": "Light — traducción sistemática de los tokens dark (script make-light.mjs): mismos matices, contraste recalibrado. Cubos igual de saturados; tintas oscuras del mismo tono para texto (#4d8a00 / #1273c4 / #a36b00); glow → halo; sombras de piso suavizadas; paneles blancos con sombra en capas. El ámbar sigue siendo exclusivo de esperando-input."
+    }
+  ],
+  "launch": { "view": "canvas", "page": "light" }
+}
