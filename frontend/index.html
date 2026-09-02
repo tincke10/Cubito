@@ -1,10 +1,12 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cubito</title>
     <style>
+      /* Every colour here is a --cubito-* custom property written at startup by
+         applyCssTheme(); no hex literal may appear in this file or any DOM module. */
       * {
         margin: 0;
         padding: 0;
@@ -13,28 +15,90 @@
       html,
       body {
         height: 100%;
-        background: #0a0e12;
-        color: #9fef00;
-        font-family: 'SF Mono', ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
+        background: var(--cubito-background);
+        color: var(--cubito-text-primary);
+        font-family: 'Fira Code', 'SF Mono', ui-monospace, 'Cascadia Code', monospace;
         overflow: hidden;
       }
       #app {
+        position: relative;
         height: 100%;
+      }
+      /* Vignette (design §7.5): the mockup's vignette is a gradient, so CSS reproduces it
+         pixel-exactly at zero scene cost. */
+      #vignette {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(ellipse at center, transparent 0%, var(--cubito-vignette-edge) 90%);
       }
       #hud {
         position: fixed;
-        top: 12px;
-        left: 16px;
+        inset: 12px 16px auto 16px;
         font-size: 12px;
         line-height: 1.6;
         pointer-events: none;
-        text-shadow: 0 0 8px rgba(159, 239, 0, 0.35);
+      }
+      .cubito-hud__line--glow {
+        text-shadow: 0 0 8px var(--cubito-accent);
+      }
+      .cubito-hud__dot {
+        display: inline-block;
+        width: 7px;
+        height: 7px;
+        margin-right: 8px;
+        border-radius: 50%;
+        vertical-align: middle;
+      }
+      #keyboard-bar {
+        position: fixed;
+        left: 16px;
+        bottom: 14px;
+        pointer-events: none;
+      }
+      .cubito-keyboard-bar {
+        display: flex;
+        gap: 14px;
+        font-size: 11px;
+        color: var(--cubito-text-dim);
+      }
+      .cubito-keychip__key {
+        display: inline-block;
+        padding: 2px 6px;
+        margin-right: 6px;
+        border: 1px solid var(--cubito-panel-border);
+        border-radius: 4px;
+        background: var(--cubito-panel-surface);
+        color: var(--cubito-key-chip);
+      }
+      .cubito-node-label {
+        font-size: 11px;
+        line-height: 1.45;
+      }
+      .pulse {
+        animation: pulse 1.6s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.4;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .pulse {
+          animation: none;
+        }
       }
     </style>
   </head>
   <body>
     <div id="app"></div>
+    <div id="vignette"></div>
     <div id="hud"></div>
+    <div id="keyboard-bar"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

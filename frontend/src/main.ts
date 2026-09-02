@@ -1,18 +1,28 @@
 import { createSceneStore } from './application/scene-store'
 import { syncWorktreeGraph } from './application/sync-worktree-graph'
-import { createScene } from './presentation/scene/create-scene'
-import { createGraphView } from './presentation/scene/graph-view'
 import type { RuntimeGateway } from './application/ports/runtime-gateway'
 import type { RawWorktreeRecord } from './domain/worktree-graph/build-graph'
+import { frameAll } from './presentation/camera/camera-framing'
+import { createHudOverlay } from './presentation/hud/hud-overlay'
+import { hudModel } from './presentation/hud/hud-model'
+import { createKeyboardBar } from './presentation/hud/keyboard-bar'
+import { createKeyboardController } from './presentation/input/keyboard-controller'
+import { createCameraRig } from './presentation/scene/camera-rig'
+import { createScene } from './presentation/scene/create-scene'
+import { createGraphView } from './presentation/scene/graph-view'
+import { applyCssTheme } from './presentation/theme/css-theme'
+import { paletteFor } from './presentation/theme/scene-palette'
+import type { Theme } from './presentation/theme/scene-palette'
 
 // Demo gateway until the orcad connection (pairing or local bridge) lands.
-// Shape matches the real `worktree.list` payload observed against orcad.
+// Shape matches the real `worktree.list` payload observed against orcad; the optional
+// activity fields exercise the state ladder for the visual calibration pass.
 const demoRecords: RawWorktreeRecord[] = [
   {
     id: 'demo::/repo',
     branch: 'refs/heads/main',
     parentWorktreeId: null,
-    childWorktreeIds: ['demo::/wt/alpha', 'demo::/wt/beta'],
+    childWorktreeIds: ['demo::/wt/alpha', 'demo::/wt/beta', 'demo::/wt/delta'],
     workspaceStatus: 'in-progress',
     git: { path: '/repo', isMainWorktree: true }
   },
@@ -22,7 +32,8 @@ const demoRecords: RawWorktreeRecord[] = [
     parentWorktreeId: 'demo::/repo',
     childWorktreeIds: ['demo::/wt/gamma'],
     workspaceStatus: 'in-progress',
-    git: { path: '/wt/alpha', isMainWorktree: false }
+    git: { path: '/wt/alpha', isMainWorktree: false },
+    agentStatus: 'working'
   },
   {
     id: 'demo::/wt/beta',
@@ -30,7 +41,8 @@ const demoRecords: RawWorktreeRecord[] = [
     parentWorktreeId: 'demo::/repo',
     childWorktreeIds: [],
     workspaceStatus: 'in-progress',
-    git: { path: '/wt/beta', isMainWorktree: false }
+    git: { path: '/wt/beta', isMainWorktree: false },
+    agentStatus: 'waiting-input'
   },
   {
     id: 'demo::/wt/gamma',
@@ -38,7 +50,18 @@ const demoRecords: RawWorktreeRecord[] = [
     parentWorktreeId: 'demo::/wt/alpha',
     childWorktreeIds: [],
     workspaceStatus: 'in-progress',
-    git: { path: '/wt/gamma', isMainWorktree: false }
+    git: { path: '/wt/gamma', isMainWorktree: false },
+    isUnread: true,
+    diff: { added: 412, removed: 38 }
+  },
+  {
+    id: 'demo::/wt/delta',
+    branch: 'refs/heads/cubito-delta',
+    parentWorktreeId: 'demo::/repo',
+    childWorktreeIds: [],
+    workspaceStatus: 'archived',
+    git: { path: '/wt/delta', isMainWorktree: false },
+    isArchived: true
   }
 ]
 
@@ -48,29 +71,56 @@ const demoGateway: RuntimeGateway = {
 
 const container = document.getElementById('app')
 const hud = document.getElementById('hud')
-if (!container || !hud) {
-  throw new Error('index.html must provide #app and #hud')
+const keyboardBarSlot = document.getElementById('keyboard-bar')
+if (!container || !hud || !keyboardBarSlot) {
+  throw new Error('index.html must provide #app, #hud and #keyboard-bar')
 }
 
-const { scene } = createScene(container)
-const graphView = createGraphView(scene)
+const theme: Theme = 'dark'
+const palette = paletteFor(theme)
+applyCssTheme(document.documentElement, palette)
+
+const cubitoScene = createScene(container, palette)
+const graphView = createGraphView(cubitoScene.scene, cubitoScene.labelLayer)
+const cameraRig = createCameraRig(cubitoScene.camera, cubitoScene.controls)
 const store = createSceneStore()
 
+const hudOverlay = createHudOverlay()
+hud.appendChild(hudOverlay.root)
+const keyboardBar = createKeyboardBar()
+keyboardBarSlot.appendChild(keyboardBar.root)
+
+const platform = { isMac: navigator.userAgent.includes('Mac') }
+
+const keyboardController = createKeyboardController({
+  store,
+  cameraRig,
+  scenePositions: graphView
+})
+keyboardController.attach(window)
+
+cubitoScene.onFrame((elapsedSeconds) => {
+  graphView.tick(elapsedSeconds)
+  cameraRig.tick(elapsedSeconds)
+})
+
+cubitoScene.onResize((width, height) => {
+  cameraRig.setAspect(width / height)
+  graphView.setResolution(width, height)
+})
+
+// The first non-empty graph gets an initial fit; afterwards the camera is the user's.
+let framed = false
+
 store.subscribe((state) => {
-  graphView.update(state.graph)
-  const sync = state.sync
-  const status =
-    sync.state === 'synced'
-      ? `synced ${new Date(sync.at).toLocaleTimeString()}`
-      : sync.state === 'error'
-        ? `error: ${sync.code}`
-        : sync.state
-  hud.innerText = [
-    'CUBITO — worktree graph',
-    `nodes: ${state.graph.nodes.size}  edges: ${state.graph.edges.length}`,
-    `runtime: demo gateway (${status})`,
-    'drag: orbit · wheel: zoom'
-  ].join('\n')
+  graphView.update({ graph: state.graph, selectedId: state.selection.selectedId, palette })
+  const model = hudModel(state, platform)
+  hudOverlay.apply(model)
+  keyboardBar.apply(model.chips)
+  if (!framed && state.graph.nodes.size > 0) {
+    framed = true
+    cameraRig.apply(frameAll(graphView.nodeCenters()))
+  }
 })
 
 void syncWorktreeGraph(demoGateway, store)
