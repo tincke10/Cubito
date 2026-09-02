@@ -55,6 +55,7 @@ export const MAX_RADIUS = 60
 export const FOCUS_DURATION_MS = 420
 export const MIN_POLAR_DEG = 15
 export const MAX_POLAR_DEG = 80 // never dip below the ground plane
+export const MS_PER_SECOND = 1000 // FOCUS_DURATION_MS is milliseconds; camera clock ticks in seconds
 
 // ── decorations ─────────────────────────────────────────────────────────
 export const SELECTION_RING_RADIUS = 1.412 // mockup rx 48 ÷ 34
