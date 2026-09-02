@@ -1,4 +1,6 @@
 import type { WorktreeEdge, WorktreeGraph, WorktreeId, WorktreeNode } from './types'
+import { inertActivity } from './node-activity'
+import type { AgentStatus, DiffSummary, NodeActivity, SpawnProgress } from './node-activity'
 
 /**
  * The subset of an orcad `worktree.list` record the graph is built from.
@@ -14,6 +16,36 @@ export type RawWorktreeRecord = {
     path: string
     isMainWorktree: boolean
   }
+  agentStatus?: AgentStatus
+  isUnread?: boolean
+  lastActivityAt?: number
+  isArchived?: boolean
+  diff?: DiffSummary
+  spawn?: SpawnProgress
+}
+
+/** Overrides only the optional fields a record actually supplies; the rest stays inert. */
+function activityFromRecord(raw: RawWorktreeRecord): NodeActivity {
+  const activity = inertActivity()
+  if (raw.agentStatus !== undefined) {
+    activity.agentStatus = raw.agentStatus
+  }
+  if (raw.isUnread !== undefined) {
+    activity.isUnread = raw.isUnread
+  }
+  if (raw.lastActivityAt !== undefined) {
+    activity.lastActivityAt = raw.lastActivityAt
+  }
+  if (raw.isArchived !== undefined) {
+    activity.isArchived = raw.isArchived
+  }
+  if (raw.diff !== undefined) {
+    activity.diff = raw.diff
+  }
+  if (raw.spawn !== undefined) {
+    activity.spawn = raw.spawn
+  }
+  return activity
 }
 
 /**
@@ -34,8 +66,10 @@ export function buildWorktreeGraph(records: readonly RawWorktreeRecord[]): Workt
       path: raw.git.path,
       status: raw.workspaceStatus,
       isMain: raw.git.isMainWorktree,
+      kind: raw.git.isMainWorktree ? 'root' : 'worktree',
       parentId: raw.parentWorktreeId,
-      childIds: [...raw.childWorktreeIds]
+      childIds: [...raw.childWorktreeIds],
+      activity: activityFromRecord(raw)
     })
   }
 

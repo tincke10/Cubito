@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { buildWorktreeGraph } from './build-graph'
 import type { RawWorktreeRecord } from './build-graph'
+import { inertActivity } from './node-activity'
+import type { AgentStatus, DiffSummary, NodeActivity, SpawnProgress } from './node-activity'
 
 const record = (overrides: Partial<RawWorktreeRecord> = {}): RawWorktreeRecord => ({
   id: 'repo::/path/main',
@@ -66,5 +68,51 @@ describe('buildWorktreeGraph', () => {
     })
     const graph = buildWorktreeGraph([rootA, rootB, child])
     expect(graph.rootIds).toEqual(['repo::/a', 'repo::/b'])
+  })
+
+  it('gives a node with no optional activity fields the inert default', () => {
+    const graph = buildWorktreeGraph([record()])
+    const node = graph.nodes.get('repo::/path/main')
+    expect(node?.activity).toEqual(inertActivity())
+  })
+
+  it.each<[string, Partial<RawWorktreeRecord>, Partial<NodeActivity>]>([
+    ['agentStatus', { agentStatus: 'working' satisfies AgentStatus }, { agentStatus: 'working' }],
+    ['isUnread', { isUnread: true }, { isUnread: true }],
+    ['lastActivityAt', { lastActivityAt: 12345 }, { lastActivityAt: 12345 }],
+    ['isArchived', { isArchived: true }, { isArchived: true }],
+    [
+      'diff',
+      { diff: { added: 3, removed: 1 } satisfies DiffSummary },
+      { diff: { added: 3, removed: 1 } }
+    ],
+    [
+      'spawn',
+      { spawn: { phase: 'cloning', progress: 0.3 } satisfies SpawnProgress },
+      { spawn: { phase: 'cloning', progress: 0.3 } }
+    ]
+  ])('maps the optional %s field onto activity, leaving the rest inert', (_field, overrides, expectedDiff) => {
+    const graph = buildWorktreeGraph([record(overrides)])
+    const activity = graph.nodes.get('repo::/path/main')?.activity
+    expect(activity).toEqual({ ...inertActivity(), ...expectedDiff })
+    expect(activity).not.toEqual(inertActivity())
+  })
+
+  it.each<[boolean, 'root' | 'worktree']>([
+    [true, 'root'],
+    [false, 'worktree']
+  ])('derives kind %s -> %s from isMain', (isMain, expectedKind) => {
+    const graph = buildWorktreeGraph([record({ git: { path: '/path/main', isMainWorktree: isMain } })])
+    expect(graph.nodes.get('repo::/path/main')?.kind).toBe(expectedKind)
+  })
+
+  it('never produces a node with an undefined activity', () => {
+    const graph = buildWorktreeGraph([
+      record(),
+      record({ id: 'repo::/b', git: { path: '/b', isMainWorktree: false } })
+    ])
+    for (const node of graph.nodes.values()) {
+      expect(node.activity).toBeDefined()
+    }
   })
 })
