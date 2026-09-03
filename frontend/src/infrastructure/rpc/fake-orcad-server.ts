@@ -9,7 +9,16 @@
  */
 import { createServer, type Server } from 'node:http'
 import { WebSocketServer, type WebSocket as NodeWebSocket, type RawData } from 'ws'
-import { decrypt, deriveSharedKey, encrypt, generateKeyPair, publicKeyFromBase64, publicKeyToBase64 } from './e2ee-box'
+import {
+  decrypt,
+  decryptBytes,
+  deriveSharedKey,
+  encrypt,
+  encryptBytes,
+  generateKeyPair,
+  publicKeyFromBase64,
+  publicKeyToBase64
+} from './e2ee-box'
 
 const DEFAULT_RUNTIME_ID = 'fake-orcad-runtime'
 const DEFAULT_DEVICE_TOKEN = 'fake-orcad-device-token'
@@ -44,15 +53,20 @@ export type FakeOrcadServer = {
   deviceToken: string
   authFrames: Record<string, unknown>[]
   requestMethods: string[]
+  binaryFramesReceived: Uint8Array[]
   connectionCount(): number
   /** Force-closes every currently open socket without shutting the server down. */
   closeActiveConnections(code?: number, reason?: string): void
+  /** Seals and sends `bytes` as a binary WS frame to every authenticated connection, on demand. */
+  sendBinaryToActiveConnections(bytes: Uint8Array): void
   close(): Promise<void>
 }
 
 const DEFAULT_RESPONSE: FakeOrcadRpcResponse = { ok: true, result: { worktrees: [] } }
 
-export async function startFakeOrcadServer(options: FakeOrcadServerOptions = {}): Promise<FakeOrcadServer> {
+export async function startFakeOrcadServer(
+  options: FakeOrcadServerOptions = {}
+): Promise<FakeOrcadServer> {
   const runtimeId = options.runtimeId ?? DEFAULT_RUNTIME_ID
   const deviceToken = options.deviceToken ?? DEFAULT_DEVICE_TOKEN
   const serverKeyPair = generateKeyPair()
@@ -60,13 +74,18 @@ export async function startFakeOrcadServer(options: FakeOrcadServerOptions = {})
   const wss = new WebSocketServer({ server: httpServer })
   const authFrames: Record<string, unknown>[] = []
   const requestMethods: string[] = []
+  const binaryFramesReceived: Uint8Array[] = []
   const activeSockets = new Set<NodeWebSocket>()
+  const authenticatedKeys = new Map<NodeWebSocket, Uint8Array>()
   let connectionCount = 0
 
   wss.on('connection', (ws) => {
     connectionCount += 1
     activeSockets.add(ws)
-    ws.on('close', () => activeSockets.delete(ws))
+    ws.on('close', () => {
+      activeSockets.delete(ws)
+      authenticatedKeys.delete(ws)
+    })
 
     let sharedKey: Uint8Array | null = null
     let authenticated = false
@@ -106,7 +125,12 @@ export async function startFakeOrcadServer(options: FakeOrcadServerOptions = {})
       socket.send(JSON.stringify({ type: 'e2ee_ready' }))
     }
 
-    function handleAuth(socket: NodeWebSocket, data: RawData, isBinary: boolean, key: Uint8Array): boolean {
+    function handleAuth(
+      socket: NodeWebSocket,
+      data: RawData,
+      isBinary: boolean,
+      key: Uint8Array
+    ): boolean {
       if (isBinary) {
         socket.close(4002, 'expected sealed e2ee_auth')
         return false
@@ -123,7 +147,9 @@ export async function startFakeOrcadServer(options: FakeOrcadServerOptions = {})
         return false
       }
       if (options.rejectAuth || auth.type !== 'e2ee_auth' || auth.deviceToken !== deviceToken) {
-        socket.send(encrypt(JSON.stringify({ type: 'e2ee_error', error: { code: 'unauthorized' } }), key))
+        socket.send(
+          encrypt(JSON.stringify({ type: 'e2ee_error', error: { code: 'unauthorized' } }), key)
+        )
         socket.close(4001, 'auth failed')
         return false
       }
@@ -136,12 +162,25 @@ export async function startFakeOrcadServer(options: FakeOrcadServerOptions = {})
         return false
       }
       socket.send(encrypt(JSON.stringify({ type: 'e2ee_authenticated' }), key))
+      authenticatedKeys.set(socket, key)
       return true
     }
 
-    function handleRpc(socket: NodeWebSocket, data: RawData, isBinary: boolean, key: Uint8Array): void {
-      if (isBinary || options.binaryFrameAt === 'runtime') {
+    function handleRpc(
+      socket: NodeWebSocket,
+      data: RawData,
+      isBinary: boolean,
+      key: Uint8Array
+    ): void {
+      if (options.binaryFrameAt === 'runtime') {
         socket.send(new Uint8Array([1, 2, 3]))
+        return
+      }
+      if (isBinary) {
+        const plaintext = decryptBytes(toUint8Array(data), key)
+        if (plaintext) {
+          binaryFramesReceived.push(plaintext)
+        }
         return
       }
       const plaintext = decrypt(data.toString(), key)
@@ -171,10 +210,16 @@ export async function startFakeOrcadServer(options: FakeOrcadServerOptions = {})
     deviceToken,
     authFrames,
     requestMethods,
+    binaryFramesReceived,
     connectionCount: () => connectionCount,
     closeActiveConnections(code?: number, reason?: string) {
       for (const socket of activeSockets) {
         socket.close(code, reason)
+      }
+    },
+    sendBinaryToActiveConnections(bytes: Uint8Array) {
+      for (const [socket, key] of authenticatedKeys) {
+        socket.send(encryptBytes(bytes, key))
       }
     },
     close: async () => {
@@ -187,6 +232,17 @@ export async function startFakeOrcadServer(options: FakeOrcadServerOptions = {})
       await closeHttpServer(httpServer)
     }
   }
+}
+
+/** `ws` delivers binary payloads as Buffer (a Uint8Array subclass) unless fragmented into an array. */
+function toUint8Array(data: RawData): Uint8Array {
+  if (Array.isArray(data)) {
+    return new Uint8Array(Buffer.concat(data))
+  }
+  if (data instanceof ArrayBuffer) {
+    return new Uint8Array(data)
+  }
+  return new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
 }
 
 async function listen(server: Server): Promise<void> {

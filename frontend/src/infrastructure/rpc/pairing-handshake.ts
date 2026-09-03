@@ -30,6 +30,7 @@ export type HandshakeEffect =
   | { kind: 'send'; frame: string }
   | { kind: 'ready' }
   | { kind: 'deliver'; plaintext: string }
+  | { kind: 'deliver-binary'; bytes: Uint8Array }
   | { kind: 'fail'; failure: HandshakeFailure }
 
 export type PairingHandshakeOptions = {
@@ -45,9 +46,10 @@ export type PairingHandshake = {
   readonly stage: PairingStage
   start(): readonly HandshakeEffect[]
   onTextFrame(frame: string): readonly HandshakeEffect[]
-  onBinaryFrame(): readonly HandshakeEffect[]
+  onBinaryFrame(bytes: Uint8Array): readonly HandshakeEffect[]
   onClose(code: number, reason: string): readonly HandshakeEffect[]
   sealRequest(plaintext: string): string
+  sealBinary(bytes: Uint8Array): Uint8Array
 }
 
 function stageForState(state: Exclude<HandshakeState, 'failed'>): PairingStage {
@@ -86,14 +88,19 @@ export function createPairingHandshake(options: PairingHandshakeOptions): Pairin
   ): readonly HandshakeEffect[] {
     state = 'failed'
     failedStage = stage
-    const failure: HandshakeFailure = closeCode === undefined ? { code, message, stage } : { code, message, stage, closeCode }
+    const failure: HandshakeFailure =
+      closeCode === undefined ? { code, message, stage } : { code, message, stage, closeCode }
     return [{ kind: 'fail', failure }]
   }
 
   function handleAwaitingReadyText(frame: string): readonly HandshakeEffect[] {
     const parsed = parseJson(frame)
     if (!parsed.ok) {
-      return fail('invalid_runtime_response', 'Remote Orca runtime returned an invalid E2EE handshake frame.', 'host-identity')
+      return fail(
+        'invalid_runtime_response',
+        'Remote Orca runtime returned an invalid E2EE handshake frame.',
+        'host-identity'
+      )
     }
     if (!hasType(parsed.value, 'e2ee_ready')) {
       return fail(
@@ -112,11 +119,19 @@ export function createPairingHandshake(options: PairingHandshakeOptions): Pairin
   function handleAwaitingAuthenticatedText(frame: string): readonly HandshakeEffect[] {
     const plaintext = codec.open(frame)
     if (plaintext === null) {
-      return fail('invalid_runtime_response', 'Remote Orca runtime returned an undecryptable frame.', 'host-identity')
+      return fail(
+        'invalid_runtime_response',
+        'Remote Orca runtime returned an undecryptable frame.',
+        'host-identity'
+      )
     }
     const parsed = parseJson(plaintext)
     if (!parsed.ok) {
-      return fail('invalid_runtime_response', 'Remote Orca runtime returned an invalid E2EE auth frame.', 'host-identity')
+      return fail(
+        'invalid_runtime_response',
+        'Remote Orca runtime returned an invalid E2EE auth frame.',
+        'host-identity'
+      )
     }
     if (hasType(parsed.value, 'e2ee_authenticated')) {
       state = 'ready'
@@ -129,13 +144,21 @@ export function createPairingHandshake(options: PairingHandshakeOptions): Pairin
     if (errorCode === 'unauthorized') {
       return fail('unauthorized', 'Remote Orca runtime rejected the pairing token.', 'access-grant')
     }
-    return fail('invalid_runtime_response', 'Remote Orca runtime rejected the pairing token.', 'host-identity')
+    return fail(
+      'invalid_runtime_response',
+      'Remote Orca runtime rejected the pairing token.',
+      'host-identity'
+    )
   }
 
   function handleReadyText(frame: string): readonly HandshakeEffect[] {
     const plaintext = codec.open(frame)
     if (plaintext === null) {
-      return fail('invalid_runtime_response', 'Remote Orca runtime returned an undecryptable frame.', 'runtime')
+      return fail(
+        'invalid_runtime_response',
+        'Remote Orca runtime returned an undecryptable frame.',
+        'runtime'
+      )
     }
     return [{ kind: 'deliver', plaintext }]
   }
@@ -148,7 +171,10 @@ export function createPairingHandshake(options: PairingHandshakeOptions): Pairin
       return state === 'failed' ? failedStage : stageForState(state)
     },
     start(): readonly HandshakeEffect[] {
-      const hello = JSON.stringify({ type: 'e2ee_hello', publicKeyB64: publicKeyToBase64(keyPair.publicKey) })
+      const hello = JSON.stringify({
+        type: 'e2ee_hello',
+        publicKeyB64: publicKeyToBase64(keyPair.publicKey)
+      })
       return [{ kind: 'send', frame: hello }]
     },
     onTextFrame(frame: string): readonly HandshakeEffect[] {
@@ -157,10 +183,24 @@ export function createPairingHandshake(options: PairingHandshakeOptions): Pairin
       if (state === 'awaiting_authenticated') return handleAwaitingAuthenticatedText(frame)
       return handleReadyText(frame)
     },
-    onBinaryFrame(): readonly HandshakeEffect[] {
+    onBinaryFrame(bytes: Uint8Array): readonly HandshakeEffect[] {
       if (state === 'failed') return []
-      const stage = state === 'ready' ? 'runtime' : 'host-identity'
-      return fail('invalid_runtime_response', 'Remote Orca runtime returned an unexpected binary frame.', stage)
+      if (state !== 'ready') {
+        return fail(
+          'invalid_runtime_response',
+          'Remote Orca runtime returned an unexpected binary frame.',
+          'host-identity'
+        )
+      }
+      const plaintext = codec.openBytes(bytes)
+      if (plaintext === null) {
+        return fail(
+          'invalid_runtime_response',
+          'Remote Orca runtime returned an undecryptable binary frame.',
+          'runtime'
+        )
+      }
+      return [{ kind: 'deliver-binary', bytes: plaintext }]
     },
     onClose(code: number, reason: string): readonly HandshakeEffect[] {
       if (state === 'failed') return []
@@ -177,6 +217,12 @@ export function createPairingHandshake(options: PairingHandshakeOptions): Pairin
         throw new Error('sealRequest called before the handshake reached ready')
       }
       return codec.seal(plaintext)
+    },
+    sealBinary(bytes: Uint8Array): Uint8Array {
+      if (state !== 'ready') {
+        throw new Error('sealBinary called before the handshake reached ready')
+      }
+      return codec.sealBytes(bytes)
     }
   }
 }

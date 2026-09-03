@@ -43,12 +43,7 @@ export function publicKeyToBase64(key: Uint8Array): string {
 
 export function encrypt(plaintext: string, sharedKey: Uint8Array): string {
   const messageBytes = new TextEncoder().encode(plaintext)
-  const nonce = nacl.randomBytes(nacl.box.nonceLength)
-  const ciphertext = nacl.box.after(messageBytes, nonce, sharedKey)
-  const bundle = new Uint8Array(nonce.length + ciphertext.length)
-  bundle.set(nonce)
-  bundle.set(ciphertext, nonce.length)
-  return bytesToBase64(bundle)
+  return bytesToBase64(encryptBytes(messageBytes, sharedKey))
 }
 
 /** Never throws — malformed/truncated/oversize input maps to `null`, same contract as the engine port. */
@@ -63,14 +58,27 @@ export function decrypt(encrypted: string, sharedKey: Uint8Array): string | null
     // atob throws InvalidCharacterError on non-base64 input; Buffer.from is lenient — normalize to null here.
     return null
   }
+  const plaintext = decryptBytes(bundle, sharedKey)
+  return plaintext ? new TextDecoder().decode(plaintext) : null
+}
+
+/** Raw-binary counterpart of `encrypt` — no base64, mirrors src/shared/e2ee-crypto.ts. */
+export function encryptBytes(plaintext: Uint8Array, sharedKey: Uint8Array): Uint8Array {
+  const nonce = nacl.randomBytes(nacl.box.nonceLength)
+  const ciphertext = nacl.box.after(plaintext, nonce, sharedKey)
+  const bundle = new Uint8Array(nonce.length + ciphertext.length)
+  bundle.set(nonce)
+  bundle.set(ciphertext, nonce.length)
+  return bundle
+}
+
+/** Raw-binary counterpart of `decrypt` — no base64. Never throws; bad input maps to `null`. */
+export function decryptBytes(bundle: Uint8Array, sharedKey: Uint8Array): Uint8Array | null {
   if (bundle.length < nacl.box.nonceLength + nacl.box.overheadLength) {
     return null
   }
   const nonce = bundle.slice(0, nacl.box.nonceLength)
   const ciphertext = bundle.slice(nacl.box.nonceLength)
   const plaintext = nacl.box.open.after(ciphertext, nonce, sharedKey)
-  if (!plaintext) {
-    return null
-  }
-  return new TextDecoder().decode(plaintext)
+  return plaintext ?? null
 }

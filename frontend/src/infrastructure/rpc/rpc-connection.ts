@@ -9,6 +9,8 @@ export type RpcTransport = {
   send(data: string): void
   onMessage(cb: (data: string) => void): () => void
   onClose(cb: (reason?: string) => void): () => void
+  sendBinary?(bytes: Uint8Array): void
+  onBinary?(cb: (bytes: Uint8Array) => void): () => void
 }
 
 export class RpcCallError extends Error {
@@ -58,7 +60,10 @@ export class RpcConnection {
     transport.onClose(() => this.rejectAll('connection_closed', 'The runtime connection closed.'))
   }
 
-  call<TResult = unknown>(method: string, params?: unknown): Promise<RpcSuccessFrame & { result: TResult }> {
+  call<TResult = unknown>(
+    method: string,
+    params?: unknown
+  ): Promise<RpcSuccessFrame & { result: TResult }> {
     const id = this.generateId()
     return new Promise((resolve, reject) => {
       this.pending.set(id, {
@@ -86,7 +91,9 @@ export class RpcConnection {
   ): ReturnType<typeof setTimeout> {
     return setTimeout(() => {
       this.pending.delete(id)
-      reject(new RpcCallError('rpc_timeout', `No response for ${method} within ${this.timeoutMs}ms.`))
+      reject(
+        new RpcCallError('rpc_timeout', `No response for ${method} within ${this.timeoutMs}ms.`)
+      )
     }, this.timeoutMs)
   }
 

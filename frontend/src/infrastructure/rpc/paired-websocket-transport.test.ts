@@ -4,7 +4,12 @@ import { startFakeOrcadServer, type FakeOrcadServer } from './fake-orcad-server'
 import type { PairingOffer } from './pairing-offer'
 
 function offerFor(server: FakeOrcadServer): PairingOffer {
-  return { v: 2, endpoint: server.endpoint, deviceToken: server.deviceToken, publicKeyB64: server.serverPublicKeyB64 }
+  return {
+    v: 2,
+    endpoint: server.endpoint,
+    deviceToken: server.deviceToken,
+    publicKeyB64: server.serverPublicKeyB64
+  }
 }
 
 describe('connectPairedTransport', () => {
@@ -32,7 +37,9 @@ describe('connectPairedTransport', () => {
       code: 'unauthorized',
       stage: 'access-grant'
     })
-    await expect(connectPairedTransport(offerFor(server))).rejects.toBeInstanceOf(PairingConnectionError)
+    await expect(connectPairedTransport(offerFor(server))).rejects.toBeInstanceOf(
+      PairingConnectionError
+    )
   })
 
   it('rejects with PairingConnectionError when the server sends a garbage frame', async () => {
@@ -66,11 +73,19 @@ describe('connectPairedTransport', () => {
       const received = new Promise<string>((resolve) => {
         transport.onMessage((data) => resolve(data))
       })
-      const requestPlaintext = JSON.stringify({ id: 'req-1', deviceToken: server.deviceToken, method: 'worktree.list' })
+      const requestPlaintext = JSON.stringify({
+        id: 'req-1',
+        deviceToken: server.deviceToken,
+        method: 'worktree.list'
+      })
       transport.send(requestPlaintext)
 
       const plaintext = await received
-      expect(JSON.parse(plaintext)).toMatchObject({ id: 'req-1', ok: true, result: { echoedMethod: 'worktree.list' } })
+      expect(JSON.parse(plaintext)).toMatchObject({
+        id: 'req-1',
+        ok: true,
+        result: { echoedMethod: 'worktree.list' }
+      })
       expect(server.requestMethods).toEqual(['worktree.list'])
     } finally {
       transport.close()
@@ -113,7 +128,9 @@ describe('connectPairedTransport', () => {
 
     const transport = await connectPairedTransport(offerFor(server))
     const closed = new Promise<void>((resolve) => transport.onClose(() => resolve()))
-    transport.send(JSON.stringify({ id: 'req-1', deviceToken: server.deviceToken, method: 'worktree.list' }))
+    transport.send(
+      JSON.stringify({ id: 'req-1', deviceToken: server.deviceToken, method: 'worktree.list' })
+    )
     await closed
 
     expect(() => transport.send('{}')).toThrow()
@@ -124,9 +141,45 @@ describe('connectPairedTransport', () => {
     servers.push(server)
 
     const transport = await connectPairedTransport(offerFor(server))
-    const closed = new Promise<string | undefined>((resolve) => transport.onClose((reason) => resolve(reason)))
+    const closed = new Promise<string | undefined>((resolve) =>
+      transport.onClose((reason) => resolve(reason))
+    )
     server.closeActiveConnections(1000, 'bye')
 
     await expect(closed).resolves.toBe('bye')
+  })
+
+  it('delivers a genuine inbound binary frame to onBinary, decrypted, without disturbing text messaging', async () => {
+    const server = await startFakeOrcadServer()
+    servers.push(server)
+
+    const transport = await connectPairedTransport(offerFor(server))
+    try {
+      const payload = new Uint8Array([10, 20, 30, 0, 255])
+      const received = new Promise<Uint8Array>((resolve) => {
+        transport.onBinary?.((bytes) => resolve(bytes))
+      })
+      server.sendBinaryToActiveConnections(payload)
+      expect(await received).toEqual(payload)
+    } finally {
+      transport.close()
+    }
+  })
+
+  it('sendBinary seals outbound bytes as a binary WS frame the server decrypts', async () => {
+    const server = await startFakeOrcadServer()
+    servers.push(server)
+
+    const transport = await connectPairedTransport(offerFor(server))
+    try {
+      const payload = new Uint8Array([1, 2, 3, 254, 255])
+      transport.sendBinary?.(payload)
+      await new Promise((resolve) => setTimeout(resolve, 20))
+
+      expect(server.binaryFramesReceived).toHaveLength(1)
+      expect(server.binaryFramesReceived[0]).toEqual(payload)
+    } finally {
+      transport.close()
+    }
   })
 })

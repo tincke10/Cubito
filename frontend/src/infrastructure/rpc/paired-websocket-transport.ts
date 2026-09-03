@@ -3,15 +3,21 @@
  * Single-shot (one connect, one close) — reconnect/backoff sequencing belongs to the
  * application layer (`reconnect-backoff.ts` + `live-worktree-sync.ts`), not here.
  *
- * Text vs binary is discriminated via `typeof event.data === 'string'`: browser and Node
- * default `binaryType` differently ('blob' vs 'arraybuffer'), but that never matters here.
+ * Text vs binary is discriminated via `typeof event.data === 'string'`. `binaryType` is
+ * pinned to 'arraybuffer' at socket creation so inbound binary is always synchronously
+ * readable (Blob, the other default, requires an async read).
  */
-import { createPairingHandshake, type HandshakeEffect, type HandshakeFailure, type PairingStage } from './pairing-handshake'
+import {
+  createPairingHandshake,
+  type HandshakeEffect,
+  type HandshakeFailure,
+  type PairingStage
+} from './pairing-handshake'
 import type { PairingOffer } from './pairing-offer'
 import type { RpcTransport } from './rpc-connection'
 
 export type WebSocketLike = {
-  send(data: string): void
+  send(data: string | ArrayBufferLike | Uint8Array): void
   close(code?: number, reason?: string): void
   addEventListener(type: 'open' | 'message' | 'close' | 'error', cb: (event: any) => void): void
 }
@@ -38,9 +44,17 @@ export class PairingConnectionError extends Error {
   }
 }
 
-const defaultCreateSocket = (url: string): WebSocketLike => new WebSocket(url) as unknown as WebSocketLike
+const defaultCreateSocket = (url: string): WebSocketLike => {
+  const socket = new WebSocket(url)
+  // Browsers default to 'blob' (async); pin 'arraybuffer' so inbound binary is sync-readable.
+  socket.binaryType = 'arraybuffer'
+  return socket as unknown as WebSocketLike
+}
 
-export function connectPairedTransport(offer: PairingOffer, deps: PairedTransportDeps = {}): Promise<PairedTransport> {
+export function connectPairedTransport(
+  offer: PairingOffer,
+  deps: PairedTransportDeps = {}
+): Promise<PairedTransport> {
   const createSocket = deps.createSocket ?? defaultCreateSocket
   const handshake = createPairingHandshake({
     deviceToken: offer.deviceToken,
@@ -50,6 +64,7 @@ export function connectPairedTransport(offer: PairingOffer, deps: PairedTranspor
   return new Promise((resolve, reject) => {
     const socket = createSocket(offer.endpoint)
     const messageHandlers = new Set<(data: string) => void>()
+    const binaryHandlers = new Set<(bytes: Uint8Array) => void>()
     const closeHandlers = new Set<(reason?: string) => void>()
     let settled = false
     let closed = false
@@ -65,7 +80,14 @@ export function connectPairedTransport(offer: PairingOffer, deps: PairedTranspor
     function handleFailure(failure: HandshakeFailure): void {
       if (!settled) {
         settled = true
-        reject(new PairingConnectionError(failure.code, failure.message, failure.stage, failure.closeCode))
+        reject(
+          new PairingConnectionError(
+            failure.code,
+            failure.message,
+            failure.stage,
+            failure.closeCode
+          )
+        )
       } else {
         fireClose(failure.message)
       }
@@ -82,9 +104,16 @@ export function connectPairedTransport(offer: PairingOffer, deps: PairedTranspor
             send(data: string) {
               socket.send(handshake.sealRequest(data))
             },
+            sendBinary(bytes: Uint8Array) {
+              socket.send(handshake.sealBinary(bytes))
+            },
             onMessage(cb) {
               messageHandlers.add(cb)
               return () => messageHandlers.delete(cb)
+            },
+            onBinary(cb) {
+              binaryHandlers.add(cb)
+              return () => binaryHandlers.delete(cb)
             },
             onClose(cb) {
               closeHandlers.add(cb)
@@ -97,6 +126,8 @@ export function connectPairedTransport(offer: PairingOffer, deps: PairedTranspor
           })
         } else if (effect.kind === 'deliver') {
           for (const cb of [...messageHandlers]) cb(effect.plaintext)
+        } else if (effect.kind === 'deliver-binary') {
+          for (const cb of [...binaryHandlers]) cb(effect.bytes)
         } else {
           handleFailure(effect.failure)
         }
@@ -107,7 +138,11 @@ export function connectPairedTransport(offer: PairingOffer, deps: PairedTranspor
       applyEffects(handshake.start())
     })
     socket.addEventListener('message', (event: { data: unknown }) => {
-      applyEffects(typeof event.data === 'string' ? handshake.onTextFrame(event.data) : handshake.onBinaryFrame())
+      if (typeof event.data === 'string') {
+        applyEffects(handshake.onTextFrame(event.data))
+      } else {
+        applyEffects(handshake.onBinaryFrame(new Uint8Array(event.data as ArrayBufferLike)))
+      }
     })
     socket.addEventListener('close', (event: { code: number; reason: string }) => {
       applyEffects(handshake.onClose(event.code, event.reason))

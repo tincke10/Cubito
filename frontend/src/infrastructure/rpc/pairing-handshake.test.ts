@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createPairingHandshake, RUNTIME_CLIENT_CAPABILITIES } from './pairing-handshake'
 import { base64ToBytes } from './base64-binary'
-import { decrypt, encrypt } from './e2ee-box'
+import { decrypt, decryptBytes, encrypt, encryptBytes } from './e2ee-box'
 import { ORCAD_WIRE_VECTORS } from './orcad-wire-vectors'
 
 const vectors = ORCAD_WIRE_VECTORS
@@ -47,7 +47,13 @@ describe('createPairingHandshake — awaiting_ready', () => {
     handshake.start()
     const effects = handshake.onTextFrame('not json')
     expect(effects).toEqual([
-      { kind: 'fail', failure: expect.objectContaining({ code: 'invalid_runtime_response', stage: 'host-identity' }) }
+      {
+        kind: 'fail',
+        failure: expect.objectContaining({
+          code: 'invalid_runtime_response',
+          stage: 'host-identity'
+        })
+      }
     ])
     expect(handshake.state).toBe('failed')
     expect(handshake.stage).toBe('host-identity')
@@ -58,16 +64,28 @@ describe('createPairingHandshake — awaiting_ready', () => {
     handshake.start()
     const effects = handshake.onTextFrame(JSON.stringify({ type: 'not_ready' }))
     expect(effects).toEqual([
-      { kind: 'fail', failure: expect.objectContaining({ code: 'invalid_runtime_response', stage: 'host-identity' }) }
+      {
+        kind: 'fail',
+        failure: expect.objectContaining({
+          code: 'invalid_runtime_response',
+          stage: 'host-identity'
+        })
+      }
     ])
   })
 
   it('fails invalid_runtime_response/host-identity on a binary frame (CO-107)', () => {
     const handshake = createVectorHandshake()
     handshake.start()
-    const effects = handshake.onBinaryFrame()
+    const effects = handshake.onBinaryFrame(new Uint8Array([1, 2, 3]))
     expect(effects).toEqual([
-      { kind: 'fail', failure: expect.objectContaining({ code: 'invalid_runtime_response', stage: 'host-identity' }) }
+      {
+        kind: 'fail',
+        failure: expect.objectContaining({
+          code: 'invalid_runtime_response',
+          stage: 'host-identity'
+        })
+      }
     ])
   })
 })
@@ -84,7 +102,13 @@ describe('createPairingHandshake — awaiting_authenticated', () => {
     const handshake = advanceToAwaitingAuthenticated()
     const effects = handshake.onTextFrame('garbage!!!not-a-sealed-frame')
     expect(effects).toEqual([
-      { kind: 'fail', failure: expect.objectContaining({ code: 'invalid_runtime_response', stage: 'host-identity' }) }
+      {
+        kind: 'fail',
+        failure: expect.objectContaining({
+          code: 'invalid_runtime_response',
+          stage: 'host-identity'
+        })
+      }
     ])
   })
 
@@ -93,7 +117,13 @@ describe('createPairingHandshake — awaiting_authenticated', () => {
     const sealed = encrypt('not json', sharedKey)
     const effects = handshake.onTextFrame(sealed)
     expect(effects).toEqual([
-      { kind: 'fail', failure: expect.objectContaining({ code: 'invalid_runtime_response', stage: 'host-identity' }) }
+      {
+        kind: 'fail',
+        failure: expect.objectContaining({
+          code: 'invalid_runtime_response',
+          stage: 'host-identity'
+        })
+      }
     ])
   })
 
@@ -111,7 +141,10 @@ describe('createPairingHandshake — awaiting_authenticated', () => {
     const sealed = encrypt(vectors.handshake.unauthorizedPlaintext, sharedKey)
     const effects = handshake.onTextFrame(sealed)
     expect(effects).toEqual([
-      { kind: 'fail', failure: expect.objectContaining({ code: 'unauthorized', stage: 'access-grant' }) }
+      {
+        kind: 'fail',
+        failure: expect.objectContaining({ code: 'unauthorized', stage: 'access-grant' })
+      }
     ])
     expect(handshake.stage).toBe('access-grant')
   })
@@ -121,7 +154,13 @@ describe('createPairingHandshake — awaiting_authenticated', () => {
     const sealed = encrypt(vectors.handshake.badAuthPlaintext, sharedKey)
     const effects = handshake.onTextFrame(sealed)
     expect(effects).toEqual([
-      { kind: 'fail', failure: expect.objectContaining({ code: 'invalid_runtime_response', stage: 'host-identity' }) }
+      {
+        kind: 'fail',
+        failure: expect.objectContaining({
+          code: 'invalid_runtime_response',
+          stage: 'host-identity'
+        })
+      }
     ])
   })
 
@@ -130,15 +169,27 @@ describe('createPairingHandshake — awaiting_authenticated', () => {
     const sealed = encrypt(JSON.stringify({ type: 'something_else' }), sharedKey)
     const effects = handshake.onTextFrame(sealed)
     expect(effects).toEqual([
-      { kind: 'fail', failure: expect.objectContaining({ code: 'invalid_runtime_response', stage: 'host-identity' }) }
+      {
+        kind: 'fail',
+        failure: expect.objectContaining({
+          code: 'invalid_runtime_response',
+          stage: 'host-identity'
+        })
+      }
     ])
   })
 
   it('fails invalid_runtime_response/host-identity on a binary frame', () => {
     const handshake = advanceToAwaitingAuthenticated()
-    const effects = handshake.onBinaryFrame()
+    const effects = handshake.onBinaryFrame(new Uint8Array([1, 2, 3]))
     expect(effects).toEqual([
-      { kind: 'fail', failure: expect.objectContaining({ code: 'invalid_runtime_response', stage: 'host-identity' }) }
+      {
+        kind: 'fail',
+        failure: expect.objectContaining({
+          code: 'invalid_runtime_response',
+          stage: 'host-identity'
+        })
+      }
     ])
   })
 })
@@ -164,16 +215,44 @@ describe('createPairingHandshake — ready', () => {
     const handshake = advanceToReady()
     const effects = handshake.onTextFrame('undecryptable-garbage!!!')
     expect(effects).toEqual([
-      { kind: 'fail', failure: expect.objectContaining({ code: 'invalid_runtime_response', stage: 'runtime' }) }
+      {
+        kind: 'fail',
+        failure: expect.objectContaining({ code: 'invalid_runtime_response', stage: 'runtime' })
+      }
     ])
   })
 
-  it('fails invalid_runtime_response/runtime on a binary frame', () => {
+  it('fails invalid_runtime_response/runtime on an undecryptable binary frame', () => {
     const handshake = advanceToReady()
-    const effects = handshake.onBinaryFrame()
+    const effects = handshake.onBinaryFrame(new Uint8Array([1, 2, 3]))
     expect(effects).toEqual([
-      { kind: 'fail', failure: expect.objectContaining({ code: 'invalid_runtime_response', stage: 'runtime' }) }
+      {
+        kind: 'fail',
+        failure: expect.objectContaining({ code: 'invalid_runtime_response', stage: 'runtime' })
+      }
     ])
+  })
+
+  it('decrypts a genuine binary frame and delivers it as deliver-binary; state stays ready', () => {
+    const handshake = advanceToReady()
+    const payload = new Uint8Array([0, 1, 2, 127, 128, 254, 255])
+    const sealed = encryptBytes(payload, sharedKey)
+    const effects = handshake.onBinaryFrame(sealed)
+    expect(effects).toEqual([{ kind: 'deliver-binary', bytes: payload }])
+    expect(handshake.state).toBe('ready')
+  })
+
+  it('sealBinary() returns a sealed frame the mirror shared key can decrypt back to the same bytes', () => {
+    const handshake = advanceToReady()
+    const payload = new Uint8Array([9, 8, 7, 6])
+    const sealed = handshake.sealBinary(payload)
+    expect(decryptBytes(sealed, sharedKey)).toEqual(payload)
+  })
+
+  it('sealBinary() throws when state !== ready', () => {
+    const handshake = createVectorHandshake()
+    handshake.start()
+    expect(() => handshake.sealBinary(new Uint8Array([1]))).toThrow()
   })
 
   it('sealRequest() returns a sealed frame the mirror shared key can decrypt back to the plaintext', () => {
@@ -191,7 +270,11 @@ describe('createPairingHandshake — onClose at each stage (CO-106)', () => {
     expect(effects).toEqual([
       {
         kind: 'fail',
-        failure: expect.objectContaining({ code: 'remote_runtime_unavailable', stage: 'connect', closeCode: 1006 })
+        failure: expect.objectContaining({
+          code: 'remote_runtime_unavailable',
+          stage: 'connect',
+          closeCode: 1006
+        })
       }
     ])
   })
@@ -204,7 +287,11 @@ describe('createPairingHandshake — onClose at each stage (CO-106)', () => {
     expect(effects).toEqual([
       {
         kind: 'fail',
-        failure: expect.objectContaining({ code: 'remote_runtime_unavailable', stage: 'host-identity', closeCode: 1000 })
+        failure: expect.objectContaining({
+          code: 'remote_runtime_unavailable',
+          stage: 'host-identity',
+          closeCode: 1000
+        })
       }
     ])
   })
@@ -218,7 +305,11 @@ describe('createPairingHandshake — onClose at each stage (CO-106)', () => {
     expect(effects).toEqual([
       {
         kind: 'fail',
-        failure: expect.objectContaining({ code: 'remote_runtime_unavailable', stage: 'runtime', closeCode: 1011 })
+        failure: expect.objectContaining({
+          code: 'remote_runtime_unavailable',
+          stage: 'runtime',
+          closeCode: 1011
+        })
       }
     ])
   })
@@ -231,7 +322,7 @@ describe('createPairingHandshake — failed is idempotent', () => {
     handshake.onTextFrame('garbage')
     expect(handshake.state).toBe('failed')
     expect(handshake.onTextFrame('anything')).toEqual([])
-    expect(handshake.onBinaryFrame()).toEqual([])
+    expect(handshake.onBinaryFrame(new Uint8Array([1, 2, 3]))).toEqual([])
     expect(handshake.onClose(1000, 'x')).toEqual([])
   })
 })
