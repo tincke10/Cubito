@@ -12,143 +12,157 @@ frontend intenta la conexión real; sin él sirve el modo demo
 
 ## 0. Estado de validación (importante)
 
-El stack de conexión del frontend está **validado end-to-end contra un orcad
-real**: nuestro `e2ee-box` + `pairing-handshake` + `connect-orcad` completan el
-handshake E2EE v1 y traen el `worktree.list` real. Dos cosas aprendidas en esa
-validación que cambian cómo se lee este runbook:
+- **Browser-e2e VERDE, verificado.** Con `orcad` corriendo **nativo en el host**
+  (loopback puro, sin Docker), un navegador **en la misma máquina** completa el
+  handshake E2EE v1 y el HUD llega a `conectado · runtime <id>` con el runtime
+  real del proceso. Es el **camino recomendado** — ver §1.
+- **El stack del frontend es correcto, probado a nivel byte.** El mismo bundle
+  (`parsePairingCode` → `connectOrcad` → `listWorktrees`, con tweetnacl adentro)
+  autentica y trae `worktree.list` sobre loopback limpio. No hay defecto en el
+  frontend; lo que falla es el path de red de Docker (abajo).
+- **El browser-e2e a través del puerto publicado de Docker Desktop (`-p`) NO
+  funciona.** El proxy de red de Docker Desktop (vpnkit) entre host y contenedor
+  **resetea el stream de forma determinística** (un echo de integridad de bytes
+  se corta siempre en el mismo punto, ~143 bytes, bidireccional), así que los
+  frames de respuesta de orcad se truncan a mitad del handshake y este cierra con
+  `4001 Unauthorized` o `1006`. `4001 Unauthorized` es ambiguo: `e2ee-channel.ts`
+  emite ese código tanto ante token inválido como ante fallo de desencriptado. Un
+  relay a `127.0.0.1` dentro del contenedor **no** lo salva (la corrupción está en
+  el tramo host→contenedor, antes del relay), y un túnel SSH moriría igual. Es el
+  NAT, no el frontend.
+- **El CLI `orca --pairing-code` NO prueba la ruta WS cuando corre co-locado con
+  orcad.** Encuentra `orca-runtime.json` (transporte unix + `authToken`) y usa el
+  socket local, bypasseando el pairing WS (`cli/runtime/metadata.ts`). Para
+  ejercitar la ruta WS con el CLI hay que forzarlo con un `ORCA_USER_DATA` vacío.
 
-- **El browser-e2e desde el host NO funciona a través del puerto publicado de
-  Docker Desktop (`-p`).** El proxy de red de Docker Desktop (vpnkit) entre el
-  host y el contenedor rompe el frame WS de autenticación cifrado, y orcad lo
-  cierra con `4001 Unauthorized` (que es ambiguo: `e2ee-channel.ts:180` emite
-  ese mismo código ante un fallo de desencriptado, no solo ante un token
-  inválido). El mismo código, mismo token y mismo crypto **autentican sobre
-  loopback dentro del contenedor**. No es un defecto del frontend; es el NAT.
-  Para un browser-e2e verde hace falta un path sin ese NAT: túnel SSH que
-  termine en loopback dentro del contenedor, o correr el frontend co-locado.
-- **El CLI `orca --pairing-code` NO prueba la ruta WS cuando corre co-locado
-  con orcad.** Encuentra `orca-runtime.json` (transporte unix + `authToken`) y
-  usa el socket local, bypasseando el pairing WS (`cli/runtime/metadata.ts`).
-  Para ejercitar la ruta WS con el CLI hay que forzarlo con un `ORCA_USER_DATA`
-  vacío (sin `orca-runtime.json` que descubrir).
+## 1. Camino recomendado (verificado): orcad nativo en el host
 
-## 1. Levantar un orcad real en un contenedor
+Corré orcad en la propia Mac. Así el navegador le pega por loopback del host y no
+hay NAT de por medio. Es el path que da el browser-e2e en verde.
 
-No hay una imagen Docker publicada de `orcad` — se construye adentro de un
-contenedor Node genérico. El contenedor de validación existente
-(`cubito-orcad-validation`) **no publica puertos**, así que para este
-checklist levantá uno nuevo con `-p` desde el arranque (Docker no permite
-agregar `-p` a un contenedor ya creado).
+**Node 24.** La app fija `engines.node: "24"`; usá esa versión para instalar,
+buildear y correr, así el ABI de `node-pty` matchea. Con `nvm`:
 
-Desde la raíz del repo, en el host (macOS con Docker Desktop en Apple
-Silicon — sacá `--platform linux/arm64` en un host x86_64 o Linux nativo):
+```bash
+NODE24="$HOME/.nvm/versions/node/v24.13.1/bin"   # ajustá al v24.x que tengas
+```
+
+1. **Instalar deps del root** (es un install single-project, `packages: []`;
+   `frontend/` es un workspace aparte que ya tiene sus deps). Reconstruye
+   `node-pty` desde source para darwin-arm64 (~segundos):
+
+   ```bash
+   PATH="$NODE24:$PATH" corepack pnpm install --frozen-lockfile
+   ```
+
+2. **Buildear orcad nativo** (`config/scripts/build-orcad.mjs` → `out/orcad/orcad.js`;
+   contrato completo en `docs/reference/orcad-operations.md`):
+
+   ```bash
+   PATH="$NODE24:$PATH" corepack pnpm run build:orcad
+   ```
+
+3. **Arrancar orcad** en loopback del host (bind default `127.0.0.1`), salida JSON,
+   en background para capturar la línea de arranque:
+
+   ```bash
+   PATH="$NODE24:$PATH" nohup node out/orcad/orcad.js --port 6768 --json \
+     > /tmp/orcad-ready.log 2>/tmp/orcad-stderr.log &
+   ```
+
+   El terminal daemon arranca `live`/healthy (node-pty nativo real, sin el warning
+   de spawn-helper que aparece en contenedores emulados).
+
+4. **Extraer la URL de pairing** y armar la URL del frontend (fragmento
+   `#pairing=` URL-encodeado — `pairing-fragment.ts`, `readPairingFragment`):
+
+   ```bash
+   PAIRING_URL=$(node -e "console.log(JSON.parse(require('fs').readFileSync('/tmp/orcad-ready.log','utf8').trim().split('\n')[0]).pairing.url)")
+   node -e "console.log('http://localhost:5180/#pairing=' + encodeURIComponent(process.argv[1]))" "$PAIRING_URL"
+   ```
+
+5. **Levantar el dev server** del frontend (puerto `5180`, fijado en
+   `frontend/vite.config.ts`) y abrir la URL del paso 4 en un navegador **de esta
+   misma máquina**:
+
+   ```bash
+   pnpm --dir frontend dev
+   ```
+
+**Un pairing offer se consume/queda atado a su runtime.** Reiniciá orcad para un
+offer prístino si ya lo tocaste (un probe, un intento previo), y usá la URL nueva.
+
+## 2. Alternativa: orcad en contenedor (solo valida crypto, NO el browser)
+
+Útil para ejercitar el handshake sin instalar nada nativo, pero **el browser-e2e a
+través de `-p` no anda** (§0). Sirve para validar el crypto por loopback *dentro*
+del contenedor, no para la inspección visual en el navegador del host.
+
+No hay imagen Docker publicada de `orcad`; se construye adentro de un contenedor
+Node genérico (macOS con Docker Desktop en Apple Silicon — sacá
+`--platform linux/arm64` en x86_64 o Linux nativo):
 
 ```bash
 docker run -d --platform linux/arm64 --name cubito-orcad-e2e \
   -p 6768:6768 node:24-bookworm sleep infinity
-
 docker cp . cubito-orcad-e2e:/orca
-
 docker exec -w /orca cubito-orcad-e2e sh -c \
   "corepack enable && pnpm install --frozen-lockfile && pnpm run build:orcad"
-```
-
-`build:orcad` (`config/scripts/build-orcad.mjs`) produce `out/orcad/orcad.js`
-— ver `docs/reference/orcad-operations.md` para el contrato completo de qué
-es y qué supervisa ese proceso.
-
-Arrancalo con el puerto publicado, bind ancho (`-p` no llega a `127.0.0.1`
-dentro del contenedor) y salida JSON, en background para poder capturar la
-línea de arranque:
-
-```bash
 docker exec -d -w /orca cubito-orcad-e2e sh -c \
   "node out/orcad/orcad.js --port 6768 --bind 0.0.0.0 --json \
      > /tmp/orcad-ready.log 2>/tmp/orcad-stderr.log"
-
-sleep 1
-docker exec cubito-orcad-e2e cat /tmp/orcad-ready.log
 ```
+
+Para validar el crypto de verdad, corré el stack del frontend **dentro** del
+contenedor sobre `127.0.0.1:6768` (bundleá el entry con esbuild y corré el `.cjs`
+con el Node del contenedor); eso autentica. La ruta host→`-p`→browser no.
 
 Flags relevantes (`src/main/orcad/orcad-entry.ts:parseArgs`):
 
 - `--port <n>` — puerto RPC/WebSocket.
-- `--bind <ip-literal>` — default `127.0.0.1`; `0.0.0.0` es el opt-in
-  explícito a exposición de red, obligatorio para que `-p` llegue al
-  proceso (`src/main/orcad/orcad-bind-address.ts`).
+- `--bind <ip-literal>` — default `127.0.0.1`; `0.0.0.0` es el opt-in explícito a
+  exposición de red (`src/main/orcad/orcad-bind-address.ts`), obligatorio para que
+  `-p` llegue al proceso en el contenedor.
 - `--json` — la línea de arranque sale como un único JSON (`type:
-  "orca_server_ready"`) en vez de texto humano.
-- `--pairing-address <host:port>` — solo hace falta si el puerto publicado
-  en el host **difiere** del puerto interno del contenedor. Sin este flag,
-  `resolveAdvertisedPairingEndpoint` (`src/main/runtime/pairing-endpoint.ts`)
-  reescribe el bind ancho a `ws://127.0.0.1:<mismo-puerto>` — correcto
-  cuando `-p 6768:6768` usa el mismo número a ambos lados.
-
-**Limitación conocida, no bloqueante**: un contenedor sin las prebuilds
-nativas de `node-pty` para su arquitectura loguea una advertencia de
-spawn-helper al arrancar. No afecta pairing ni `worktree.list` — solo
-afectaría abrir una terminal PTY, fuera del alcance de este checklist.
-
-## 2. Extraer la URL de pairing
-
-`/tmp/orcad-ready.log` tiene una sola línea JSON. Extraé `pairing.url`
-(`orca://pair?code=…`) sin depender de `jq`:
-
-```bash
-PAIRING_URL=$(docker exec cubito-orcad-e2e node -e "
-  const line = require('fs').readFileSync('/tmp/orcad-ready.log', 'utf8').trim()
-  console.log(JSON.parse(line).pairing.url)
-")
-echo "$PAIRING_URL"
-```
-
-Si `pairing.available` es `false` (por ejemplo se arrancó con
-`--no-pairing`), no hay URL — repetí el paso 1 sin ese flag.
-
-## 3. Construir la URL del frontend y levantar el dev server
-
-El fragmento `#pairing=` lleva la URL de pairing URL-encodeada
-(`pairing-fragment.ts`, `readPairingFragment`):
-
-```bash
-node -e "console.log('http://localhost:5180/#pairing=' + encodeURIComponent(process.argv[1]))" "$PAIRING_URL"
-```
-
-En otra terminal, en el host:
-
-```bash
-pnpm --dir frontend dev
-```
-
-Abrí en el navegador la URL que imprimió el `node -e` de arriba (puerto
-`5180`, el que fija `frontend/vite.config.ts`).
-
-## 4. Checklist de verificación manual
-
-No es un test automatizado — es una inspección visual + de la URL.
-
-1. Contenedor arriba, línea `orca_server_ready` capturada, `pnpm --dir
-   frontend dev` corriendo, navegador abierto en la URL con `#pairing=`.
-2. El HUD pasa por `conectando…` (punto ámbar) y llega a `conectado ·
-   runtime <id>` (punto accent) — `<id>` no puede estar vacío.
-3. La escena muestra el grafo **real** del contenedor (nodos que
-   corresponden a los worktrees que existen adentro), no `demoRecords`.
-4. Matá el contenedor (`docker kill cubito-orcad-e2e`) y observá al HUD
-   pasar por `reconectando… · intento N` (punto ámbar) y terminar en
-   `desconectado · orcad no responde` (punto ámbar apagado) una vez agotado
-   el backoff.
-5. Después de la carga inicial, el fragmento `#pairing=` ya no está en la
-   barra de direcciones (`consumePairingFragment` lo limpia con
-   `history.replaceState`).
+  "orca_server_ready"`).
+- `--pairing-address <host:port>` — solo si el puerto publicado en el host difiere
+  del interno; si no, `resolveAdvertisedPairingEndpoint`
+  (`src/main/runtime/pairing-endpoint.ts`) reescribe el bind ancho a
+  `ws://127.0.0.1:<mismo-puerto>`.
 
 Al terminar: `docker rm -f cubito-orcad-e2e`.
 
-## 5. Troubleshooting
+## 3. Checklist de verificación manual (browser)
+
+No es un test automatizado — es inspección visual + de la URL.
+
+1. orcad arriba (línea `orca_server_ready` capturada), `pnpm --dir frontend dev`
+   corriendo, navegador de la misma máquina abierto en la URL con `#pairing=`.
+2. **La URL con el fragmento tiene que cargar en un documento fresco.** Cambiar
+   *solo el hash* sobre una página ya cargada NO recarga el documento, así que
+   `main.ts` no re-lee el fragmento y el frontend se queda en modo demo. Abrí la
+   URL en una pestaña nueva (o recargá con el fragmento presente), no navegando
+   solo el `#`.
+3. El HUD pasa por `conectando…` (punto ámbar) y llega a `conectado · runtime
+   <id>` (punto accent) — `<id>` no puede estar vacío y debe coincidir con el
+   `runtimeId` de `orcad-ready.log`.
+4. La escena muestra el estado **real** del runtime. Un workspace fresco reporta
+   `0 nodos` / `sin repositorio`: `worktree.list` lista solo worktrees gestionados
+   por orca, **no** las git worktrees crudas (`git worktree add` no aparece). Para
+   un grafo con nodos hay que crear worktrees por el flujo de orca.
+5. Matá orcad y observá al HUD pasar por `reconectando… · intento N` (punto ámbar)
+   y terminar en `desconectado · orcad no responde` una vez agotado el backoff.
+6. Tras la carga inicial, el fragmento `#pairing=` ya no está en la barra de
+   direcciones (`consumePairingFragment` lo limpia con `history.replaceState`).
+
+## 4. Troubleshooting
 
 | Síntoma | Causa | Dónde mirar |
 |---|---|---|
-| El navegador nunca conecta, error de contenido mixto | La página del frontend está en `https://` y trata de abrir `ws://` | Serví el frontend por `http://` en dev — no hay bloqueo del lado de orcad (`src/main/runtime/rpc/ws-transport.ts` no valida `Origin`, no hay preflight CORS en WS) |
-| HUD va directo a `desconectado · orcad no responde` sin pasar por `conectando…` | Puerto equivocado, o `--bind 0.0.0.0` sin `-p`, o el puerto publicado no coincide con `--pairing-address` | Repetí los pasos 1–2 verificando que el puerto de `-p host:container` sea el mismo que `--port` |
-| HUD llega a `desconectado · orcad rechazó el token` | El `deviceToken` del pairing offer no es válido para ese runtime (offer viejo, contenedor reiniciado con un runtime nuevo) | Repetí el paso 2 contra el `orcad-ready.log` del contenedor actual — un offer es válido solo para el runtime que lo emitió |
-| El navegador cierra con `4001 Unauthorized` pese a offer/token frescos | El NAT de Docker Desktop (vpnkit) del `-p` rompe el frame WS de auth cifrado (ver sección 0). `4001 Unauthorized` es ambiguo: también significa fallo de desencriptado, no solo token inválido | Confirmá el crypto por loopback dentro del contenedor (autentica); para el browser usá un túnel SSH que termine en loopback o corré el frontend co-locado, no el `-p` de Docker Desktop |
-| El grafo aparece pero con menos campos que en el CLI/mobile | `clientCapabilities` se manda como `[]` (D1, decisión deliberada). Verificado: `[]`, la lista completa y omitido **los tres autentican** — no afecta la resolución del dispositivo | Si faltan campos, compará la respuesta de `worktree.list` del frontend contra la de un cliente que declare capabilities; recién ahí evaluá declarar la lista |
+| El HUD se queda en `modo demo` pese a la URL con `#pairing=` | Se cambió solo el hash sobre una página ya cargada; `main.ts` no re-leyó el fragmento | Abrí la URL en un documento fresco (pestaña nueva / recarga con el fragmento), no navegando solo el `#` (§3.2) |
+| El navegador nunca conecta, error de contenido mixto | La página está en `https://` y trata de abrir `ws://` | Serví el frontend por `http://` en dev — orcad no valida `Origin` ni hace preflight CORS en WS (`src/main/runtime/rpc/ws-transport.ts`) |
+| El browser del automation no alcanza la página / el WS | El navegador corre en otra máquina (extensión remota, browser cloud) y no ve el `localhost` del host ni `127.0.0.1:6768` | Usá un navegador **co-locado** con orcad (misma máquina). Un Chromium local llega a ambos; uno remoto no |
+| HUD va directo a `desconectado · orcad no responde` sin `conectando…` | Puerto equivocado; o `--bind 0.0.0.0` sin `-p` (contenedor); o el publicado no coincide con `--pairing-address` | Verificá `--port` vs el endpoint del offer |
+| HUD llega a `desconectado · orcad rechazó el token` | El `deviceToken` del offer no es válido para ese runtime (offer viejo, orcad reiniciado con runtime nuevo, u offer ya consumido) | Regenerá el offer contra el `orcad-ready.log` actual — un offer vale solo para el runtime que lo emitió |
+| El navegador cierra con `4001 Unauthorized`/`1006` pese a offer/token frescos, vía Docker `-p` | El NAT de Docker Desktop (vpnkit) resetea el stream (~143 bytes) y trunca el frame de auth (§0). `4001` es ambiguo: también significa fallo de desencriptado | Corré orcad **nativo en el host** (§1). El crypto por loopback dentro del contenedor autentica; el `-p` de Docker Desktop no |
+| El grafo aparece con menos campos que en CLI/mobile | `clientCapabilities` se manda como `[]` (D1, deliberado). Verificado: `[]`, la lista completa y omitido **los tres autentican** — no afecta la resolución del dispositivo | Si faltan campos, compará `worktree.list` del frontend contra un cliente que declare capabilities; recién ahí evaluá declarar la lista |
