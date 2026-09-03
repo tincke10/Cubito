@@ -82,4 +82,34 @@ describe('decodeRpcFrame', () => {
   it('rejects a failure envelope without an error object', () => {
     expect(decodeRpcFrame(JSON.stringify({ id: 'a', ok: false })).kind).toBe('invalid')
   })
+
+  // Streaming RPC emits (terminal.multiplex) reuse the request id across multiple frames;
+  // decoding them as plain 'response' makes RpcConnection resolve+delete on the first emit.
+  it('decodes a streaming-tagged frame as kind "stream", not "response"', () => {
+    const frame = decodeRpcFrame(
+      JSON.stringify({
+        id: 'a',
+        ok: true,
+        result: { type: 'ready' },
+        _meta: { runtimeId: 'rt' },
+        streaming: true
+      })
+    )
+    expect(frame).toEqual({
+      kind: 'stream',
+      response: {
+        id: 'a',
+        ok: true,
+        result: { type: 'ready' },
+        _meta: { runtimeId: 'rt' }
+      }
+    })
+  })
+
+  it('still decodes a non-streaming success frame as "response"', () => {
+    const frame = decodeRpcFrame(
+      JSON.stringify({ id: 'a', ok: true, result: [], _meta: { runtimeId: 'rt' } })
+    )
+    expect(frame.kind).toBe('response')
+  })
 })

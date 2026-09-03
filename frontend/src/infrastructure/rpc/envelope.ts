@@ -31,6 +31,7 @@ export type RpcResponseFrame = RpcSuccessFrame | RpcFailureFrame
 
 export type DecodedRpcFrame =
   | { kind: 'response'; response: RpcResponseFrame }
+  | { kind: 'stream'; response: RpcSuccessFrame }
   | { kind: 'keepalive' }
   | { kind: 'invalid'; reason: string }
 
@@ -70,15 +71,18 @@ export function decodeRpcFrame(raw: string): DecodedRpcFrame {
     if (typeof meta?.runtimeId !== 'string') {
       return { kind: 'invalid', reason: 'missing_runtime_id' }
     }
-    return {
-      kind: 'response',
-      response: {
-        id: frame.id,
-        ok: true,
-        result: frame.result,
-        _meta: { runtimeId: meta.runtimeId }
-      }
+    const response: RpcSuccessFrame = {
+      id: frame.id,
+      ok: true,
+      result: frame.result,
+      _meta: { runtimeId: meta.runtimeId }
     }
+    // terminal.multiplex-style streaming RPCs reuse the request id across many emits — decode
+    // separately so RpcConnection doesn't resolve+delete the pending call on the first one.
+    if (frame.streaming === true) {
+      return { kind: 'stream', response }
+    }
+    return { kind: 'response', response }
   }
 
   if (frame.ok === false) {

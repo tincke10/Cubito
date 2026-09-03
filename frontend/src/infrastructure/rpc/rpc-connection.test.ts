@@ -4,21 +4,32 @@ import type { RpcTransport } from './rpc-connection'
 
 type FakeTransport = RpcTransport & {
   sent: string[]
+  sentBinary: Uint8Array[]
   receive(raw: string): void
+  receiveBinary(bytes: Uint8Array): void
   close(reason?: string): void
 }
 
 const createFakeTransport = (): FakeTransport => {
   const messageHandlers: ((data: string) => void)[] = []
   const closeHandlers: ((reason?: string) => void)[] = []
+  const binaryHandlers: ((bytes: Uint8Array) => void)[] = []
   return {
     sent: [],
+    sentBinary: [],
     send(data) {
       this.sent.push(data)
+    },
+    sendBinary(bytes) {
+      this.sentBinary.push(bytes)
     },
     onMessage(cb) {
       messageHandlers.push(cb)
       return () => void messageHandlers.splice(messageHandlers.indexOf(cb), 1)
+    },
+    onBinary(cb) {
+      binaryHandlers.push(cb)
+      return () => void binaryHandlers.splice(binaryHandlers.indexOf(cb), 1)
     },
     onClose(cb) {
       closeHandlers.push(cb)
@@ -26,6 +37,9 @@ const createFakeTransport = (): FakeTransport => {
     },
     receive(raw) {
       for (const cb of [...messageHandlers]) cb(raw)
+    },
+    receiveBinary(bytes) {
+      for (const cb of [...binaryHandlers]) cb(bytes)
     },
     close(reason) {
       for (const cb of [...closeHandlers]) cb(reason)
@@ -35,6 +49,9 @@ const createFakeTransport = (): FakeTransport => {
 
 const success = (id: string, result: unknown): string =>
   JSON.stringify({ id, ok: true, result, _meta: { runtimeId: 'rt' } })
+
+const streamEmit = (id: string, result: unknown): string =>
+  JSON.stringify({ id, ok: true, result, _meta: { runtimeId: 'rt' }, streaming: true })
 
 describe('RpcConnection', () => {
   let transport: FakeTransport
@@ -137,5 +154,128 @@ describe('RpcConnection', () => {
     const parsed = JSON.parse(transport.sent[0] ?? '')
     expect(parsed.deviceToken).toBe('tok')
     expect(parsed.authToken).toBeUndefined()
+  })
+
+  describe('openStream', () => {
+    it('delivers multiple emits on the same id without tearing down after the first', () => {
+      const emits: unknown[] = []
+      connection.openStream(
+        'terminal.multiplex',
+        {},
+        {
+          onEmit: (result) => emits.push(result),
+          onError: () => {},
+          onClose: () => {}
+        }
+      )
+      expect(JSON.parse(transport.sent[0] ?? '')).toMatchObject({
+        id: 'id-1',
+        method: 'terminal.multiplex'
+      })
+      transport.receive(streamEmit('id-1', { type: 'ready' }))
+      transport.receive(streamEmit('id-1', { type: 'subscribed', streamId: 1 }))
+      transport.receive(streamEmit('id-1', { type: 'end', streamId: 1 }))
+      expect(emits).toEqual([
+        { type: 'ready' },
+        { type: 'subscribed', streamId: 1 },
+        { type: 'end', streamId: 1 }
+      ])
+    })
+
+    it('does not resolve/consume pending calls or vice versa (separate maps)', async () => {
+      const emits: unknown[] = []
+      connection.openStream(
+        'terminal.multiplex',
+        {},
+        {
+          onEmit: (result) => emits.push(result),
+          onError: () => {},
+          onClose: () => {}
+        }
+      )
+      const pending = connection.call('worktree.list')
+      transport.receive(streamEmit('id-1', { type: 'ready' }))
+      transport.receive(success('id-2', []))
+      await expect(pending).resolves.toMatchObject({ result: [] })
+      expect(emits).toEqual([{ type: 'ready' }])
+    })
+
+    it('routes a failure response for the stream id to onError, not call()', () => {
+      const errors: unknown[] = []
+      connection.openStream(
+        'terminal.multiplex',
+        {},
+        {
+          onEmit: () => {},
+          onError: (err) => errors.push(err),
+          onClose: () => {}
+        }
+      )
+      transport.receive(
+        JSON.stringify({ id: 'id-1', ok: false, error: { code: 'boom', message: 'nope' } })
+      )
+      expect(errors).toHaveLength(1)
+      expect(errors[0]).toMatchObject({ code: 'boom' })
+    })
+
+    it('notifies onClose for every open stream when the transport closes', () => {
+      const closed: boolean[] = []
+      connection.openStream(
+        'terminal.multiplex',
+        {},
+        {
+          onEmit: () => {},
+          onError: () => {},
+          onClose: () => closed.push(true)
+        }
+      )
+      transport.close('gone')
+      expect(closed).toEqual([true])
+    })
+
+    it('is not subject to the request timeout', async () => {
+      connection.openStream(
+        'terminal.multiplex',
+        {},
+        {
+          onEmit: () => {},
+          onError: () => {},
+          onClose: () => {
+            throw new Error('stream should not be torn down by the call timeout')
+          }
+        }
+      )
+      await vi.advanceTimersByTimeAsync(5001)
+    })
+
+    it('routes binary frames to the stream consumer via onBinary passthrough', () => {
+      const received: Uint8Array[] = []
+      connection.onBinary?.((bytes) => received.push(bytes))
+      const bytes = new Uint8Array([1, 2, 3])
+      transport.receiveBinary(bytes)
+      expect(received).toEqual([bytes])
+    })
+
+    it('sendBinary passes through to the transport', () => {
+      const bytes = new Uint8Array([9, 8, 7])
+      connection.sendBinary?.(bytes)
+      expect(transport.sentBinary).toEqual([bytes])
+    })
+
+    it('a keepalive does not touch stream state (no timers to refresh)', () => {
+      const emits: unknown[] = []
+      connection.openStream(
+        'terminal.multiplex',
+        {},
+        {
+          onEmit: (result) => emits.push(result),
+          onError: () => {},
+          onClose: () => {}
+        }
+      )
+      transport.receive(JSON.stringify({ _keepalive: true }))
+      transport.receive(streamEmit('id-1', { type: 'ready' }))
+      expect(emits).toEqual([{ type: 'ready' }])
+    })
   })
 })

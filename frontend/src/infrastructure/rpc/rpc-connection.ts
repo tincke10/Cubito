@@ -32,6 +32,14 @@ type PendingCall = {
   method: string
 }
 
+export type StreamHandlers = {
+  onEmit(result: unknown): void
+  onError(error: RpcCallError): void
+  onClose(): void
+}
+
+export type OpenRpcStream = { close(): void }
+
 export type RpcConnectionOptions = {
   deviceToken: string
   timeoutMs?: number
@@ -50,6 +58,9 @@ export class RpcConnection {
   private readonly timeoutMs: number
   private readonly generateId: () => string
   private readonly pending = new Map<string, PendingCall>()
+  // Long-lived streaming RPCs (terminal.multiplex): kept out of `pending` so they are never
+  // touched by the request timeout or resolved/deleted after their first emit.
+  private readonly streams = new Map<string, StreamHandlers>()
 
   constructor(transport: RpcTransport, options: RpcConnectionOptions) {
     this.transport = transport
@@ -84,6 +95,35 @@ export class RpcConnection {
     })
   }
 
+  /** Opens a long-lived streaming RPC (e.g. terminal.multiplex). Not timeout-bounded. */
+  openStream(method: string, params: unknown, handlers: StreamHandlers): OpenRpcStream {
+    const id = this.generateId()
+    this.streams.set(id, handlers)
+    const request: Parameters<typeof encodeRpcRequest>[0] = {
+      id,
+      deviceToken: this.deviceToken,
+      method
+    }
+    if (params !== undefined) {
+      request.params = params
+    }
+    this.transport.send(encodeRpcRequest(request))
+    return {
+      close: () => {
+        this.streams.delete(id)
+      }
+    }
+  }
+
+  /** Out-of-band binary frames (no rpc id) — passthrough to the transport. */
+  sendBinary(bytes: Uint8Array): void {
+    this.transport.sendBinary?.(bytes)
+  }
+
+  onBinary(cb: (bytes: Uint8Array) => void): () => void {
+    return this.transport.onBinary?.(cb) ?? (() => {})
+  }
+
   private startTimeoutTimer(
     id: string,
     method: string,
@@ -103,7 +143,20 @@ export class RpcConnection {
       this.refreshPendingTimeouts()
       return
     }
+    if (frame.kind === 'stream') {
+      this.streams.get(frame.response.id)?.onEmit(frame.response.result)
+      return
+    }
     if (frame.kind !== 'response') {
+      return
+    }
+    const stream = this.streams.get(frame.response.id)
+    if (stream) {
+      // A streaming RPC only ever replies with a failure while alive (never a final success).
+      if (!frame.response.ok) {
+        const { code, message, data } = frame.response.error
+        stream.onError(new RpcCallError(code, message, data))
+      }
       return
     }
     const pending = this.pending.get(frame.response.id)
@@ -135,5 +188,9 @@ export class RpcConnection {
       pending.reject(new RpcCallError(code, message))
     }
     this.pending.clear()
+    for (const stream of this.streams.values()) {
+      stream.onClose()
+    }
+    this.streams.clear()
   }
 }
