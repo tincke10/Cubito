@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createSceneStore } from './scene-store'
 import { emptyWorktreeGraph } from '../domain/worktree-graph/types'
+import { emptyTerminalsState } from './terminal-session-model'
 
 describe('createSceneStore', () => {
   it('starts idle with an empty graph and no connection/selection', () => {
@@ -52,7 +53,10 @@ describe('createSceneStore', () => {
 
   it('sync and connection are independently settable', () => {
     const store = createSceneStore()
-    store.update({ sync: { state: 'synced', at: 1 }, connection: { state: 'down', reason: 'offline' } })
+    store.update({
+      sync: { state: 'synced', at: 1 },
+      connection: { state: 'down', reason: 'offline' }
+    })
     const state = store.get()
     expect(state.sync).toEqual({ state: 'synced', at: 1 })
     expect(state.connection).toEqual({ state: 'down', reason: 'offline' })
@@ -70,7 +74,11 @@ describe('createSceneStore', () => {
     expect(store.get().connection).toEqual({ state: 'connecting' })
 
     store.update({ connection: { state: 'reconnecting', attempt: 3, nextRetryInMs: 2000 } })
-    expect(store.get().connection).toEqual({ state: 'reconnecting', attempt: 3, nextRetryInMs: 2000 })
+    expect(store.get().connection).toEqual({
+      state: 'reconnecting',
+      attempt: 3,
+      nextRetryInMs: 2000
+    })
 
     store.set({ ...store.get(), connection: { state: 'connecting' } })
     expect(store.get().connection).toEqual({ state: 'connecting' })
@@ -83,5 +91,49 @@ describe('createSceneStore', () => {
 
     store.update({ graph: emptyWorktreeGraph() })
     expect('counters' in store.get()).toBe(false)
+  })
+
+  it('starts with an empty terminals slice', () => {
+    const store = createSceneStore()
+    expect(store.get().terminals).toEqual(emptyTerminalsState())
+  })
+
+  it('dispatchTerminal() drives the terminals slice through the reducer', () => {
+    const store = createSceneStore()
+    store.dispatchTerminal({ type: 'open-terminal-for-node', nodeId: 'w1' })
+    const state = store.get()
+    expect(state.terminals.sessions.get(1)).toMatchObject({ nodeId: 'w1', status: 'creating' })
+    expect(state.terminals.activePanel).toMatchObject({ nodeId: 'w1', sessionIndex: 0 })
+  })
+
+  it('dispatchTerminal() notifies subscribers and leaves the rest of SceneState untouched', () => {
+    const store = createSceneStore()
+    const listener = vi.fn()
+    store.subscribe(listener)
+    const before = store.get()
+    store.dispatchTerminal({ type: 'open-terminal-for-node', nodeId: 'w1' })
+    expect(listener).toHaveBeenCalledTimes(1)
+    const after = store.get()
+    expect(after.graph).toBe(before.graph)
+    expect(after.connection).toBe(before.connection)
+    expect(after.terminals).not.toBe(before.terminals)
+  })
+
+  it('dispatchTerminal() accumulates across multiple actions', () => {
+    const store = createSceneStore()
+    store.dispatchTerminal({ type: 'open-terminal-for-node', nodeId: 'w1' })
+    store.dispatchTerminal({
+      type: 'subscribed',
+      streamId: 1,
+      terminal: 'term-1',
+      cols: 80,
+      rows: 24
+    })
+    store.dispatchTerminal({ type: 'output-arrived', streamId: 1 })
+    expect(store.get().terminals.sessions.get(1)).toMatchObject({
+      handle: 'term-1',
+      status: 'live',
+      hasOutput: true
+    })
   })
 })

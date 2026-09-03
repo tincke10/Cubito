@@ -29,11 +29,27 @@ function deferred<T>(): Deferred<T> {
   return { promise, resolve, reject }
 }
 
+/** Fake terminals port: reconnect-hook tests only assert identity, never call these. */
+function createFakeTerminalsPort(): LiveSyncConnection['terminals'] {
+  return {
+    createTerminal: async () => ({ terminal: 'fake' }),
+    subscribe: () => {},
+    sendInput: () => {},
+    sendResize: () => {},
+    unsubscribe: () => {},
+    close: async () => {}
+  }
+}
+
 /** Fake connection: `listWorktrees` resolution timing and `runtimeId` are test-controlled. */
 function createFakeConnection(overrides?: {
   runtimeId?: string
   listWorktrees?: () => Promise<RawWorktreeRecord[]>
-}): LiveSyncConnection & { listWorktreesCalls: number; closed: boolean; emitClose(reason: string): void } {
+}): LiveSyncConnection & {
+  listWorktreesCalls: number
+  closed: boolean
+  emitClose(reason: string): void
+} {
   const closeHandlers: ((reason: string) => void)[] = []
   const connection = {
     listWorktreesCalls: 0,
@@ -47,6 +63,7 @@ function createFakeConnection(overrides?: {
         return records
       }
     },
+    terminals: createFakeTerminalsPort(),
     close() {
       connection.closed = true
     },
@@ -90,7 +107,9 @@ describe('createLiveWorktreeSync', () => {
     visibilityCb = undefined
     random = () => 0.5
     setTimerSpy = vi.fn((fn: () => void, ms: number) => setTimeout(fn, ms))
-    clearTimerSpy = vi.fn((handle: unknown) => clearTimeout(handle as ReturnType<typeof setTimeout>))
+    clearTimerSpy = vi.fn((handle: unknown) =>
+      clearTimeout(handle as ReturnType<typeof setTimeout>)
+    )
   })
 
   afterEach(() => {
@@ -122,7 +141,10 @@ describe('createLiveWorktreeSync', () => {
 
   it('CO-502 chains the next poll only after the previous one settles — no overlap when a poll outruns the interval', async () => {
     const slow = deferred<RawWorktreeRecord[]>()
-    const connection = createFakeConnection({ runtimeId: 'rt-1', listWorktrees: () => slow.promise })
+    const connection = createFakeConnection({
+      runtimeId: 'rt-1',
+      listWorktrees: () => slow.promise
+    })
     const sync = createLiveWorktreeSync(baseDeps(async () => connection))
     sync.start()
     await vi.advanceTimersByTimeAsync(0)
@@ -166,7 +188,9 @@ describe('createLiveWorktreeSync', () => {
 
   it('visible resets the reconnect attempt counter: a pending reconnect wait is skipped and the next failure restarts at attempt 1', async () => {
     let connectCalls = 0
-    const liveConnection: { current: (LiveSyncConnection & { emitClose(reason: string): void }) | null } = {
+    const liveConnection: {
+      current: (LiveSyncConnection & { emitClose(reason: string): void }) | null
+    } = {
       current: null
     }
     const connect = async () => {
@@ -226,7 +250,10 @@ describe('createLiveWorktreeSync', () => {
       random = () => seed
       const connection = createFakeConnection({ runtimeId: 'rt-1' })
       const localSpy = vi.fn((fn: () => void, ms: number) => setTimeout(fn, ms))
-      const sync = createLiveWorktreeSync({ ...baseDeps(async () => connection), setTimer: localSpy })
+      const sync = createLiveWorktreeSync({
+        ...baseDeps(async () => connection),
+        setTimer: localSpy
+      })
       sync.start()
       await vi.advanceTimersByTimeAsync(0)
       const delays = localSpy.mock.calls.map(([, ms]) => ms as number)
@@ -240,7 +267,9 @@ describe('createLiveWorktreeSync', () => {
 
   it('CO-505: transport loss drives reconnecting{attempt,nextRetryInMs} through reconnect-backoff', async () => {
     let connectCalls = 0
-    const liveConnection: { current: ReturnType<typeof createFakeConnection> | null } = { current: null }
+    const liveConnection: { current: ReturnType<typeof createFakeConnection> | null } = {
+      current: null
+    }
     const connect = async () => {
       connectCalls += 1
       liveConnection.current = createFakeConnection({ runtimeId: 'rt-1' })
@@ -278,7 +307,9 @@ describe('createLiveWorktreeSync', () => {
 
   it('CO-505: retry-budget exhaustion (every reconnect attempt itself fails) eventually lands on down{reason}', async () => {
     let connectCalls = 0
-    const initialConnection: { current: ReturnType<typeof createFakeConnection> | null } = { current: null }
+    const initialConnection: { current: ReturnType<typeof createFakeConnection> | null } = {
+      current: null
+    }
     const connect = async () => {
       connectCalls += 1
       if (connectCalls === 1) {
@@ -327,6 +358,60 @@ describe('createLiveWorktreeSync', () => {
     await vi.advanceTimersByTimeAsync(0)
     expect(setTimerSpy.mock.calls.length).toBeGreaterThan(callsWhilePending)
     expect(resolveCount).toBe(1)
+    sync.stop()
+  })
+
+  it('P3.5: calls onConnected with the fresh connection (terminals port included) after each successful connect', async () => {
+    const connection = createFakeConnection({ runtimeId: 'rt-1' })
+    const onConnected = vi.fn()
+    const sync = createLiveWorktreeSync({ ...baseDeps(async () => connection), onConnected })
+    sync.start()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(onConnected).toHaveBeenCalledTimes(1)
+    expect(onConnected).toHaveBeenCalledWith(connection)
+    expect(onConnected.mock.calls[0]?.[0]?.terminals).toBe(connection.terminals)
+    sync.stop()
+  })
+
+  it('P3.5: calls onDisconnected on connection loss, then onConnected again once reconnected — so a terminal layer can re-subscribe active sessions on the fresh port', async () => {
+    let connectCalls = 0
+    const liveConnection: { current: ReturnType<typeof createFakeConnection> | null } = {
+      current: null
+    }
+    const connect = async () => {
+      connectCalls += 1
+      liveConnection.current = createFakeConnection({ runtimeId: 'rt-1' })
+      return liveConnection.current
+    }
+    const onConnected = vi.fn()
+    const onDisconnected = vi.fn()
+    const sync = createLiveWorktreeSync({ ...baseDeps(connect), onConnected, onDisconnected })
+    sync.start()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(onConnected).toHaveBeenCalledTimes(1)
+    const firstConnection = liveConnection.current
+
+    liveConnection.current?.emitClose('remote_runtime_unavailable')
+    expect(onDisconnected).toHaveBeenCalledTimes(1)
+    expect(onConnected).toHaveBeenCalledTimes(1) // not re-fired until a new connection actually lands
+
+    const state = store.get().connection
+    if (state.state === 'reconnecting') {
+      await vi.advanceTimersByTimeAsync(state.nextRetryInMs)
+    }
+    expect(connectCalls).toBe(2)
+    expect(onConnected).toHaveBeenCalledTimes(2)
+    expect(onConnected.mock.calls[1]?.[0]).not.toBe(firstConnection)
+    sync.stop()
+  })
+
+  it('P3.5: onConnected/onDisconnected are optional — omitting them changes nothing', async () => {
+    const connection = createFakeConnection({ runtimeId: 'rt-1' })
+    const sync = createLiveWorktreeSync(baseDeps(async () => connection))
+    sync.start()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(store.get().connection).toEqual({ state: 'connected', runtimeId: 'rt-1' })
+    expect(() => connection.emitClose('unauthorized')).not.toThrow()
     sync.stop()
   })
 

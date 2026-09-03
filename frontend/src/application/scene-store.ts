@@ -1,5 +1,7 @@
 import { emptyWorktreeGraph } from '../domain/worktree-graph/types'
 import type { WorktreeGraph, WorktreeId } from '../domain/worktree-graph/types'
+import { emptyTerminalsState, reduceTerminals } from './terminal-session-model'
+import type { TerminalAction, TerminalsState } from './terminal-session-model'
 
 export type SyncStatus =
   | { state: 'idle' }
@@ -19,12 +21,15 @@ export type SceneState = {
   connection: ConnectionState
   selection: { selectedId: WorktreeId | null }
   repo: { name: string; baseBranch: string } | null
+  terminals: TerminalsState
 }
 
 export type SceneStore = {
   get(): SceneState
   set(next: SceneState): void
   update(patch: Partial<SceneState>): void
+  /** Drives the terminals slice through terminal-session-model's pure reducer, one notify. */
+  dispatchTerminal(action: TerminalAction): void
   subscribe(listener: (state: SceneState) => void): () => void
 }
 
@@ -33,7 +38,8 @@ const initialSceneState = (): SceneState => ({
   sync: { state: 'idle' },
   connection: { state: 'down', reason: 'not connected' },
   selection: { selectedId: null },
-  repo: null
+  repo: null,
+  terminals: emptyTerminalsState()
 })
 
 /** Minimal observable store; swap for a richer signal system when the UI grows. */
@@ -53,6 +59,10 @@ export function createSceneStore(): SceneStore {
     },
     update(patch) {
       state = { ...state, ...patch }
+      notify()
+    },
+    dispatchTerminal(action) {
+      state = { ...state, terminals: reduceTerminals(state.terminals, action) }
       notify()
     },
     subscribe(listener) {

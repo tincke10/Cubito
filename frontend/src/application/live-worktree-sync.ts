@@ -3,6 +3,7 @@ import { connectionFailureReason } from './connection-reason'
 import { syncWorktreeGraph } from './sync-worktree-graph'
 import type { SceneStore } from './scene-store'
 import type { RuntimeGateway } from './ports/runtime-gateway'
+import type { TerminalStreamPort } from './ports/terminal-stream-port'
 
 /** Poll loop owns its own timer (D5) — `main.ts` only composes and calls `start()`. */
 export const LIVE_SYNC_POLL_INTERVAL_MS = 2000
@@ -15,6 +16,7 @@ export const LIVE_SYNC_JITTER_RATIO = 0.1
  */
 export type LiveSyncConnection = {
   gateway: RuntimeGateway
+  terminals: TerminalStreamPort
   runtimeId?: string
   close(): void
   onClose(cb: (reason: string) => void): void
@@ -29,6 +31,12 @@ export type LiveSyncDeps = {
   clearTimer?: (handle: unknown) => void
   isDocumentHidden?: () => boolean
   onVisibilityChange?: (cb: () => void) => () => void
+  /** Fires with the fresh connection right after each successful connect (area 7): lets the
+   * terminal layer re-subscribe active sessions on the new port. live-worktree-sync stays the
+   * sole owner of connection lifecycle — this is a notification, not a delegation. */
+  onConnected?(connection: LiveSyncConnection): void
+  /** Fires once per connection loss, before any reconnect/backoff decision. */
+  onDisconnected?(): void
 }
 
 export type LiveWorktreeSync = { start(): void; stop(): void }
@@ -41,12 +49,16 @@ export type LiveWorktreeSync = { start(): void; stop(): void }
  * and RPC-only failures (socket alive) are left to `syncWorktreeGraph`'s own `sync.error` — no
  * backoff there, polling continues at the normal interval (D4).
  */
-export function createLiveWorktreeSync(deps: LiveSyncDeps, options?: { pollIntervalMs?: number }): LiveWorktreeSync {
+export function createLiveWorktreeSync(
+  deps: LiveSyncDeps,
+  options?: { pollIntervalMs?: number }
+): LiveWorktreeSync {
   const pollIntervalMs = options?.pollIntervalMs ?? LIVE_SYNC_POLL_INTERVAL_MS
   const now = deps.now ?? Date.now
   const random = deps.random ?? Math.random
   const setTimer = deps.setTimer ?? ((fn: () => void, ms: number) => setTimeout(fn, ms))
-  const clearTimer = deps.clearTimer ?? ((handle: unknown) => clearTimeout(handle as ReturnType<typeof setTimeout>))
+  const clearTimer =
+    deps.clearTimer ?? ((handle: unknown) => clearTimeout(handle as ReturnType<typeof setTimeout>))
   const isDocumentHidden = deps.isDocumentHidden ?? (() => false)
   const onVisibilityChange = deps.onVisibilityChange ?? (() => () => {})
 
@@ -94,6 +106,7 @@ export function createLiveWorktreeSync(deps: LiveSyncDeps, options?: { pollInter
     clearPendingTimer()
     connection = null
     firstPollSucceeded = false
+    deps.onDisconnected?.()
     if (stopped) return
     if (!isRetryableFailure(code) || reconnectAttempt >= RECONNECT_MAX_ATTEMPTS) {
       deps.store.update({ connection: { state: 'down', reason: connectionFailureReason(code) } })
@@ -101,7 +114,9 @@ export function createLiveWorktreeSync(deps: LiveSyncDeps, options?: { pollInter
     }
     reconnectAttempt += 1
     const delay = reconnectDelayMs(reconnectAttempt, random)
-    deps.store.update({ connection: { state: 'reconnecting', attempt: reconnectAttempt, nextRetryInMs: delay } })
+    deps.store.update({
+      connection: { state: 'reconnecting', attempt: reconnectAttempt, nextRetryInMs: delay }
+    })
     timerHandle = setTimer(() => {
       timerHandle = null
       void connectAndPoll()
@@ -119,6 +134,7 @@ export function createLiveWorktreeSync(deps: LiveSyncDeps, options?: { pollInter
       }
       connection = nextConnection
       firstPollSucceeded = false
+      deps.onConnected?.(nextConnection)
       nextConnection.onClose((reason) => {
         if (connection !== nextConnection) return
         handleConnectionLost(reason)

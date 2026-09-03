@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { hudModel } from './hud-model'
 import { countNodeStates } from '../theme/node-state'
 import { emptyWorktreeGraph } from '../../domain/worktree-graph/types'
+import { emptyTerminalsState } from '../../application/terminal-session-model'
 import type { SceneState } from '../../application/scene-store'
 
 const baseState = (overrides: Partial<SceneState> = {}): SceneState => ({
@@ -12,6 +13,7 @@ const baseState = (overrides: Partial<SceneState> = {}): SceneState => ({
   connection: { state: 'down', reason: 'not connected' },
   selection: { selectedId: null },
   repo: null,
+  terminals: emptyTerminalsState(),
   ...overrides
 })
 
@@ -50,9 +52,12 @@ describe('hudModel', () => {
   })
 
   it('connection.label includes the reason when down', () => {
-    const model = hudModel(baseState({ connection: { state: 'down', reason: 'runtime unreachable' } }), {
-      isMac: true
-    })
+    const model = hudModel(
+      baseState({ connection: { state: 'down', reason: 'runtime unreachable' } }),
+      {
+        isMac: true
+      }
+    )
     expect(model.connection.label).toContain('runtime unreachable')
   })
 
@@ -64,7 +69,9 @@ describe('hudModel', () => {
       baseState({ connection: { state: 'reconnecting', attempt: 1, nextRetryInMs: 500 } }),
       { isMac: true }
     )
-    const down = hudModel(baseState({ connection: { state: 'down', reason: 'x' } }), { isMac: true })
+    const down = hudModel(baseState({ connection: { state: 'down', reason: 'x' } }), {
+      isMac: true
+    })
 
     expect(connected.connection.dotColor).not.toBe(reconnecting.connection.dotColor)
     expect(connected.connection.dotColor).not.toBe(down.connection.dotColor)
@@ -76,7 +83,9 @@ describe('hudModel', () => {
   })
 
   it('repo passes through name and baseBranch when present', () => {
-    const model = hudModel(baseState({ repo: { name: 'Cubito', baseBranch: 'main' } }), { isMac: true })
+    const model = hudModel(baseState({ repo: { name: 'Cubito', baseBranch: 'main' } }), {
+      isMac: true
+    })
     expect(model.repo).toEqual({ name: 'Cubito', baseBranch: 'main' })
   })
 

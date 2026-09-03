@@ -1,11 +1,16 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { WebSocketServer } from 'ws'
 import { connectOrcad } from './connect-orcad'
 import { startFakeOrcadServer, type FakeOrcadServer } from './fake-orcad-server'
 import type { PairingOffer } from './pairing-offer'
 
 function offerFor(server: FakeOrcadServer): PairingOffer {
-  return { v: 2, endpoint: server.endpoint, deviceToken: server.deviceToken, publicKeyB64: server.serverPublicKeyB64 }
+  return {
+    v: 2,
+    endpoint: server.endpoint,
+    deviceToken: server.deviceToken,
+    publicKeyB64: server.serverPublicKeyB64
+  }
 }
 
 describe('connectOrcad', () => {
@@ -26,7 +31,9 @@ describe('connectOrcad', () => {
       workspaceStatus: 'in-progress',
       git: { path: '/repo', isMainWorktree: true }
     }
-    const server = await startFakeOrcadServer({ handleRequest: () => ({ ok: true, result: { worktrees: [record] } }) })
+    const server = await startFakeOrcadServer({
+      handleRequest: () => ({ ok: true, result: { worktrees: [record] } })
+    })
     servers.push(server)
 
     const connection = await connectOrcad(offerFor(server))
@@ -44,7 +51,9 @@ describe('connectOrcad', () => {
     const connection = await connectOrcad(offerFor(server))
     connection.close()
 
-    expect(server.authFrames).toEqual([{ type: 'e2ee_auth', deviceToken: server.deviceToken, clientCapabilities: [] }])
+    expect(server.authFrames).toEqual([
+      { type: 'e2ee_auth', deviceToken: server.deviceToken, clientCapabilities: [] }
+    ])
   })
 
   it('surfaces runtimeId on the connection once the first call resolves', async () => {
@@ -88,6 +97,70 @@ describe('connectOrcad', () => {
     expect(closeCount).toBeLessThanOrEqual(1)
   })
 
+  it('exposes a working terminals port: create, subscribe, input/resize/output, close (P3.4)', async () => {
+    const server = await startFakeOrcadServer({
+      handleRequest: (method) => {
+        if (method === 'terminal.create') return { ok: true, result: { terminal: 'term-1' } }
+        if (method === 'terminal.close') return { ok: true, result: { close: true } }
+        return { ok: true, result: { worktrees: [] } }
+      }
+    })
+    servers.push(server)
+
+    const connection = await connectOrcad(offerFor(server))
+    try {
+      const created = await connection.terminals.createTerminal('w1')
+      expect(created).toEqual({ terminal: 'term-1' })
+
+      const writes: string[] = []
+      let subscribedMeta: unknown
+      let resized: { cols: number; rows: number } | null = null
+      connection.terminals.subscribe(
+        1,
+        created.terminal,
+        { cols: 80, rows: 24 },
+        {
+          onSubscribed: (meta) => {
+            subscribedMeta = meta
+          },
+          onSnapshotStart: () => {},
+          write: (bytes) => writes.push(new TextDecoder().decode(bytes)),
+          onSnapshotEnd: () => {},
+          onResize: (cols, rows) => {
+            resized = { cols, rows }
+          },
+          onError: () => {},
+          onEnd: () => {}
+        }
+      )
+
+      await vi.waitFor(() =>
+        expect(subscribedMeta).toMatchObject({ streamId: 1, terminal: 'term-1' })
+      )
+      expect(server.subscribeFrames).toContainEqual(
+        expect.objectContaining({ streamId: 1, terminal: 'term-1' })
+      )
+
+      connection.terminals.sendInput(1, 'echo hi\n')
+      await vi.waitFor(() =>
+        expect(server.inputReceived).toContainEqual({ streamId: 1, text: 'echo hi\n' })
+      )
+
+      server.pushTerminalOutput(1, 'hi\n')
+      await vi.waitFor(() => expect(writes).toContain('hi\n'))
+
+      connection.terminals.sendResize(1, 100, 40)
+      await vi.waitFor(() => expect(resized).toEqual({ cols: 100, rows: 40 }))
+
+      connection.terminals.unsubscribe(1)
+      await vi.waitFor(() => expect(server.unsubscribedStreamIds).toContain(1))
+
+      await expect(connection.terminals.close(created.terminal)).resolves.toBeUndefined()
+    } finally {
+      connection.close()
+    }
+  })
+
   it('rejects with remote_runtime_unavailable if no handshake response arrives within timeoutMs', async () => {
     const wss = new WebSocketServer({ port: 0 })
     await new Promise<void>((resolve) => wss.once('listening', resolve))
@@ -109,6 +182,8 @@ describe('connectOrcad', () => {
       publicKeyB64: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
     }
 
-    await expect(connectOrcad(offer, { timeoutMs: 50 })).rejects.toMatchObject({ code: 'remote_runtime_unavailable' })
+    await expect(connectOrcad(offer, { timeoutMs: 50 })).rejects.toMatchObject({
+      code: 'remote_runtime_unavailable'
+    })
   })
 })
