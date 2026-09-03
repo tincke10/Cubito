@@ -1,0 +1,252 @@
+import { describe, expect, it, vi } from 'vitest'
+import { createTerminalPanelController } from './terminal-panel-controller'
+import type { TerminalPanelControllerDeps } from './terminal-panel-controller'
+import { emptyTerminalsState, reduceTerminals } from '../../application/terminal-session-model'
+import type { TerminalAction, TerminalsState } from '../../application/terminal-session-model'
+import type {
+  TerminalStreamPort,
+  TerminalStreamSink
+} from '../../application/ports/terminal-stream-port'
+import type { TerminalPanelHandle } from './terminal-panel-element'
+import type { TerminalConnectorHandle } from './terminal-connector-element'
+
+const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
+
+type FakePanel = TerminalPanelHandle & {
+  writes: Uint8Array[]
+  resetCalls: number
+  fitCalls: number
+  disposed: boolean
+  emitData(data: string): void
+  emitResize(cols: number, rows: number): void
+}
+
+const createFakePanel = (): FakePanel => {
+  let dataCb: ((data: string) => void) | null = null
+  let resizeCb: ((cols: number, rows: number) => void) | null = null
+  const panel: FakePanel = {
+    object: { position: { set: vi.fn() } } as unknown as TerminalPanelHandle['object'],
+    element: {} as HTMLElement,
+    writes: [],
+    resetCalls: 0,
+    fitCalls: 0,
+    disposed: false,
+    apply: vi.fn(),
+    write(bytes: Uint8Array) {
+      panel.writes.push(bytes)
+    },
+    reset() {
+      panel.resetCalls++
+    },
+    fit() {
+      panel.fitCalls++
+    },
+    onData(cb) {
+      dataCb = cb
+      return () => (dataCb = null)
+    },
+    onResize(cb) {
+      resizeCb = cb
+      return () => (resizeCb = null)
+    },
+    focus: vi.fn(),
+    blur: vi.fn(),
+    dispose() {
+      panel.disposed = true
+    },
+    emitData(data) {
+      dataCb?.(data)
+    },
+    emitResize(cols, rows) {
+      resizeCb?.(cols, rows)
+    }
+  }
+  return panel
+}
+
+const createFakeConnector = (): TerminalConnectorHandle & {
+  applyCalls: number
+  hideCalls: number
+} => {
+  const handle = {
+    svg: {} as SVGSVGElement,
+    applyCalls: 0,
+    hideCalls: 0,
+    apply: vi.fn(() => {
+      handle.applyCalls++
+    }),
+    hide: vi.fn(() => {
+      handle.hideCalls++
+    }),
+    dispose: vi.fn()
+  }
+  return handle
+}
+
+const createFakePort = (): TerminalStreamPort & { sinks: Map<number, TerminalStreamSink> } => {
+  const sinks = new Map<number, TerminalStreamSink>()
+  return {
+    sinks,
+    createTerminal: vi.fn(async (worktree: string) => ({ terminal: `handle-${worktree}` })),
+    subscribe: vi.fn((streamId: number, _terminal: string, _viewport, sink: TerminalStreamSink) => {
+      sinks.set(streamId, sink)
+    }),
+    sendInput: vi.fn(),
+    sendResize: vi.fn(),
+    unsubscribe: vi.fn(),
+    close: vi.fn(async () => {})
+  }
+}
+
+const openedState = (nodeId = 'repo::/wt/a'): TerminalsState =>
+  reduceTerminals(emptyTerminalsState(), {
+    type: 'open-terminal-for-node',
+    nodeId
+  })
+
+const setup = () => {
+  const port = createFakePort()
+  const panels: FakePanel[] = []
+  const connector = createFakeConnector()
+  const labelLayer = { add: vi.fn(), remove: vi.fn() }
+  const hud = { appendChild: vi.fn() }
+  const dispatch = vi.fn<(action: TerminalAction) => void>()
+  const deps: TerminalPanelControllerDeps = {
+    port,
+    createPanel: () => {
+      const p = createFakePanel()
+      panels.push(p)
+      return p
+    },
+    createConnector: () => connector,
+    labelLayer,
+    hud,
+    dispatch,
+    nodeCenter: vi.fn(() => ({ x: 1, y: 2, z: 3 })),
+    projectToNdc: vi.fn((world) => ({ x: world.x, y: world.y, z: 0 })),
+    viewport: () => ({ width: 1000, height: 800 })
+  }
+  const controller = createTerminalPanelController(deps)
+  return { controller, port, panels, connector, labelLayer, hud, dispatch, deps }
+}
+
+describe('createTerminalPanelController', () => {
+  it('does nothing when there is no active panel', () => {
+    const { controller, panels } = setup()
+    controller.sync(emptyTerminalsState())
+    expect(panels).toHaveLength(0)
+  })
+
+  it('mounts a panel into the scene label layer and creates+subscribes the terminal', async () => {
+    const { controller, port, panels, labelLayer } = setup()
+    controller.sync(openedState())
+    await flush()
+    expect(panels).toHaveLength(1)
+    expect(labelLayer.add).toHaveBeenCalledWith(panels[0]!.object)
+    expect(port.createTerminal).toHaveBeenCalledWith('repo::/wt/a')
+    expect(port.subscribe).toHaveBeenCalledWith(
+      1,
+      'handle-repo::/wt/a',
+      undefined,
+      expect.anything()
+    )
+  })
+
+  it('pipes sink output straight to the panel, bypassing dispatch after the first chunk', async () => {
+    const { controller, port, panels, dispatch } = setup()
+    controller.sync(openedState())
+    await flush()
+    const sink = port.sinks.get(1)!
+    const bytes = new Uint8Array([1, 2, 3])
+    sink.write(bytes)
+    expect(panels[0]!.writes).toEqual([bytes])
+    expect(dispatch).toHaveBeenCalledWith({ type: 'output-arrived', streamId: 1 })
+    dispatch.mockClear()
+    sink.write(new Uint8Array([4]))
+    expect(dispatch).not.toHaveBeenCalled()
+  })
+
+  it('resets the panel on snapshot start and dispatches subscribed on onSubscribed', async () => {
+    const { controller, port, panels, dispatch } = setup()
+    controller.sync(openedState())
+    await flush()
+    const sink = port.sinks.get(1)!
+    sink.onSnapshotStart({})
+    expect(panels[0]!.resetCalls).toBe(1)
+    sink.onSubscribed({ streamId: 1, terminal: 'handle-repo::/wt/a', cols: 80, rows: 24 })
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'subscribed',
+      streamId: 1,
+      terminal: 'handle-repo::/wt/a',
+      cols: 80,
+      rows: 24
+    })
+  })
+
+  it('wires panel input to port.sendInput and panel resize to port.sendResize', async () => {
+    const { controller, port, panels } = setup()
+    controller.sync(openedState())
+    await flush()
+    panels[0]!.emitData('ls\n')
+    expect(port.sendInput).toHaveBeenCalledWith(1, 'ls\n')
+    panels[0]!.emitResize(100, 30)
+    expect(port.sendResize).toHaveBeenCalledWith(1, 100, 30)
+  })
+
+  it('positions the panel object from nodeCenter each tick', async () => {
+    const { controller, panels, deps } = setup()
+    controller.sync(openedState())
+    await flush()
+    controller.tick()
+    expect(deps.nodeCenter).toHaveBeenCalledWith('repo::/wt/a')
+    expect(panels[0]!.object.position.set).toHaveBeenCalled()
+  })
+
+  it('applies the dashed connector in scene placement and hides it in hud placement', async () => {
+    const { controller, connector } = setup()
+    controller.sync(openedState())
+    await flush()
+    controller.tick()
+    expect(connector.applyCalls).toBe(1)
+
+    const hudState = reduceTerminals(openedState(), { type: 'set-placement', placement: 'hud' })
+    controller.sync(hudState)
+    controller.tick()
+    expect(connector.hideCalls).toBeGreaterThan(0)
+  })
+
+  it('reparents the same panel instance across placement changes instead of recreating it', async () => {
+    const { controller, panels, labelLayer, hud } = setup()
+    controller.sync(openedState())
+    await flush()
+    const hudState = reduceTerminals(openedState(), { type: 'set-placement', placement: 'hud' })
+    controller.sync(hudState)
+    expect(panels).toHaveLength(1)
+    expect(labelLayer.remove).toHaveBeenCalledWith(panels[0]!.object)
+    expect(hud.appendChild).toHaveBeenCalledWith(panels[0]!.element)
+  })
+
+  it('unmounts and disposes the panel when the active panel disappears', async () => {
+    const { controller, panels, labelLayer } = setup()
+    const state = openedState()
+    controller.sync(state)
+    await flush()
+    const closed = reduceTerminals(state, { type: 'close-terminal', streamId: 1 })
+    controller.sync(closed)
+    expect(panels[0]!.disposed).toBe(true)
+    expect(labelLayer.remove).toHaveBeenCalledWith(panels[0]!.object)
+  })
+
+  it('unmounts the old panel and mounts a new one when the active session changes', async () => {
+    const { controller, panels } = setup()
+    let state = openedState('repo::/wt/a')
+    controller.sync(state)
+    await flush()
+    state = reduceTerminals(state, { type: 'open-terminal-for-node', nodeId: 'repo::/wt/b' })
+    controller.sync(state)
+    await flush()
+    expect(panels).toHaveLength(2)
+    expect(panels[0]!.disposed).toBe(true)
+    expect(panels[1]!.disposed).toBe(false)
+  })
+})

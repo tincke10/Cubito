@@ -4,10 +4,21 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  '@xterm/xterm@6.1.0-beta.287':
+    hash: 46796c152f3b73e28238f44499eaf5a867a863809bc7b470b159526a41e354f7
+    path: config/patches/@xterm__xterm@6.1.0-beta.287.patch
+
 importers:
 
   .:
     dependencies:
+      '@xterm/addon-fit':
+        specifier: 0.12.0-beta.287
+        version: 0.12.0-beta.287(@xterm/xterm@6.1.0-beta.287(patch_hash=46796c152f3b73e28238f44499eaf5a867a863809bc7b470b159526a41e354f7))
+      '@xterm/xterm':
+        specifier: 6.1.0-beta.287
+        version: 6.1.0-beta.287(patch_hash=46796c152f3b73e28238f44499eaf5a867a863809bc7b470b159526a41e354f7)
       three:
         specifier: ^0.180.0
         version: 0.180.0
@@ -454,6 +465,14 @@ packages:
 
   '@webgpu/types@0.1.72':
     resolution: {integrity: sha512-0cF7RFM2edNoiIS1ODJp0/Gzv4/xSXhwoR0YCza+OWpJWtn4wmo9DvK91aLlH9+uUnwIriP7ZiC3WitmyhuzBw==}
+
+  '@xterm/addon-fit@0.12.0-beta.287':
+    resolution: {integrity: sha512-2MDj+J4x67bjOS/SuBPxSYEWH38NbX6ENV18RbKVOhfRYCX3yERnuHBOrgH9hYdY8rCtsLQmuVgF6cmvCJiV2w==}
+    peerDependencies:
+      '@xterm/xterm': ^6.1.0-beta.287
+
+  '@xterm/xterm@6.1.0-beta.287':
+    resolution: {integrity: sha512-3aOHVlxlRVb3tOHI4b/z2O/OsRnqpW5u0qq8OqpqbwLVTbUhThmQ7mBKaehGdbsmcCCBTP1cBwhG0qcvuOjowA==}
 
   assertion-error@2.0.1:
     resolution: {integrity: sha512-Izi8RQcffqCeNVgFigKli1ssklIbpHnCYc6AknXGYoB6grJqyeby7jv12JUQgmTAnIDnbck1uxksT4dzN3PWBA==}
@@ -976,6 +995,12 @@ snapshots:
       tinyrainbow: 2.0.0
 
   '@webgpu/types@0.1.72': {}
+
+  '@xterm/addon-fit@0.12.0-beta.287(@xterm/xterm@6.1.0-beta.287(patch_hash=46796c152f3b73e28238f44499eaf5a867a863809bc7b470b159526a41e354f7))':
+    dependencies:
+      '@xterm/xterm': 6.1.0-beta.287(patch_hash=46796c152f3b73e28238f44499eaf5a867a863809bc7b470b159526a41e354f7)
+
+  '@xterm/xterm@6.1.0-beta.287(patch_hash=46796c152f3b73e28238f44499eaf5a867a863809bc7b470b159526a41e354f7)': {}
 
   assertion-error@2.0.1: {}
 

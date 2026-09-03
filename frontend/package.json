@@ -2,8 +2,8 @@
   "name": "cubito-frontend",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
   "description": "Cubito's 3D frontend: the orcad worktree graph rendered as a navigable GPU scene",
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -14,6 +14,8 @@
     "lint": "oxlint -c .oxlintrc.json --disable-nested-config src"
   },
   "dependencies": {
+    "@xterm/addon-fit": "0.12.0-beta.287",
+    "@xterm/xterm": "6.1.0-beta.287",
     "three": "^0.180.0",
     "tweetnacl": "^1.0.3"
   },
@@ -27,5 +29,10 @@
     "vitest": "^3.2.0",
     "ws": "^8.21.3",
     "zod": "4.4.3"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "@xterm/xterm@6.1.0-beta.287": "config/patches/@xterm__xterm@6.1.0-beta.287.patch"
+    }
   }
 }
