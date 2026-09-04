@@ -5,6 +5,7 @@ import { emptyTerminalsState } from './terminal-session-model'
 import { emptySpawnMenuSlice } from './spawn-menu-model'
 import { emptyReposSlice } from './repos-model'
 import { emptyProjectSelectorSlice } from './project-selector-model'
+import { emptyCommandPaletteSlice } from './command-palette-model'
 
 describe('createSceneStore', () => {
   it('starts idle with an empty graph and no connection/selection', () => {
@@ -209,5 +210,29 @@ describe('createSceneStore', () => {
     expect(after.graph).toBe(before.graph)
     expect(after.repos).toBe(before.repos)
     expect(after.projectSelector).not.toBe(before.projectSelector)
+  })
+
+  it('starts with a closed command palette slice', () => {
+    const store = createSceneStore()
+    expect(store.get().commandPalette).toEqual(emptyCommandPaletteSlice())
+  })
+
+  it('dispatchCommandPalette() drives the commandPalette slice through the reducer', () => {
+    const store = createSceneStore()
+    store.dispatchCommandPalette({ type: 'open' })
+    expect(store.get().commandPalette).toEqual({ view: 'open', query: '', highlightedIndex: 0 })
+  })
+
+  it('dispatchCommandPalette() notifies subscribers once and leaves the rest of SceneState untouched', () => {
+    const store = createSceneStore()
+    const listener = vi.fn()
+    store.subscribe(listener)
+    const before = store.get()
+    store.dispatchCommandPalette({ type: 'open' })
+    expect(listener).toHaveBeenCalledTimes(1)
+    const after = store.get()
+    expect(after.graph).toBe(before.graph)
+    expect(after.projectSelector).toBe(before.projectSelector)
+    expect(after.commandPalette).not.toBe(before.commandPalette)
   })
 })

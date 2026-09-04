@@ -8,6 +8,8 @@ import { emptyReposSlice, reduceRepos } from './repos-model'
 import type { ReposAction, ReposSlice } from './repos-model'
 import { emptyProjectSelectorSlice, reduceProjectSelector } from './project-selector-model'
 import type { ProjectSelectorAction, ProjectSelectorSlice } from './project-selector-model'
+import { emptyCommandPaletteSlice, reduceCommandPalette } from './command-palette-model'
+import type { CommandPaletteAction, CommandPaletteSlice } from './command-palette-model'
 
 export type SyncStatus =
   | { state: 'idle' }
@@ -30,6 +32,7 @@ export type SceneState = {
   spawnMenu: SpawnMenuSlice
   repos: ReposSlice
   projectSelector: ProjectSelectorSlice
+  commandPalette: CommandPaletteSlice
 }
 
 export type SceneStore = {
@@ -44,6 +47,8 @@ export type SceneStore = {
   dispatchRepos(action: ReposAction): void
   /** Drives the projectSelector slice through project-selector-model's pure reducer, one notify. */
   dispatchProjectSelector(action: ProjectSelectorAction): void
+  /** Drives the commandPalette slice through command-palette-model's pure reducer, one notify. */
+  dispatchCommandPalette(action: CommandPaletteAction): void
   subscribe(listener: (state: SceneState) => void): () => void
 }
 
@@ -55,7 +60,8 @@ const initialSceneState = (): SceneState => ({
   terminals: emptyTerminalsState(),
   spawnMenu: emptySpawnMenuSlice(),
   repos: emptyReposSlice(),
-  projectSelector: emptyProjectSelectorSlice()
+  projectSelector: emptyProjectSelectorSlice(),
+  commandPalette: emptyCommandPaletteSlice()
 })
 
 /** Minimal observable store; swap for a richer signal system when the UI grows. */
@@ -91,6 +97,10 @@ export function createSceneStore(): SceneStore {
     },
     dispatchProjectSelector(action) {
       state = { ...state, projectSelector: reduceProjectSelector(state.projectSelector, action) }
+      notify()
+    },
+    dispatchCommandPalette(action) {
+      state = { ...state, commandPalette: reduceCommandPalette(state.commandPalette, action) }
       notify()
     },
     subscribe(listener) {
