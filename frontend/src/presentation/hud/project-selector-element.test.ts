@@ -327,6 +327,16 @@ describe('createProjectSelector', () => {
     expect(focused).toBe(true)
   })
 
+  it('focusPath focuses the add-form path input', () => {
+    const selector = createProjectSelector(createFakeDocument())
+    const root = rootOf(selector)
+    const input = pathInputOf(root)
+    let focused = false
+    input.focus = () => (focused = true)
+    selector.focusPath()
+    expect(focused).toBe(true)
+  })
+
   it('dispose removes the root element', () => {
     const selector = createProjectSelector(createFakeDocument())
     const root = rootOf(selector)

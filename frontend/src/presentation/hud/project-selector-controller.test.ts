@@ -79,6 +79,7 @@ const createFakeSelector = (): FakeSelector => {
       return () => (addCancelCb = null)
     },
     focusQuery: vi.fn(() => (selector.focused = true)),
+    focusPath: vi.fn(),
     dispose: vi.fn(() => (selector.disposed = true)),
     emitQueryChange(query) {
       queryCb?.(query)
@@ -220,6 +221,31 @@ describe('createProjectSelectorController', () => {
     expect(dispatch).toHaveBeenCalledWith({ type: 'close' })
     selectors[0]!.emitAddCancel()
     expect(dispatch).toHaveBeenCalledWith({ type: 'back-to-list' })
+  })
+
+  it('focuses the path input on the list -> add-form transition (display:none force-blurs it otherwise)', () => {
+    const { controller, selectors } = setup()
+    controller.sync(openSlice(), emptyReposSlice())
+    expect(selectors[0]!.focusPath).not.toHaveBeenCalled()
+    const addFormSlice = reduceProjectSelector(openSlice(), { type: 'open-add-form' })
+    controller.sync(addFormSlice, emptyReposSlice())
+    expect(selectors[0]!.focusPath).toHaveBeenCalledOnce()
+  })
+
+  it('does not re-focus the path input on subsequent syncs while already in the add-form', () => {
+    const { controller, selectors } = setup()
+    controller.sync(openSlice(), emptyReposSlice())
+    const addFormSlice = reduceProjectSelector(openSlice(), { type: 'open-add-form' })
+    controller.sync(addFormSlice, emptyReposSlice())
+    expect(selectors[0]!.focusPath).toHaveBeenCalledOnce()
+    const typingSlice = reduceProjectSelector(addFormSlice, {
+      type: 'update-add-field',
+      field: 'path',
+      value: '/abs/x'
+    })
+    controller.sync(typingSlice, emptyReposSlice())
+    controller.sync(typingSlice, emptyReposSlice())
+    expect(selectors[0]!.focusPath).toHaveBeenCalledOnce()
   })
 
   it('wires add-form field changes to update-add-field dispatches', () => {

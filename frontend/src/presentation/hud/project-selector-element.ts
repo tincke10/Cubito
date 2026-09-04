@@ -45,6 +45,7 @@ export type ProjectSelectorHandle = {
   onAddSubmit(callback: () => void): () => void
   onAddCancel(callback: () => void): () => void
   focusQuery(): void
+  focusPath(): void
   dispose(): void
 }
 
@@ -243,6 +244,9 @@ export function createProjectSelector(doc: Document = document): ProjectSelector
     },
     focusQuery() {
       queryInput.focus()
+    },
+    focusPath() {
+      pathInput.focus()
     },
     dispose() {
       root.remove()

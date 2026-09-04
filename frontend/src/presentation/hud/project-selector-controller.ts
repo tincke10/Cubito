@@ -39,6 +39,7 @@ export function createProjectSelectorController(
   let gateway = deps.gateway
   let element: ProjectSelectorHandle | null = null
   let wasClosed = true
+  let previousView: ProjectSelectorSlice['view'] = 'closed'
   let currentSlice: ProjectSelectorSlice = { view: 'closed' }
 
   const handleAddSubmit = async (): Promise<void> => {
@@ -96,6 +97,7 @@ export function createProjectSelectorController(
       if (selector.view === 'closed') {
         unmount()
         wasClosed = true
+        previousView = 'closed'
         return
       }
       if (wasClosed) {
@@ -103,8 +105,16 @@ export function createProjectSelectorController(
       }
       wasClosed = false
       const model = projectSelectorViewModel(selector, repos)
-      if (model === null) return
-      mount().apply(model)
+      if (model === null) {
+        previousView = selector.view
+        return
+      }
+      const mounted = mount()
+      mounted.apply(model)
+      // display:none force-blurs a focused descendant, so the path input needs an explicit
+      // focus() on the list -> add-form transition, mirroring spawn-form's focusFirstField().
+      if (selector.view === 'add-form' && previousView !== 'add-form') mounted.focusPath()
+      previousView = selector.view
     },
     rebindGateway(newGateway: ProjectSelectorGatewayPort): void {
       gateway = newGateway
