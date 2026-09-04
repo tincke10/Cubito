@@ -68,14 +68,19 @@ describe('createOrcadGateway', () => {
     expect(onRuntimeId).not.toHaveBeenCalled()
   })
 
-  it('stays frozen at the spawn-era method set — no undocumented methods added (CO-305 ratchet)', () => {
+  it('stays frozen at the proyectos-era method set — no undocumented methods added (CO-305 ratchet)', () => {
     const call: RpcCaller = vi.fn()
     const gateway = createOrcadGateway({ call })
-    expect(Object.keys(gateway)).toEqual(['listWorktrees', 'listRepos', 'createWorktree'])
+    expect(Object.keys(gateway)).toEqual([
+      'listWorktrees',
+      'listRepos',
+      'addRepo',
+      'createWorktree'
+    ])
   })
 
   it('lists repos via repo.list', async () => {
-    const repos = [{ id: 'repo-1' }]
+    const repos = [{ id: 'repo-1', path: '/repo-1', displayName: 'Repo One', kind: 'git' }]
     const call: RpcCaller = vi.fn(async () => ({
       id: 'x',
       ok: true as const,
@@ -85,6 +90,41 @@ describe('createOrcadGateway', () => {
     const gateway = createOrcadGateway({ call })
     await expect(gateway.listRepos()).resolves.toEqual(repos)
     expect(call).toHaveBeenCalledWith('repo.list')
+  })
+
+  it('adds a repo via repo.add, passing path/kind through as params', async () => {
+    const repo = { id: 'repo-2', path: '/abs/repo-2', displayName: 'Repo Two', kind: 'git' }
+    const call: RpcCaller = vi.fn(async () => ({
+      id: 'x',
+      ok: true as const,
+      result: { repo },
+      _meta: { runtimeId: 'rt' }
+    }))
+    const gateway = createOrcadGateway({ call })
+    await expect(gateway.addRepo({ path: '/abs/repo-2', kind: 'git' })).resolves.toEqual(repo)
+    expect(call).toHaveBeenCalledWith('repo.add', { path: '/abs/repo-2', kind: 'git' })
+  })
+
+  it('rejects readably when repo.add returns no repo id', async () => {
+    const call: RpcCaller = async () => ({
+      id: 'x',
+      ok: true as const,
+      result: {},
+      _meta: { runtimeId: 'rt' }
+    })
+    const gateway = createOrcadGateway({ call })
+    await expect(gateway.addRepo({ path: '/abs/repo-2' })).rejects.toThrow(/repo\.add/)
+  })
+
+  it('addRepo rejection propagates the underlying error without leaking RPC internals', async () => {
+    const error = new Error('Project path must be an absolute path')
+    const call: RpcCaller = vi.fn(async () => {
+      throw error
+    })
+    const gateway = createOrcadGateway({ call })
+    await expect(gateway.addRepo({ path: 'relative/path' })).rejects.toThrow(
+      'Project path must be an absolute path'
+    )
   })
 
   it('rejects when repo.list returns no repos array', async () => {

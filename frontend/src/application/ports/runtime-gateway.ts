@@ -1,7 +1,12 @@
 import type { RawWorktreeRecord } from '../../domain/worktree-graph/build-graph'
 
-/** Minimal repo identity from `repo.list`; enough to build an `id:`-style repo selector. */
-export type RepoSummary = { id: string }
+/** Repo identity from `repo.list`/`repo.add`; `id` alone builds an `id:`-style repo selector. */
+export type RepoSummary = {
+  id: string
+  path: string
+  displayName: string
+  kind: 'git' | 'folder' | null
+}
 
 /** Startup agent choice for a spawned worktree; `'none'` omits agent params entirely. */
 export type SpawnAgent = 'none' | 'claude'
@@ -29,4 +34,5 @@ export type RuntimeGateway = {
   listWorktrees(): Promise<readonly RawWorktreeRecord[]>
   listRepos(): Promise<readonly RepoSummary[]>
   createWorktree(input: CreateWorktreeInput): Promise<CreateWorktreeResult>
+  addRepo(input: { path: string; kind?: 'git' | 'folder' }): Promise<RepoSummary>
 }

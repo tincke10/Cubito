@@ -22,6 +22,8 @@ export type SpawnMenuControllerDeps = {
   refetch: () => Promise<void>
   /** Injectable for deterministic tests; defaults to the real UUID generator. */
   generateMutationId?: () => string
+  /** Repos slice's active repo (design Area 8) — preferred over `repos[0]` when resolving the selector. */
+  activeRepoId?: () => string | null
 }
 
 export type SpawnMenuController = {
@@ -45,6 +47,7 @@ export function createSpawnMenuController(deps: SpawnMenuControllerDeps): SpawnM
   let repoFetchInFlight = false
 
   const generateMutationId = deps.generateMutationId ?? (() => crypto.randomUUID())
+  const activeRepoId = deps.activeRepoId ?? (() => null)
 
   const unmountMenu = (): void => {
     if (!menu) return
@@ -87,8 +90,8 @@ export function createSpawnMenuController(deps: SpawnMenuControllerDeps): SpawnM
     void gateway
       .listRepos()
       .then((repos) => {
-        const first = repos[0]
-        if (first) deps.dispatch({ type: 'set-repo-selector', repoSelector: `id:${first.id}` })
+        const id = activeRepoId() ?? repos[0]?.id
+        if (id) deps.dispatch({ type: 'set-repo-selector', repoSelector: `id:${id}` })
       })
       .finally(() => {
         repoFetchInFlight = false

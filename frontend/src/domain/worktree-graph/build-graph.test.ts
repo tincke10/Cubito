@@ -91,18 +91,23 @@ describe('buildWorktreeGraph', () => {
       { spawn: { phase: 'cloning', progress: 0.3 } satisfies SpawnProgress },
       { spawn: { phase: 'cloning', progress: 0.3 } }
     ]
-  ])('maps the optional %s field onto activity, leaving the rest inert', (_field, overrides, expectedDiff) => {
-    const graph = buildWorktreeGraph([record(overrides)])
-    const activity = graph.nodes.get('repo::/path/main')?.activity
-    expect(activity).toEqual({ ...inertActivity(), ...expectedDiff })
-    expect(activity).not.toEqual(inertActivity())
-  })
+  ])(
+    'maps the optional %s field onto activity, leaving the rest inert',
+    (_field, overrides, expectedDiff) => {
+      const graph = buildWorktreeGraph([record(overrides)])
+      const activity = graph.nodes.get('repo::/path/main')?.activity
+      expect(activity).toEqual({ ...inertActivity(), ...expectedDiff })
+      expect(activity).not.toEqual(inertActivity())
+    }
+  )
 
   it.each<[boolean, 'root' | 'worktree']>([
     [true, 'root'],
     [false, 'worktree']
   ])('derives kind %s -> %s from isMain', (isMain, expectedKind) => {
-    const graph = buildWorktreeGraph([record({ git: { path: '/path/main', isMainWorktree: isMain } })])
+    const graph = buildWorktreeGraph([
+      record({ git: { path: '/path/main', isMainWorktree: isMain } })
+    ])
     expect(graph.nodes.get('repo::/path/main')?.kind).toBe(expectedKind)
   })
 
@@ -114,5 +119,15 @@ describe('buildWorktreeGraph', () => {
     for (const node of graph.nodes.values()) {
       expect(node.activity).toBeDefined()
     }
+  })
+
+  it('carries repoId from the record when present', () => {
+    const graph = buildWorktreeGraph([record({ repoId: 'explicit-repo' })])
+    expect(graph.nodes.get('repo::/path/main')?.repoId).toBe('explicit-repo')
+  })
+
+  it('falls back to the id prefix when repoId is absent', () => {
+    const graph = buildWorktreeGraph([record({ id: 'fallback-repo::/path/main' })])
+    expect(graph.nodes.get('fallback-repo::/path/main')?.repoId).toBe('fallback-repo')
   })
 })

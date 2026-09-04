@@ -18,6 +18,7 @@ const node = (
   isMain = false
 ): WorktreeNode => ({
   id,
+  repoId: 'repo',
   branch: id,
   path: `/tmp/${id}`,
   status: 'clean',

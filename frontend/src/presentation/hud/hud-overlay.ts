@@ -58,7 +58,9 @@ export function createHudOverlay(doc: Document = document): HudOverlayHandle {
       connectionText.textContent = model.connection.label
 
       repoLine.textContent =
-        model.repo === null ? REPO_PLACEHOLDER : `${model.repo.name} · ${model.repo.baseBranch}`
+        model.repo === null
+          ? REPO_PLACEHOLDER
+          : `${model.repo.displayName} · ${model.repo.nodeCount} nodos`
 
       countersPrefix.textContent = `${model.counters.total} nodos · ${model.counters.working} agentes activos · `
       countersWaiting.textContent = `${model.counters.waitingInput} esperando input`

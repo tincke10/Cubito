@@ -1,6 +1,7 @@
 import { countNodeStates } from '../theme/node-state'
 import type { ConnectionState, SceneState } from '../../application/scene-store'
 import type { TerminalsState } from '../../application/terminal-session-model'
+import type { WorktreeGraph } from '../../domain/worktree-graph/types'
 
 /** Semantic palette token names — never raw hex; the DOM writer maps these to CSS vars. */
 export type ConnectionDotTone = 'accent' | 'amber' | 'amberDim'
@@ -9,7 +10,7 @@ export type HudChip = { key: string; description: string }
 
 export type HudModel = {
   connection: { label: string; dotColor: ConnectionDotTone }
-  repo: { name: string; baseBranch: string } | null
+  repo: { displayName: string; nodeCount: number } | null
   counters: ReturnType<typeof countNodeStates>
   chips: readonly HudChip[]
 }
@@ -64,6 +65,22 @@ const terminalChips = (terminals: TerminalsState, selectedId: unknown): readonly
   return chips
 }
 
+const countNodesInRepo = (graph: WorktreeGraph, repoId: string): number => {
+  let count = 0
+  for (const node of graph.nodes.values()) {
+    if (node.repoId === repoId) count++
+  }
+  return count
+}
+
+const activeRepoLine = (state: SceneState): HudModel['repo'] => {
+  const { activeRepoId, list } = state.repos
+  if (activeRepoId === null) return null
+  const repo = list.find((candidate) => candidate.id === activeRepoId)
+  if (!repo) return null
+  return { displayName: repo.displayName, nodeCount: countNodesInRepo(state.graph, activeRepoId) }
+}
+
 const chipsFor = (platform: { isMac: boolean }): readonly HudChip[] => [
   { key: 'hjkl', description: 'navegar' },
   { key: 'f', description: 'focus' },
@@ -78,7 +95,7 @@ export function hudModel(state: SceneState, platform: { isMac: boolean }): HudMo
       label: connectionLabel(state.connection),
       dotColor: connectionDotColor(state.connection)
     },
-    repo: state.repo,
+    repo: activeRepoLine(state),
     counters: countNodeStates(state.graph),
     chips: [...chipsFor(platform), ...terminalChips(state.terminals, state.selection.selectedId)]
   }

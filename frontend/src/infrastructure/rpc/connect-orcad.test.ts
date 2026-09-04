@@ -163,6 +163,49 @@ describe('connectOrcad', () => {
     }
   })
 
+  it('adds a repo via repo.add, in the shape addRepo resolves (no server change)', async () => {
+    const repo = { id: 'repo-2', path: '/abs/repo-2', displayName: 'Repo Two', kind: 'git' }
+    const server = await startFakeOrcadServer({
+      handleRequest: (method) => {
+        if (method === 'repo.add') return { ok: true, result: { repo } }
+        return { ok: true, result: { worktrees: [] } }
+      }
+    })
+    servers.push(server)
+
+    const connection = await connectOrcad(offerFor(server))
+    try {
+      await expect(
+        connection.gateway.addRepo({ path: '/abs/repo-2', kind: 'git' })
+      ).resolves.toEqual(repo)
+    } finally {
+      connection.close()
+    }
+  })
+
+  it('surfaces a repo.add server error (relative path) readably', async () => {
+    const server = await startFakeOrcadServer({
+      handleRequest: (method) => {
+        if (method === 'repo.add')
+          return {
+            ok: false,
+            error: { code: 'invalid_argument', message: 'Project path must be an absolute path' }
+          }
+        return { ok: true, result: { worktrees: [] } }
+      }
+    })
+    servers.push(server)
+
+    const connection = await connectOrcad(offerFor(server))
+    try {
+      await expect(connection.gateway.addRepo({ path: 'relative/path' })).rejects.toThrow(
+        'Project path must be an absolute path'
+      )
+    } finally {
+      connection.close()
+    }
+  })
+
   it('rejects with remote_runtime_unavailable if no handshake response arrives within timeoutMs', async () => {
     const wss = new WebSocketServer({ port: 0 })
     await new Promise<void>((resolve) => wss.once('listening', resolve))

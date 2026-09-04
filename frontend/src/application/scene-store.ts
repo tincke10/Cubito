@@ -4,6 +4,8 @@ import { emptyTerminalsState, reduceTerminals } from './terminal-session-model'
 import type { TerminalAction, TerminalsState } from './terminal-session-model'
 import { emptySpawnMenuSlice, reduceSpawnMenu } from './spawn-menu-model'
 import type { SpawnMenuAction, SpawnMenuSlice } from './spawn-menu-model'
+import { emptyReposSlice, reduceRepos } from './repos-model'
+import type { ReposAction, ReposSlice } from './repos-model'
 
 export type SyncStatus =
   | { state: 'idle' }
@@ -22,9 +24,9 @@ export type SceneState = {
   sync: SyncStatus
   connection: ConnectionState
   selection: { selectedId: WorktreeId | null }
-  repo: { name: string; baseBranch: string } | null
   terminals: TerminalsState
   spawnMenu: SpawnMenuSlice
+  repos: ReposSlice
 }
 
 export type SceneStore = {
@@ -35,6 +37,8 @@ export type SceneStore = {
   dispatchTerminal(action: TerminalAction): void
   /** Drives the spawnMenu slice through spawn-menu-model's pure reducer, one notify. */
   dispatchSpawn(action: SpawnMenuAction): void
+  /** Drives the repos slice through repos-model's pure reducer, one notify. */
+  dispatchRepos(action: ReposAction): void
   subscribe(listener: (state: SceneState) => void): () => void
 }
 
@@ -43,9 +47,9 @@ const initialSceneState = (): SceneState => ({
   sync: { state: 'idle' },
   connection: { state: 'down', reason: 'not connected' },
   selection: { selectedId: null },
-  repo: null,
   terminals: emptyTerminalsState(),
-  spawnMenu: emptySpawnMenuSlice()
+  spawnMenu: emptySpawnMenuSlice(),
+  repos: emptyReposSlice()
 })
 
 /** Minimal observable store; swap for a richer signal system when the UI grows. */
@@ -73,6 +77,10 @@ export function createSceneStore(): SceneStore {
     },
     dispatchSpawn(action) {
       state = { ...state, spawnMenu: reduceSpawnMenu(state.spawnMenu, action) }
+      notify()
+    },
+    dispatchRepos(action) {
+      state = { ...state, repos: reduceRepos(state.repos, action) }
       notify()
     },
     subscribe(listener) {

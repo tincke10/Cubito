@@ -6,8 +6,12 @@ import { inertActivity } from '../../domain/worktree-graph/node-activity'
 import type { NodeActivity } from '../../domain/worktree-graph/node-activity'
 import type { WorktreeNode } from '../../domain/worktree-graph/types'
 
-const node = (activity: Partial<NodeActivity> = {}, overrides: Partial<WorktreeNode> = {}): WorktreeNode => ({
+const node = (
+  activity: Partial<NodeActivity> = {},
+  overrides: Partial<WorktreeNode> = {}
+): WorktreeNode => ({
   id: 'repo::/path/feature-x',
+  repoId: 'repo',
   branch: 'refs/heads/feature-x',
   path: '/path/feature-x',
   status: 'in-progress',
@@ -24,7 +28,15 @@ const modelFor = (n: WorktreeNode): ReturnType<typeof nodeLabelModel> => {
   return nodeLabelModel(n, state, deriveDecorations(n, false))
 }
 
-const SEMANTIC_TONES: readonly LabelTone[] = ['accent', 'primary', 'dim', 'faint', 'amber', 'amberDim', 'info']
+const SEMANTIC_TONES: readonly LabelTone[] = [
+  'accent',
+  'primary',
+  'dim',
+  'faint',
+  'amber',
+  'amberDim',
+  'info'
+]
 
 describe('nodeLabelModel', () => {
   it('primary is the short branch name, in the same fixed tone regardless of state', () => {
@@ -107,9 +119,12 @@ describe('nodeLabelModel', () => {
     ]
     for (const n of fixtures) {
       const model = modelFor(n)
-      const lines = [model.primary, model.secondary, model.callout?.title, model.callout?.hint].filter(
-        (l): l is { text: string; tone: LabelTone } => l != null
-      )
+      const lines = [
+        model.primary,
+        model.secondary,
+        model.callout?.title,
+        model.callout?.hint
+      ].filter((l): l is { text: string; tone: LabelTone } => l != null)
       for (const line of lines) {
         expect(line.text).not.toMatch(/#|0x/)
         expect(SEMANTIC_TONES).toContain(line.tone)

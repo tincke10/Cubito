@@ -3,6 +3,7 @@ import { createSceneStore } from './scene-store'
 import { emptyWorktreeGraph } from '../domain/worktree-graph/types'
 import { emptyTerminalsState } from './terminal-session-model'
 import { emptySpawnMenuSlice } from './spawn-menu-model'
+import { emptyReposSlice } from './repos-model'
 
 describe('createSceneStore', () => {
   it('starts idle with an empty graph and no connection/selection', () => {
@@ -11,7 +12,6 @@ describe('createSceneStore', () => {
     expect(state.sync).toEqual({ state: 'idle' })
     expect(state.graph.nodes.size).toBe(0)
     expect(state.selection).toEqual({ selectedId: null })
-    expect(state.repo).toBeNull()
   })
 
   it('notifies subscribers on set', () => {
@@ -41,7 +41,6 @@ describe('createSceneStore', () => {
     expect(after.graph).toBe(before.graph)
     expect(after.sync).toBe(before.sync)
     expect(after.connection).toBe(before.connection)
-    expect(after.repo).toBe(before.repo)
   })
 
   it('notifies subscribers on update()', () => {
@@ -160,5 +159,30 @@ describe('createSceneStore', () => {
     expect(after.graph).toBe(before.graph)
     expect(after.terminals).toBe(before.terminals)
     expect(after.spawnMenu).not.toBe(before.spawnMenu)
+  })
+
+  it('starts with an empty repos slice', () => {
+    const store = createSceneStore()
+    expect(store.get().repos).toEqual(emptyReposSlice())
+  })
+
+  it('dispatchRepos() drives the repos slice through the reducer', () => {
+    const store = createSceneStore()
+    const repo = { id: 'r1', path: '/r1', displayName: 'R1', kind: 'git' as const }
+    store.dispatchRepos({ type: 'set-list', list: [repo] })
+    expect(store.get().repos).toEqual({ list: [repo], activeRepoId: 'r1' })
+  })
+
+  it('dispatchRepos() notifies subscribers once and leaves the rest of SceneState untouched', () => {
+    const store = createSceneStore()
+    const listener = vi.fn()
+    store.subscribe(listener)
+    const before = store.get()
+    store.dispatchRepos({ type: 'set-list', list: [] })
+    expect(listener).toHaveBeenCalledTimes(1)
+    const after = store.get()
+    expect(after.graph).toBe(before.graph)
+    expect(after.spawnMenu).toBe(before.spawnMenu)
+    expect(after.repos).not.toBe(before.repos)
   })
 })

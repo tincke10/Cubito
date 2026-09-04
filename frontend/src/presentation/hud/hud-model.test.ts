@@ -6,16 +6,18 @@ import { countNodeStates } from '../theme/node-state'
 import { emptyWorktreeGraph } from '../../domain/worktree-graph/types'
 import { emptyTerminalsState, reduceTerminals } from '../../application/terminal-session-model'
 import { emptySpawnMenuSlice } from '../../application/spawn-menu-model'
+import { emptyReposSlice } from '../../application/repos-model'
 import type { SceneState } from '../../application/scene-store'
+import { buildWorktreeGraph } from '../../domain/worktree-graph/build-graph'
 
 const baseState = (overrides: Partial<SceneState> = {}): SceneState => ({
   graph: emptyWorktreeGraph(),
   sync: { state: 'idle' },
   connection: { state: 'down', reason: 'not connected' },
   selection: { selectedId: null },
-  repo: null,
   terminals: emptyTerminalsState(),
   spawnMenu: emptySpawnMenuSlice(),
+  repos: emptyReposSlice(),
   ...overrides
 })
 
@@ -79,16 +81,50 @@ describe('hudModel', () => {
     expect(connected.connection.dotColor).not.toBe(down.connection.dotColor)
   })
 
-  it('repo is null when state.repo is null', () => {
-    const model = hudModel(baseState({ repo: null }), { isMac: true })
+  it('repo is null when there are 0 repos', () => {
+    const model = hudModel(baseState({ repos: emptyReposSlice() }), { isMac: true })
     expect(model.repo).toBeNull()
   })
 
-  it('repo passes through name and baseBranch when present', () => {
-    const model = hudModel(baseState({ repo: { name: 'Cubito', baseBranch: 'main' } }), {
-      isMac: true
-    })
-    expect(model.repo).toEqual({ name: 'Cubito', baseBranch: 'main' })
+  it('repo shows the active repo displayName and its node count', () => {
+    const graph = buildWorktreeGraph([
+      {
+        id: 'r1::/a',
+        repoId: 'r1',
+        branch: 'main',
+        parentWorktreeId: null,
+        childWorktreeIds: [],
+        workspaceStatus: 'in-progress',
+        git: { path: '/a', isMainWorktree: true }
+      },
+      {
+        id: 'r1::/b',
+        repoId: 'r1',
+        branch: 'feat',
+        parentWorktreeId: null,
+        childWorktreeIds: [],
+        workspaceStatus: 'in-progress',
+        git: { path: '/b', isMainWorktree: false }
+      },
+      {
+        id: 'r2::/c',
+        repoId: 'r2',
+        branch: 'main',
+        parentWorktreeId: null,
+        childWorktreeIds: [],
+        workspaceStatus: 'in-progress',
+        git: { path: '/c', isMainWorktree: true }
+      }
+    ])
+    const repos = {
+      list: [
+        { id: 'r1', path: '/r1', displayName: 'Cubito', kind: 'git' as const },
+        { id: 'r2', path: '/r2', displayName: 'Other', kind: 'git' as const }
+      ],
+      activeRepoId: 'r1'
+    }
+    const model = hudModel(baseState({ graph, repos }), { isMac: true })
+    expect(model.repo).toEqual({ displayName: 'Cubito', nodeCount: 2 })
   })
 
   it('counters equals countNodeStates(graph) exactly — no independent computation', () => {

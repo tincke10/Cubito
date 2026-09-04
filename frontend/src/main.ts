@@ -85,6 +85,9 @@ const demoGateway: RuntimeGateway = {
   listRepos: async () => [],
   createWorktree: async () => {
     throw new Error('createWorktree not implemented in the demo gateway')
+  },
+  addRepo: async () => {
+    throw new Error('addRepo not implemented in the demo gateway')
   }
 }
 
@@ -222,7 +225,8 @@ function bindSpawn(connection: LiveSyncConnection): void {
     hud: hudElement,
     dispatch: (action) => store.dispatchSpawn(action),
     nodeCenter: (id) => graphView.nodeCenter(id),
-    refetch: () => syncWorktreeGraph(spawnGateway, store)
+    refetch: () => syncWorktreeGraph(spawnGateway, store),
+    activeRepoId: () => store.get().repos.activeRepoId
   })
   spawnController.sync(store.get().spawnMenu, store.get().graph)
 }

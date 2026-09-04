@@ -5,6 +5,7 @@ import type { WorktreeGraph, WorktreeNode } from '../../domain/worktree-graph/ty
 import { DEPTH_STEP, MIN_ANGULAR_SEPARATION } from '../theme/scene-metrics'
 
 const node = (overrides: Partial<WorktreeNode> & Pick<WorktreeNode, 'id'>): WorktreeNode => ({
+  repoId: 'repo',
   branch: `refs/heads/${overrides.id}`,
   path: `/path/${overrides.id}`,
   status: 'in-progress',

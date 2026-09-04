@@ -44,12 +44,14 @@ const createFakeElement = (tag: string): FakeElement => {
 const createFakeDocument = (): Document =>
   ({ createElement: (tag: string) => createFakeElement(tag) }) as unknown as Document
 
-const everyStyle = (el: FakeElement, predicate: (style: Record<string, string>) => boolean): boolean =>
-  predicate(el.style) && el.children.every((child) => everyStyle(child, predicate))
+const everyStyle = (
+  el: FakeElement,
+  predicate: (style: Record<string, string>) => boolean
+): boolean => predicate(el.style) && el.children.every((child) => everyStyle(child, predicate))
 
 const fixture = (overrides: Partial<HudModel> = {}): HudModel => ({
   connection: { label: 'conectado · runtime 4f2a9c', dotColor: 'accent' },
-  repo: { name: 'Cubito', baseBranch: 'main' },
+  repo: { displayName: 'Cubito', nodeCount: 4 },
   counters: { total: 6, working: 2, waitingInput: 1 },
   chips: [],
   ...overrides
@@ -73,12 +75,12 @@ describe('createHudOverlay', () => {
     expect(text!.textContent).toBe('conectado · runtime 4f2a9c')
   })
 
-  it('repo line shows the repo name and base branch', () => {
+  it('repo line shows the active repo displayName and node count', () => {
     const overlay = createHudOverlay(createFakeDocument())
-    overlay.apply(fixture({ repo: { name: 'Cubito', baseBranch: 'main' } }))
+    overlay.apply(fixture({ repo: { displayName: 'Cubito', nodeCount: 4 } }))
     const [, repoLine] = (overlay.root as unknown as FakeElement).children
     expect(repoLine!.textContent).toContain('Cubito')
-    expect(repoLine!.textContent).toContain('main')
+    expect(repoLine!.textContent).toContain('4 nodos')
   })
 
   it('repo line shows placeholder text when repo is null', () => {
@@ -111,14 +113,18 @@ describe('createHudOverlay', () => {
   it('the accent glow class applies only to the connection line, not repo or counters', () => {
     const overlay = createHudOverlay(createFakeDocument())
     overlay.apply(fixture())
-    const [connectionLine, repoLine, countersLine] = (overlay.root as unknown as FakeElement).children
+    const [connectionLine, repoLine, countersLine] = (overlay.root as unknown as FakeElement)
+      .children
     expect(connectionLine!.classes.has('cubito-hud__line--glow')).toBe(true)
     expect(repoLine!.classes.has('cubito-hud__line--glow')).toBe(false)
     expect(countersLine!.classes.has('cubito-hud__line--glow')).toBe(false)
   })
 
   it('never imports application/* — the DOM writer takes only a HudModel', () => {
-    const source = readFileSync(fileURLToPath(new URL('./hud-overlay.ts', import.meta.url)), 'utf-8')
+    const source = readFileSync(
+      fileURLToPath(new URL('./hud-overlay.ts', import.meta.url)),
+      'utf-8'
+    )
     expect(source).not.toMatch(/from ['"].*application/)
     expect(source).not.toMatch(/:\s*SceneState\b/)
   })

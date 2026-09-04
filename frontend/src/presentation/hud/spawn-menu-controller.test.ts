@@ -70,7 +70,9 @@ const createFakeForm = (): FakeForm => {
 }
 
 const createFakeGateway = () => ({
-  listRepos: vi.fn<() => Promise<readonly RepoSummary[]>>(async () => [{ id: 'repo-1' }]),
+  listRepos: vi.fn<() => Promise<readonly RepoSummary[]>>(async () => [
+    { id: 'repo-1', path: '/repo-1', displayName: 'Repo One', kind: 'git' }
+  ]),
   createWorktree: vi.fn<(input: CreateWorktreeInput) => Promise<CreateWorktreeResult>>(
     async () => ({
       worktreeId: 'wt-1'
@@ -174,6 +176,37 @@ describe('createSpawnMenuController', () => {
     controller.sync({ ...radialSlice(), repoSelector: 'id:repo-1' }, emptyWorktreeGraph())
     await flush()
     expect(gateway.listRepos).not.toHaveBeenCalled()
+  })
+
+  it('prefers activeRepoId over the first listed repo when resolving the repo selector', async () => {
+    const gateway = createFakeGateway()
+    gateway.listRepos.mockResolvedValueOnce([
+      { id: 'repo-1', path: '/repo-1', displayName: 'Repo One', kind: 'git' },
+      { id: 'repo-2', path: '/repo-2', displayName: 'Repo Two', kind: 'git' }
+    ])
+    const dispatch = vi.fn<(action: SpawnMenuAction) => void>()
+    const controller = createSpawnMenuController({
+      gateway,
+      createMenu: () => createFakeMenu(),
+      createForm: () => createFakeForm(),
+      labelLayer: { add: vi.fn(), remove: vi.fn() },
+      hud: { appendChild: vi.fn() },
+      dispatch,
+      nodeCenter: vi.fn(),
+      refetch: vi.fn(async () => {}),
+      activeRepoId: () => 'repo-2'
+    })
+    controller.sync(radialSlice(), emptyWorktreeGraph())
+    await flush()
+    expect(dispatch).toHaveBeenCalledWith({ type: 'set-repo-selector', repoSelector: 'id:repo-2' })
+  })
+
+  it('falls back to the first listed repo when activeRepoId is null', async () => {
+    const { controller, gateway, dispatch } = setup()
+    controller.sync(radialSlice(), emptyWorktreeGraph())
+    await flush()
+    expect(gateway.listRepos).toHaveBeenCalledOnce()
+    expect(dispatch).toHaveBeenCalledWith({ type: 'set-repo-selector', repoSelector: 'id:repo-1' })
   })
 
   it('wires field changes from the form to update-field dispatches', () => {

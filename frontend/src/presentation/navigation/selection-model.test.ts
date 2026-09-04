@@ -5,6 +5,7 @@ import { inertActivity } from '../../domain/worktree-graph/node-activity'
 import { emptyWorktreeGraph } from '../../domain/worktree-graph/types'
 
 const node = (overrides: Partial<WorktreeNode> & Pick<WorktreeNode, 'id'>): WorktreeNode => ({
+  repoId: 'repo',
   branch: `refs/heads/${overrides.id}`,
   path: `/path/${overrides.id}`,
   status: 'in-progress',

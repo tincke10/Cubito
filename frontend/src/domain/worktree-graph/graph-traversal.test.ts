@@ -4,6 +4,7 @@ import type { WorktreeGraph, WorktreeNode } from './types'
 import { inertActivity } from './node-activity'
 
 const node = (overrides: Partial<WorktreeNode> & Pick<WorktreeNode, 'id'>): WorktreeNode => ({
+  repoId: 'repo',
   branch: `refs/heads/${overrides.id}`,
   path: `/path/${overrides.id}`,
   status: 'in-progress',
@@ -24,10 +25,7 @@ const graphOf = (nodes: readonly WorktreeNode[]): WorktreeGraph => ({
 
 describe('parentOf', () => {
   it('returns the parent id when resolvable', () => {
-    const graph = graphOf([
-      node({ id: 'a', childIds: ['b'] }),
-      node({ id: 'b', parentId: 'a' })
-    ])
+    const graph = graphOf([node({ id: 'a', childIds: ['b'] }), node({ id: 'b', parentId: 'a' })])
     expect(parentOf(graph, 'b')).toBe('a')
   })
 

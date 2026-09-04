@@ -1,6 +1,28 @@
 import type { RawWorktreeRecord } from '../../domain/worktree-graph/build-graph'
-import type { CreateWorktreeInput, RuntimeGateway } from '../../application/ports/runtime-gateway'
+import type {
+  CreateWorktreeInput,
+  RepoSummary,
+  RuntimeGateway
+} from '../../application/ports/runtime-gateway'
 import type { RpcSuccessFrame } from './envelope'
+
+/** Projects a raw `repo.list`/`repo.add` row onto the local `RepoSummary` shape. */
+function toRepoSummary(row: {
+  id?: unknown
+  path?: unknown
+  displayName?: unknown
+  kind?: unknown
+}): RepoSummary {
+  if (typeof row.id !== 'string') {
+    throw new Error('repo row missing an id')
+  }
+  return {
+    id: row.id,
+    path: typeof row.path === 'string' ? row.path : '',
+    displayName: typeof row.displayName === 'string' ? row.displayName : row.id,
+    kind: row.kind === 'git' || row.kind === 'folder' ? row.kind : null
+  }
+}
 
 /** The one method of RpcConnection the gateway needs; eases test doubles. */
 export type RpcCaller = (method: string, params?: unknown) => Promise<RpcSuccessFrame>
@@ -30,7 +52,15 @@ export function createOrcadGateway(
       if (!Array.isArray(result?.repos)) {
         throw new Error('repo.list returned no repos array')
       }
-      return result.repos as { id: string }[]
+      return (result.repos as Record<string, unknown>[]).map(toRepoSummary)
+    },
+    async addRepo(input) {
+      const response = await connection.call('repo.add', input)
+      const result = response.result as { repo?: unknown }
+      if (typeof result?.repo !== 'object' || result.repo === null) {
+        throw new Error('repo.add returned no repo')
+      }
+      return toRepoSummary(result.repo as Record<string, unknown>)
     },
     async createWorktree(input: CreateWorktreeInput) {
       const response = await connection.call('worktree.create', input)

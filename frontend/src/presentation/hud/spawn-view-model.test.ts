@@ -8,6 +8,7 @@ import { inertActivity } from '../../domain/worktree-graph/node-activity'
 
 const node = (id: string, branch: string): WorktreeNode => ({
   id,
+  repoId: 'repo',
   branch,
   path: `/tmp/${id}`,
   status: 'clean',

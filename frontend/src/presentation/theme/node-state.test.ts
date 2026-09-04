@@ -5,8 +5,12 @@ import { inertActivity } from '../../domain/worktree-graph/node-activity'
 import type { NodeActivity } from '../../domain/worktree-graph/node-activity'
 import type { WorktreeGraph, WorktreeNode } from '../../domain/worktree-graph/types'
 
-const node = (activity: Partial<NodeActivity> = {}, overrides: Partial<WorktreeNode> = {}): WorktreeNode => ({
+const node = (
+  activity: Partial<NodeActivity> = {},
+  overrides: Partial<WorktreeNode> = {}
+): WorktreeNode => ({
   id: 'repo::/path/main',
+  repoId: 'repo',
   branch: 'refs/heads/main',
   path: '/path/main',
   status: 'in-progress',
@@ -67,8 +71,16 @@ describe('deriveNodeState', () => {
 
   it.each<[string, Partial<NodeActivity>, NodeState]>([
     ['archived beats working', { isArchived: true, agentStatus: 'working' }, 'archived'],
-    ['waiting-input beats unread', { agentStatus: 'waiting-input', isUnread: true }, 'waiting-input'],
-    ['working beats a nonzero diff', { agentStatus: 'working', diff: { added: 4, removed: 0 } }, 'working'],
+    [
+      'waiting-input beats unread',
+      { agentStatus: 'waiting-input', isUnread: true },
+      'waiting-input'
+    ],
+    [
+      'working beats a nonzero diff',
+      { agentStatus: 'working', diff: { added: 4, removed: 0 } },
+      'working'
+    ],
     [
       'a nonzero diff beats unread',
       { diff: { added: 1, removed: 0 }, isUnread: true, agentStatus: 'idle' },
@@ -120,12 +132,12 @@ describe('deriveDecorations', () => {
 
   it('unreadDot is true only when unread and not archived/spawning', () => {
     expect(deriveDecorations(node({ isUnread: true }), false).unreadDot).toBe(true)
-    expect(deriveDecorations(node({ isUnread: true, isArchived: true }), false).unreadDot).toBe(false)
+    expect(deriveDecorations(node({ isUnread: true, isArchived: true }), false).unreadDot).toBe(
+      false
+    )
     expect(
-      deriveDecorations(
-        node({ isUnread: true, spawn: { phase: 'cloning', progress: 0.2 } }),
-        false
-      ).unreadDot
+      deriveDecorations(node({ isUnread: true, spawn: { phase: 'cloning', progress: 0.2 } }), false)
+        .unreadDot
     ).toBe(false)
   })
 
@@ -138,7 +150,9 @@ describe('deriveDecorations', () => {
   })
 
   it('waitingCallout is true only in the waiting-input state', () => {
-    expect(deriveDecorations(node({ agentStatus: 'waiting-input' }), false).waitingCallout).toBe(true)
+    expect(deriveDecorations(node({ agentStatus: 'waiting-input' }), false).waitingCallout).toBe(
+      true
+    )
     expect(deriveDecorations(node({ agentStatus: 'working' }), false).waitingCallout).toBe(false)
   })
 })

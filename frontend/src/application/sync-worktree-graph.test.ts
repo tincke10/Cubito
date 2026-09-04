@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createSceneStore } from './scene-store'
 import { syncWorktreeGraph } from './sync-worktree-graph'
-import type { RuntimeGateway } from './ports/runtime-gateway'
+import type { RepoSummary, RuntimeGateway } from './ports/runtime-gateway'
 import type { RawWorktreeRecord } from '../domain/worktree-graph/build-graph'
 
 const records: RawWorktreeRecord[] = [
@@ -23,12 +23,18 @@ const records: RawWorktreeRecord[] = [
   }
 ]
 
-/** Minimal RuntimeGateway fake — spawn's listRepos/createWorktree are untested here (see spawn-menu-model.test.ts). */
-const fakeGateway = (listWorktrees: () => Promise<RawWorktreeRecord[]>): RuntimeGateway => ({
+/** Minimal RuntimeGateway fake — spawn's createWorktree is untested here (see spawn-menu-model.test.ts). */
+const fakeGateway = (
+  listWorktrees: () => Promise<RawWorktreeRecord[]>,
+  listRepos: () => Promise<readonly RepoSummary[]> = async () => []
+): RuntimeGateway => ({
   listWorktrees,
-  listRepos: async () => [],
+  listRepos,
   createWorktree: async () => {
     throw new Error('createWorktree not implemented in this fake')
+  },
+  addRepo: async () => {
+    throw new Error('addRepo not implemented in this fake')
   }
 })
 
@@ -110,6 +116,50 @@ describe('syncWorktreeGraph', () => {
       })
       await syncWorktreeGraph(failing, store, () => 2)
       expect(store.get().selection.selectedId).toBe('repo::/b')
+    })
+  })
+
+  describe('repos sync', () => {
+    const repoSummaries: RepoSummary[] = [
+      { id: 'r1', path: '/r1', displayName: 'Repo One', kind: 'git' },
+      { id: 'r2', path: '/r2', displayName: 'Repo Two', kind: 'git' }
+    ]
+
+    it('populates repos and reconciles activeRepoId from repo.list, alongside the worktree fetch', async () => {
+      const store = createSceneStore()
+      const gateway = fakeGateway(
+        async () => records,
+        async () => repoSummaries
+      )
+      await syncWorktreeGraph(gateway, store, () => 1)
+      const state = store.get()
+      expect(state.repos.list).toEqual(repoSummaries)
+      expect(state.repos.activeRepoId).toBe('r1')
+      expect(state.graph.nodes.size).toBe(2)
+    })
+
+    it('a repo.list failure leaves the graph and the prior repos slice intact (best-effort)', async () => {
+      const store = createSceneStore()
+      await syncWorktreeGraph(
+        fakeGateway(
+          async () => records,
+          async () => repoSummaries
+        ),
+        store,
+        () => 1
+      )
+      const failingRepos = fakeGateway(
+        async () => records,
+        async () => {
+          throw new Error('repo.list boom')
+        }
+      )
+      await syncWorktreeGraph(failingRepos, store, () => 2)
+      const state = store.get()
+      expect(state.graph.nodes.size).toBe(2)
+      expect(state.sync).toEqual({ state: 'synced', at: 2 })
+      expect(state.repos.list).toEqual(repoSummaries)
+      expect(state.repos.activeRepoId).toBe('r1')
     })
   })
 

@@ -8,6 +8,8 @@ import type { AgentStatus, DiffSummary, NodeActivity, SpawnProgress } from './no
  */
 export type RawWorktreeRecord = {
   id: string
+  /** Optional — defensive for legacy/demo rows; the wire already ships it. */
+  repoId?: string
   branch: string
   parentWorktreeId: string | null
   childWorktreeIds: readonly string[]
@@ -62,6 +64,7 @@ export function buildWorktreeGraph(records: readonly RawWorktreeRecord[]): Workt
     }
     nodes.set(raw.id, {
       id: raw.id,
+      repoId: raw.repoId ?? raw.id.split('::')[0]!,
       branch: raw.branch,
       path: raw.git.path,
       status: raw.workspaceStatus,

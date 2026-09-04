@@ -7,6 +7,7 @@ export const NODE_KINDS = ['root', 'worktree'] as const satisfies readonly NodeK
 
 export type WorktreeNode = {
   id: WorktreeId
+  repoId: string
   branch: string
   path: string
   status: string
