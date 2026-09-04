@@ -102,6 +102,9 @@ export function createTerminalPanelController(
         cols: meta.cols,
         rows: meta.rows
       })
+      // Fit now that the stream is live: xterm resizes from its default to the real panel size,
+      // and the resulting sendResize (SIGWINCH) is what makes the shell draw its first prompt.
+      entry.panel.fit()
     },
     onSnapshotStart: () => entry.panel.reset(),
     write: (bytes) => {
@@ -146,13 +149,13 @@ export function createTerminalPanelController(
     if (cachedHandle) {
       // Already created+subscribed once on this connection (tab switch / revisited node) — no
       // need to allocate a new PTY, just resubscribe; the server replays a fresh snapshot.
-      port.subscribe(streamId, cachedHandle, undefined, sinkFor(entry))
+      port.subscribe(streamId, cachedHandle, entry.panel.dimensions(), sinkFor(entry))
       return
     }
     void port.createTerminal(nodeId).then(({ terminal }) => {
       if (mounted !== entry) return // superseded while the create RPC was in flight
       entry.handle = terminal
-      port.subscribe(streamId, terminal, undefined, sinkFor(entry))
+      port.subscribe(streamId, terminal, entry.panel.dimensions(), sinkFor(entry))
     })
   }
 
@@ -200,7 +203,7 @@ export function createTerminalPanelController(
       void port.createTerminal(entry.nodeId).then(({ terminal }) => {
         if (mounted !== entry) return
         entry.handle = terminal
-        port.subscribe(entry.streamId, terminal, undefined, sinkFor(entry))
+        port.subscribe(entry.streamId, terminal, entry.panel.dimensions(), sinkFor(entry))
       })
     },
     tick(): void {

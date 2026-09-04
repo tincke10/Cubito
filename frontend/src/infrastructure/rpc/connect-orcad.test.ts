@@ -100,7 +100,9 @@ describe('connectOrcad', () => {
   it('exposes a working terminals port: create, subscribe, input/resize/output, close (P3.4)', async () => {
     const server = await startFakeOrcadServer({
       handleRequest: (method) => {
-        if (method === 'terminal.create') return { ok: true, result: { terminal: 'term-1' } }
+        // orcad's real shape: terminal.create returns a terminal OBJECT; the handle is nested.
+        if (method === 'terminal.create')
+          return { ok: true, result: { terminal: { handle: 'term-1' } } }
         if (method === 'terminal.close') return { ok: true, result: { close: true } }
         return { ok: true, result: { worktrees: [] } }
       }

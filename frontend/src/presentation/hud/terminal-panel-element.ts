@@ -1,5 +1,6 @@
 import { Terminal } from '@xterm/xterm'
 import type { IDisposable, ITheme } from '@xterm/xterm'
+import '@xterm/xterm/css/xterm.css' // base styles: hides the helper textarea, lays out rows/cursor
 import { FitAddon } from '@xterm/addon-fit'
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
 import type { TerminalPanelModel } from './terminal-panel-model'
@@ -48,6 +49,8 @@ export type TerminalPanelHandle = {
   write(bytes: Uint8Array): void
   reset(): void
   fit(): void
+  /** Current xterm grid size — sent as the Subscribe viewport so orcad sizes the PTY. */
+  dimensions(): { cols: number; rows: number }
   onData(callback: (data: string) => void): () => void
   onResize(callback: (cols: number, rows: number) => void): () => void
   focus(): void
@@ -103,6 +106,9 @@ export function createTerminalPanel(onExit: () => void): TerminalPanelHandle {
     },
     fit() {
       fitAddon.fit()
+    },
+    dimensions() {
+      return { cols: term.cols, rows: term.rows }
     },
     onData(callback: (data: string) => void): () => void {
       const subscription: IDisposable = term.onData(callback)

@@ -71,10 +71,15 @@ async function openTerminalsPort(rpcConnection: RpcConnection): Promise<Terminal
   await client.open()
   return {
     async createTerminal(worktree) {
-      const response = await rpcConnection.call<{ terminal: string }>('terminal.create', {
-        worktree
-      })
-      return response.result
+      // orcad returns { terminal: { handle, tabId, paneKey, ... } }; the multiplex Subscribe frame
+      // wants only the handle STRING (stream-schemas.ts TerminalHandle) — pass that, not the object.
+      const response = await rpcConnection.call<{ terminal: { handle: string } }>(
+        'terminal.create',
+        {
+          worktree
+        }
+      )
+      return { terminal: response.result.terminal.handle }
     },
     subscribe: (streamId, terminal, viewport, sink) =>
       client.subscribe(streamId, terminal, viewport, sink),

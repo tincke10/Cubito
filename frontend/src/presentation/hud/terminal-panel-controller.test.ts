@@ -41,6 +41,9 @@ const createFakePanel = (): FakePanel => {
     fit() {
       panel.fitCalls++
     },
+    dimensions() {
+      return { cols: 80, rows: 24 }
+    },
     onData(cb) {
       dataCb = cb
       return () => (dataCb = null)
@@ -152,7 +155,7 @@ describe('createTerminalPanelController', () => {
     expect(port.subscribe).toHaveBeenCalledWith(
       1,
       'handle-repo::/wt/a',
-      undefined,
+      { cols: 80, rows: 24 },
       expect.anything()
     )
   })
@@ -186,6 +189,8 @@ describe('createTerminalPanelController', () => {
       cols: 80,
       rows: 24
     })
+    // fit-on-subscribed nudges the shell (SIGWINCH) so it draws its first prompt on open.
+    expect(panels[0]!.fitCalls).toBe(1)
   })
 
   it('wires panel input to port.sendInput and panel resize to port.sendResize', async () => {
@@ -291,7 +296,12 @@ describe('createTerminalPanelController', () => {
       await flush()
 
       expect(port.createTerminal).toHaveBeenCalledTimes(2)
-      expect(port.subscribe).toHaveBeenCalledWith(1, 'pty-1', undefined, expect.anything())
+      expect(port.subscribe).toHaveBeenCalledWith(
+        1,
+        'pty-1',
+        { cols: 80, rows: 24 },
+        expect.anything()
+      )
     })
   })
 
@@ -358,7 +368,7 @@ describe('createTerminalPanelController', () => {
       expect(newPort.subscribe).toHaveBeenCalledWith(
         1,
         'handle-repo::/wt/a',
-        undefined,
+        { cols: 80, rows: 24 },
         expect.anything()
       )
       expect(panels).toHaveLength(1) // same xterm instance reused, not recreated
