@@ -20,7 +20,8 @@ const PANEL_WORLD_LIFT = 3
 
 export type TerminalPanelControllerDeps = {
   port: TerminalStreamPort
-  createPanel: () => TerminalPanelHandle
+  /** `onExit` fires on the panel's Ctrl+] chord (see terminal-panel-element.ts). */
+  createPanel: (onExit: () => void) => TerminalPanelHandle
   createConnector: () => TerminalConnectorHandle
   labelLayer: { add(object: unknown): void; remove(object: unknown): void }
   hud: { appendChild(element: unknown): void }
@@ -34,6 +35,15 @@ export type TerminalPanelControllerDeps = {
 export type TerminalPanelController = {
   sync(state: TerminalsState): void
   tick(): void
+  /** Gives the currently mounted panel's xterm real DOM focus (`[t]`/reopen). */
+  focusActivePanel(): void
+  /** Blurs the mounted panel and dispatches `set-focused:false` — the exit chord/click-away path. */
+  exitFocus(): void
+  /** Unsubscribes + closes the mounted session on the port, then dispatches `close-terminal`. */
+  closeActiveSession(): void
+  /** Reconnect (design Area 7): swaps the port and, if a session is mounted, re-creates +
+   *  re-subscribes it on the fresh connection without recreating the xterm/DOM panel. */
+  rebind(port: TerminalStreamPort): void
   dispose(): void
 }
 
@@ -45,6 +55,9 @@ type Mounted = {
   unsubscribeData: () => void
   unsubscribeResize: () => void
   dispatchedOutput: boolean
+  /** Known once `terminal.create`/`onSubscribed` resolve — lets a later re-mount (tab switch,
+   *  revisiting a node) skip `createTerminal` and just resubscribe the existing PTY handle. */
+  handle: string | null
 }
 
 /**
@@ -56,6 +69,7 @@ export function createTerminalPanelController(
   deps: TerminalPanelControllerDeps
 ): TerminalPanelController {
   const connector = deps.createConnector()
+  let port = deps.port
   let mounted: Mounted | null = null
 
   const attach = (panel: TerminalPanelHandle, placement: TerminalPlacement): void => {
@@ -70,6 +84,7 @@ export function createTerminalPanelController(
   const unmount = (): void => {
     if (!mounted) return
     detach(mounted.panel, mounted.placement)
+    port.unsubscribe(mounted.streamId)
     mounted.unsubscribeData()
     mounted.unsubscribeResize()
     mounted.panel.dispose()
@@ -78,6 +93,7 @@ export function createTerminalPanelController(
 
   const sinkFor = (entry: Mounted): TerminalStreamSink => ({
     onSubscribed: (meta) => {
+      entry.handle = meta.terminal
       deps.dispatch({
         type: 'subscribed',
         streamId: meta.streamId,
@@ -100,12 +116,20 @@ export function createTerminalPanelController(
     onEnd: () => {}
   })
 
-  const mount = (nodeId: WorktreeId, streamId: number, placement: TerminalPlacement): void => {
-    const panel = deps.createPanel()
-    const unsubscribeData = panel.onData((data) => deps.port.sendInput(streamId, data))
-    const unsubscribeResize = panel.onResize((cols, rows) =>
-      deps.port.sendResize(streamId, cols, rows)
-    )
+  const exitFocus = (): void => {
+    mounted?.panel.blur()
+    deps.dispatch({ type: 'set-focused', focused: false })
+  }
+
+  const mount = (
+    nodeId: WorktreeId,
+    streamId: number,
+    placement: TerminalPlacement,
+    cachedHandle: string | null
+  ): void => {
+    const panel = deps.createPanel(() => exitFocus())
+    const unsubscribeData = panel.onData((data) => port.sendInput(streamId, data))
+    const unsubscribeResize = panel.onResize((cols, rows) => port.sendResize(streamId, cols, rows))
     attach(panel, placement)
     const entry: Mounted = {
       nodeId,
@@ -114,12 +138,20 @@ export function createTerminalPanelController(
       panel,
       unsubscribeData,
       unsubscribeResize,
-      dispatchedOutput: false
+      dispatchedOutput: false,
+      handle: cachedHandle
     }
     mounted = entry
-    void deps.port.createTerminal(nodeId).then(({ terminal }) => {
+    if (cachedHandle) {
+      // Already created+subscribed once on this connection (tab switch / revisited node) — no
+      // need to allocate a new PTY, just resubscribe; the server replays a fresh snapshot.
+      port.subscribe(streamId, cachedHandle, undefined, sinkFor(entry))
+      return
+    }
+    void port.createTerminal(nodeId).then(({ terminal }) => {
       if (mounted !== entry) return // superseded while the create RPC was in flight
-      deps.port.subscribe(streamId, terminal, undefined, sinkFor(entry))
+      entry.handle = terminal
+      port.subscribe(streamId, terminal, undefined, sinkFor(entry))
     })
   }
 
@@ -139,7 +171,7 @@ export function createTerminalPanelController(
 
       if (!mounted || mounted.streamId !== streamId) {
         unmount()
-        mount(model.nodeId, streamId, model.placement)
+        mount(model.nodeId, streamId, model.placement, state.sessions.get(streamId)?.handle ?? null)
       } else if (mounted.placement !== model.placement) {
         detach(mounted.panel, mounted.placement)
         attach(mounted.panel, model.placement)
@@ -147,6 +179,28 @@ export function createTerminalPanelController(
       }
 
       mounted!.panel.apply(model)
+    },
+    focusActivePanel(): void {
+      mounted?.panel.focus()
+    },
+    exitFocus,
+    closeActiveSession(): void {
+      if (!mounted) return
+      const { streamId, handle } = mounted
+      port.unsubscribe(streamId)
+      if (handle) void port.close(handle)
+      deps.dispatch({ type: 'close-terminal', streamId })
+    },
+    rebind(newPort: TerminalStreamPort): void {
+      port = newPort
+      if (!mounted) return
+      const entry = mounted
+      entry.dispatchedOutput = false
+      void port.createTerminal(entry.nodeId).then(({ terminal }) => {
+        if (mounted !== entry) return
+        entry.handle = terminal
+        port.subscribe(entry.streamId, terminal, undefined, sinkFor(entry))
+      })
     },
     tick(): void {
       if (!mounted) {

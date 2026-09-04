@@ -249,4 +249,120 @@ describe('createTerminalPanelController', () => {
     expect(panels[0]!.disposed).toBe(true)
     expect(panels[1]!.disposed).toBe(false)
   })
+
+  it('unsubscribes on the port whenever the currently mounted panel unmounts', async () => {
+    const { controller, port } = setup()
+    const state = openedState()
+    controller.sync(state)
+    await flush()
+    controller.sync(reduceTerminals(state, { type: 'close-terminal', streamId: 1 }))
+    expect(port.unsubscribe).toHaveBeenCalledWith(1)
+  })
+
+  describe('P6.4 — multiplex tabs on the same node', () => {
+    it('reuses the cached PTY handle when switching back to an already-subscribed tab — no duplicate terminal.create', async () => {
+      const { controller, port } = setup()
+      let state = openedState('repo::/wt/a') // tab 1 -> streamId 1
+      controller.sync(state)
+      await flush()
+      port.sinks.get(1)!.onSubscribed({ streamId: 1, terminal: 'pty-1', cols: 80, rows: 24 })
+      state = reduceTerminals(state, {
+        type: 'subscribed',
+        streamId: 1,
+        terminal: 'pty-1',
+        cols: 80,
+        rows: 24
+      })
+
+      // Open a second tab on the same node -> streamId 2 becomes active.
+      state = reduceTerminals(state, { type: 'open-terminal-for-node', nodeId: 'repo::/wt/a' })
+      controller.sync(state)
+      await flush()
+      expect(port.createTerminal).toHaveBeenCalledTimes(2)
+
+      // Cycle back to tab 1 (already subscribed) — must NOT create a new terminal.
+      state = reduceTerminals(state, { type: 'next-tab', nodeId: 'repo::/wt/a' })
+      controller.sync(state)
+      await flush()
+
+      expect(port.createTerminal).toHaveBeenCalledTimes(2)
+      expect(port.subscribe).toHaveBeenCalledWith(1, 'pty-1', undefined, expect.anything())
+    })
+  })
+
+  describe('focus/close/rebind commands', () => {
+    it('focusActivePanel() focuses the mounted panel, no-ops with nothing mounted', async () => {
+      const { controller, panels } = setup()
+      controller.focusActivePanel() // no-op, nothing mounted
+      controller.sync(openedState())
+      await flush()
+      controller.focusActivePanel()
+      expect(panels[0]!.focus).toHaveBeenCalledOnce()
+    })
+
+    it('exitFocus() blurs the mounted panel and dispatches set-focused:false', async () => {
+      const { controller, panels, dispatch } = setup()
+      controller.sync(openedState())
+      await flush()
+      controller.exitFocus()
+      expect(panels[0]!.blur).toHaveBeenCalledOnce()
+      expect(dispatch).toHaveBeenCalledWith({ type: 'set-focused', focused: false })
+    })
+
+    it("the panel's onExit callback (Ctrl+] chord) routes through exitFocus", async () => {
+      const { controller, deps, panels, dispatch } = setup()
+      const createPanelSpy = vi.spyOn(deps, 'createPanel')
+      controller.sync(openedState())
+      await flush()
+      const onExit = createPanelSpy.mock.calls[0]![0]
+      onExit()
+      expect(panels[0]!.blur).toHaveBeenCalledOnce()
+      expect(dispatch).toHaveBeenCalledWith({ type: 'set-focused', focused: false })
+    })
+
+    it('closeActiveSession() unsubscribes + closes the handle on the port, then dispatches close-terminal', async () => {
+      const { controller, port, dispatch } = setup()
+      controller.sync(openedState())
+      await flush()
+      port.sinks.get(1)!.onSubscribed({ streamId: 1, terminal: 'pty-1', cols: 80, rows: 24 })
+
+      controller.closeActiveSession()
+
+      expect(port.unsubscribe).toHaveBeenCalledWith(1)
+      expect(port.close).toHaveBeenCalledWith('pty-1')
+      expect(dispatch).toHaveBeenCalledWith({ type: 'close-terminal', streamId: 1 })
+    })
+
+    it('closeActiveSession() is a no-op with nothing mounted', () => {
+      const { controller, port, dispatch } = setup()
+      controller.closeActiveSession()
+      expect(port.unsubscribe).not.toHaveBeenCalled()
+      expect(dispatch).not.toHaveBeenCalled()
+    })
+
+    it('rebind() resubscribes the mounted session on the fresh port without recreating the panel', async () => {
+      const { controller, panels } = setup()
+      controller.sync(openedState())
+      await flush()
+      const newPort = createFakePort()
+
+      controller.rebind(newPort)
+      await flush()
+
+      expect(newPort.createTerminal).toHaveBeenCalledWith('repo::/wt/a')
+      expect(newPort.subscribe).toHaveBeenCalledWith(
+        1,
+        'handle-repo::/wt/a',
+        undefined,
+        expect.anything()
+      )
+      expect(panels).toHaveLength(1) // same xterm instance reused, not recreated
+    })
+
+    it('rebind() before anything is mounted just swaps the port for the next mount', () => {
+      const { controller } = setup()
+      const newPort = createFakePort()
+      expect(() => controller.rebind(newPort)).not.toThrow()
+    })
+  })
 })

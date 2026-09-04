@@ -1,5 +1,6 @@
 import { countNodeStates } from '../theme/node-state'
 import type { ConnectionState, SceneState } from '../../application/scene-store'
+import type { TerminalsState } from '../../application/terminal-session-model'
 
 /** Semantic palette token names — never raw hex; the DOM writer maps these to CSS vars. */
 export type ConnectionDotTone = 'accent' | 'amber' | 'amberDim'
@@ -39,6 +40,30 @@ const connectionDotColor = (connection: ConnectionState): ConnectionDotTone => {
   }
 }
 
+/** Terminal-aware chips (design Area 8): no terminal -> `[t]`; scene placement -> pin/tab/exit;
+ *  hud placement -> its escena/close counterparts. Reflects `TerminalsState` only, no DOM. */
+const terminalChips = (terminals: TerminalsState, selectedId: unknown): readonly HudChip[] => {
+  const panel = terminals.activePanel
+  if (!panel) {
+    return selectedId === null ? [] : [{ key: 't', description: 'terminal' }]
+  }
+  const tabs = terminals.byNode.get(panel.nodeId) ?? []
+  if (panel.placement === 'scene') {
+    const chips: HudChip[] = [{ key: 'p', description: 'pin' }]
+    if (tabs.length > 1) {
+      chips.push({ key: '⇥', description: 'otra terminal' })
+    }
+    chips.push({ key: 'Ctrl+]', description: 'salir' })
+    return chips
+  }
+  const chips: HudChip[] = [{ key: 'esc', description: 'cerrar panel' }]
+  if (tabs.length > 1) {
+    chips.push({ key: '⇥', description: 'otra terminal' })
+  }
+  chips.push({ key: 'p', description: 'escena' })
+  return chips
+}
+
 const chipsFor = (platform: { isMac: boolean }): readonly HudChip[] => [
   { key: 'hjkl', description: 'navegar' },
   { key: 'f', description: 'focus' },
@@ -55,6 +80,6 @@ export function hudModel(state: SceneState, platform: { isMac: boolean }): HudMo
     },
     repo: state.repo,
     counters: countNodeStates(state.graph),
-    chips: chipsFor(platform)
+    chips: [...chipsFor(platform), ...terminalChips(state.terminals, state.selection.selectedId)]
   }
 }

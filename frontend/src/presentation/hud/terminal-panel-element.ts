@@ -21,6 +21,26 @@ const xtermTheme = (): ITheme => ({
   cursor: readThemeColor('--cubito-accent')
 })
 
+/** Ctrl+] (tmux-detach idiom, platform-neutral per AGENTS.md) — the only chord that exits
+ *  terminal focus back to the graph; Esc must never be caught here, it always reaches the PTY. */
+export function isTerminalExitChord(key: string, ctrlKey: boolean): boolean {
+  return ctrlKey && key === ']'
+}
+
+/** xterm's `attachCustomKeyEventHandler` predicate (design Area 8/P6.3), extracted pure for
+ *  testing without a DOM: `false` stops xterm processing the event (and fires `onExit`);
+ *  any other key — Esc included — returns `true` so xterm forwards it to the PTY untouched. */
+export function terminalCustomKeyEventHandler(
+  event: { type: string; key: string; ctrlKey: boolean },
+  onExit: () => void
+): boolean {
+  if (event.type === 'keydown' && isTerminalExitChord(event.key, event.ctrlKey)) {
+    onExit()
+    return false
+  }
+  return true
+}
+
 export type TerminalPanelHandle = {
   readonly object: CSS2DObject
   readonly element: HTMLElement
@@ -39,8 +59,10 @@ export type TerminalPanelHandle = {
  * xterm.js instance hosted in a CSS2DObject (design Area 6), built the same way as
  * node-label-element.ts: plain DOM construction, `var(--cubito-*)` only, dispose on teardown.
  * Untestable under `environment:'node'` (no `document`/canvas) — wiring lives in the controller.
+ * `onExit` fires on the Ctrl+] chord (see `terminalCustomKeyEventHandler` above) so the
+ * controller can blur the panel and hand focus back to the graph.
  */
-export function createTerminalPanel(): TerminalPanelHandle {
+export function createTerminalPanel(onExit: () => void): TerminalPanelHandle {
   const root = document.createElement('div')
   root.className = 'cubito-terminal-panel'
   root.style.backgroundColor = `var(${CHROME_VAR.panelSurface})`
@@ -61,6 +83,7 @@ export function createTerminalPanel(): TerminalPanelHandle {
   const fitAddon = new FitAddon()
   term.loadAddon(fitAddon)
   term.open(body)
+  term.attachCustomKeyEventHandler((event) => terminalCustomKeyEventHandler(event, onExit))
 
   const object = new CSS2DObject(root)
 

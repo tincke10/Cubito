@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { hudModel } from './hud-model'
 import { countNodeStates } from '../theme/node-state'
 import { emptyWorktreeGraph } from '../../domain/worktree-graph/types'
-import { emptyTerminalsState } from '../../application/terminal-session-model'
+import { emptyTerminalsState, reduceTerminals } from '../../application/terminal-session-model'
 import type { SceneState } from '../../application/scene-store'
 
 const baseState = (overrides: Partial<SceneState> = {}): SceneState => ({
@@ -106,6 +106,70 @@ describe('hudModel', () => {
     const model = hudModel(baseState(), { isMac: false })
     const paletteChip = model.chips.find((chip) => chip.description === 'paleta')
     expect(paletteChip?.key).toContain('Ctrl+K')
+  })
+
+  it('adds no [t] terminal chip when no node is selected', () => {
+    const model = hudModel(baseState({ selection: { selectedId: null } }), { isMac: true })
+    expect(model.chips.some((chip) => chip.key === 't')).toBe(false)
+  })
+
+  it('adds a [t] terminal chip when a node is selected and no terminal is open', () => {
+    const model = hudModel(baseState({ selection: { selectedId: 'w1' } }), { isMac: true })
+    expect(model.chips).toContainEqual({ key: 't', description: 'terminal' })
+  })
+
+  it('shows pin + exit chips (no tab chip) for a single terminal open in scene placement', () => {
+    const terminals = reduceTerminals(emptyTerminalsState(), {
+      type: 'open-terminal-for-node',
+      nodeId: 'w1'
+    })
+    const model = hudModel(baseState({ terminals, selection: { selectedId: 'w1' } }), {
+      isMac: true
+    })
+    expect(model.chips).toContainEqual({ key: 'p', description: 'pin' })
+    expect(model.chips).toContainEqual({ key: 'Ctrl+]', description: 'salir' })
+    expect(model.chips.some((chip) => chip.key === '⇥')).toBe(false)
+    expect(model.chips.some((chip) => chip.key === 't')).toBe(false)
+  })
+
+  it('adds the tab-switch chip once a second terminal is open on the same node', () => {
+    let terminals = reduceTerminals(emptyTerminalsState(), {
+      type: 'open-terminal-for-node',
+      nodeId: 'w1'
+    })
+    terminals = reduceTerminals(terminals, { type: 'open-terminal-for-node', nodeId: 'w1' })
+    const model = hudModel(baseState({ terminals, selection: { selectedId: 'w1' } }), {
+      isMac: true
+    })
+    expect(model.chips).toContainEqual({ key: '⇥', description: 'otra terminal' })
+  })
+
+  it('shows escena + cerrar-panel chips once the terminal is pinned to the hud', () => {
+    let terminals = reduceTerminals(emptyTerminalsState(), {
+      type: 'open-terminal-for-node',
+      nodeId: 'w1'
+    })
+    terminals = reduceTerminals(terminals, { type: 'set-placement', placement: 'hud' })
+    const model = hudModel(baseState({ terminals, selection: { selectedId: 'w1' } }), {
+      isMac: true
+    })
+    expect(model.chips).toContainEqual({ key: 'p', description: 'escena' })
+    expect(model.chips).toContainEqual({ key: 'esc', description: 'cerrar panel' })
+    expect(model.chips.some((chip) => chip.key === 'Ctrl+]')).toBe(false)
+    expect(model.chips.some((chip) => chip.key === '⇥')).toBe(false)
+  })
+
+  it('also shows the tab-switch chip once pinned when a second terminal is open', () => {
+    let terminals = reduceTerminals(emptyTerminalsState(), {
+      type: 'open-terminal-for-node',
+      nodeId: 'w1'
+    })
+    terminals = reduceTerminals(terminals, { type: 'open-terminal-for-node', nodeId: 'w1' })
+    terminals = reduceTerminals(terminals, { type: 'set-placement', placement: 'hud' })
+    const model = hudModel(baseState({ terminals, selection: { selectedId: 'w1' } }), {
+      isMac: true
+    })
+    expect(model.chips).toContainEqual({ key: '⇥', description: 'otra terminal' })
   })
 
   it('never reads the global navigator to decide platform — it only takes `platform.isMac`', () => {

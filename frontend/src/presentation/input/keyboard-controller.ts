@@ -27,14 +27,24 @@ export type KeyboardControllerEvent = {
   target: { tagName: string; isContentEditable: boolean } | null
 }
 
+/** The terminal-panel-controller operations the keyboard layer delegates to (design Area 8) —
+ *  a narrow structural subset, like `CameraRigLike`/`ScenePositions` above. */
+export type TerminalCommandPort = {
+  focusActivePanel(): void
+  closeActiveSession(): void
+}
+
 export type KeyboardControllerDeps = {
   store: SceneStore
   cameraRig: CameraRigLike
   scenePositions: ScenePositions
+  terminal: TerminalCommandPort
 }
 
 export type KeyboardController = {
-  handleKeyDown(event: KeyboardControllerEvent): void
+  /** Returns true when a command was resolved and acted on — `attach` uses it to decide
+   *  whether to suppress the key's default browser behavior (e.g. Tab's focus traversal). */
+  handleKeyDown(event: KeyboardControllerEvent): boolean
   /** Thin DOM wiring — untested logic lives only here. Returns a detach function. */
   attach(target: DomKeydownTarget): () => void
 }
@@ -50,7 +60,7 @@ type DomKeydownTarget = {
  * drive the camera. No parent/sibling/camera math lives here — it all delegates.
  */
 export function createKeyboardController(deps: KeyboardControllerDeps): KeyboardController {
-  const { store, cameraRig, scenePositions } = deps
+  const { store, cameraRig, scenePositions, terminal } = deps
   let currentFraming: CameraFraming | null = null
 
   const focusFraming = (framing: CameraFraming): void => {
@@ -69,9 +79,11 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
     }
   }
 
-  const handleKeyDown = (event: KeyboardControllerEvent): void => {
+  const handleKeyDown = (event: KeyboardControllerEvent): boolean => {
     if (event.target && isTextEntryTarget(event.target.tagName, event.target.isContentEditable)) {
-      return
+      // Covers xterm.js's hidden helper textarea too (TEXT_ENTRY_TAGS includes TEXTAREA) — while
+      // a terminal is focused, every keystroke (incl. Esc) reaches the PTY, never the graph.
+      return false
     }
     const command = resolveNavCommand(event.key, {
       alt: event.altKey,
@@ -80,7 +92,7 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
       shift: event.shiftKey
     })
     if (!command) {
-      return
+      return false
     }
     if (command.kind === 'move') {
       const graph = store.get().graph
@@ -92,7 +104,7 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
       if (next !== null) {
         guardSelectionInView(next)
       }
-      return
+      return true
     }
     if (command.kind === 'focus') {
       const selectedId = store.get().selection.selectedId
@@ -100,22 +112,62 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
       if (center) {
         focusFraming(frameNode(center))
       }
-      return
+      return true
     }
-    focusFraming(frameAll(scenePositions.nodeCenters()))
+    if (command.kind === 'fit-all') {
+      focusFraming(frameAll(scenePositions.nodeCenters()))
+      return true
+    }
+    if (command.kind === 'open-terminal') {
+      const selectedId = store.get().selection.selectedId
+      if (selectedId === null) return false
+      const activePanel = store.get().terminals.activePanel
+      if (activePanel?.nodeId === selectedId) {
+        store.dispatchTerminal({ type: 'set-focused', focused: true })
+      } else {
+        store.dispatchTerminal({ type: 'open-terminal-for-node', nodeId: selectedId })
+      }
+      terminal.focusActivePanel()
+      return true
+    }
+    if (command.kind === 'pin-terminal') {
+      const activePanel = store.get().terminals.activePanel
+      if (!activePanel) return false
+      store.dispatchTerminal({
+        type: 'set-placement',
+        placement: activePanel.placement === 'scene' ? 'hud' : 'scene'
+      })
+      return true
+    }
+    if (command.kind === 'next-terminal') {
+      const activePanel = store.get().terminals.activePanel
+      if (!activePanel) return false
+      store.dispatchTerminal({ type: 'next-tab', nodeId: activePanel.nodeId })
+      return true
+    }
+    // command.kind === 'close-terminal'
+    if (!store.get().terminals.activePanel) return false
+    terminal.closeActiveSession()
+    return true
   }
 
   const attach = (target: DomKeydownTarget): (() => void) => {
     const onKeyDown = (domEvent: KeyboardEvent): void => {
       const element = domEvent.target instanceof HTMLElement ? domEvent.target : null
-      handleKeyDown({
+      const handled = handleKeyDown({
         key: domEvent.key,
         altKey: domEvent.altKey,
         ctrlKey: domEvent.ctrlKey,
         metaKey: domEvent.metaKey,
         shiftKey: domEvent.shiftKey,
-        target: element ? { tagName: element.tagName, isContentEditable: element.isContentEditable } : null
+        target: element
+          ? { tagName: element.tagName, isContentEditable: element.isContentEditable }
+          : null
       })
+      // Tab's default browser behavior (focus traversal) would otherwise fight next-terminal.
+      if (handled && domEvent.key === 'Tab') {
+        domEvent.preventDefault()
+      }
     }
     target.addEventListener('keydown', onKeyDown)
     return () => target.removeEventListener('keydown', onKeyDown)

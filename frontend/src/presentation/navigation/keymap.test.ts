@@ -21,6 +21,22 @@ describe('resolveNavCommand', () => {
     expect(resolveNavCommand('', noModifiers)).toBeNull()
   })
 
+  it.each([
+    ['t', { kind: 'open-terminal' }],
+    ['p', { kind: 'pin-terminal' }],
+    ['Tab', { kind: 'next-terminal' }],
+    ['Escape', { kind: 'close-terminal' }]
+  ] as const)('maps %s with no modifiers to %o', (key, expected) => {
+    expect(resolveNavCommand(key, noModifiers)).toEqual(expected)
+  })
+
+  it.each(['t', 'p', 'Tab', 'Escape'] as const)(
+    'returns null for terminal key %s when any modifier is held',
+    (key) => {
+      expect(resolveNavCommand(key, { ...noModifiers, ctrl: true })).toBeNull()
+    }
+  )
+
   const keys = ['h', 'l', 'k', 'j', 'f', 'v'] as const
   const modifierNames = ['alt', 'ctrl', 'meta', 'shift'] as const
 
@@ -43,5 +59,9 @@ describe('isTextEntryTarget', () => {
 
   it('is false for a non-editable non-input element', () => {
     expect(isTextEntryTarget('DIV', false)).toBe(false)
+  })
+
+  it("is true for TEXTAREA — covers xterm.js's hidden helper textarea", () => {
+    expect(isTextEntryTarget('TEXTAREA', false)).toBe(true)
   })
 })

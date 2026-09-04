@@ -1,6 +1,13 @@
 export type NavDirection = 'parent' | 'child' | 'prev-sibling' | 'next-sibling'
 
-export type NavCommand = { kind: 'move'; direction: NavDirection } | { kind: 'focus' } | { kind: 'fit-all' }
+export type NavCommand =
+  | { kind: 'move'; direction: NavDirection }
+  | { kind: 'focus' }
+  | { kind: 'fit-all' }
+  | { kind: 'open-terminal' }
+  | { kind: 'pin-terminal' }
+  | { kind: 'close-terminal' }
+  | { kind: 'next-terminal' }
 
 type Modifiers = { alt: boolean; ctrl: boolean; meta: boolean; shift: boolean }
 
@@ -13,7 +20,8 @@ const MOVE_DIRECTIONS = {
 
 const TEXT_ENTRY_TAGS = new Set(['INPUT', 'TEXTAREA', 'SELECT'])
 
-const hasModifier = (modifiers: Modifiers): boolean => modifiers.alt || modifiers.ctrl || modifiers.meta || modifiers.shift
+const hasModifier = (modifiers: Modifiers): boolean =>
+  modifiers.alt || modifiers.ctrl || modifiers.meta || modifiers.shift
 
 /** `h/l/k/j` move the selection, `f` focuses, `v` fits all; any modifier or unmapped key yields `null`. */
 export function resolveNavCommand(key: string, modifiers: Modifiers): NavCommand | null {
@@ -28,6 +36,18 @@ export function resolveNavCommand(key: string, modifiers: Modifiers): NavCommand
   }
   if (key === 'v') {
     return { kind: 'fit-all' }
+  }
+  if (key === 't') {
+    return { kind: 'open-terminal' }
+  }
+  if (key === 'p') {
+    return { kind: 'pin-terminal' }
+  }
+  if (key === 'Tab') {
+    return { kind: 'next-terminal' }
+  }
+  if (key === 'Escape') {
+    return { kind: 'close-terminal' }
   }
   return null
 }

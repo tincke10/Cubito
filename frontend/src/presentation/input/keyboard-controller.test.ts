@@ -65,13 +65,18 @@ function baseEvent(overrides: Partial<KeyboardControllerEvent>): KeyboardControl
   }
 }
 
+function fakeTerminalCommandPort() {
+  return { focusActivePanel: vi.fn(), closeActiveSession: vi.fn() }
+}
+
 function setup(selectedId: string | null = 'b') {
   const store = createSceneStore()
   store.update({ graph: buildFanGraph(), selection: { selectedId } })
   const cameraRig = { animateTo: vi.fn() }
   const scenePositions = fakeScenePositions()
-  const controller = createKeyboardController({ store, cameraRig, scenePositions })
-  return { store, cameraRig, scenePositions, controller }
+  const terminal = fakeTerminalCommandPort()
+  const controller = createKeyboardController({ store, cameraRig, scenePositions, terminal })
+  return { store, cameraRig, scenePositions, terminal, controller }
 }
 
 describe('createKeyboardController', () => {
@@ -120,7 +125,10 @@ describe('createKeyboardController', () => {
     controller.handleKeyDown(baseEvent({ key: 'v' }))
 
     expect(cameraRig.animateTo).toHaveBeenCalledTimes(1)
-    expect(cameraRig.animateTo).toHaveBeenCalledWith(frameAll(scenePositions.nodeCenters()), FOCUS_DURATION_MS)
+    expect(cameraRig.animateTo).toHaveBeenCalledWith(
+      frameAll(scenePositions.nodeCenters()),
+      FOCUS_DURATION_MS
+    )
   })
 
   it('any modifier held resolves to null — zero store updates, zero camera calls', () => {
@@ -150,8 +158,12 @@ describe('createKeyboardController', () => {
     const { store, cameraRig, controller } = setup('b')
     const before = store.get().selection.selectedId
 
-    controller.handleKeyDown(baseEvent({ key: 'h', target: { tagName: 'INPUT', isContentEditable: false } }))
-    controller.handleKeyDown(baseEvent({ key: 'f', target: { tagName: 'DIV', isContentEditable: true } }))
+    controller.handleKeyDown(
+      baseEvent({ key: 'h', target: { tagName: 'INPUT', isContentEditable: false } })
+    )
+    controller.handleKeyDown(
+      baseEvent({ key: 'f', target: { tagName: 'DIV', isContentEditable: true } })
+    )
 
     expect(store.get().selection.selectedId).toBe(before)
     expect(cameraRig.animateTo).not.toHaveBeenCalled()
@@ -160,7 +172,9 @@ describe('createKeyboardController', () => {
   it('still acts on a non-text DOM target', () => {
     const { store, controller } = setup('b')
 
-    controller.handleKeyDown(baseEvent({ key: 'h', target: { tagName: 'DIV', isContentEditable: false } }))
+    controller.handleKeyDown(
+      baseEvent({ key: 'h', target: { tagName: 'DIV', isContentEditable: false } })
+    )
 
     expect(store.get().selection.selectedId).toBe('root')
   })
@@ -201,8 +215,90 @@ describe('createKeyboardController', () => {
   })
 
   it('never imports or constructs THREE objects — the selection ring stays the only indicator', () => {
-    const source = readFileSync(fileURLToPath(new URL('./keyboard-controller.ts', import.meta.url)), 'utf8')
+    const source = readFileSync(
+      fileURLToPath(new URL('./keyboard-controller.ts', import.meta.url)),
+      'utf8'
+    )
     expect(source).not.toMatch(/from ['"]three['"]/)
     expect(source).not.toMatch(/new THREE\.(Mesh|Line)/)
+  })
+
+  describe('terminal command arbitration (design Area 8)', () => {
+    it('t opens a terminal for the selected node and focuses the panel', () => {
+      const { store, terminal, controller } = setup('a')
+      const handled = controller.handleKeyDown(baseEvent({ key: 't' }))
+      expect(handled).toBe(true)
+      expect(store.get().terminals.activePanel).toMatchObject({ nodeId: 'a', placement: 'scene' })
+      expect(terminal.focusActivePanel).toHaveBeenCalledOnce()
+    })
+
+    it('t with no node selected is a no-op', () => {
+      const { store, terminal, controller } = setup(null)
+      controller.handleKeyDown(baseEvent({ key: 't' }))
+      expect(store.get().terminals.activePanel).toBeNull()
+      expect(terminal.focusActivePanel).not.toHaveBeenCalled()
+    })
+
+    it('t on an already-open node just refocuses it instead of opening a second session', () => {
+      const { store, controller } = setup('a')
+      controller.handleKeyDown(baseEvent({ key: 't' }))
+      store.dispatchTerminal({ type: 'set-focused', focused: false })
+      controller.handleKeyDown(baseEvent({ key: 't' }))
+      expect(store.get().terminals.byNode.get('a')).toHaveLength(1)
+      expect(store.get().terminals.activePanel?.focused).toBe(true)
+    })
+
+    it('p toggles placement scene -> hud -> scene', () => {
+      const { store, controller } = setup('a')
+      controller.handleKeyDown(baseEvent({ key: 't' }))
+      expect(store.get().terminals.activePanel?.placement).toBe('scene')
+      controller.handleKeyDown(baseEvent({ key: 'p' }))
+      expect(store.get().terminals.activePanel?.placement).toBe('hud')
+      controller.handleKeyDown(baseEvent({ key: 'p' }))
+      expect(store.get().terminals.activePanel?.placement).toBe('scene')
+    })
+
+    it('p with no terminal open is a no-op', () => {
+      const { store, controller } = setup('a')
+      const handled = controller.handleKeyDown(baseEvent({ key: 'p' }))
+      expect(handled).toBe(false)
+      expect(store.get().terminals.activePanel).toBeNull()
+    })
+
+    it('Tab cycles tabs on the active node and is consumed (default browser traversal suppressed)', () => {
+      const { store, controller } = setup('a')
+      controller.handleKeyDown(baseEvent({ key: 't' }))
+      store.dispatchTerminal({ type: 'open-terminal-for-node', nodeId: 'a' })
+      const handled = controller.handleKeyDown(baseEvent({ key: 'Tab' }))
+      expect(handled).toBe(true)
+      expect(store.get().terminals.activePanel?.sessionIndex).toBe(0)
+    })
+
+    it('Escape closes the active terminal via the terminal command port', () => {
+      const { terminal, controller } = setup('a')
+      controller.handleKeyDown(baseEvent({ key: 't' }))
+      const handled = controller.handleKeyDown(baseEvent({ key: 'Escape' }))
+      expect(handled).toBe(true)
+      expect(terminal.closeActiveSession).toHaveBeenCalledOnce()
+    })
+
+    it('Escape with no terminal open is a graph-nav no-op, never reaches the terminal port', () => {
+      const { terminal, controller } = setup('a')
+      const handled = controller.handleKeyDown(baseEvent({ key: 'Escape' }))
+      expect(handled).toBe(false)
+      expect(terminal.closeActiveSession).not.toHaveBeenCalled()
+    })
+
+    it('a focused text-entry target (xterm textarea) suppresses hjkl AND the terminal commands alike', () => {
+      const { store, terminal, controller } = setup('a')
+      const textarea = { tagName: 'TEXTAREA', isContentEditable: false }
+      controller.handleKeyDown(baseEvent({ key: 'h', target: textarea }))
+      controller.handleKeyDown(baseEvent({ key: 't', target: textarea }))
+      controller.handleKeyDown(baseEvent({ key: 'Escape', target: textarea }))
+      expect(store.get().selection.selectedId).toBe('a')
+      expect(store.get().terminals.activePanel).toBeNull()
+      expect(terminal.focusActivePanel).not.toHaveBeenCalled()
+      expect(terminal.closeActiveSession).not.toHaveBeenCalled()
+    })
   })
 })

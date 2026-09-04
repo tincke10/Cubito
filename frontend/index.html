@@ -75,6 +75,29 @@
         font-size: 11px;
         line-height: 1.45;
       }
+      /* Terminal panel (design Area 6): 520px matches the mockup's HUD dock; the same size is
+         reused in-scene so reparenting the CSS2DObject never resizes the live xterm instance. */
+      .cubito-terminal-panel {
+        display: flex;
+        flex-direction: column;
+        width: 520px;
+        height: 360px;
+        overflow: hidden;
+        pointer-events: auto;
+      }
+      .cubito-terminal-panel--focused {
+        border-color: var(--cubito-accent);
+      }
+      .cubito-terminal-panel__header {
+        flex-shrink: 0;
+        padding: 8px 12px;
+        font-size: 12px;
+      }
+      .cubito-terminal-panel__body {
+        flex: 1;
+        min-height: 0;
+        padding: 0 6px 6px;
+      }
       .pulse {
         animation: pulse 1.6s ease-in-out infinite;
       }
