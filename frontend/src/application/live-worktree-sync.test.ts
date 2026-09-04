@@ -61,6 +61,10 @@ function createFakeConnection(overrides?: {
         connection.listWorktreesCalls += 1
         if (overrides?.listWorktrees) return overrides.listWorktrees()
         return records
+      },
+      listRepos: async () => [],
+      createWorktree: async () => {
+        throw new Error('createWorktree not implemented in this fake')
       }
     },
     terminals: createFakeTerminalsPort(),

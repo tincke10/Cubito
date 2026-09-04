@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createSceneStore } from './scene-store'
 import { emptyWorktreeGraph } from '../domain/worktree-graph/types'
 import { emptyTerminalsState } from './terminal-session-model'
+import { emptySpawnMenuSlice } from './spawn-menu-model'
 
 describe('createSceneStore', () => {
   it('starts idle with an empty graph and no connection/selection', () => {
@@ -135,5 +136,29 @@ describe('createSceneStore', () => {
       status: 'live',
       hasOutput: true
     })
+  })
+
+  it('starts with a closed spawn menu slice', () => {
+    const store = createSceneStore()
+    expect(store.get().spawnMenu).toEqual(emptySpawnMenuSlice())
+  })
+
+  it('dispatchSpawn() drives the spawnMenu slice through the reducer', () => {
+    const store = createSceneStore()
+    store.dispatchSpawn({ type: 'open-for-node', nodeId: 'w1' })
+    expect(store.get().spawnMenu).toEqual({ view: 'radial', nodeId: 'w1', repoSelector: null })
+  })
+
+  it('dispatchSpawn() notifies subscribers once and leaves the rest of SceneState untouched', () => {
+    const store = createSceneStore()
+    const listener = vi.fn()
+    store.subscribe(listener)
+    const before = store.get()
+    store.dispatchSpawn({ type: 'open-for-node', nodeId: 'w1' })
+    expect(listener).toHaveBeenCalledTimes(1)
+    const after = store.get()
+    expect(after.graph).toBe(before.graph)
+    expect(after.terminals).toBe(before.terminals)
+    expect(after.spawnMenu).not.toBe(before.spawnMenu)
   })
 })

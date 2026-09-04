@@ -68,9 +68,96 @@ describe('createOrcadGateway', () => {
     expect(onRuntimeId).not.toHaveBeenCalled()
   })
 
-  it('stays frozen at listWorktrees only — no mutation methods added (CO-305 ratchet)', () => {
+  it('stays frozen at the spawn-era method set — no undocumented methods added (CO-305 ratchet)', () => {
     const call: RpcCaller = vi.fn()
     const gateway = createOrcadGateway({ call })
-    expect(Object.keys(gateway)).toEqual(['listWorktrees'])
+    expect(Object.keys(gateway)).toEqual(['listWorktrees', 'listRepos', 'createWorktree'])
+  })
+
+  it('lists repos via repo.list', async () => {
+    const repos = [{ id: 'repo-1' }]
+    const call: RpcCaller = vi.fn(async () => ({
+      id: 'x',
+      ok: true as const,
+      result: { repos },
+      _meta: { runtimeId: 'rt' }
+    }))
+    const gateway = createOrcadGateway({ call })
+    await expect(gateway.listRepos()).resolves.toEqual(repos)
+    expect(call).toHaveBeenCalledWith('repo.list')
+  })
+
+  it('rejects when repo.list returns no repos array', async () => {
+    const call: RpcCaller = async () => ({
+      id: 'x',
+      ok: true as const,
+      result: { unexpected: true },
+      _meta: { runtimeId: 'rt' }
+    })
+    const gateway = createOrcadGateway({ call })
+    await expect(gateway.listRepos()).rejects.toThrow(/repo\.list/)
+  })
+
+  it('creates a worktree via worktree.create, passing the input through as params', async () => {
+    const input = { repo: 'id:repo-1', name: 'cubito/auth-retry', clientMutationId: 'm-1' }
+    const call: RpcCaller = vi.fn(async () => ({
+      id: 'x',
+      ok: true as const,
+      result: { worktree: { id: 'w-1' } },
+      _meta: { runtimeId: 'rt' }
+    }))
+    const gateway = createOrcadGateway({ call })
+    await expect(gateway.createWorktree(input)).resolves.toEqual({ worktreeId: 'w-1' })
+    expect(call).toHaveBeenCalledWith('worktree.create', input)
+  })
+
+  it('createWorktree sends exactly the given keys — no undefined-valued keys added (omit contract)', async () => {
+    const input = { repo: 'id:repo-1', name: 'x' }
+    const call: RpcCaller = vi.fn(async () => ({
+      id: 'x',
+      ok: true as const,
+      result: { worktree: { id: 'w-1' } },
+      _meta: { runtimeId: 'rt' }
+    }))
+    const gateway = createOrcadGateway({ call })
+    await gateway.createWorktree(input)
+    const sentParams = (call as ReturnType<typeof vi.fn>).mock.calls[0]?.[1]
+    expect(sentParams).toStrictEqual(input)
+  })
+
+  it('surfaces warnings from worktree.create when present', async () => {
+    const call: RpcCaller = vi.fn(async () => ({
+      id: 'x',
+      ok: true as const,
+      result: { worktree: { id: 'w-1' }, warnings: ['base branch fell back to main'] },
+      _meta: { runtimeId: 'rt' }
+    }))
+    const gateway = createOrcadGateway({ call })
+    await expect(gateway.createWorktree({ repo: 'id:repo-1' })).resolves.toEqual({
+      worktreeId: 'w-1',
+      warnings: ['base branch fell back to main']
+    })
+  })
+
+  it('rejects readably when worktree.create returns no worktree id', async () => {
+    const call: RpcCaller = async () => ({
+      id: 'x',
+      ok: true as const,
+      result: {},
+      _meta: { runtimeId: 'rt' }
+    })
+    const gateway = createOrcadGateway({ call })
+    await expect(gateway.createWorktree({ repo: 'id:repo-1' })).rejects.toThrow(/worktree\.create/)
+  })
+
+  it('createWorktree rejection propagates the underlying error without leaking RPC internals', async () => {
+    const error = new Error('connection dropped')
+    const call: RpcCaller = vi.fn(async () => {
+      throw error
+    })
+    const gateway = createOrcadGateway({ call })
+    await expect(gateway.createWorktree({ repo: 'id:repo-1' })).rejects.toThrow(
+      'connection dropped'
+    )
   })
 })

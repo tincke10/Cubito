@@ -2,6 +2,8 @@ import { emptyWorktreeGraph } from '../domain/worktree-graph/types'
 import type { WorktreeGraph, WorktreeId } from '../domain/worktree-graph/types'
 import { emptyTerminalsState, reduceTerminals } from './terminal-session-model'
 import type { TerminalAction, TerminalsState } from './terminal-session-model'
+import { emptySpawnMenuSlice, reduceSpawnMenu } from './spawn-menu-model'
+import type { SpawnMenuAction, SpawnMenuSlice } from './spawn-menu-model'
 
 export type SyncStatus =
   | { state: 'idle' }
@@ -22,6 +24,7 @@ export type SceneState = {
   selection: { selectedId: WorktreeId | null }
   repo: { name: string; baseBranch: string } | null
   terminals: TerminalsState
+  spawnMenu: SpawnMenuSlice
 }
 
 export type SceneStore = {
@@ -30,6 +33,8 @@ export type SceneStore = {
   update(patch: Partial<SceneState>): void
   /** Drives the terminals slice through terminal-session-model's pure reducer, one notify. */
   dispatchTerminal(action: TerminalAction): void
+  /** Drives the spawnMenu slice through spawn-menu-model's pure reducer, one notify. */
+  dispatchSpawn(action: SpawnMenuAction): void
   subscribe(listener: (state: SceneState) => void): () => void
 }
 
@@ -39,7 +44,8 @@ const initialSceneState = (): SceneState => ({
   connection: { state: 'down', reason: 'not connected' },
   selection: { selectedId: null },
   repo: null,
-  terminals: emptyTerminalsState()
+  terminals: emptyTerminalsState(),
+  spawnMenu: emptySpawnMenuSlice()
 })
 
 /** Minimal observable store; swap for a richer signal system when the UI grows. */
@@ -63,6 +69,10 @@ export function createSceneStore(): SceneStore {
     },
     dispatchTerminal(action) {
       state = { ...state, terminals: reduceTerminals(state.terminals, action) }
+      notify()
+    },
+    dispatchSpawn(action) {
+      state = { ...state, spawnMenu: reduceSpawnMenu(state.spawnMenu, action) }
       notify()
     },
     subscribe(listener) {

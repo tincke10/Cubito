@@ -5,6 +5,7 @@ import { hudModel } from './hud-model'
 import { countNodeStates } from '../theme/node-state'
 import { emptyWorktreeGraph } from '../../domain/worktree-graph/types'
 import { emptyTerminalsState, reduceTerminals } from '../../application/terminal-session-model'
+import { emptySpawnMenuSlice } from '../../application/spawn-menu-model'
 import type { SceneState } from '../../application/scene-store'
 
 const baseState = (overrides: Partial<SceneState> = {}): SceneState => ({
@@ -14,6 +15,7 @@ const baseState = (overrides: Partial<SceneState> = {}): SceneState => ({
   selection: { selectedId: null },
   repo: null,
   terminals: emptyTerminalsState(),
+  spawnMenu: emptySpawnMenuSlice(),
   ...overrides
 })
 

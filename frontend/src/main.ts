@@ -77,7 +77,11 @@ const demoRecords: RawWorktreeRecord[] = [
 ]
 
 const demoGateway: RuntimeGateway = {
-  listWorktrees: async () => demoRecords
+  listWorktrees: async () => demoRecords,
+  listRepos: async () => [],
+  createWorktree: async () => {
+    throw new Error('createWorktree not implemented in the demo gateway')
+  }
 }
 
 const container = document.getElementById('app')
