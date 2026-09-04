@@ -134,6 +134,24 @@ describe('terminal stream JSON payload codec', () => {
     expect(() => decodeTerminalStreamJson(garbage)).not.toThrow()
     expect(decodeTerminalStreamJson(garbage)).toBeNull()
   })
+
+  // WARNING-2 (mirrors src/shared/terminal-stream-protocol.ts's DoS guards).
+  it('decodes null for a payload over the 8MB JSON size cap, without throwing', () => {
+    const oversized = new TextEncoder().encode(`{"pad":"${'a'.repeat(8 * 1024 * 1024)}"}`)
+    expect(() => decodeTerminalStreamJson(oversized)).not.toThrow()
+    expect(decodeTerminalStreamJson(oversized)).toBeNull()
+  })
+
+  it('decodes null for pathologically deep JSON nesting, without throwing', () => {
+    const deep = new TextEncoder().encode('['.repeat(40) + ']'.repeat(40))
+    expect(() => decodeTerminalStreamJson(deep)).not.toThrow()
+    expect(decodeTerminalStreamJson(deep)).toBeNull()
+  })
+
+  it('still round-trips a JSON payload well within both limits', () => {
+    const value = { type: 'output', streamId: 3, data: [1, 2, [3, 4]] }
+    expect(decodeTerminalStreamJson(encodeTerminalStreamJson(value))).toEqual(value)
+  })
 })
 
 describe('terminal stream text payload codec', () => {

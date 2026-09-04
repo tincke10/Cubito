@@ -69,6 +69,7 @@ export function createTerminalPanelController(
   deps: TerminalPanelControllerDeps
 ): TerminalPanelController {
   const connector = deps.createConnector()
+  deps.hud.appendChild(connector.svg) // mount once; apply()/hide() toggle visibility thereafter
   let port = deps.port
   let mounted: Mounted | null = null
 

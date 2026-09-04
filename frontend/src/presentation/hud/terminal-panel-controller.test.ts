@@ -131,6 +131,11 @@ const setup = () => {
 }
 
 describe('createTerminalPanelController', () => {
+  it('mounts the connector svg into the hud container at construction (CRITICAL-1)', () => {
+    const { connector, hud } = setup()
+    expect(hud.appendChild).toHaveBeenCalledWith(connector.svg)
+  })
+
   it('does nothing when there is no active panel', () => {
     const { controller, panels } = setup()
     controller.sync(emptyTerminalsState())

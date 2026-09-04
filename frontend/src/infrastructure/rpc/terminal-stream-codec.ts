@@ -7,6 +7,10 @@
 const TERMINAL_STREAM_KIND = 0x74
 const TERMINAL_STREAM_VERSION = 1
 const HEADER_BYTES = 16
+// DoS guards mirrored from src/shared/json-text-structure-limit.ts (rpc-purity forbids importing it).
+const JSON_MAX_BYTES = 8 * 1024 * 1024
+const JSON_STRUCTURAL_TOKEN_LIMIT = 256 * 1024
+const JSON_NESTING_DEPTH_LIMIT = 32
 
 export enum TerminalStreamOpcode {
   Output = 1,
@@ -77,10 +81,63 @@ export function encodeTerminalStreamJson(value: unknown): Uint8Array {
 }
 
 export function decodeTerminalStreamJson<T>(payload: Uint8Array): T | null {
+  if (payload.byteLength > JSON_MAX_BYTES) {
+    return null
+  }
   try {
-    return JSON.parse(new TextDecoder().decode(payload)) as T
+    const content = new TextDecoder().decode(payload)
+    assertJsonStructureWithinLimits(content)
+    return JSON.parse(content) as T
   } catch {
     return null
+  }
+}
+
+/** Ported algorithm from src/shared/json-text-structure-limit.ts — throws past a token/depth cap. */
+function assertJsonStructureWithinLimits(content: string): void {
+  let structuralTokens = 0
+  let depth = 0
+  let inString = false
+  let escaped = false
+
+  for (let index = 0; index < content.length; index += 1) {
+    const character = content[index]
+    if (inString) {
+      if (escaped) {
+        escaped = false
+      } else if (character === '\\') {
+        escaped = true
+      } else if (character === '"') {
+        inString = false
+      }
+      continue
+    }
+    if (character === '"') {
+      inString = true
+      continue
+    }
+    if (
+      character !== '{' &&
+      character !== '}' &&
+      character !== '[' &&
+      character !== ']' &&
+      character !== ',' &&
+      character !== ':'
+    ) {
+      continue
+    }
+    structuralTokens += 1
+    if (structuralTokens > JSON_STRUCTURAL_TOKEN_LIMIT) {
+      throw new Error('JSON structure exceeds token limit')
+    }
+    if (character === '{' || character === '[') {
+      depth += 1
+      if (depth > JSON_NESTING_DEPTH_LIMIT) {
+        throw new Error('JSON nesting exceeds depth limit')
+      }
+    } else if (character === '}' || character === ']') {
+      depth = Math.max(0, depth - 1)
+    }
   }
 }
 
