@@ -9,6 +9,10 @@ describe('resolveNavCommand', () => {
     ['l', { kind: 'move', direction: 'child' }],
     ['k', { kind: 'move', direction: 'prev-sibling' }],
     ['j', { kind: 'move', direction: 'next-sibling' }],
+    ['ArrowLeft', { kind: 'move', direction: 'parent' }],
+    ['ArrowRight', { kind: 'move', direction: 'child' }],
+    ['ArrowUp', { kind: 'move', direction: 'prev-sibling' }],
+    ['ArrowDown', { kind: 'move', direction: 'next-sibling' }],
     ['f', { kind: 'focus' }],
     ['v', { kind: 'fit-all' }]
   ] as const)('maps %s with no modifiers to %o', (key, expected) => {
@@ -25,13 +29,14 @@ describe('resolveNavCommand', () => {
     ['t', { kind: 'open-terminal' }],
     ['p', { kind: 'pin-terminal' }],
     ['Tab', { kind: 'next-terminal' }],
-    ['Escape', { kind: 'close-terminal' }]
+    ['s', { kind: 'open-spawn' }],
+    ['Escape', { kind: 'escape' }]
   ] as const)('maps %s with no modifiers to %o', (key, expected) => {
     expect(resolveNavCommand(key, noModifiers)).toEqual(expected)
   })
 
-  it.each(['t', 'p', 'Tab', 'Escape'] as const)(
-    'returns null for terminal key %s when any modifier is held',
+  it.each(['t', 'p', 'Tab', 's', 'Escape'] as const)(
+    'returns null for terminal/spawn key %s when any modifier is held',
     (key) => {
       expect(resolveNavCommand(key, { ...noModifiers, ctrl: true })).toBeNull()
     }

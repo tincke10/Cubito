@@ -98,6 +98,99 @@
         min-height: 0;
         padding: 0 6px 6px;
       }
+      /* Spawn radial (design Area 3/mockup Spawn.dc.html): chips float around the selected
+         node's CSS2DObject; layout only here, content/tone comes from spawn-view-model.ts. */
+      .cubito-spawn-menu {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      .cubito-spawn-chip {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .cubito-spawn-chip__key {
+        color: var(--cubito-text-dim);
+        font-size: 10px;
+      }
+      .cubito-spawn-chip--disabled {
+        opacity: 0.6;
+      }
+      /* Spawn form (mockup: 420px panel, 22px padding, 6px radius, 40px field rows). */
+      .cubito-spawn-form {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        width: 420px;
+        padding: 22px;
+        background: var(--cubito-panel-surface);
+        border: 1px solid var(--cubito-panel-border);
+        border-radius: 6px;
+        font-size: 12.5px;
+      }
+      .cubito-spawn-form__title {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--cubito-text-primary);
+      }
+      .cubito-spawn-form__field {
+        height: 40px;
+        padding: 0 12px;
+        background: var(--cubito-background);
+        border: 1px solid var(--cubito-panel-border);
+        border-radius: 4px;
+        color: var(--cubito-text-primary);
+        font-family: inherit;
+        font-size: 12.5px;
+      }
+      .cubito-spawn-form__field:focus {
+        outline: none;
+        border-color: var(--cubito-accent);
+      }
+      .cubito-spawn-form__field--prompt {
+        height: 84px;
+        padding: 10px 12px;
+        line-height: 1.6;
+        resize: none;
+      }
+      .cubito-spawn-form__field:disabled {
+        color: var(--cubito-text-dim);
+      }
+      .cubito-spawn-form__submit {
+        height: 40px;
+        border: none;
+        border-radius: 4px;
+        background: var(--cubito-accent);
+        color: var(--cubito-background);
+        font-weight: 600;
+        font-size: 12.5px;
+        cursor: pointer;
+      }
+      .cubito-spawn-form__submit:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      .cubito-spawn-form__cancel {
+        height: 40px;
+        border: 1px solid var(--cubito-panel-border);
+        border-radius: 4px;
+        background: transparent;
+        color: var(--cubito-text-dim);
+        font-size: 12.5px;
+        cursor: pointer;
+      }
+      .cubito-spawn-form__error {
+        font-size: 11px;
+        color: var(--cubito-amber);
+      }
+      .cubito-spawn-form__hint {
+        font-size: 10px;
+        color: var(--cubito-text-faint);
+        text-align: right;
+      }
       .pulse {
         animation: pulse 1.6s ease-in-out infinite;
       }

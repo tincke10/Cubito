@@ -6,8 +6,10 @@ export type NavCommand =
   | { kind: 'fit-all' }
   | { kind: 'open-terminal' }
   | { kind: 'pin-terminal' }
-  | { kind: 'close-terminal' }
   | { kind: 'next-terminal' }
+  | { kind: 'open-spawn' }
+  /** Single escape command (SPAWN-005) — the handler decides spawn-close vs. terminal-close by context. */
+  | { kind: 'escape' }
 
 type Modifiers = { alt: boolean; ctrl: boolean; meta: boolean; shift: boolean }
 
@@ -15,7 +17,11 @@ const MOVE_DIRECTIONS = {
   h: 'parent',
   l: 'child',
   k: 'prev-sibling',
-  j: 'next-sibling'
+  j: 'next-sibling',
+  ArrowLeft: 'parent',
+  ArrowRight: 'child',
+  ArrowUp: 'prev-sibling',
+  ArrowDown: 'next-sibling'
 } as const satisfies Record<string, NavDirection>
 
 const TEXT_ENTRY_TAGS = new Set(['INPUT', 'TEXTAREA', 'SELECT'])
@@ -46,8 +52,11 @@ export function resolveNavCommand(key: string, modifiers: Modifiers): NavCommand
   if (key === 'Tab') {
     return { kind: 'next-terminal' }
   }
+  if (key === 's') {
+    return { kind: 'open-spawn' }
+  }
   if (key === 'Escape') {
-    return { kind: 'close-terminal' }
+    return { kind: 'escape' }
   }
   return null
 }

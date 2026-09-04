@@ -95,6 +95,10 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
       return false
     }
     if (command.kind === 'move') {
+      // Radial open: arrow/hjkl "cycle the active chip" (SPAWN-005) — v1 ships a single
+      // enabled chip, so this is a handled no-op that must not drag the graph selection
+      // out from under the anchored menu.
+      if (store.get().spawnMenu.view === 'radial') return true
       const graph = store.get().graph
       const current = store.get().selection.selectedId
       const next = moveSelection(graph, current, command.direction)
@@ -145,7 +149,26 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
       store.dispatchTerminal({ type: 'next-tab', nodeId: activePanel.nodeId })
       return true
     }
-    // command.kind === 'close-terminal'
+    if (command.kind === 'open-spawn') {
+      const spawnMenu = store.get().spawnMenu
+      if (spawnMenu.view === 'radial') {
+        store.dispatchSpawn({ type: 'radial-select' })
+        return true
+      }
+      if (spawnMenu.view === 'form') return false
+      const selectedId = store.get().selection.selectedId
+      store.dispatchSpawn(
+        selectedId !== null
+          ? { type: 'open-for-node', nodeId: selectedId }
+          : { type: 'open-rootless' }
+      )
+      return true
+    }
+    // command.kind === 'escape' — spawn-close wins over terminal-close (SPAWN-005 precedence)
+    if (store.get().spawnMenu.view !== 'closed') {
+      store.dispatchSpawn({ type: 'cancel' })
+      return true
+    }
     if (!store.get().terminals.activePanel) return false
     terminal.closeActiveSession()
     return true

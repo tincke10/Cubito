@@ -289,6 +289,31 @@ describe('createKeyboardController', () => {
       expect(terminal.closeActiveSession).not.toHaveBeenCalled()
     })
 
+    it('spawn-close beats terminal-close: Escape with both open cancels spawn, leaves the terminal untouched (SPAWN-005)', () => {
+      const { store, terminal, controller } = setup('a')
+      controller.handleKeyDown(baseEvent({ key: 't' })) // terminal open
+      store.dispatchSpawn({ type: 'open-for-node', nodeId: 'a' }) // spawn radial open
+
+      const handled = controller.handleKeyDown(baseEvent({ key: 'Escape' }))
+
+      expect(handled).toBe(true)
+      expect(store.get().spawnMenu.view).toBe('closed')
+      expect(terminal.closeActiveSession).not.toHaveBeenCalled()
+      expect(store.get().terminals.activePanel).not.toBeNull()
+    })
+
+    it('once spawn is closed, Escape still routes to terminal-close as before', () => {
+      const { store, terminal, controller } = setup('a')
+      controller.handleKeyDown(baseEvent({ key: 't' }))
+      store.dispatchSpawn({ type: 'open-for-node', nodeId: 'a' })
+      controller.handleKeyDown(baseEvent({ key: 'Escape' })) // closes spawn only
+
+      const handled = controller.handleKeyDown(baseEvent({ key: 'Escape' }))
+
+      expect(handled).toBe(true)
+      expect(terminal.closeActiveSession).toHaveBeenCalledOnce()
+    })
+
     it('a focused text-entry target (xterm textarea) suppresses hjkl AND the terminal commands alike', () => {
       const { store, terminal, controller } = setup('a')
       const textarea = { tagName: 'TEXTAREA', isContentEditable: false }
@@ -299,6 +324,55 @@ describe('createKeyboardController', () => {
       expect(store.get().terminals.activePanel).toBeNull()
       expect(terminal.focusActivePanel).not.toHaveBeenCalled()
       expect(terminal.closeActiveSession).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('spawn command arbitration (SPAWN-002/005)', () => {
+    it('s with a node selected and spawn closed opens the radial anchored to it', () => {
+      const { store, controller } = setup('a')
+      const handled = controller.handleKeyDown(baseEvent({ key: 's' }))
+      expect(handled).toBe(true)
+      expect(store.get().spawnMenu).toMatchObject({ view: 'radial', nodeId: 'a' })
+    })
+
+    it('s with no node selected and spawn closed opens the form directly (rootless)', () => {
+      const { store, controller } = setup(null)
+      const handled = controller.handleKeyDown(baseEvent({ key: 's' }))
+      expect(handled).toBe(true)
+      expect(store.get().spawnMenu).toMatchObject({ view: 'form', parentId: null })
+    })
+
+    it('s while the radial is open chooses the spawn chip, transitioning radial -> form', () => {
+      const { store, controller } = setup('a')
+      controller.handleKeyDown(baseEvent({ key: 's' }))
+      const handled = controller.handleKeyDown(baseEvent({ key: 's' }))
+      expect(handled).toBe(true)
+      expect(store.get().spawnMenu).toMatchObject({ view: 'form', parentId: 'a' })
+    })
+
+    it('s while the form is already open is a no-op', () => {
+      const { store, controller } = setup(null)
+      controller.handleKeyDown(baseEvent({ key: 's' }))
+      const handled = controller.handleKeyDown(baseEvent({ key: 's' }))
+      expect(handled).toBe(false)
+      expect(store.get().spawnMenu.view).toBe('form')
+    })
+
+    it('hjkl while the radial is open is a handled no-op — it never moves the graph selection', () => {
+      const { store, controller } = setup('a')
+      controller.handleKeyDown(baseEvent({ key: 's' }))
+      const handled = controller.handleKeyDown(baseEvent({ key: 'j' }))
+      expect(handled).toBe(true)
+      expect(store.get().selection.selectedId).toBe('a')
+      expect(store.get().spawnMenu.view).toBe('radial')
+    })
+
+    it("typing 's' into a focused form field never dispatches open-spawn (isTextEntryTarget guard)", () => {
+      const { store, controller } = setup('a')
+      const input = { tagName: 'INPUT', isContentEditable: false }
+      const handled = controller.handleKeyDown(baseEvent({ key: 's', target: input }))
+      expect(handled).toBe(false)
+      expect(store.get().spawnMenu.view).toBe('closed')
     })
   })
 })
