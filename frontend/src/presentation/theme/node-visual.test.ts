@@ -13,6 +13,7 @@ const decorationsOf = (overrides: Partial<NodeDecorations> = {}): NodeDecoration
   diffLabel: null,
   waitingCallout: false,
   selectionRing: false,
+  dimmed: false,
   ...overrides
 })
 
@@ -108,18 +109,38 @@ describe('nodeVisual', () => {
   it('shows a selection ring unconditionally across every state and kind when selected', () => {
     for (const kind of NODE_KINDS) {
       for (const state of NODE_STATES) {
-        const selected = nodeVisual(kind, state, decorationsOf({ selectionRing: true }), darkPalette)
+        const selected = nodeVisual(
+          kind,
+          state,
+          decorationsOf({ selectionRing: true }),
+          darkPalette
+        )
         expect(selected.ring).toEqual({ color: darkPalette.accent, radius: SELECTION_RING_RADIUS })
-        const unselected = nodeVisual(kind, state, decorationsOf({ selectionRing: false }), darkPalette)
+        const unselected = nodeVisual(
+          kind,
+          state,
+          decorationsOf({ selectionRing: false }),
+          darkPalette
+        )
         expect(unselected.ring).toBeNull()
       }
     }
   })
 
   it('shows an unread dot iff decorations.unreadDot is set', () => {
-    const withDot = nodeVisual('worktree', 'unread', decorationsOf({ unreadDot: true }), darkPalette)
+    const withDot = nodeVisual(
+      'worktree',
+      'unread',
+      decorationsOf({ unreadDot: true }),
+      darkPalette
+    )
     expect(withDot.dot).not.toBeNull()
-    const withoutDot = nodeVisual('worktree', 'unread', decorationsOf({ unreadDot: false }), darkPalette)
+    const withoutDot = nodeVisual(
+      'worktree',
+      'unread',
+      decorationsOf({ unreadDot: false }),
+      darkPalette
+    )
     expect(withoutDot.dot).toBeNull()
   })
 
@@ -131,9 +152,22 @@ describe('nodeVisual', () => {
     ]
     for (const [kind, state] of glowing) {
       const visual = nodeVisual(kind, state, decorationsOf(), darkPalette)
-      if (visual.surface.kind !== 'solid' || visual.glow === null) throw new Error('expected a glowing solid fixture')
+      if (visual.surface.kind !== 'solid' || visual.glow === null)
+        throw new Error('expected a glowing solid fixture')
       expect(visual.glow.color).toBe(visual.surface.faces.top)
     }
+  })
+
+  it('passes decorations.dimmed straight through, independent of kind/state', () => {
+    const dimmed = nodeVisual('worktree', 'working', decorationsOf({ dimmed: true }), darkPalette)
+    expect(dimmed.dimmed).toBe(true)
+    const undimmed = nodeVisual(
+      'worktree',
+      'working',
+      decorationsOf({ dimmed: false }),
+      darkPalette
+    )
+    expect(undimmed.dimmed).toBe(false)
   })
 
   it('holds under the light palette too', () => {

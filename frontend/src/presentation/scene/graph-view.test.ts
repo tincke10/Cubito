@@ -19,6 +19,9 @@ const record = (
 ): RawWorktreeRecord => {
   const raw: RawWorktreeRecord = {
     id,
+    // Fixed, shared repoId: these ids ('root', 'a', ...) have no '::' separator, so the
+    // domain fallback (id.split('::')[0]) would otherwise give every node its own island.
+    repoId: 'repo',
     branch: `refs/heads/${id}`,
     parentWorktreeId: parent,
     childWorktreeIds: [...children],
@@ -31,7 +34,8 @@ const record = (
   return raw
 }
 
-const graphOf = (...records: readonly RawWorktreeRecord[]): WorktreeGraph => buildWorktreeGraph(records)
+const graphOf = (...records: readonly RawWorktreeRecord[]): WorktreeGraph =>
+  buildWorktreeGraph(records)
 
 /** root → (a, b) */
 const baseGraph = (): WorktreeGraph =>
@@ -48,7 +52,7 @@ type Harness = {
   scene: THREE.Object3D
   labelLayer: THREE.Object3D
   labels: NodeLabelHandle[]
-  update(graph: WorktreeGraph, selectedId?: WorktreeId | null): void
+  update(graph: WorktreeGraph, selectedId?: WorktreeId | null, activeRepoId?: string | null): void
 }
 
 const harness = (): Harness => {
@@ -67,8 +71,8 @@ const harness = (): Harness => {
     scene,
     labelLayer,
     labels,
-    update(graph, selectedId = null) {
-      view.update({ graph, selectedId, palette: darkPalette })
+    update(graph, selectedId = null, activeRepoId = null) {
+      view.update({ graph, selectedId, palette: darkPalette, activeRepoId })
     }
   }
 }
@@ -89,7 +93,14 @@ const materialsUnder = (object: THREE.Object3D): THREE.Material[] => {
   return [...found]
 }
 
-const ringOf = (object: THREE.Object3D): THREE.Object3D | undefined => object.getObjectByName('ring')
+const ringOf = (object: THREE.Object3D): THREE.Object3D | undefined =>
+  object.getObjectByName('ring')
+
+const surfaceMaterialsOf = (view: GraphView, id: WorktreeId): THREE.MeshBasicMaterial[] => {
+  const object = nodeObject(view, id)
+  if (!object) throw new Error(`missing node ${id}`)
+  return (object.getObjectByName('surface') as THREE.Mesh).material as THREE.MeshBasicMaterial[]
+}
 
 const ringedNodeIds = (view: GraphView, graph: WorktreeGraph): WorktreeId[] =>
   [...graph.nodes.keys()].filter((id) => {
@@ -117,7 +128,9 @@ describe('createGraphView', () => {
     const edgeBefore = edgeObject(h.view, 'root->a')
 
     // 'b' removed, 'c' added — 'a' and 'root' are untouched.
-    h.update(graphOf(record('root', null, ['a', 'c']), record('a', 'root', []), record('c', 'root', [])))
+    h.update(
+      graphOf(record('root', null, ['a', 'c']), record('a', 'root', []), record('c', 'root', []))
+    )
 
     expect(nodeObject(h.view, 'root')).toBe(rootBefore)
     expect(nodeObject(h.view, 'a')).toBe(aBefore)
@@ -254,6 +267,27 @@ describe('createGraphView', () => {
     h.view.tick(0.3)
 
     expect(material.dashOffset).not.toBe(atZero)
+  })
+
+  it('dims nodes outside the active repo and leaves the active repo at full opacity', () => {
+    const h = harness()
+    const repoA = { ...record('a::root', null, []), repoId: 'a' }
+    const repoB = { ...record('b::root', null, []), repoId: 'b' }
+    const graph = buildWorktreeGraph([repoA, repoB])
+
+    h.update(graph, null, 'a')
+
+    for (const material of surfaceMaterialsOf(h.view, 'a::root')) expect(material.opacity).toBe(1)
+    for (const material of surfaceMaterialsOf(h.view, 'b::root'))
+      expect(material.opacity).toBeLessThan(1)
+  })
+
+  it('undims every node when activeRepoId is null (single-repo / not loaded)', () => {
+    const h = harness()
+    h.update(baseGraph(), null, null)
+
+    for (const material of surfaceMaterialsOf(h.view, 'root')) expect(material.opacity).toBe(1)
+    for (const material of surfaceMaterialsOf(h.view, 'a')) expect(material.opacity).toBe(1)
   })
 
   it('disposes every binding and label on dispose and detaches from the scene', () => {

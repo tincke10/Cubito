@@ -85,6 +85,12 @@ export const PULSE_PERIOD_SECONDS = 1.6
 export const PULSE_MIN_OPACITY = 0.4
 export const PULSE_MAX_OPACITY = 1
 
+// ── galaxy (multi-repo island layout, layout/galaxy-layout.ts) ────────────
+export const GALAXY_ISLAND_GAP = 6 // world units of clearance between island bounding circles
+export const GALAXY_MIN_RING_RADIUS = 12 // floor so 2 tiny islands aren't on top of each other
+// ── dim (non-active island emphasis) ───────────────────────────────────────
+export const DIM_OPACITY = 0.35
+
 // ── iso grid ────────────────────────────────────────────────────────────
 export const GRID_CELL = NODE_SIZE
 export const GRID_HALF_EXTENT = 64

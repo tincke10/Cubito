@@ -155,6 +155,18 @@ describe('deriveDecorations', () => {
     )
     expect(deriveDecorations(node({ agentStatus: 'working' }), false).waitingCallout).toBe(false)
   })
+
+  it('dimmed is false when activeRepoId is omitted or null, regardless of the node repoId', () => {
+    expect(deriveDecorations(node(), false).dimmed).toBe(false)
+    expect(deriveDecorations(node(), false, null).dimmed).toBe(false)
+  })
+
+  it('dimmed is true only for nodes outside the active repo', () => {
+    const active = node({}, { repoId: 'repo' })
+    const other = node({}, { repoId: 'other-repo' })
+    expect(deriveDecorations(active, false, 'repo').dimmed).toBe(false)
+    expect(deriveDecorations(other, false, 'repo').dimmed).toBe(true)
+  })
 })
 
 describe('countNodeStates', () => {

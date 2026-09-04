@@ -25,7 +25,8 @@ describe('degrade-to-idle invariant', () => {
       unreadDot: false,
       diffLabel: null,
       waitingCallout: false,
-      selectionRing: true
+      selectionRing: true,
+      dimmed: false
     })
 
     const unselected = deriveDecorations(node, false)
@@ -33,7 +34,8 @@ describe('degrade-to-idle invariant', () => {
       unreadDot: false,
       diffLabel: null,
       waitingCallout: false,
-      selectionRing: false
+      selectionRing: false,
+      dimmed: false
     })
   })
 })

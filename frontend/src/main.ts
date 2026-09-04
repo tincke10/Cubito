@@ -167,7 +167,12 @@ cubitoScene.onResize((width, height) => {
 let framed = false
 
 store.subscribe((state) => {
-  graphView.update({ graph: state.graph, selectedId: state.selection.selectedId, palette })
+  graphView.update({
+    graph: state.graph,
+    selectedId: state.selection.selectedId,
+    palette,
+    activeRepoId: state.repos.activeRepoId
+  })
   const model = hudModel(state, platform)
   hudOverlay.apply(model)
   keyboardBar.apply(model.chips)

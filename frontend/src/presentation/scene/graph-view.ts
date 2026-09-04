@@ -4,7 +4,7 @@ import type { Vec3 } from '../camera/camera-framing'
 import { createNodeLabel } from '../hud/node-label-element'
 import type { NodeLabelHandle } from '../hud/node-label-element'
 import { nodeLabelModel } from '../hud/node-label-model'
-import { layoutByIsoLineage } from '../layout/iso-lineage-layout'
+import { galaxyLayout } from '../layout/galaxy-layout'
 import { edgeVisual } from '../theme/edge-visual'
 import { elevationFor } from '../theme/node-elevation'
 import { deriveDecorations, deriveNodeState } from '../theme/node-state'
@@ -22,6 +22,8 @@ export type GraphViewInput = {
   graph: WorktreeGraph
   selectedId: WorktreeId | null
   palette: ScenePalette
+  /** repoId of the active island — undimmed. Optional: main.ts is the only caller that knows it. */
+  activeRepoId?: string | null
 }
 
 /** Injectable so the reconciliation suite runs under `environment:'node'`, where the real
@@ -83,15 +85,15 @@ export function createGraphView(
     edges.delete(key)
   }
 
-  const syncNodes = ({ graph, selectedId, palette }: GraphViewInput): void => {
-    const positions = layoutByIsoLineage(graph)
+  const syncNodes = ({ graph, selectedId, palette, activeRepoId = null }: GraphViewInput): void => {
+    const positions = galaxyLayout(graph)
 
     for (const node of graph.nodes.values()) {
       const ground = positions.get(node.id)
       if (!ground) continue
 
       const state = deriveNodeState(node)
-      const decorations = deriveDecorations(node, node.id === selectedId)
+      const decorations = deriveDecorations(node, node.id === selectedId, activeRepoId)
       const elevation = elevationFor(state, node.kind)
       const label = nodeLabelModel(node, state, decorations)
 

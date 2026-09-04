@@ -4,7 +4,7 @@ import type { NodeLabelModel } from '../hud/node-label-model'
 import { pulseOpacity } from '../theme/pulse-cycle'
 import type { Elevation } from '../theme/node-elevation'
 import type { NodeVisual } from '../theme/node-visual'
-import { GLOW_SPRITE_SCALE, SHADOW_Y, UNREAD_DOT_OFFSET } from '../theme/scene-metrics'
+import { DIM_OPACITY, GLOW_SPRITE_SCALE, SHADOW_Y, UNREAD_DOT_OFFSET } from '../theme/scene-metrics'
 import type { SceneResources } from './scene-resources'
 
 /**
@@ -82,6 +82,9 @@ export const createNodeBinding = (resources: SceneResources): NodeBinding => {
   let pulseGlow = false
   let pulseDot = false
   let glowBaseOpacity = 0
+  // Non-active-island emphasis (design §Area 6): 1 when undimmed, DIM_OPACITY otherwise —
+  // composed into every decoration's opacity, including the pulse tick.
+  let dimFactor = 1
 
   const rebuildSurface = (kind: SurfaceKind): void => {
     if (surface !== null) {
@@ -89,13 +92,17 @@ export const createNodeBinding = (resources: SceneResources): NodeBinding => {
       for (const material of surfaceMaterials) material.dispose()
     }
     if (kind === 'solid') {
-      const materials: [THREE.MeshBasicMaterial, THREE.MeshBasicMaterial, THREE.MeshBasicMaterial] = [
-        new THREE.MeshBasicMaterial(),
-        new THREE.MeshBasicMaterial(),
-        new THREE.MeshBasicMaterial()
-      ]
+      const materials: [THREE.MeshBasicMaterial, THREE.MeshBasicMaterial, THREE.MeshBasicMaterial] =
+        [
+          new THREE.MeshBasicMaterial(),
+          new THREE.MeshBasicMaterial(),
+          new THREE.MeshBasicMaterial()
+        ]
       // faceMaterialGroups is a fixed [0,1,2]-valued tuple matching `materials`' length by construction.
-      const mesh = new THREE.Mesh(resources.cubeGeometry, faceMaterialGroups.map((i) => materials[i]))
+      const mesh = new THREE.Mesh(
+        resources.cubeGeometry,
+        faceMaterialGroups.map((i) => materials[i])
+      )
       mesh.name = 'surface'
       surface = mesh
       surfaceMaterials = materials
@@ -120,11 +127,15 @@ export const createNodeBinding = (resources: SceneResources): NodeBinding => {
       right?.color.setHex(visual.surface.faces.right)
       top?.color.setHex(visual.surface.faces.top)
       left?.color.setHex(visual.surface.faces.left)
+      for (const material of surfaceMaterials as THREE.MeshBasicMaterial[]) {
+        material.transparent = visual.dimmed
+        material.opacity = dimFactor
+      }
     } else {
       const lines = surface as THREE.LineSegments
       const material = lines.material as THREE.LineDashedMaterial
       material.color.setHex(visual.surface.stroke)
-      material.opacity = visual.surface.opacity
+      material.opacity = visual.surface.opacity * dimFactor
       const [dashSize, gapSize] = visual.surface.dash
       material.dashSize = dashSize
       material.gapSize = gapSize
@@ -138,7 +149,8 @@ export const createNodeBinding = (resources: SceneResources): NodeBinding => {
       return
     }
     shadowMesh.visible = true
-    shadowMesh.position.y = SHADOW_Y - (elevation.height + resources.cubeGeometry.parameters.height / 2)
+    shadowMesh.position.y =
+      SHADOW_Y - (elevation.height + resources.cubeGeometry.parameters.height / 2)
     shadowMesh.scale.setScalar(elevation.shadow.radius)
     shadowMaterial.color.setHex(shadowColor)
     shadowMaterial.opacity = elevation.shadow.opacity
@@ -154,7 +166,7 @@ export const createNodeBinding = (resources: SceneResources): NodeBinding => {
     glowSprite.scale.setScalar(GLOW_SPRITE_SCALE)
     glowMaterial.color.setHex(visual.glow.color)
     glowBaseOpacity = visual.glow.intensity
-    glowMaterial.opacity = glowBaseOpacity
+    glowMaterial.opacity = glowBaseOpacity * dimFactor
     pulseGlow = visual.pulse
   }
 
@@ -166,6 +178,7 @@ export const createNodeBinding = (resources: SceneResources): NodeBinding => {
     ringMesh.visible = true
     ringMesh.scale.set(visual.ring.radius, 1, visual.ring.radius)
     ringMaterial.color.setHex(visual.ring.color)
+    ringMaterial.opacity = dimFactor
   }
 
   const applyDot = (visual: NodeVisual, surfaceCenterY: number): void => {
@@ -175,7 +188,11 @@ export const createNodeBinding = (resources: SceneResources): NodeBinding => {
       return
     }
     dotSprite.visible = true
-    dotSprite.position.set(UNREAD_DOT_OFFSET.x, surfaceCenterY + UNREAD_DOT_OFFSET.y, UNREAD_DOT_OFFSET.z)
+    dotSprite.position.set(
+      UNREAD_DOT_OFFSET.x,
+      surfaceCenterY + UNREAD_DOT_OFFSET.y,
+      UNREAD_DOT_OFFSET.z
+    )
     dotMaterial.color.setHex(visual.dot.color)
     pulseDot = visual.dot.pulse
   }
@@ -186,6 +203,7 @@ export const createNodeBinding = (resources: SceneResources): NodeBinding => {
       // DOM label wiring lands with E1 (node-label-element.ts, DOM overlay agent) — not built yet.
       group.position.set(ground.x, 0, ground.z)
       const surfaceCenterY = elevation.height + resources.cubeGeometry.parameters.height / 2
+      dimFactor = visual.dimmed ? DIM_OPACITY : 1
       applySurface(visual)
       if (surface !== null) surface.position.y = surfaceCenterY
       glowSprite.position.y = surfaceCenterY
@@ -196,8 +214,9 @@ export const createNodeBinding = (resources: SceneResources): NodeBinding => {
       applyDot(visual, surfaceCenterY)
     },
     tick(elapsedSeconds: number): void {
-      if (pulseGlow) glowMaterial.opacity = glowBaseOpacity * pulseOpacity(elapsedSeconds)
-      if (pulseDot) dotMaterial.opacity = pulseOpacity(elapsedSeconds)
+      if (pulseGlow)
+        glowMaterial.opacity = glowBaseOpacity * dimFactor * pulseOpacity(elapsedSeconds)
+      if (pulseDot) dotMaterial.opacity = pulseOpacity(elapsedSeconds) * dimFactor
     },
     dispose(): void {
       for (const material of surfaceMaterials) material.dispose()

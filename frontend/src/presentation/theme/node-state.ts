@@ -1,7 +1,14 @@
 import type { DiffSummary, NodeActivity } from '../../domain/worktree-graph/node-activity'
 import type { WorktreeGraph, WorktreeNode } from '../../domain/worktree-graph/types'
 
-export type NodeState = 'spawning' | 'archived' | 'waiting-input' | 'working' | 'dirty' | 'unread' | 'idle'
+export type NodeState =
+  | 'spawning'
+  | 'archived'
+  | 'waiting-input'
+  | 'working'
+  | 'dirty'
+  | 'unread'
+  | 'idle'
 
 /** Runtime mirror of NodeState — the scene-purity ratchet (D8) builds its forbidden-literal list from this array. */
 export const NODE_STATES = [
@@ -19,6 +26,8 @@ export type NodeDecorations = {
   diffLabel: DiffSummary | null
   waitingCallout: boolean
   selectionRing: boolean
+  /** True when a different repo is active — this node's island should render dimmed. */
+  dimmed: boolean
 }
 
 const hasNonzeroDiff = (activity: NodeActivity): boolean =>
@@ -36,14 +45,19 @@ export const deriveNodeState = (node: WorktreeNode): NodeState => {
   return 'idle'
 }
 
-export const deriveDecorations = (node: WorktreeNode, isSelected: boolean): NodeDecorations => {
+export const deriveDecorations = (
+  node: WorktreeNode,
+  isSelected: boolean,
+  activeRepoId?: string | null
+): NodeDecorations => {
   const state = deriveNodeState(node)
   const { activity } = node
   return {
     unreadDot: activity.isUnread && state !== 'archived' && state !== 'spawning',
     diffLabel: state === 'archived' ? null : hasNonzeroDiff(activity) ? activity.diff : null,
     waitingCallout: state === 'waiting-input',
-    selectionRing: isSelected
+    selectionRing: isSelected,
+    dimmed: activeRepoId != null && node.repoId !== activeRepoId
   }
 }
 
