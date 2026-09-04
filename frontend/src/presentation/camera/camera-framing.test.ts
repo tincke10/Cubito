@@ -3,11 +3,15 @@ import { FIT_MIN_RADIUS, FIT_PADDING, FOCUS_RADIUS } from '../theme/scene-metric
 import {
   easeInOutCubic,
   frameAll,
+  frameIsland,
   frameNode,
   interpolateFraming,
+  islandCenters,
   isWithinFraming,
   type Vec3
 } from './camera-framing'
+import { inertActivity } from '../../domain/worktree-graph/node-activity'
+import type { WorktreeGraph, WorktreeNode } from '../../domain/worktree-graph/types'
 
 const v = (x: number, y: number, z: number): Vec3 => ({ x, y, z })
 const distance = (a: Vec3, b: Vec3): number =>
@@ -108,5 +112,62 @@ describe('isWithinFraming', () => {
 
   it('is false just beyond the boundary plus margin', () => {
     expect(isWithinFraming(v(6.01, 0, 0), framing, 1)).toBe(false)
+  })
+})
+
+const node = (id: string, repoId: string): WorktreeNode => ({
+  id,
+  repoId,
+  branch: id,
+  path: `/tmp/${id}`,
+  status: 'clean',
+  isMain: false,
+  kind: 'worktree',
+  parentId: null,
+  childIds: [],
+  activity: inertActivity()
+})
+
+const twoIslandGraph = (): WorktreeGraph => ({
+  nodes: new Map([
+    ['a1', node('a1', 'repo-a')],
+    ['a2', node('a2', 'repo-a')],
+    ['b1', node('b1', 'repo-b')]
+  ]),
+  edges: [],
+  rootIds: []
+})
+
+const CENTERS: Record<string, Vec3> = {
+  a1: v(-5, 0, 0),
+  a2: v(5, 0, 0),
+  b1: v(0, 0, 20)
+}
+const lookup = (id: string): Vec3 | null => CENTERS[id] ?? null
+
+describe('islandCenters', () => {
+  it('collects only the centers of nodes in the given repo', () => {
+    expect(islandCenters(twoIslandGraph(), 'repo-a', lookup)).toEqual([v(-5, 0, 0), v(5, 0, 0)])
+    expect(islandCenters(twoIslandGraph(), 'repo-b', lookup)).toEqual([v(0, 0, 20)])
+  })
+
+  it('is empty for an unknown repoId', () => {
+    expect(islandCenters(twoIslandGraph(), 'repo-none', lookup)).toEqual([])
+  })
+
+  it('skips a node whose center lookup returns null', () => {
+    expect(islandCenters(twoIslandGraph(), 'repo-a', () => null)).toEqual([])
+  })
+})
+
+describe('frameIsland', () => {
+  it('frames exactly the given island, matching frameAll over its centers', () => {
+    const framing = frameIsland(twoIslandGraph(), 'repo-a', lookup)
+    expect(framing).toEqual(frameAll([v(-5, 0, 0), v(5, 0, 0)]))
+  })
+
+  it('is unaffected by other islands', () => {
+    const framing = frameIsland(twoIslandGraph(), 'repo-b', lookup)
+    expect(framing.target).toEqual(v(0, 0, 20))
   })
 })

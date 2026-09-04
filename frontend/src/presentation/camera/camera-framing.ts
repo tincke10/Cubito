@@ -1,4 +1,5 @@
 import { FIT_MIN_RADIUS, FIT_PADDING, FOCUS_RADIUS } from '../theme/scene-metrics'
+import type { WorktreeGraph, WorktreeId } from '../../domain/worktree-graph/types'
 
 export type Vec3 = { x: number; y: number; z: number }
 export type CameraFraming = { target: Vec3; radius: number }
@@ -46,7 +47,11 @@ const lerp = (a: number, b: number, t: number): number => {
   return a + (b - a) * t
 }
 
-export const interpolateFraming = (from: CameraFraming, to: CameraFraming, t: number): CameraFraming => ({
+export const interpolateFraming = (
+  from: CameraFraming,
+  to: CameraFraming,
+  t: number
+): CameraFraming => ({
   target: {
     x: lerp(from.target.x, to.target.x, t),
     y: lerp(from.target.y, to.target.y, t),
@@ -57,3 +62,26 @@ export const interpolateFraming = (from: CameraFraming, to: CameraFraming, t: nu
 
 export const isWithinFraming = (point: Vec3, framing: CameraFraming, margin: number): boolean =>
   distance(point, framing.target) <= framing.radius + margin
+
+/** Centers of every node in `repoId`'s island, via an injected lookup (design Area 7) — shared by
+ *  the keyboard-controller's Tab island-cycle and the ⌘P selector's activate. */
+export const islandCenters = (
+  graph: WorktreeGraph,
+  repoId: string,
+  nodeCenter: (id: WorktreeId) => Vec3 | null
+): Vec3[] => {
+  const centers: Vec3[] = []
+  for (const node of graph.nodes.values()) {
+    if (node.repoId !== repoId) continue
+    const center = nodeCenter(node.id)
+    if (center) centers.push(center)
+  }
+  return centers
+}
+
+/** Frames the camera on one repo's island — `frameAll` over just that island's node centers. */
+export const frameIsland = (
+  graph: WorktreeGraph,
+  repoId: string,
+  nodeCenter: (id: WorktreeId) => Vec3 | null
+): CameraFraming => frameAll(islandCenters(graph, repoId, nodeCenter))

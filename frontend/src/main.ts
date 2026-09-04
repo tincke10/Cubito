@@ -137,7 +137,8 @@ const keyboardController = createKeyboardController({
   terminal: {
     focusActivePanel: () => terminalController?.focusActivePanel(),
     closeActiveSession: () => terminalController?.closeActiveSession()
-  }
+  },
+  platform
 })
 keyboardController.attach(window)
 

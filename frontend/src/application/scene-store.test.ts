@@ -4,6 +4,7 @@ import { emptyWorktreeGraph } from '../domain/worktree-graph/types'
 import { emptyTerminalsState } from './terminal-session-model'
 import { emptySpawnMenuSlice } from './spawn-menu-model'
 import { emptyReposSlice } from './repos-model'
+import { emptyProjectSelectorSlice } from './project-selector-model'
 
 describe('createSceneStore', () => {
   it('starts idle with an empty graph and no connection/selection', () => {
@@ -184,5 +185,29 @@ describe('createSceneStore', () => {
     expect(after.graph).toBe(before.graph)
     expect(after.spawnMenu).toBe(before.spawnMenu)
     expect(after.repos).not.toBe(before.repos)
+  })
+
+  it('starts with a closed project selector slice', () => {
+    const store = createSceneStore()
+    expect(store.get().projectSelector).toEqual(emptyProjectSelectorSlice())
+  })
+
+  it('dispatchProjectSelector() drives the projectSelector slice through the reducer', () => {
+    const store = createSceneStore()
+    store.dispatchProjectSelector({ type: 'open' })
+    expect(store.get().projectSelector).toEqual({ view: 'open', query: '', highlightedIndex: 0 })
+  })
+
+  it('dispatchProjectSelector() notifies subscribers once and leaves the rest of SceneState untouched', () => {
+    const store = createSceneStore()
+    const listener = vi.fn()
+    store.subscribe(listener)
+    const before = store.get()
+    store.dispatchProjectSelector({ type: 'open' })
+    expect(listener).toHaveBeenCalledTimes(1)
+    const after = store.get()
+    expect(after.graph).toBe(before.graph)
+    expect(after.repos).toBe(before.repos)
+    expect(after.projectSelector).not.toBe(before.projectSelector)
   })
 })

@@ -7,6 +7,7 @@ import { emptyWorktreeGraph } from '../../domain/worktree-graph/types'
 import { emptyTerminalsState, reduceTerminals } from '../../application/terminal-session-model'
 import { emptySpawnMenuSlice } from '../../application/spawn-menu-model'
 import { emptyReposSlice } from '../../application/repos-model'
+import { emptyProjectSelectorSlice } from '../../application/project-selector-model'
 import type { SceneState } from '../../application/scene-store'
 import { buildWorktreeGraph } from '../../domain/worktree-graph/build-graph'
 
@@ -18,6 +19,7 @@ const baseState = (overrides: Partial<SceneState> = {}): SceneState => ({
   terminals: emptyTerminalsState(),
   spawnMenu: emptySpawnMenuSlice(),
   repos: emptyReposSlice(),
+  projectSelector: emptyProjectSelectorSlice(),
   ...overrides
 })
 

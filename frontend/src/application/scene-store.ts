@@ -6,6 +6,8 @@ import { emptySpawnMenuSlice, reduceSpawnMenu } from './spawn-menu-model'
 import type { SpawnMenuAction, SpawnMenuSlice } from './spawn-menu-model'
 import { emptyReposSlice, reduceRepos } from './repos-model'
 import type { ReposAction, ReposSlice } from './repos-model'
+import { emptyProjectSelectorSlice, reduceProjectSelector } from './project-selector-model'
+import type { ProjectSelectorAction, ProjectSelectorSlice } from './project-selector-model'
 
 export type SyncStatus =
   | { state: 'idle' }
@@ -27,6 +29,7 @@ export type SceneState = {
   terminals: TerminalsState
   spawnMenu: SpawnMenuSlice
   repos: ReposSlice
+  projectSelector: ProjectSelectorSlice
 }
 
 export type SceneStore = {
@@ -39,6 +42,8 @@ export type SceneStore = {
   dispatchSpawn(action: SpawnMenuAction): void
   /** Drives the repos slice through repos-model's pure reducer, one notify. */
   dispatchRepos(action: ReposAction): void
+  /** Drives the projectSelector slice through project-selector-model's pure reducer, one notify. */
+  dispatchProjectSelector(action: ProjectSelectorAction): void
   subscribe(listener: (state: SceneState) => void): () => void
 }
 
@@ -49,7 +54,8 @@ const initialSceneState = (): SceneState => ({
   selection: { selectedId: null },
   terminals: emptyTerminalsState(),
   spawnMenu: emptySpawnMenuSlice(),
-  repos: emptyReposSlice()
+  repos: emptyReposSlice(),
+  projectSelector: emptyProjectSelectorSlice()
 })
 
 /** Minimal observable store; swap for a richer signal system when the UI grows. */
@@ -81,6 +87,10 @@ export function createSceneStore(): SceneStore {
     },
     dispatchRepos(action) {
       state = { ...state, repos: reduceRepos(state.repos, action) }
+      notify()
+    },
+    dispatchProjectSelector(action) {
+      state = { ...state, projectSelector: reduceProjectSelector(state.projectSelector, action) }
       notify()
     },
     subscribe(listener) {

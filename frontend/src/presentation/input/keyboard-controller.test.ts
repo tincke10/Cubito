@@ -5,7 +5,7 @@ import { createKeyboardController } from './keyboard-controller'
 import type { KeyboardControllerEvent, ScenePositions } from './keyboard-controller'
 import { createSceneStore } from '../../application/scene-store'
 import { moveSelection } from '../navigation/selection-model'
-import { frameAll, frameNode, isWithinFraming } from '../camera/camera-framing'
+import { frameAll, frameIsland, frameNode, isWithinFraming } from '../camera/camera-framing'
 import type { Vec3 } from '../camera/camera-framing'
 import { inertActivity } from '../../domain/worktree-graph/node-activity'
 import type { WorktreeGraph, WorktreeNode } from '../../domain/worktree-graph/types'
@@ -70,13 +70,65 @@ function fakeTerminalCommandPort() {
   return { focusActivePanel: vi.fn(), closeActiveSession: vi.fn() }
 }
 
-function setup(selectedId: string | null = 'b') {
+const LINUX = { isMac: false }
+const MAC = { isMac: true }
+
+function setup(selectedId: string | null = 'b', platform = LINUX) {
   const store = createSceneStore()
   store.update({ graph: buildFanGraph(), selection: { selectedId } })
   const cameraRig = { animateTo: vi.fn() }
   const scenePositions = fakeScenePositions()
   const terminal = fakeTerminalCommandPort()
-  const controller = createKeyboardController({ store, cameraRig, scenePositions, terminal })
+  const controller = createKeyboardController({
+    store,
+    cameraRig,
+    scenePositions,
+    terminal,
+    platform
+  })
+  return { store, cameraRig, scenePositions, terminal, controller }
+}
+
+/** Two-island graph (repos 'r1'/'r2') for Tab island-cycling (PROJ-008). */
+function buildTwoRepoGraph(): WorktreeGraph {
+  const island = (id: string, repoId: string): WorktreeNode => ({
+    ...node(id, null, []),
+    repoId
+  })
+  const nodes = new Map<string, WorktreeNode>([
+    ['x1', island('x1', 'r1')],
+    ['y1', island('y1', 'r2')],
+    ['y2', island('y2', 'r2')]
+  ])
+  return { nodes, edges: [], rootIds: ['x1', 'y1'] }
+}
+
+const ISLAND_CENTERS: Record<string, Vec3> = {
+  x1: { x: -20, y: 0, z: 0 },
+  y1: { x: 20, y: 0, z: 0 },
+  y2: { x: 20, y: 0, z: 5 }
+}
+
+const REPO_1 = { id: 'r1', path: '/r1', displayName: 'R1', kind: 'git' as const }
+const REPO_2 = { id: 'r2', path: '/r2', displayName: 'R2', kind: 'git' as const }
+
+function setupWithRepos() {
+  const store = createSceneStore()
+  store.update({ graph: buildTwoRepoGraph(), selection: { selectedId: null } })
+  store.dispatchRepos({ type: 'set-list', list: [REPO_1, REPO_2] })
+  const cameraRig = { animateTo: vi.fn() }
+  const scenePositions: ScenePositions = {
+    nodeCenter: (id) => ISLAND_CENTERS[id] ?? null,
+    nodeCenters: () => Object.values(ISLAND_CENTERS)
+  }
+  const terminal = fakeTerminalCommandPort()
+  const controller = createKeyboardController({
+    store,
+    cameraRig,
+    scenePositions,
+    terminal,
+    platform: LINUX
+  })
   return { store, cameraRig, scenePositions, terminal, controller }
 }
 
@@ -374,6 +426,140 @@ describe('createKeyboardController', () => {
       const handled = controller.handleKeyDown(baseEvent({ key: 's', target: input }))
       expect(handled).toBe(false)
       expect(store.get().spawnMenu.view).toBe('closed')
+    })
+  })
+
+  describe('⌘P/Ctrl+P projects chord and Tab/Escape precedence (PROJ-005/008)', () => {
+    it('meta+p on Mac opens the project selector', () => {
+      const { store, controller } = setup('a', MAC)
+      const handled = controller.handleKeyDown(baseEvent({ key: 'p', metaKey: true }))
+      expect(handled).toBe(true)
+      expect(store.get().projectSelector.view).toBe('open')
+    })
+
+    it('ctrl+p on Linux/Windows opens the project selector', () => {
+      const { store, controller } = setup('a', LINUX)
+      const handled = controller.handleKeyDown(baseEvent({ key: 'p', ctrlKey: true }))
+      expect(handled).toBe(true)
+      expect(store.get().projectSelector.view).toBe('open')
+    })
+
+    it('the wrong-platform chord stays gated and does not open the selector', () => {
+      const { store, controller } = setup('a', MAC)
+      const handled = controller.handleKeyDown(baseEvent({ key: 'p', ctrlKey: true }))
+      expect(handled).toBe(false)
+      expect(store.get().projectSelector.view).toBe('closed')
+    })
+
+    it('the ⌘P/Ctrl+P chord opens the selector even while a terminal (text-entry target) is focused', () => {
+      const { store, controller } = setup('a', LINUX)
+      const textarea = { tagName: 'TEXTAREA', isContentEditable: false }
+      const handled = controller.handleKeyDown(
+        baseEvent({ key: 'p', ctrlKey: true, target: textarea })
+      )
+      expect(handled).toBe(true)
+      expect(store.get().projectSelector.view).toBe('open')
+    })
+
+    it('bare p still pins the terminal, chord unaffected', () => {
+      const { store, controller } = setup('a', LINUX)
+      controller.handleKeyDown(baseEvent({ key: 't' }))
+      const handled = controller.handleKeyDown(baseEvent({ key: 'p' }))
+      expect(handled).toBe(true)
+      expect(store.get().terminals.activePanel?.placement).toBe('hud')
+      expect(store.get().projectSelector.view).toBe('closed')
+    })
+
+    it('Tab with the selector open is consumed as a no-op — never reaches terminal or island cycling', () => {
+      const { store, cameraRig, controller } = setupWithRepos()
+      controller.handleKeyDown(baseEvent({ key: 'p', ctrlKey: true })) // open selector
+      cameraRig.animateTo.mockClear()
+      const activeBefore = store.get().repos.activeRepoId
+
+      const handled = controller.handleKeyDown(baseEvent({ key: 'Tab' }))
+
+      expect(handled).toBe(true)
+      expect(store.get().repos.activeRepoId).toBe(activeBefore)
+      expect(cameraRig.animateTo).not.toHaveBeenCalled()
+    })
+
+    it('Tab with no terminal open cycles to the next island, dispatching set-active and framing its centers', () => {
+      const { store, cameraRig, scenePositions, controller } = setupWithRepos()
+      expect(store.get().repos.activeRepoId).toBe('r1') // reconciled default
+
+      const handled = controller.handleKeyDown(baseEvent({ key: 'Tab' }))
+
+      expect(handled).toBe(true)
+      expect(store.get().repos.activeRepoId).toBe('r2')
+      expect(cameraRig.animateTo).toHaveBeenCalledWith(
+        frameIsland(store.get().graph, 'r2', scenePositions.nodeCenter),
+        FOCUS_DURATION_MS
+      )
+    })
+
+    it('Tab island-cycle wraps back to the first repo and is a no-op with zero repos', () => {
+      const { store, controller } = setupWithRepos()
+      controller.handleKeyDown(baseEvent({ key: 'Tab' })) // r1 -> r2
+      controller.handleKeyDown(baseEvent({ key: 'Tab' })) // r2 -> wraps to r1
+      expect(store.get().repos.activeRepoId).toBe('r1')
+
+      store.dispatchRepos({ type: 'set-list', list: [] })
+      const handled = controller.handleKeyDown(baseEvent({ key: 'Tab' }))
+      expect(handled).toBe(false)
+    })
+
+    it('Tab with a terminal focused still takes precedence over island cycling', () => {
+      const { store, controller } = setupWithRepos()
+      store.update({ selection: { selectedId: 'x1' } })
+      controller.handleKeyDown(baseEvent({ key: 't' }))
+      const activeBefore = store.get().repos.activeRepoId
+
+      const handled = controller.handleKeyDown(baseEvent({ key: 'Tab' }))
+
+      expect(handled).toBe(true)
+      expect(store.get().terminals.activePanel?.sessionIndex).toBe(0)
+      expect(store.get().repos.activeRepoId).toBe(activeBefore)
+    })
+
+    it('Escape closes only the selector, leaving an open terminal and spawn menu untouched', () => {
+      const { store, terminal, controller } = setup('a')
+      controller.handleKeyDown(baseEvent({ key: 't' }))
+      store.dispatchSpawn({ type: 'open-for-node', nodeId: 'a' })
+      store.dispatchProjectSelector({ type: 'open' })
+
+      const handled = controller.handleKeyDown(baseEvent({ key: 'Escape' }))
+
+      expect(handled).toBe(true)
+      expect(store.get().projectSelector.view).toBe('closed')
+      expect(store.get().spawnMenu.view).not.toBe('closed')
+      expect(terminal.closeActiveSession).not.toHaveBeenCalled()
+    })
+
+    it('attach() calls preventDefault on the ⌘P/Ctrl+P chord (suppresses the browser print dialog)', () => {
+      // No DOM in this unit-test environment — `attach`'s `instanceof HTMLElement` check needs a
+      // real constructor to compare against, even though `target` itself stays null below.
+      vi.stubGlobal('HTMLElement', function HTMLElementStub() {})
+      try {
+        const { controller } = setup('a', LINUX)
+        const fakeTarget = { addEventListener: vi.fn(), removeEventListener: vi.fn() }
+        controller.attach(fakeTarget)
+        const [, handler] = fakeTarget.addEventListener.mock.calls[0]!
+
+        const preventDefault = vi.fn()
+        handler({
+          key: 'p',
+          ctrlKey: true,
+          metaKey: false,
+          altKey: false,
+          shiftKey: false,
+          target: null,
+          preventDefault
+        } as unknown as KeyboardEvent)
+
+        expect(preventDefault).toHaveBeenCalledOnce()
+      } finally {
+        vi.unstubAllGlobals()
+      }
     })
   })
 })

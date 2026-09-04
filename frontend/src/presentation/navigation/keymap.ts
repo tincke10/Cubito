@@ -10,8 +10,10 @@ export type NavCommand =
   | { kind: 'open-spawn' }
   /** Single escape command (SPAWN-005) — the handler decides spawn-close vs. terminal-close by context. */
   | { kind: 'escape' }
+  | { kind: 'open-projects' }
 
 type Modifiers = { alt: boolean; ctrl: boolean; meta: boolean; shift: boolean }
+type Platform = { isMac: boolean }
 
 const MOVE_DIRECTIONS = {
   h: 'parent',
@@ -29,8 +31,24 @@ const TEXT_ENTRY_TAGS = new Set(['INPUT', 'TEXTAREA', 'SELECT'])
 const hasModifier = (modifiers: Modifiers): boolean =>
   modifiers.alt || modifiers.ctrl || modifiers.meta || modifiers.shift
 
+/** Cmd+P on Mac / Ctrl+P elsewhere, and only that chord — the sole targeted exception to the
+ *  `hasModifier` gate below (PROJ-005). Every other modified key, and the opposite-platform
+ *  chord, stays gated; bare `p` still falls through to `pin-terminal`. */
+const isProjectsChord = (key: string, modifiers: Modifiers, platform: Platform): boolean =>
+  key === 'p' &&
+  !modifiers.alt &&
+  !modifiers.shift &&
+  (platform.isMac ? modifiers.meta && !modifiers.ctrl : modifiers.ctrl && !modifiers.meta)
+
 /** `h/l/k/j` move the selection, `f` focuses, `v` fits all; any modifier or unmapped key yields `null`. */
-export function resolveNavCommand(key: string, modifiers: Modifiers): NavCommand | null {
+export function resolveNavCommand(
+  key: string,
+  modifiers: Modifiers,
+  platform: Platform
+): NavCommand | null {
+  if (isProjectsChord(key, modifiers, platform)) {
+    return { kind: 'open-projects' }
+  }
   if (hasModifier(modifiers)) {
     return null
   }

@@ -2,8 +2,9 @@ import type { SceneStore } from '../../application/scene-store'
 import type { WorktreeId } from '../../domain/worktree-graph/types'
 import { isTextEntryTarget, resolveNavCommand } from '../navigation/keymap'
 import { moveSelection } from '../navigation/selection-model'
-import { frameAll, frameNode, isWithinFraming } from '../camera/camera-framing'
+import { frameAll, frameIsland, frameNode, isWithinFraming } from '../camera/camera-framing'
 import type { CameraFraming, Vec3 } from '../camera/camera-framing'
+import { nextIsland } from '../../application/repos-model'
 import { FOCUS_DURATION_MS, NODE_SIZE } from '../theme/scene-metrics'
 
 /** The subset of camera-rig the controller drives — never the camera/frustum directly. */
@@ -39,6 +40,8 @@ export type KeyboardControllerDeps = {
   cameraRig: CameraRigLike
   scenePositions: ScenePositions
   terminal: TerminalCommandPort
+  /** Mac vs. Linux/Windows — selects the ⌘P/Ctrl+P chord (PROJ-005). */
+  platform: { isMac: boolean }
 }
 
 export type KeyboardController = {
@@ -60,7 +63,7 @@ type DomKeydownTarget = {
  * drive the camera. No parent/sibling/camera math lives here — it all delegates.
  */
 export function createKeyboardController(deps: KeyboardControllerDeps): KeyboardController {
-  const { store, cameraRig, scenePositions, terminal } = deps
+  const { store, cameraRig, scenePositions, terminal, platform } = deps
   let currentFraming: CameraFraming | null = null
 
   const focusFraming = (framing: CameraFraming): void => {
@@ -80,17 +83,22 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
   }
 
   const handleKeyDown = (event: KeyboardControllerEvent): boolean => {
+    const command = resolveNavCommand(
+      event.key,
+      { alt: event.altKey, ctrl: event.ctrlKey, meta: event.metaKey, shift: event.shiftKey },
+      platform
+    )
+    // ⌘P/Ctrl+P must open the selector even while a terminal (a text-entry target) is focused
+    // (PROJ-008) — checked before the text-entry gate below, unlike every other command.
+    if (command?.kind === 'open-projects') {
+      store.dispatchProjectSelector({ type: 'open' })
+      return true
+    }
     if (event.target && isTextEntryTarget(event.target.tagName, event.target.isContentEditable)) {
       // Covers xterm.js's hidden helper textarea too (TEXT_ENTRY_TAGS includes TEXTAREA) — while
-      // a terminal is focused, every keystroke (incl. Esc) reaches the PTY, never the graph.
+      // a terminal is focused, every other keystroke (incl. Esc) reaches the PTY, never the graph.
       return false
     }
-    const command = resolveNavCommand(event.key, {
-      alt: event.altKey,
-      ctrl: event.ctrlKey,
-      meta: event.metaKey,
-      shift: event.shiftKey
-    })
     if (!command) {
       return false
     }
@@ -144,9 +152,19 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
       return true
     }
     if (command.kind === 'next-terminal') {
+      // Tab precedence (PROJ-008): modal > terminal > island. The selector's own query input is
+      // a text-entry target already caught above; this is belt-and-suspenders for any other case.
+      if (store.get().projectSelector.view !== 'closed') return true
       const activePanel = store.get().terminals.activePanel
-      if (!activePanel) return false
-      store.dispatchTerminal({ type: 'next-tab', nodeId: activePanel.nodeId })
+      if (activePanel) {
+        store.dispatchTerminal({ type: 'next-tab', nodeId: activePanel.nodeId })
+        return true
+      }
+      const repos = store.get().repos
+      const next = nextIsland(repos.list, repos.activeRepoId)
+      if (next === null) return false
+      store.dispatchRepos({ type: 'set-active', repoId: next })
+      focusFraming(frameIsland(store.get().graph, next, scenePositions.nodeCenter))
       return true
     }
     if (command.kind === 'open-spawn') {
@@ -164,7 +182,12 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
       )
       return true
     }
-    // command.kind === 'escape' — spawn-close wins over terminal-close (SPAWN-005 precedence)
+    // command.kind === 'escape' — selector-close wins over spawn/terminal-close (PROJ-008); the
+    // selector's own query/path input already intercepts Escape above, this is belt-and-suspenders.
+    if (store.get().projectSelector.view !== 'closed') {
+      store.dispatchProjectSelector({ type: 'close' })
+      return true
+    }
     if (store.get().spawnMenu.view !== 'closed') {
       store.dispatchSpawn({ type: 'cancel' })
       return true
@@ -187,8 +210,10 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
           ? { tagName: element.tagName, isContentEditable: element.isContentEditable }
           : null
       })
-      // Tab's default browser behavior (focus traversal) would otherwise fight next-terminal.
-      if (handled && domEvent.key === 'Tab') {
+      // Tab's default browser behavior (focus traversal) would otherwise fight next-terminal;
+      // Ctrl+P/Cmd+P would otherwise open the browser's print dialog (PROJ-005).
+      const isPrintChord = (domEvent.ctrlKey || domEvent.metaKey) && domEvent.key === 'p'
+      if (handled && (domEvent.key === 'Tab' || isPrintChord)) {
         domEvent.preventDefault()
       }
     }
