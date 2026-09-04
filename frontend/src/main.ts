@@ -17,6 +17,10 @@ import { createTerminalConnector } from './presentation/hud/terminal-connector-e
 import { createTerminalPanel } from './presentation/hud/terminal-panel-element'
 import { createTerminalPanelController } from './presentation/hud/terminal-panel-controller'
 import type { TerminalPanelController } from './presentation/hud/terminal-panel-controller'
+import { createSpawnMenu } from './presentation/hud/spawn-menu-element'
+import { createSpawnForm } from './presentation/hud/spawn-form-element'
+import { createSpawnMenuController } from './presentation/hud/spawn-menu-controller'
+import type { SpawnMenuController } from './presentation/hud/spawn-menu-controller'
 import { createKeyboardController } from './presentation/input/keyboard-controller'
 import { createCameraRig } from './presentation/scene/camera-rig'
 import { createScene } from './presentation/scene/create-scene'
@@ -115,6 +119,14 @@ const platform = { isMac: navigator.userAgent.includes('Mac') }
 let terminalController: TerminalPanelController | null = null
 let viewportSize = { width: window.innerWidth, height: window.innerHeight }
 
+// Spawn (design Area 3): unlike the terminal, spawn only needs the RPC gateway (no stream
+// port), but construction still waits for the first `onConnected` — mirroring the terminal's
+// lifecycle keeps both controllers built from the same lazy pattern. `spawnGateway` tracks the
+// live connection's gateway so `refetch` always calls through the CURRENT connection, even
+// though the controller itself is only ever built once.
+let spawnController: SpawnMenuController | null = null
+let spawnGateway: RuntimeGateway = demoGateway
+
 const keyboardController = createKeyboardController({
   store,
   cameraRig,
@@ -139,6 +151,7 @@ cubitoScene.onFrame((elapsedSeconds) => {
   graphView.tick(elapsedSeconds)
   cameraRig.tick(elapsedSeconds)
   terminalController?.tick()
+  spawnController?.tick()
 })
 
 cubitoScene.onResize((width, height) => {
@@ -156,6 +169,7 @@ store.subscribe((state) => {
   hudOverlay.apply(model)
   keyboardBar.apply(model.chips)
   terminalController?.sync(state.terminals)
+  spawnController?.sync(state.spawnMenu, state.graph)
   if (!framed && state.graph.nodes.size > 0) {
     framed = true
     cameraRig.apply(frameAll(graphView.nodeCenters()))
@@ -192,6 +206,27 @@ function bindTerminals(connection: LiveSyncConnection): void {
   store.dispatchTerminal({ type: 'connection-regained' })
 }
 
+/** Builds the spawn menu controller on the first connection (lazy, mirroring `bindTerminals`);
+ *  every later reconnect just rebinds the gateway reference (design Area 3/7). */
+function bindSpawn(connection: LiveSyncConnection): void {
+  spawnGateway = connection.gateway
+  if (spawnController) {
+    spawnController.rebindGateway(connection.gateway)
+    return
+  }
+  spawnController = createSpawnMenuController({
+    gateway: connection.gateway,
+    createMenu: createSpawnMenu,
+    createForm: createSpawnForm,
+    labelLayer: cubitoScene.labelLayer,
+    hud: hudElement,
+    dispatch: (action) => store.dispatchSpawn(action),
+    nodeCenter: (id) => graphView.nodeCenter(id),
+    refetch: () => syncWorktreeGraph(spawnGateway, store)
+  })
+  spawnController.sync(store.get().spawnMenu, store.get().graph)
+}
+
 const pairingEntry = decidePairingEntry(consumePairingFragment())
 if (pairingEntry.kind === 'connect') {
   createLiveWorktreeSync({
@@ -202,7 +237,10 @@ if (pairingEntry.kind === 'connect') {
       document.addEventListener('visibilitychange', cb)
       return () => document.removeEventListener('visibilitychange', cb)
     },
-    onConnected: bindTerminals,
+    onConnected: (connection) => {
+      bindTerminals(connection)
+      bindSpawn(connection)
+    },
     onDisconnected: () => store.dispatchTerminal({ type: 'connection-lost' })
   }).start()
 } else {
