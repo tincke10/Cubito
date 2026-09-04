@@ -148,6 +148,16 @@ describe('hudModel', () => {
     expect(paletteChip?.key).toContain('Ctrl+K')
   })
 
+  it('chips include the Mac-labeled projects shortcut when isMac is true', () => {
+    const model = hudModel(baseState(), { isMac: true })
+    expect(model.chips).toContainEqual({ key: '⌘P', description: 'proyectos' })
+  })
+
+  it('chips include the non-Mac-labeled projects shortcut when isMac is false', () => {
+    const model = hudModel(baseState(), { isMac: false })
+    expect(model.chips).toContainEqual({ key: 'Ctrl+P', description: 'proyectos' })
+  })
+
   it('adds no [t] terminal chip when no node is selected', () => {
     const model = hudModel(baseState({ selection: { selectedId: null } }), { isMac: true })
     expect(model.chips.some((chip) => chip.key === 't')).toBe(false)

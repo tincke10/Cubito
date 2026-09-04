@@ -8,7 +8,7 @@ import { connectOrcad } from './infrastructure/rpc/connect-orcad'
 import { consumePairingFragment } from './infrastructure/rpc/pairing-fragment'
 import type { RuntimeGateway } from './application/ports/runtime-gateway'
 import type { RawWorktreeRecord } from './domain/worktree-graph/build-graph'
-import { frameAll } from './presentation/camera/camera-framing'
+import { frameAll, frameIsland } from './presentation/camera/camera-framing'
 import type { Vec3 } from './presentation/camera/camera-framing'
 import { createHudOverlay } from './presentation/hud/hud-overlay'
 import { hudModel } from './presentation/hud/hud-model'
@@ -21,11 +21,15 @@ import { createSpawnMenu } from './presentation/hud/spawn-menu-element'
 import { createSpawnForm } from './presentation/hud/spawn-form-element'
 import { createSpawnMenuController } from './presentation/hud/spawn-menu-controller'
 import type { SpawnMenuController } from './presentation/hud/spawn-menu-controller'
+import { createProjectSelector } from './presentation/hud/project-selector-element'
+import { createProjectSelectorController } from './presentation/hud/project-selector-controller'
+import type { ProjectSelectorController } from './presentation/hud/project-selector-controller'
 import { createKeyboardController } from './presentation/input/keyboard-controller'
 import { createCameraRig } from './presentation/scene/camera-rig'
 import { createScene } from './presentation/scene/create-scene'
 import { createGraphView } from './presentation/scene/graph-view'
 import { applyCssTheme } from './presentation/theme/css-theme'
+import { FOCUS_DURATION_MS } from './presentation/theme/scene-metrics'
 import { paletteFor } from './presentation/theme/scene-palette'
 import type { Theme } from './presentation/theme/scene-palette'
 
@@ -130,6 +134,12 @@ let viewportSize = { width: window.innerWidth, height: window.innerHeight }
 let spawnController: SpawnMenuController | null = null
 let spawnGateway: RuntimeGateway = demoGateway
 
+// Projects (design Area 8): same lazy-on-first-connect pattern as spawn — the selector needs
+// `listRepos`/`addRepo` from the live gateway, so it stays null in demo mode (`pnpm dev`); ⌘P
+// still dispatches `open` into the store, it just has nothing to mount.
+let projectSelectorController: ProjectSelectorController | null = null
+let projectsGateway: RuntimeGateway = demoGateway
+
 const keyboardController = createKeyboardController({
   store,
   cameraRig,
@@ -179,6 +189,7 @@ store.subscribe((state) => {
   keyboardBar.apply(model.chips)
   terminalController?.sync(state.terminals)
   spawnController?.sync(state.spawnMenu, state.graph)
+  projectSelectorController?.sync(state.projectSelector, state.repos)
   if (!framed && state.graph.nodes.size > 0) {
     framed = true
     cameraRig.apply(frameAll(graphView.nodeCenters()))
@@ -237,6 +248,29 @@ function bindSpawn(connection: LiveSyncConnection): void {
   spawnController.sync(store.get().spawnMenu, store.get().graph)
 }
 
+/** Builds the ⌘P selector controller on the first connection (lazy, mirroring `bindSpawn`);
+ *  every later reconnect just rebinds the gateway reference (design Area 4/7/8). */
+function bindProjects(connection: LiveSyncConnection): void {
+  projectsGateway = connection.gateway
+  if (projectSelectorController) {
+    projectSelectorController.rebindGateway(connection.gateway)
+    return
+  }
+  projectSelectorController = createProjectSelectorController({
+    gateway: connection.gateway,
+    createElement: createProjectSelector,
+    hud: hudElement,
+    dispatch: (action) => store.dispatchProjectSelector(action),
+    reposDispatch: (action) => store.dispatchRepos(action),
+    focusIsland: (repoId) => {
+      const framing = frameIsland(store.get().graph, repoId, graphView.nodeCenter)
+      cameraRig.animateTo(framing, FOCUS_DURATION_MS)
+    },
+    refetch: () => syncWorktreeGraph(projectsGateway, store)
+  })
+  projectSelectorController.sync(store.get().projectSelector, store.get().repos)
+}
+
 const pairingEntry = decidePairingEntry(consumePairingFragment())
 if (pairingEntry.kind === 'connect') {
   createLiveWorktreeSync({
@@ -250,6 +284,7 @@ if (pairingEntry.kind === 'connect') {
     onConnected: (connection) => {
       bindTerminals(connection)
       bindSpawn(connection)
+      bindProjects(connection)
     },
     onDisconnected: () => store.dispatchTerminal({ type: 'connection-lost' })
   }).start()

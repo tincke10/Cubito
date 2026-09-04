@@ -86,7 +86,8 @@ const chipsFor = (platform: { isMac: boolean }): readonly HudChip[] => [
   { key: 'f', description: 'focus' },
   { key: 'v', description: 'ver todo' },
   { key: 's', description: 'spawn' },
-  { key: platform.isMac ? '⌘K' : 'Ctrl+K', description: 'paleta' }
+  { key: platform.isMac ? '⌘K' : 'Ctrl+K', description: 'paleta' },
+  { key: platform.isMac ? '⌘P' : 'Ctrl+P', description: 'proyectos' }
 ]
 
 export function hudModel(state: SceneState, platform: { isMac: boolean }): HudModel {
