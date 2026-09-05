@@ -14,6 +14,8 @@ export type SpawnAgent = 'none' | 'claude'
 export type CreateWorktreeInput = {
   repo: string
   name?: string
+  /** True when `name` was auto-generated (not user-typed), so the host may retire it on collision. */
+  nameWasGenerated?: boolean
   baseBranch?: string
   parentWorktree?: string
   startupAgent?: SpawnAgent

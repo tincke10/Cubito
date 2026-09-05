@@ -162,7 +162,10 @@ export function toFanOutInputs(
     const input: CreateWorktreeInput = {
       repo: repoSelector,
       parentWorktree: parentId,
-      clientMutationId: mutationId
+      clientMutationId: mutationId,
+      // Why: fan-out has no name field (litter names are auto); the host rejects an empty name.
+      name: `camada-${mutationId.replace(/-/g, '').slice(0, 10)}`,
+      nameWasGenerated: true
     }
     if (fields.agent !== 'none') {
       input.startupAgent = fields.agent

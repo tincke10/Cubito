@@ -345,16 +345,46 @@ describe('toFanOutInputs', () => {
   it('builds one input per mutationId with a distinct clientMutationId, sharing repo + parentWorktree', () => {
     const inputs = toFanOutInputs(formSlice, 'id:repo-a', ['m1', 'm2'])
     expect(inputs).toEqual([
-      { repo: 'id:repo-a', parentWorktree: 'w1', clientMutationId: 'm1' },
-      { repo: 'id:repo-a', parentWorktree: 'w1', clientMutationId: 'm2' }
+      {
+        repo: 'id:repo-a',
+        parentWorktree: 'w1',
+        clientMutationId: 'm1',
+        name: 'camada-m1',
+        nameWasGenerated: true
+      },
+      {
+        repo: 'id:repo-a',
+        parentWorktree: 'w1',
+        clientMutationId: 'm2',
+        name: 'camada-m2',
+        nameWasGenerated: true
+      }
     ])
   })
 
-  it('omits name always, and omits startupAgent/startupPrompt when agent is none', () => {
+  it('always generates a name (host rejects an empty one) and includes startupAgent/startupPrompt only when agent is not none', () => {
     const inputs = toFanOutInputs(formSlice, 'id:repo-a', ['m1'])
-    expect(inputs[0]).not.toHaveProperty('name')
+    expect(inputs[0]).toHaveProperty('name')
     expect(inputs[0]).not.toHaveProperty('startupAgent')
     expect(inputs[0]).not.toHaveProperty('startupPrompt')
+  })
+
+  it('generates a non-empty, sanitize-safe, deterministic name per mutationId', () => {
+    const mutationIds = ['aaaa-bbbb-cccc', 'dddd-eeee-ffff', '00001111-2222']
+    const inputs = toFanOutInputs(formSlice, 'id:repo-a', mutationIds)
+
+    for (const input of inputs) {
+      expect(input.name).toBeTruthy()
+      expect(input.name).toMatch(/^[a-z0-9-]+$/)
+      expect(input.nameWasGenerated).toBe(true)
+    }
+
+    const names = inputs.map((input) => input.name)
+    expect(new Set(names).size).toBe(names.length)
+
+    // Deterministic for a given mutationId: same input twice -> same name.
+    const rerun = toFanOutInputs(formSlice, 'id:repo-a', mutationIds)
+    expect(rerun.map((input) => input.name)).toEqual(names)
   })
 
   it('includes startupAgent + startupPrompt when an agent is chosen and prompt is non-blank', () => {
