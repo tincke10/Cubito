@@ -15,7 +15,7 @@ export type HudModel = {
   chips: readonly HudChip[]
 }
 
-const connectionLabel = (connection: ConnectionState): string => {
+export const connectionLabel = (connection: ConnectionState): string => {
   switch (connection.state) {
     case 'connecting':
       return 'conectando…'
@@ -28,7 +28,7 @@ const connectionLabel = (connection: ConnectionState): string => {
   }
 }
 
-const connectionDotColor = (connection: ConnectionState): ConnectionDotTone => {
+export const connectionDotColor = (connection: ConnectionState): ConnectionDotTone => {
   switch (connection.state) {
     case 'connecting':
       return 'amber'

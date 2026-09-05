@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { hudModel } from './hud-model'
+import { connectionDotColor, connectionLabel, hudModel } from './hud-model'
 import { countNodeStates } from '../theme/node-state'
 import { emptyWorktreeGraph } from '../../domain/worktree-graph/types'
 import { emptyTerminalsState, reduceTerminals } from '../../application/terminal-session-model'
@@ -226,6 +226,12 @@ describe('hudModel', () => {
       isMac: true
     })
     expect(model.chips).toContainEqual({ key: '⇥', description: 'otra terminal' })
+  })
+
+  // Exported (Wave 4, SV-403) so the system-view HUD can reuse them without duplicating logic.
+  it('exports connectionLabel and connectionDotColor as standalone pure helpers', () => {
+    expect(connectionLabel({ state: 'connected', runtimeId: '4f2a9c' })).toContain('4f2a9c')
+    expect(connectionDotColor({ state: 'connected', runtimeId: '4f2a9c' })).toBe('accent')
   })
 
   it('never reads the global navigator to decide platform — it only takes `platform.isMac`', () => {
