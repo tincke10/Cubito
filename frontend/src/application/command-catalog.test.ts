@@ -87,7 +87,9 @@ describe('commandCatalog', () => {
     ['open-projects', { hasSelection: false, isConnected: false }, true],
     ['add-repo', { hasSelection: false, isConnected: true }, true],
     ['add-repo', { hasSelection: false, isConnected: false }, false],
-    ['fan-out', { hasSelection: true, isConnected: true }, false]
+    ['fan-out', { hasSelection: true, isConnected: true }, true],
+    ['fan-out', { hasSelection: false, isConnected: true }, false],
+    ['fan-out', { hasSelection: true, isConnected: false }, false]
   ]
 
   it.each(matrix)('%s isAvailable(%o) => %s', (id, availability, expected) => {

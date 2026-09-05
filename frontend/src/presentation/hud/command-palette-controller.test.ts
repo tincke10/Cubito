@@ -254,13 +254,20 @@ describe('createCommandPaletteController', () => {
       expect(setupResult.store.get().commandPalette.view).toBe('closed')
     })
 
-    it('fan-out is always a no-op (SPAWN-002, always disabled in the catalog)', () => {
+    it('fan-out dispatches the fan-out open action for the selected node, closing the palette first', () => {
       const setupResult = setup('a')
+      openAndMount(setupResult)
+      setupResult.handles[0]!.emitActivate('fan-out')
+      expect(setupResult.store.get().commandPalette.view).toBe('closed')
+      expect(setupResult.store.get().fanOut).toMatchObject({ view: 'form', parentId: 'a' })
+    })
+
+    it('fan-out with nothing selected is a no-op (guard; upstream isAvailable already gates it)', () => {
+      const setupResult = setup(null)
       openAndMount(setupResult)
       const before = setupResult.store.get()
       setupResult.handles[0]!.emitActivate('fan-out')
-      expect(setupResult.store.get().spawnMenu).toBe(before.spawnMenu)
-      expect(setupResult.store.get().terminals).toBe(before.terminals)
+      expect(setupResult.store.get().fanOut).toBe(before.fanOut)
     })
 
     it('activating a currently-disabled command no-ops entirely (guard, belt-and-suspenders)', () => {

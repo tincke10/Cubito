@@ -45,16 +45,18 @@ describe('resolveNavCommand', () => {
   )
 
   // 'k' is excluded here — ctrl+k on Linux is now the palette chord (see describe block below),
-  // so it can't share this blanket "any modifier held -> null" assertion.
+  // so it can't share this blanket "any modifier held -> null" assertion. 'f'+'shift' is excluded
+  // for the same reason — shift+f is now the fan-out chord (see describe block below).
   const keys = ['h', 'l', 'j', 'f', 'v'] as const
   const modifierNames = ['alt', 'ctrl', 'meta', 'shift'] as const
 
-  it.each(keys.flatMap((key) => modifierNames.map((modifier) => [key, modifier] as const)))(
-    'returns null for %s with %s held',
-    (key, modifier) => {
-      expect(resolveNavCommand(key, { ...noModifiers, [modifier]: true }, LINUX)).toBeNull()
-    }
-  )
+  it.each(
+    keys
+      .flatMap((key) => modifierNames.map((modifier) => [key, modifier] as const))
+      .filter(([key, modifier]) => !(key === 'f' && modifier === 'shift'))
+  )('returns null for %s with %s held', (key, modifier) => {
+    expect(resolveNavCommand(key, { ...noModifiers, [modifier]: true }, LINUX)).toBeNull()
+  })
 
   describe('⌘P/Ctrl+P projects chord (PROJ-005) — targeted exception to the modifier gate', () => {
     it('meta+p on Mac resolves to open-projects', () => {
@@ -144,6 +146,35 @@ describe('resolveNavCommand', () => {
       expect(resolveNavCommand('k', { ...noModifiers, shift: true }, MAC)).toBeNull()
       expect(resolveNavCommand('k', { ...noModifiers, shift: true }, LINUX)).toBeNull()
     })
+  })
+})
+
+describe('shift+f fan-out chord — platform-uniform, targeted exception to the modifier gate', () => {
+  it('shift+f resolves to open-fan-out on either platform', () => {
+    expect(resolveNavCommand('f', { ...noModifiers, shift: true }, MAC)).toEqual({
+      kind: 'open-fan-out'
+    })
+    expect(resolveNavCommand('f', { ...noModifiers, shift: true }, LINUX)).toEqual({
+      kind: 'open-fan-out'
+    })
+  })
+
+  it('bare f (no modifier) still resolves to focus on either platform', () => {
+    expect(resolveNavCommand('f', noModifiers, MAC)).toEqual({ kind: 'focus' })
+    expect(resolveNavCommand('f', noModifiers, LINUX)).toEqual({ kind: 'focus' })
+  })
+
+  it('F without shift (e.g. caps-lock) is unaffected — no modifier means bare f, unrelated here', () => {
+    expect(resolveNavCommand('f', noModifiers, LINUX)).toEqual({ kind: 'focus' })
+  })
+
+  it('shift+f with ctrl, alt or meta also held stays gated to null', () => {
+    expect(resolveNavCommand('f', { ...noModifiers, shift: true, ctrl: true }, MAC)).toBeNull()
+    expect(resolveNavCommand('f', { ...noModifiers, shift: true, alt: true }, MAC)).toBeNull()
+    expect(resolveNavCommand('f', { ...noModifiers, shift: true, meta: true }, MAC)).toBeNull()
+    expect(resolveNavCommand('f', { ...noModifiers, shift: true, ctrl: true }, LINUX)).toBeNull()
+    expect(resolveNavCommand('f', { ...noModifiers, shift: true, alt: true }, LINUX)).toBeNull()
+    expect(resolveNavCommand('f', { ...noModifiers, shift: true, meta: true }, LINUX)).toBeNull()
   })
 })
 

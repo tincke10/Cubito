@@ -10,10 +10,10 @@ export type SpawnChip = {
   readonly tone: SpawnChipTone
 }
 
-/** SPAWN-002: only "spawn hijo" is in scope — fan-out/terminal/archivar render inert. */
+/** SPAWN-002/fan-out wave 5: "spawn hijo" and "fan-out" are in scope — terminal/archivar render inert. */
 const RADIAL_CHIPS: readonly SpawnChip[] = [
   { key: 's', label: 'spawn hijo', tone: 'active' },
-  { key: 'F', label: 'fan-out', tone: 'disabled' },
+  { key: 'F', label: 'fan-out', tone: 'active' },
   { key: 't', label: 'terminal', tone: 'disabled' },
   { key: 'a', label: 'archivar', tone: 'disabled' }
 ]

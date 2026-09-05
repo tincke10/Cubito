@@ -191,6 +191,12 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
       )
       return true
     }
+    if (command.kind === 'open-fan-out') {
+      const selectedId = store.get().selection.selectedId
+      if (selectedId === null) return false
+      store.dispatchFanOut({ type: 'open-for-node', nodeId: selectedId })
+      return true
+    }
     // command.kind === 'escape' — palette-close wins over selector/spawn/terminal-close, then
     // selector-close wins over spawn/terminal-close (PROJ-008); each modal's own query/path input
     // already intercepts Escape above, this is belt-and-suspenders.

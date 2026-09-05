@@ -54,5 +54,10 @@ export const commandCatalog = (platform: { isMac: boolean }): readonly PaletteCo
     keybindingHint: '—',
     isAvailable: (a) => a.isConnected
   },
-  { id: 'fan-out', label: 'fan-out', keybindingHint: '—', isAvailable: () => false }
+  {
+    id: 'fan-out',
+    label: 'fan-out',
+    keybindingHint: '—',
+    isAvailable: (a) => a.hasSelection && a.isConnected
+  }
 ]

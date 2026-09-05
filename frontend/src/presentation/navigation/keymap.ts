@@ -12,6 +12,7 @@ export type NavCommand =
   | { kind: 'escape' }
   | { kind: 'open-projects' }
   | { kind: 'open-palette' }
+  | { kind: 'open-fan-out' }
 
 type Modifiers = { alt: boolean; ctrl: boolean; meta: boolean; shift: boolean }
 type Platform = { isMac: boolean }
@@ -49,6 +50,11 @@ const isPaletteChord = (key: string, modifiers: Modifiers, platform: Platform): 
   !modifiers.shift &&
   (platform.isMac ? modifiers.meta && !modifiers.ctrl : modifiers.ctrl && !modifiers.meta)
 
+/** Shift+F — platform-uniform (no meta/ctrl branch, unlike the chords above); bare `f` still
+ *  falls through to `focus`. */
+const isFanOutChord = (key: string, modifiers: Modifiers): boolean =>
+  key === 'f' && modifiers.shift && !modifiers.alt && !modifiers.ctrl && !modifiers.meta
+
 /** `h/l/k/j` move the selection, `f` focuses, `v` fits all; any modifier or unmapped key yields `null`. */
 export function resolveNavCommand(
   key: string,
@@ -60,6 +66,9 @@ export function resolveNavCommand(
   }
   if (isPaletteChord(key, modifiers, platform)) {
     return { kind: 'open-palette' }
+  }
+  if (isFanOutChord(key, modifiers)) {
+    return { kind: 'open-fan-out' }
   }
   if (hasModifier(modifiers)) {
     return null

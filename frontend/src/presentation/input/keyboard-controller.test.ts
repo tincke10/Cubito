@@ -566,6 +566,22 @@ describe('createKeyboardController', () => {
     )
   })
 
+  describe('shift+f fan-out chord', () => {
+    it('dispatches the fan-out open action for the selected node', () => {
+      const { store, controller } = setup('a')
+      const handled = controller.handleKeyDown(baseEvent({ key: 'f', shiftKey: true }))
+      expect(handled).toBe(true)
+      expect(store.get().fanOut).toMatchObject({ view: 'form', parentId: 'a' })
+    })
+
+    it('is a no-op returning false with nothing selected', () => {
+      const { store, controller } = setup(null)
+      const handled = controller.handleKeyDown(baseEvent({ key: 'f', shiftKey: true }))
+      expect(handled).toBe(false)
+      expect(store.get().fanOut.view).toBe('closed')
+    })
+  })
+
   describe('⌘K/Ctrl+K command palette chord and Tab/Escape precedence', () => {
     it('meta+k on Mac opens the palette', () => {
       const { store, controller } = setup('a', MAC)

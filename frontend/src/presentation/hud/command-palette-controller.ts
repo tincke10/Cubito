@@ -75,7 +75,9 @@ export function createCommandPaletteController(
       store.dispatchProjectSelector({ type: 'open-add-form' })
     },
     'fan-out': () => {
-      // Always disabled in the catalog (SPAWN-002) — no-op kept for exhaustiveness.
+      const selectedId = store.get().selection.selectedId
+      if (selectedId === null) return
+      store.dispatchFanOut({ type: 'open-for-node', nodeId: selectedId })
     }
   }
 

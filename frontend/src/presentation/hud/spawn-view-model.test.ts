@@ -40,7 +40,7 @@ describe('spawnViewModel — radial', () => {
     if (model?.view !== 'radial') throw new Error('expected radial')
     expect(model.chips).toEqual([
       { key: 's', label: 'spawn hijo', tone: 'active' },
-      { key: 'F', label: 'fan-out', tone: 'disabled' },
+      { key: 'F', label: 'fan-out', tone: 'active' },
       { key: 't', label: 'terminal', tone: 'disabled' },
       { key: 'a', label: 'archivar', tone: 'disabled' }
     ])
