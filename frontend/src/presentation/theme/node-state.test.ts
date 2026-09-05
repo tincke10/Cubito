@@ -180,10 +180,48 @@ describe('countNodeStates', () => {
       node({ isArchived: true }, { id: 'archived' })
     ]
     const counters = countNodeStates(graphOf(nodes))
-    expect(counters).toEqual({ total: 6, working: 2, waitingInput: 1 })
+    expect(counters).toEqual({
+      total: 6,
+      spawning: 0,
+      archived: 1,
+      'waiting-input': 1,
+      working: 2,
+      dirty: 1,
+      unread: 0,
+      idle: 1
+    })
   })
 
   it('total always equals graph.nodes.size, even for an empty graph', () => {
-    expect(countNodeStates(graphOf([]))).toEqual({ total: 0, working: 0, waitingInput: 0 })
+    expect(countNodeStates(graphOf([]))).toEqual({
+      total: 0,
+      spawning: 0,
+      archived: 0,
+      'waiting-input': 0,
+      working: 0,
+      dirty: 0,
+      unread: 0,
+      idle: 0
+    })
+  })
+
+  it('zero-initializes every NODE_STATES member and counts each node exactly once', () => {
+    const activityByState: Record<NodeState, Partial<NodeActivity>> = {
+      spawning: { spawn: { phase: 'cloning', progress: 0.5 } },
+      archived: { isArchived: true },
+      'waiting-input': { agentStatus: 'waiting-input' },
+      working: { agentStatus: 'working' },
+      dirty: { diff: { added: 2, removed: 0 } },
+      unread: { isUnread: true },
+      idle: {}
+    }
+    const nodes = NODE_STATES.map((state, index) =>
+      node(activityByState[state], { id: `n${index}` })
+    )
+    const counters = countNodeStates(graphOf(nodes))
+    expect(counters.total).toBe(NODE_STATES.length)
+    for (const state of NODE_STATES) {
+      expect(counters[state]).toBe(1)
+    }
   })
 })

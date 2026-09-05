@@ -4,6 +4,7 @@ import {
   easeInOutCubic,
   frameAll,
   frameIsland,
+  frameLitter,
   frameNode,
   interpolateFraming,
   islandCenters,
@@ -11,7 +12,7 @@ import {
   type Vec3
 } from './camera-framing'
 import { inertActivity } from '../../domain/worktree-graph/node-activity'
-import type { WorktreeGraph, WorktreeNode } from '../../domain/worktree-graph/types'
+import type { WorktreeGraph, WorktreeId, WorktreeNode } from '../../domain/worktree-graph/types'
 
 const v = (x: number, y: number, z: number): Vec3 => ({ x, y, z })
 const distance = (a: Vec3, b: Vec3): number =>
@@ -169,5 +170,27 @@ describe('frameIsland', () => {
   it('is unaffected by other islands', () => {
     const framing = frameIsland(twoIslandGraph(), 'repo-b', lookup)
     expect(framing.target).toEqual(v(0, 0, 20))
+  })
+})
+
+describe('frameLitter', () => {
+  it('frames exactly the given member ids, matching frameAll over their resolved centers', () => {
+    const memberIds: readonly WorktreeId[] = ['a1', 'a2']
+    expect(frameLitter(memberIds, lookup)).toEqual(frameAll([v(-5, 0, 0), v(5, 0, 0)]))
+  })
+
+  it('skips a member whose center lookup returns null', () => {
+    const memberIds: readonly WorktreeId[] = ['a1', 'unknown']
+    expect(frameLitter(memberIds, lookup)).toEqual(frameAll([v(-5, 0, 0)]))
+  })
+
+  it('falls back to the origin at FIT_MIN_RADIUS when given no members', () => {
+    const framing = frameLitter([], lookup)
+    expect(framing).toEqual({ target: { x: 0, y: 0, z: 0 }, radius: FIT_MIN_RADIUS })
+  })
+
+  it('falls back to FIT_MIN_RADIUS when every member is unresolvable', () => {
+    const framing = frameLitter(['unknown-1', 'unknown-2'], () => null)
+    expect(framing.radius).toBe(FIT_MIN_RADIUS)
   })
 })

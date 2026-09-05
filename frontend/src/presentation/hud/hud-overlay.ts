@@ -63,7 +63,7 @@ export function createHudOverlay(doc: Document = document): HudOverlayHandle {
           : `${model.repo.displayName} · ${model.repo.nodeCount} nodos`
 
       countersPrefix.textContent = `${model.counters.total} nodos · ${model.counters.working} agentes activos · `
-      countersWaiting.textContent = `${model.counters.waitingInput} esperando input`
+      countersWaiting.textContent = `${model.counters['waiting-input']} esperando input`
     },
     dispose() {
       root.remove()

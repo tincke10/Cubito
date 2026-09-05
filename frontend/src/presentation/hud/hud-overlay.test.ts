@@ -52,7 +52,16 @@ const everyStyle = (
 const fixture = (overrides: Partial<HudModel> = {}): HudModel => ({
   connection: { label: 'conectado · runtime 4f2a9c', dotColor: 'accent' },
   repo: { displayName: 'Cubito', nodeCount: 4 },
-  counters: { total: 6, working: 2, waitingInput: 1 },
+  counters: {
+    total: 6,
+    working: 2,
+    'waiting-input': 1,
+    spawning: 0,
+    archived: 0,
+    dirty: 0,
+    unread: 0,
+    idle: 3
+  },
   chips: [],
   ...overrides
 })
@@ -93,7 +102,20 @@ describe('createHudOverlay', () => {
 
   it('counters line wraps the "esperando input" segment in a pulse-amber span', () => {
     const overlay = createHudOverlay(createFakeDocument())
-    overlay.apply(fixture({ counters: { total: 6, working: 2, waitingInput: 1 } }))
+    overlay.apply(
+      fixture({
+        counters: {
+          total: 6,
+          working: 2,
+          'waiting-input': 1,
+          spawning: 0,
+          archived: 0,
+          dirty: 0,
+          unread: 0,
+          idle: 3
+        }
+      })
+    )
     const [, , countersLine] = (overlay.root as unknown as FakeElement).children
     const [prefix, waiting] = countersLine!.children
     expect(prefix!.textContent).toContain('6 nodos')

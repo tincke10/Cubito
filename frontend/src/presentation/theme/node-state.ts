@@ -63,13 +63,13 @@ export const deriveDecorations = (
 
 export const countNodeStates = (
   graph: WorktreeGraph
-): { total: number; working: number; waitingInput: number } => {
-  let working = 0
-  let waitingInput = 0
+): { total: number } & Record<NodeState, number> => {
+  const counts = Object.fromEntries(NODE_STATES.map((state) => [state, 0])) as Record<
+    NodeState,
+    number
+  >
   for (const node of graph.nodes.values()) {
-    const state = deriveNodeState(node)
-    if (state === 'working') working += 1
-    if (state === 'waiting-input') waitingInput += 1
+    counts[deriveNodeState(node)] += 1
   }
-  return { total: graph.nodes.size, working, waitingInput }
+  return { total: graph.nodes.size, ...counts }
 }

@@ -85,3 +85,17 @@ export const frameIsland = (
   repoId: string,
   nodeCenter: (id: WorktreeId) => Vec3 | null
 ): CameraFraming => frameAll(islandCenters(graph, repoId, nodeCenter))
+
+/** Frames the camera on a fan-out litter (parent + its batch) — `frameAll` over the resolved
+ *  member centers; an empty/unresolvable set falls back to `frameAll`'s empty-input radius. */
+export const frameLitter = (
+  memberIds: readonly WorktreeId[],
+  nodeCenter: (id: WorktreeId) => Vec3 | null
+): CameraFraming => {
+  const centers: Vec3[] = []
+  for (const id of memberIds) {
+    const center = nodeCenter(id)
+    if (center) centers.push(center)
+  }
+  return frameAll(centers)
+}
