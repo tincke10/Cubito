@@ -22,7 +22,12 @@ import { NODE_STATES } from '../theme/node-state'
 
 const SCENE_DIR = fileURLToPath(new URL('.', import.meta.url))
 const PRESENTATION_DIR = path.resolve(SCENE_DIR, '..')
-const COLOR_CHECKED_DIRS = [SCENE_DIR, path.join(PRESENTATION_DIR, 'hud'), path.join(PRESENTATION_DIR, 'input')]
+const COLOR_CHECKED_DIRS = [
+  SCENE_DIR,
+  path.join(PRESENTATION_DIR, 'hud'),
+  path.join(PRESENTATION_DIR, 'input'),
+  path.join(PRESENTATION_DIR, 'system')
+]
 
 /**
  * Justified, reviewed carve-outs. Each key is a path relative to `presentation/`, each value
@@ -67,7 +72,8 @@ const COLOR_LITERAL = /\b0x[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3,8}\b/g
 const NUMERIC_LITERAL = /(?<![\w.$])-?\d+(?:\.\d+)?(?![\w])/g
 const IMPORT_SPECIFIER = /\bfrom\s*'([^']+)'/g
 
-const colorViolations = (source: string): string[] => [...stripComments(source).matchAll(COLOR_LITERAL)].map((m) => m[0])
+const colorViolations = (source: string): string[] =>
+  [...stripComments(source).matchAll(COLOR_LITERAL)].map((m) => m[0])
 
 const numericViolations = (source: string): string[] =>
   [...stripStrings(stripComments(source)).matchAll(NUMERIC_LITERAL)]
@@ -162,42 +168,48 @@ describe('scene purity ratchet — the real sources', () => {
     expect(colorCheckedSources.length).toBeGreaterThan(sceneSources.length)
   })
 
-  it.each(colorCheckedSources)('$relativePath declares no colour literal', ({ relativePath, source }) => {
-    expect(withoutExceptions(relativePath, colorViolations(source))).toEqual([])
-  })
+  it.each(colorCheckedSources)(
+    '$relativePath declares no colour literal',
+    ({ relativePath, source }) => {
+      expect(withoutExceptions(relativePath, colorViolations(source))).toEqual([])
+    }
+  )
 
   it.each(sceneSources)('$relativePath declares no magic number', ({ relativePath, source }) => {
     expect(withoutExceptions(relativePath, numericViolations(source))).toEqual([])
   })
 
-  it.each(sceneSources)('$relativePath branches on no NodeState or NodeKind', ({ relativePath, source }) => {
-    expect(withoutExceptions(relativePath, domainLiteralViolations(source))).toEqual([])
-  })
+  it.each(sceneSources)(
+    '$relativePath branches on no NodeState or NodeKind',
+    ({ relativePath, source }) => {
+      expect(withoutExceptions(relativePath, domainLiteralViolations(source))).toEqual([])
+    }
+  )
 
-  it.each(sceneSources)('$relativePath imports no application or infrastructure module', ({
-    relativePath,
-    source
-  }) => {
-    expect(withoutExceptions(relativePath, importViolations(source))).toEqual([])
-  })
+  it.each(sceneSources)(
+    '$relativePath imports no application or infrastructure module',
+    ({ relativePath, source }) => {
+      expect(withoutExceptions(relativePath, importViolations(source))).toEqual([])
+    }
+  )
 })
 
 describe('scene purity ratchet — no stale exceptions', () => {
-  it.each(Object.entries(PURITY_EXCEPTIONS))('%s still exists and still needs every listed exception', (
-    relativePath,
-    allowed
-  ) => {
-    const file = sceneSources.find((candidate) => candidate.relativePath === relativePath)
-    expect(file, `exception for a file that no longer exists: ${relativePath}`).toBeDefined()
-    const source = (file as SourceFile).source
-    const found = new Set([
-      ...colorViolations(source),
-      ...numericViolations(source),
-      ...domainLiteralViolations(source),
-      ...importViolations(source)
-    ])
-    for (const violation of allowed) {
-      expect(found, `stale exception "${violation}" in ${relativePath}`).toContain(violation)
+  it.each(Object.entries(PURITY_EXCEPTIONS))(
+    '%s still exists and still needs every listed exception',
+    (relativePath, allowed) => {
+      const file = sceneSources.find((candidate) => candidate.relativePath === relativePath)
+      expect(file, `exception for a file that no longer exists: ${relativePath}`).toBeDefined()
+      const source = (file as SourceFile).source
+      const found = new Set([
+        ...colorViolations(source),
+        ...numericViolations(source),
+        ...domainLiteralViolations(source),
+        ...importViolations(source)
+      ])
+      for (const violation of allowed) {
+        expect(found, `stale exception "${violation}" in ${relativePath}`).toContain(violation)
+      }
     }
-  })
+  )
 })
