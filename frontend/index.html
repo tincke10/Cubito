@@ -30,7 +30,11 @@
         position: fixed;
         inset: 0;
         pointer-events: none;
-        background: radial-gradient(ellipse at center, transparent 0%, var(--cubito-vignette-edge) 90%);
+        background: radial-gradient(
+          ellipse at center,
+          transparent 0%,
+          var(--cubito-vignette-edge) 90%
+        );
       }
       #hud {
         position: fixed;
@@ -463,10 +467,196 @@
           opacity: 0.4;
         }
       }
+      @keyframes flow {
+        to {
+          stroke-dashoffset: -24;
+        }
+      }
       @media (prefers-reduced-motion: reduce) {
         .pulse {
           animation: none;
         }
+        .system-edge--flow,
+        .system-node--editing .system-node__shape {
+          animation: none;
+        }
+      }
+      /* Sistema en vivo (design: VistaSistema.dc.html) — the mode's own HUD block, mounted
+         separately from #hud since it is not the mode-aware shared worktree HUD. */
+      #system {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+      }
+      .cubito-system-hud {
+        position: absolute;
+        inset: 12px 16px auto 16px;
+        font-size: 12px;
+        line-height: 1.6;
+        pointer-events: none;
+      }
+      .cubito-system-hud__label {
+        color: var(--cubito-info);
+      }
+      /* System graph SVG: nodes are <g>s carrying system-node--<kind>/--<state> from
+         system-graph-model.ts; edges are <line>s carrying system-edge--<kind>. */
+      .cubito-system-graph {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: calc(100% - 400px);
+        height: 100%;
+      }
+      .system-node__shape {
+        fill: var(--cubito-panel-surface);
+        stroke: var(--cubito-panel-border);
+      }
+      .system-node__label {
+        fill: var(--cubito-text-primary);
+        font-size: 12px;
+      }
+      .system-node--endpoint .system-node__label,
+      .system-node--service .system-node__label,
+      .system-node--database .system-node__label {
+        fill: var(--cubito-key-chip);
+      }
+      .system-node__method {
+        fill: var(--cubito-text-dim);
+        font-weight: 600;
+        font-size: 11px;
+      }
+      .system-node__diff {
+        fill: var(--cubito-amber-ink);
+        font-size: 10px;
+      }
+      .system-node__note {
+        fill: var(--cubito-info);
+        font-size: 10px;
+      }
+      /* editing: glowing solid border + the shared pulse (reused, not reimplemented). */
+      .system-node--editing .system-node__shape {
+        stroke: var(--cubito-active-faces-right);
+        stroke-width: 1.5;
+        filter: drop-shadow(0 0 6px var(--cubito-active-faces-right));
+        animation: pulse 1.6s ease-in-out infinite;
+      }
+      /* naciendo: dashed outline, no fill — the node the agent just created. */
+      .system-node--naciendo .system-node__shape {
+        fill: none;
+        stroke: var(--cubito-active-faces-right);
+        stroke-dasharray: 5 4;
+        opacity: 0.8;
+      }
+      /* dirty service: faintly lit, downstream of the endpoint being edited. */
+      .system-node--service.system-node--dirty .system-node__shape {
+        stroke: var(--cubito-active-faces-right);
+        stroke-opacity: 0.5;
+      }
+      .system-node--tested .system-node__shape {
+        stroke: var(--cubito-accent);
+      }
+      .system-node--highlighted .system-node__shape {
+        stroke: var(--cubito-accent);
+      }
+      .system-edge--normal {
+        stroke: var(--cubito-edge-normal);
+        stroke-width: 1.5;
+        opacity: 0.8;
+      }
+      .system-edge--flow {
+        stroke: var(--cubito-active-faces-right);
+        stroke-width: 2;
+        stroke-dasharray: 6 6;
+        opacity: 0.7;
+        animation: flow 1.2s linear infinite;
+      }
+      .system-edge--faint {
+        stroke: var(--cubito-active-faces-right);
+        stroke-width: 1;
+        stroke-dasharray: 3 5;
+        opacity: 0.4;
+      }
+      /* Activity feed (design: right-panel "actividad del agente" dock, 400px). */
+      .cubito-activity-feed {
+        position: absolute;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        width: 400px;
+        display: flex;
+        flex-direction: column;
+        background: var(--cubito-panel-surface);
+        border-left: 1px solid var(--cubito-panel-border);
+      }
+      .cubito-activity-feed__header {
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--cubito-panel-border);
+      }
+      .cubito-activity-feed__title {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--cubito-text-primary);
+      }
+      .cubito-activity-feed__subtitle {
+        font-size: 11px;
+        color: var(--cubito-text-dim);
+        margin-top: 4px;
+      }
+      .cubito-activity-feed__rows {
+        flex: 1;
+        padding: 14px 18px;
+        font-size: 11.5px;
+        line-height: 1.9;
+        color: var(--cubito-key-chip);
+        overflow: hidden;
+      }
+      .cubito-activity-feed__row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .cubito-activity-feed__row--highlighted {
+        background: color-mix(in srgb, var(--cubito-info) 7%, transparent);
+        margin: 2px -18px;
+        padding: 2px 18px;
+      }
+      .cubito-activity-feed__time {
+        color: var(--cubito-text-faint);
+      }
+      .cubito-activity-feed__text {
+        color: var(--cubito-text-primary);
+      }
+      .cubito-activity-feed__detail {
+        flex-basis: 100%;
+        padding-left: 20px;
+        color: var(--cubito-text-dim);
+      }
+      .activity-row--read .cubito-activity-feed__glyph,
+      .activity-row--edit .cubito-activity-feed__glyph,
+      .activity-row--create .cubito-activity-feed__glyph {
+        color: var(--cubito-info);
+      }
+      .activity-row--run .cubito-activity-feed__glyph {
+        color: var(--cubito-key-chip);
+      }
+      .activity-row--pass .cubito-activity-feed__glyph {
+        color: var(--cubito-accent);
+      }
+      .activity-row--diff .cubito-activity-feed__glyph {
+        color: var(--cubito-amber-ink);
+      }
+      .cubito-activity-feed__footer {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 18px;
+        border-top: 1px solid var(--cubito-panel-border);
+        color: var(--cubito-text-dim);
+        font-size: 11.5px;
+      }
+      .cubito-activity-feed__cursor {
+        color: var(--cubito-info);
+        font-size: 12px;
       }
     </style>
   </head>
@@ -474,6 +664,7 @@
     <div id="app"></div>
     <div id="vignette"></div>
     <div id="hud"></div>
+    <div id="system"></div>
     <div id="keyboard-bar"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
