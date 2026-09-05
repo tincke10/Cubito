@@ -6,10 +6,7 @@ export type KeyboardBarHandle = {
   dispose(): void
 }
 
-/**
- * Bottom keyboard bar, fed only by HudModel['chips']. Every chip is a plain,
- * inert label — including the ⌘K/Ctrl+K one, which has no command palette yet.
- */
+/** Bottom keyboard bar, fed only by HudModel['chips']. Every chip is a plain, inert label. */
 export function createKeyboardBar(doc: Document = document): KeyboardBarHandle {
   const root = doc.createElement('div')
   root.className = 'cubito-keyboard-bar'

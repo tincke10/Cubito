@@ -44,7 +44,9 @@ describe('resolveNavCommand', () => {
     }
   )
 
-  const keys = ['h', 'l', 'k', 'j', 'f', 'v'] as const
+  // 'k' is excluded here — ctrl+k on Linux is now the palette chord (see describe block below),
+  // so it can't share this blanket "any modifier held -> null" assertion.
+  const keys = ['h', 'l', 'j', 'f', 'v'] as const
   const modifierNames = ['alt', 'ctrl', 'meta', 'shift'] as const
 
   it.each(keys.flatMap((key) => modifierNames.map((modifier) => [key, modifier] as const)))(
@@ -92,6 +94,55 @@ describe('resolveNavCommand', () => {
     it('every other modified key is unaffected by the exception — still gated to null', () => {
       expect(resolveNavCommand('h', { ...noModifiers, meta: true }, MAC)).toBeNull()
       expect(resolveNavCommand('t', { ...noModifiers, ctrl: true }, LINUX)).toBeNull()
+    })
+  })
+
+  describe('⌘K/Ctrl+K palette chord — targeted exception to the modifier gate', () => {
+    it('meta+k on Mac resolves to open-palette', () => {
+      expect(resolveNavCommand('k', { ...noModifiers, meta: true }, MAC)).toEqual({
+        kind: 'open-palette'
+      })
+    })
+
+    it('ctrl+k on Linux/Windows resolves to open-palette', () => {
+      expect(resolveNavCommand('k', { ...noModifiers, ctrl: true }, LINUX)).toEqual({
+        kind: 'open-palette'
+      })
+    })
+
+    it('bare k (no modifier) still resolves to move prev-sibling on either platform', () => {
+      expect(resolveNavCommand('k', noModifiers, MAC)).toEqual({
+        kind: 'move',
+        direction: 'prev-sibling'
+      })
+      expect(resolveNavCommand('k', noModifiers, LINUX)).toEqual({
+        kind: 'move',
+        direction: 'prev-sibling'
+      })
+    })
+
+    it('the wrong-platform chord stays gated: ctrl+k on Mac, meta+k on Linux/Windows', () => {
+      expect(resolveNavCommand('k', { ...noModifiers, ctrl: true }, MAC)).toBeNull()
+      expect(resolveNavCommand('k', { ...noModifiers, meta: true }, LINUX)).toBeNull()
+    })
+
+    it('adding shift or alt to the platform chord gates it back to null', () => {
+      expect(resolveNavCommand('k', { ...noModifiers, meta: true, shift: true }, MAC)).toBeNull()
+      expect(resolveNavCommand('k', { ...noModifiers, meta: true, alt: true }, MAC)).toBeNull()
+      expect(resolveNavCommand('k', { ...noModifiers, ctrl: true, shift: true }, LINUX)).toBeNull()
+      expect(resolveNavCommand('k', { ...noModifiers, ctrl: true, alt: true }, LINUX)).toBeNull()
+    })
+
+    it('holding both meta and ctrl together stays gated on either platform', () => {
+      expect(resolveNavCommand('k', { ...noModifiers, meta: true, ctrl: true }, MAC)).toBeNull()
+      expect(resolveNavCommand('k', { ...noModifiers, meta: true, ctrl: true }, LINUX)).toBeNull()
+    })
+
+    it('alt or shift alone (no chord modifier) gates k to null on either platform', () => {
+      expect(resolveNavCommand('k', { ...noModifiers, alt: true }, MAC)).toBeNull()
+      expect(resolveNavCommand('k', { ...noModifiers, alt: true }, LINUX)).toBeNull()
+      expect(resolveNavCommand('k', { ...noModifiers, shift: true }, MAC)).toBeNull()
+      expect(resolveNavCommand('k', { ...noModifiers, shift: true }, LINUX)).toBeNull()
     })
   })
 })

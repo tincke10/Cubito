@@ -535,31 +535,115 @@ describe('createKeyboardController', () => {
       expect(terminal.closeActiveSession).not.toHaveBeenCalled()
     })
 
-    it('attach() calls preventDefault on the ⌘P/Ctrl+P chord (suppresses the browser print dialog)', () => {
-      // No DOM in this unit-test environment — `attach`'s `instanceof HTMLElement` check needs a
-      // real constructor to compare against, even though `target` itself stays null below.
-      vi.stubGlobal('HTMLElement', function HTMLElementStub() {})
-      try {
-        const { controller } = setup('a', LINUX)
-        const fakeTarget = { addEventListener: vi.fn(), removeEventListener: vi.fn() }
-        controller.attach(fakeTarget)
-        const [, handler] = fakeTarget.addEventListener.mock.calls[0]!
+    it.each(['p', 'k'] as const)(
+      'attach() calls preventDefault on the ⌘%s/Ctrl+%s chord (isBrowserChord, suppresses the browser dialog)',
+      (key) => {
+        // No DOM in this unit-test environment — `attach`'s `instanceof HTMLElement` check needs a
+        // real constructor to compare against, even though `target` itself stays null below.
+        vi.stubGlobal('HTMLElement', function HTMLElementStub() {})
+        try {
+          const { controller } = setup('a', LINUX)
+          const fakeTarget = { addEventListener: vi.fn(), removeEventListener: vi.fn() }
+          controller.attach(fakeTarget)
+          const [, handler] = fakeTarget.addEventListener.mock.calls[0]!
 
-        const preventDefault = vi.fn()
-        handler({
-          key: 'p',
-          ctrlKey: true,
-          metaKey: false,
-          altKey: false,
-          shiftKey: false,
-          target: null,
-          preventDefault
-        } as unknown as KeyboardEvent)
+          const preventDefault = vi.fn()
+          handler({
+            key,
+            ctrlKey: true,
+            metaKey: false,
+            altKey: false,
+            shiftKey: false,
+            target: null,
+            preventDefault
+          } as unknown as KeyboardEvent)
 
-        expect(preventDefault).toHaveBeenCalledOnce()
-      } finally {
-        vi.unstubAllGlobals()
+          expect(preventDefault).toHaveBeenCalledOnce()
+        } finally {
+          vi.unstubAllGlobals()
+        }
       }
+    )
+  })
+
+  describe('⌘K/Ctrl+K command palette chord and Tab/Escape precedence', () => {
+    it('meta+k on Mac opens the palette', () => {
+      const { store, controller } = setup('a', MAC)
+      const handled = controller.handleKeyDown(baseEvent({ key: 'k', metaKey: true }))
+      expect(handled).toBe(true)
+      expect(store.get().commandPalette.view).toBe('open')
+    })
+
+    it('ctrl+k on Linux/Windows opens the palette', () => {
+      const { store, controller } = setup('a', LINUX)
+      const handled = controller.handleKeyDown(baseEvent({ key: 'k', ctrlKey: true }))
+      expect(handled).toBe(true)
+      expect(store.get().commandPalette.view).toBe('open')
+    })
+
+    it('the wrong-platform chord stays gated and does not open the palette', () => {
+      const { store, controller } = setup('a', MAC)
+      const handled = controller.handleKeyDown(baseEvent({ key: 'k', ctrlKey: true }))
+      expect(handled).toBe(false)
+      expect(store.get().commandPalette.view).toBe('closed')
+    })
+
+    it('opens the palette even while a terminal (text-entry target) is focused', () => {
+      const { store, controller } = setup('a', LINUX)
+      const textarea = { tagName: 'TEXTAREA', isContentEditable: false }
+      const handled = controller.handleKeyDown(
+        baseEvent({ key: 'k', ctrlKey: true, target: textarea })
+      )
+      expect(handled).toBe(true)
+      expect(store.get().commandPalette.view).toBe('open')
+    })
+
+    it('bare k still moves to prev-sibling, chord unaffected', () => {
+      const { store, controller } = setup('c', LINUX)
+      const handled = controller.handleKeyDown(baseEvent({ key: 'k' }))
+      expect(handled).toBe(true)
+      expect(store.get().commandPalette.view).toBe('closed')
+    })
+
+    it('opening the palette also closes the project selector and cancels an open spawn menu', () => {
+      const { store, controller } = setup('a', LINUX)
+      store.dispatchProjectSelector({ type: 'open' })
+      store.dispatchSpawn({ type: 'open-for-node', nodeId: 'a' })
+
+      const handled = controller.handleKeyDown(baseEvent({ key: 'k', ctrlKey: true }))
+
+      expect(handled).toBe(true)
+      expect(store.get().projectSelector.view).toBe('closed')
+      expect(store.get().spawnMenu.view).toBe('closed')
+      expect(store.get().commandPalette.view).toBe('open')
+    })
+
+    it('Escape closes only the palette, leaving an open selector/spawn/terminal untouched (palette wins precedence)', () => {
+      const { store, terminal, controller } = setup('a', LINUX)
+      controller.handleKeyDown(baseEvent({ key: 't' }))
+      store.dispatchSpawn({ type: 'open-for-node', nodeId: 'a' })
+      store.dispatchProjectSelector({ type: 'open' })
+      store.dispatchCommandPalette({ type: 'open' })
+
+      const handled = controller.handleKeyDown(baseEvent({ key: 'Escape' }))
+
+      expect(handled).toBe(true)
+      expect(store.get().commandPalette.view).toBe('closed')
+      expect(store.get().projectSelector.view).not.toBe('closed')
+      expect(store.get().spawnMenu.view).not.toBe('closed')
+      expect(terminal.closeActiveSession).not.toHaveBeenCalled()
+    })
+
+    it('Tab with the palette open is consumed as a no-op — never reaches selector/terminal/island cycling', () => {
+      const { store, cameraRig, controller } = setupWithRepos()
+      store.dispatchCommandPalette({ type: 'open' })
+      const activeBefore = store.get().repos.activeRepoId
+
+      const handled = controller.handleKeyDown(baseEvent({ key: 'Tab' }))
+
+      expect(handled).toBe(true)
+      expect(store.get().repos.activeRepoId).toBe(activeBefore)
+      expect(cameraRig.animateTo).not.toHaveBeenCalled()
     })
   })
 })

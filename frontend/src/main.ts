@@ -24,6 +24,8 @@ import type { SpawnMenuController } from './presentation/hud/spawn-menu-controll
 import { createProjectSelector } from './presentation/hud/project-selector-element'
 import { createProjectSelectorController } from './presentation/hud/project-selector-controller'
 import type { ProjectSelectorController } from './presentation/hud/project-selector-controller'
+import { createCommandPalette } from './presentation/hud/command-palette-element'
+import { createCommandPaletteController } from './presentation/hud/command-palette-controller'
 import { createKeyboardController } from './presentation/input/keyboard-controller'
 import { createCameraRig } from './presentation/scene/camera-rig'
 import { createScene } from './presentation/scene/create-scene'
@@ -140,17 +142,35 @@ let spawnGateway: RuntimeGateway = demoGateway
 let projectSelectorController: ProjectSelectorController | null = null
 let projectsGateway: RuntimeGateway = demoGateway
 
+// Shared by the keyboard controller and the eager command-palette controller below — both talk
+// to the terminal panel through the same closure-backed proxy (built before it exists).
+const terminalCommands = {
+  focusActivePanel: () => terminalController?.focusActivePanel(),
+  closeActiveSession: () => terminalController?.closeActiveSession()
+}
+
 const keyboardController = createKeyboardController({
   store,
   cameraRig,
   scenePositions: graphView,
-  terminal: {
-    focusActivePanel: () => terminalController?.focusActivePanel(),
-    closeActiveSession: () => terminalController?.closeActiveSession()
-  },
+  terminal: terminalCommands,
   platform
 })
 keyboardController.attach(window)
+
+// Command palette (design Area 4/6): unlike terminal/spawn/projects, the palette makes no
+// gateway calls — every dep exists at startup, so it is built EAGERLY, not on first connect.
+// Connection-dependent commands (open-terminal/open-spawn/add-repo) report unavailable via the
+// catalog's isAvailable predicates until connection.state === 'connected'.
+const commandPaletteController = createCommandPaletteController({
+  store,
+  cameraRig,
+  scenePositions: graphView,
+  terminal: terminalCommands,
+  createElement: createCommandPalette,
+  hud: hudElement,
+  platform
+})
 
 // Click-away exit: only a mousedown that lands directly on the WebGL canvas counts as
 // "away" — the in-scene terminal panel's CSS2DObject is also a `container` descendant
@@ -190,6 +210,7 @@ store.subscribe((state) => {
   terminalController?.sync(state.terminals)
   spawnController?.sync(state.spawnMenu, state.graph)
   projectSelectorController?.sync(state.projectSelector, state.repos)
+  commandPaletteController.sync(state.commandPalette, state)
   if (!framed && state.graph.nodes.size > 0) {
     framed = true
     cameraRig.apply(frameAll(graphView.nodeCenters()))

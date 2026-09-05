@@ -94,6 +94,14 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
       store.dispatchProjectSelector({ type: 'open' })
       return true
     }
+    // ⌘K/Ctrl+K must open the palette even while a terminal is focused, same exception as
+    // open-projects above; closing the selector/spawn menu first keeps only one modal live.
+    if (command?.kind === 'open-palette') {
+      store.dispatchProjectSelector({ type: 'close' })
+      store.dispatchSpawn({ type: 'cancel' })
+      store.dispatchCommandPalette({ type: 'open' })
+      return true
+    }
     if (event.target && isTextEntryTarget(event.target.tagName, event.target.isContentEditable)) {
       // Covers xterm.js's hidden helper textarea too (TEXT_ENTRY_TAGS includes TEXTAREA) — while
       // a terminal is focused, every other keystroke (incl. Esc) reaches the PTY, never the graph.
@@ -152,8 +160,9 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
       return true
     }
     if (command.kind === 'next-terminal') {
-      // Tab precedence (PROJ-008): modal > terminal > island. The selector's own query input is
+      // Tab precedence: palette > selector > terminal > island. Each modal's own query input is
       // a text-entry target already caught above; this is belt-and-suspenders for any other case.
+      if (store.get().commandPalette.view !== 'closed') return true
       if (store.get().projectSelector.view !== 'closed') return true
       const activePanel = store.get().terminals.activePanel
       if (activePanel) {
@@ -182,8 +191,13 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
       )
       return true
     }
-    // command.kind === 'escape' — selector-close wins over spawn/terminal-close (PROJ-008); the
-    // selector's own query/path input already intercepts Escape above, this is belt-and-suspenders.
+    // command.kind === 'escape' — palette-close wins over selector/spawn/terminal-close, then
+    // selector-close wins over spawn/terminal-close (PROJ-008); each modal's own query/path input
+    // already intercepts Escape above, this is belt-and-suspenders.
+    if (store.get().commandPalette.view !== 'closed') {
+      store.dispatchCommandPalette({ type: 'close' })
+      return true
+    }
     if (store.get().projectSelector.view !== 'closed') {
       store.dispatchProjectSelector({ type: 'close' })
       return true
@@ -211,9 +225,11 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
           : null
       })
       // Tab's default browser behavior (focus traversal) would otherwise fight next-terminal;
-      // Ctrl+P/Cmd+P would otherwise open the browser's print dialog (PROJ-005).
-      const isPrintChord = (domEvent.ctrlKey || domEvent.metaKey) && domEvent.key === 'p'
-      if (handled && (domEvent.key === 'Tab' || isPrintChord)) {
+      // Ctrl+P/Cmd+P would otherwise open the browser's print dialog (PROJ-005), and Ctrl+K/Cmd+K
+      // the browser/address-bar search (Chrome/Safari) or Firefox's quick-find.
+      const isBrowserChord =
+        (domEvent.ctrlKey || domEvent.metaKey) && (domEvent.key === 'p' || domEvent.key === 'k')
+      if (handled && (domEvent.key === 'Tab' || isBrowserChord)) {
         domEvent.preventDefault()
       }
     }

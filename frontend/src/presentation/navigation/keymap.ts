@@ -11,6 +11,7 @@ export type NavCommand =
   /** Single escape command (SPAWN-005) — the handler decides spawn-close vs. terminal-close by context. */
   | { kind: 'escape' }
   | { kind: 'open-projects' }
+  | { kind: 'open-palette' }
 
 type Modifiers = { alt: boolean; ctrl: boolean; meta: boolean; shift: boolean }
 type Platform = { isMac: boolean }
@@ -40,6 +41,14 @@ const isProjectsChord = (key: string, modifiers: Modifiers, platform: Platform):
   !modifiers.shift &&
   (platform.isMac ? modifiers.meta && !modifiers.ctrl : modifiers.ctrl && !modifiers.meta)
 
+/** Cmd+K on Mac / Ctrl+K elsewhere — same targeted exception shape as isProjectsChord; bare
+ *  `k` still falls through to `move prev-sibling`. */
+const isPaletteChord = (key: string, modifiers: Modifiers, platform: Platform): boolean =>
+  key === 'k' &&
+  !modifiers.alt &&
+  !modifiers.shift &&
+  (platform.isMac ? modifiers.meta && !modifiers.ctrl : modifiers.ctrl && !modifiers.meta)
+
 /** `h/l/k/j` move the selection, `f` focuses, `v` fits all; any modifier or unmapped key yields `null`. */
 export function resolveNavCommand(
   key: string,
@@ -48,6 +57,9 @@ export function resolveNavCommand(
 ): NavCommand | null {
   if (isProjectsChord(key, modifiers, platform)) {
     return { kind: 'open-projects' }
+  }
+  if (isPaletteChord(key, modifiers, platform)) {
+    return { kind: 'open-palette' }
   }
   if (hasModifier(modifiers)) {
     return null
