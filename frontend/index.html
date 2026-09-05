@@ -191,6 +191,80 @@
         color: var(--cubito-text-faint);
         text-align: right;
       }
+      /* Fan-out form/running callout (mockup Fanout.dc.html): mirrors the spawn form's 420px
+         panel exactly; the callout/counters share one panel with the form fields since the
+         fan-out slice has no separate radial step. Accent/amber are the mockup's own lime
+         title and amber "esperando input" colours — already the same tokens, no new var. */
+      .cubito-fanout-form {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        width: 420px;
+        padding: 22px;
+        background: var(--cubito-panel-surface);
+        border: 1px solid var(--cubito-panel-border);
+        border-radius: 6px;
+        font-size: 12.5px;
+      }
+      .cubito-fanout-form__field {
+        height: 40px;
+        padding: 0 12px;
+        background: var(--cubito-background);
+        border: 1px solid var(--cubito-panel-border);
+        border-radius: 4px;
+        color: var(--cubito-text-primary);
+        font-family: inherit;
+        font-size: 12.5px;
+      }
+      .cubito-fanout-form__field:focus {
+        outline: none;
+        border-color: var(--cubito-accent);
+      }
+      .cubito-fanout-form__field--prompt {
+        height: 84px;
+        padding: 10px 12px;
+        line-height: 1.6;
+        resize: none;
+      }
+      .cubito-fanout-form__field:disabled {
+        color: var(--cubito-text-dim);
+      }
+      .cubito-fanout-form__submit {
+        height: 40px;
+        border: none;
+        border-radius: 4px;
+        background: var(--cubito-accent);
+        color: var(--cubito-background);
+        font-weight: 600;
+        font-size: 12.5px;
+        cursor: pointer;
+      }
+      .cubito-fanout-form__submit:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      .cubito-fanout-form__cancel {
+        height: 40px;
+        border: 1px solid var(--cubito-panel-border);
+        border-radius: 4px;
+        background: transparent;
+        color: var(--cubito-text-dim);
+        font-size: 12.5px;
+        cursor: pointer;
+      }
+      .cubito-fanout-form__error {
+        font-size: 11px;
+        color: var(--cubito-amber);
+      }
+      .cubito-fanout-form__callout {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--cubito-accent);
+      }
+      .cubito-fanout-form__counters {
+        font-size: 11px;
+        color: var(--cubito-text-dim);
+      }
       /* Project selector (design Area 4/PROJ-005/006): command-palette panel — query input, repo
          rows, trailing "+ agregar repo" row, and the add-form, sized like the spawn form. */
       .cubito-project-selector {

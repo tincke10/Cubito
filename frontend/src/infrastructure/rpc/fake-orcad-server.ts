@@ -78,6 +78,8 @@ export type FakeOrcadServer = {
   deviceToken: string
   authFrames: Record<string, unknown>[]
   requestMethods: string[]
+  /** Every decrypted RPC request, method + params, in receipt order — for sequencing assertions. */
+  requestFrames: { method: string; params: unknown }[]
   binaryFramesReceived: Uint8Array[]
   /** Every Subscribe(9) control frame received, across all connections. */
   subscribeFrames: FakeOrcadSubscribeFrame[]
@@ -111,6 +113,7 @@ export async function startFakeOrcadServer(
   const wss = new WebSocketServer({ server: httpServer })
   const authFrames: Record<string, unknown>[] = []
   const requestMethods: string[] = []
+  const requestFrames: { method: string; params: unknown }[] = []
   const binaryFramesReceived: Uint8Array[] = []
   const subscribeFrames: FakeOrcadSubscribeFrame[] = []
   const inputReceived: { streamId: number; text: string }[] = []
@@ -256,6 +259,7 @@ export async function startFakeOrcadServer(
       }
       const request = JSON.parse(plaintext) as { id: string; method: string; params?: unknown }
       requestMethods.push(request.method)
+      requestFrames.push({ method: request.method, params: request.params })
       if (request.method === 'terminal.multiplex') {
         multiplexStates.set(socket, { rpcId: request.id, streams: new Map() })
         sendStreamEmit(socket, key, request.id, { type: 'ready' })
@@ -397,6 +401,7 @@ export async function startFakeOrcadServer(
     deviceToken,
     authFrames,
     requestMethods,
+    requestFrames,
     binaryFramesReceived,
     subscribeFrames,
     inputReceived,

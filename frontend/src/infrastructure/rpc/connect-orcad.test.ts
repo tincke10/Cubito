@@ -3,6 +3,7 @@ import { WebSocketServer } from 'ws'
 import { connectOrcad } from './connect-orcad'
 import { startFakeOrcadServer, type FakeOrcadServer } from './fake-orcad-server'
 import type { PairingOffer } from './pairing-offer'
+import { mapPsStatusToAgentStatus } from '../../application/fan-out-model'
 
 function offerFor(server: FakeOrcadServer): PairingOffer {
   return {
@@ -201,6 +202,71 @@ describe('connectOrcad', () => {
       await expect(connection.gateway.addRepo({ path: 'relative/path' })).rejects.toThrow(
         'Project path must be an absolute path'
       )
+    } finally {
+      connection.close()
+    }
+  })
+
+  it('sends N worktree.create calls with DISTINCT clientMutationIds, sequentially', async () => {
+    let nextId = 1
+    const server = await startFakeOrcadServer({
+      handleRequest: (method) => {
+        if (method === 'worktree.create') {
+          return { ok: true, result: { worktree: { id: `w${nextId++}` } } }
+        }
+        return { ok: true, result: { worktrees: [] } }
+      }
+    })
+    servers.push(server)
+
+    const connection = await connectOrcad(offerFor(server))
+    try {
+      const inputs = [
+        { repo: 'id:r1', parentWorktree: 'w0', clientMutationId: 'm1' },
+        { repo: 'id:r1', parentWorktree: 'w0', clientMutationId: 'm2' },
+        { repo: 'id:r1', parentWorktree: 'w0', clientMutationId: 'm3' }
+      ]
+      for (const input of inputs) {
+        await connection.gateway.createWorktree(input)
+      }
+
+      const createFrames = server.requestFrames.filter(
+        (frame) => frame.method === 'worktree.create'
+      )
+      expect(createFrames).toEqual(
+        inputs.map((input) => ({ method: 'worktree.create', params: input }))
+      )
+      const mutationIds = createFrames.map(
+        (frame) => (frame.params as { clientMutationId: string }).clientMutationId
+      )
+      expect(new Set(mutationIds).size).toBe(mutationIds.length)
+    } finally {
+      connection.close()
+    }
+  })
+
+  it('listWorktreePs() maps a served worktree.ps payload into WorktreePsRow[] and a member status flips', async () => {
+    let status = 'working'
+    const server = await startFakeOrcadServer({
+      handleRequest: (method) => {
+        if (method === 'worktree.ps') {
+          return { ok: true, result: { worktrees: [{ worktreeId: 'w1', status }] } }
+        }
+        return { ok: true, result: { worktrees: [] } }
+      }
+    })
+    servers.push(server)
+
+    const connection = await connectOrcad(offerFor(server))
+    try {
+      const first = await connection.gateway.listWorktreePs()
+      expect(first).toEqual([{ worktreeId: 'w1', status: 'working' }])
+      expect(mapPsStatusToAgentStatus(first[0]!.status)).toBe('working')
+
+      status = 'permission'
+      const second = await connection.gateway.listWorktreePs()
+      expect(second).toEqual([{ worktreeId: 'w1', status: 'permission' }])
+      expect(mapPsStatusToAgentStatus(second[0]!.status)).toBe('waiting-input')
     } finally {
       connection.close()
     }

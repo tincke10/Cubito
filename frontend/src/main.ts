@@ -10,6 +10,7 @@ import type { RuntimeGateway } from './application/ports/runtime-gateway'
 import type { RawWorktreeRecord } from './domain/worktree-graph/build-graph'
 import { frameAll, frameIsland } from './presentation/camera/camera-framing'
 import type { Vec3 } from './presentation/camera/camera-framing'
+import { createFanOutBinder } from './bind-fan-out'
 import { createHudOverlay } from './presentation/hud/hud-overlay'
 import { hudModel } from './presentation/hud/hud-model'
 import { createKeyboardBar } from './presentation/hud/keyboard-bar'
@@ -143,6 +144,18 @@ let spawnGateway: RuntimeGateway = demoGateway
 let projectSelectorController: ProjectSelectorController | null = null
 let projectsGateway: RuntimeGateway = demoGateway
 
+// Fan-out (design camada): same lazy-on-first-connect pattern as spawn/projects, extracted to
+// its own module (main.ts max-lines ratchet) — the controller owns a `memberPoll` (worktree.ps
+// loop), rebuilt once and rebound alongside the gateway on reconnect.
+const fanOutBinder = createFanOutBinder({
+  store,
+  hud: hudElement,
+  nodeCenter: (id) => graphView.nodeCenter(id),
+  animateTo: (framing, durationMs) => cameraRig.animateTo(framing, durationMs),
+  focusDurationMs: FOCUS_DURATION_MS,
+  demoGateway
+})
+
 // Shared by the keyboard controller and the eager command-palette controller below — both talk
 // to the terminal panel through the same closure-backed proxy (built before it exists).
 const terminalCommands = {
@@ -211,6 +224,7 @@ store.subscribe((state) => {
   terminalController?.sync(state.terminals)
   spawnController?.sync(state.spawnMenu, state.graph)
   projectSelectorController?.sync(state.projectSelector, state.repos)
+  fanOutBinder.sync()
   commandPaletteController.sync(state.commandPalette, state)
   if (!framed && state.graph.nodes.size > 0) {
     framed = true
@@ -307,6 +321,7 @@ if (pairingEntry.kind === 'connect') {
       bindTerminals(connection)
       bindSpawn(connection)
       bindProjects(connection)
+      fanOutBinder.bind(connection)
     },
     onDisconnected: () => store.dispatchTerminal({ type: 'connection-lost' })
   }).start()
