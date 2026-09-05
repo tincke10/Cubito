@@ -78,6 +78,11 @@ export function createCommandPaletteController(
       const selectedId = store.get().selection.selectedId
       if (selectedId === null) return
       store.dispatchFanOut({ type: 'open-for-node', nodeId: selectedId })
+    },
+    'open-system': () => {
+      const selectedId = store.get().selection.selectedId
+      if (selectedId === null) return
+      store.dispatchSystemView({ type: 'open', nodeId: selectedId })
     }
   }
 

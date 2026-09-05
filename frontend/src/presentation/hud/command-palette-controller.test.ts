@@ -270,6 +270,25 @@ describe('createCommandPaletteController', () => {
       expect(setupResult.store.get().fanOut).toBe(before.fanOut)
     })
 
+    it('open-system dispatches system-view open for the selected node, closing the palette first', () => {
+      const setupResult = setup('a')
+      openAndMount(setupResult)
+      setupResult.handles[0]!.emitActivate('open-system')
+      expect(setupResult.store.get().commandPalette.view).toBe('closed')
+      expect(setupResult.store.get().systemView).toMatchObject({
+        view: 'open',
+        focusedNodeId: 'a'
+      })
+    })
+
+    it('open-system with nothing selected is a no-op (guard; upstream isAvailable already gates it)', () => {
+      const setupResult = setup(null)
+      openAndMount(setupResult)
+      const before = setupResult.store.get()
+      setupResult.handles[0]!.emitActivate('open-system')
+      expect(setupResult.store.get().systemView).toBe(before.systemView)
+    })
+
     it('activating a currently-disabled command no-ops entirely (guard, belt-and-suspenders)', () => {
       const setupResult = setup(null, false) // no selection, not connected
       openAndMount(setupResult)

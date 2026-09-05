@@ -110,6 +110,15 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
     if (!command) {
       return false
     }
+    // While the system view owns the screen, every graph-nav/terminal/spawn/open-system command
+    // is a handled no-op — only 'close-system' (bare g) and 'escape' (routed through the
+    // precedence ladder below) may act. ⌘K/⌘P already returned above, unaffected by this gate.
+    if (store.get().systemView.view === 'open' && command.kind !== 'escape') {
+      if (command.kind === 'close-system') {
+        store.dispatchSystemView({ type: 'close' })
+      }
+      return true
+    }
     if (command.kind === 'move') {
       // Radial open: arrow/hjkl "cycle the active chip" (SPAWN-005) — v1 ships a single
       // enabled chip, so this is a handled no-op that must not drag the graph selection
@@ -197,9 +206,19 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
       store.dispatchFanOut({ type: 'open-for-node', nodeId: selectedId })
       return true
     }
-    // command.kind === 'escape' — palette-close wins over selector/spawn/terminal-close, then
-    // selector-close wins over spawn/terminal-close (PROJ-008); each modal's own query/path input
-    // already intercepts Escape above, this is belt-and-suspenders.
+    if (command.kind === 'open-system') {
+      const selectedId = store.get().selection.selectedId
+      if (selectedId === null) return false
+      store.dispatchSystemView({ type: 'open', nodeId: selectedId })
+      return true
+    }
+    if (command.kind === 'close-system') {
+      // Only meaningful while open — that case already returned above via the system-view gate.
+      return false
+    }
+    // command.kind === 'escape' — palette-close wins over selector/spawn/system/terminal-close,
+    // then selector-close wins over spawn/system/terminal-close (PROJ-008); each modal's own
+    // query/path input already intercepts Escape above, this is belt-and-suspenders.
     if (store.get().commandPalette.view !== 'closed') {
       store.dispatchCommandPalette({ type: 'close' })
       return true
@@ -210,6 +229,10 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
     }
     if (store.get().spawnMenu.view !== 'closed') {
       store.dispatchSpawn({ type: 'cancel' })
+      return true
+    }
+    if (store.get().systemView.view === 'open') {
+      store.dispatchSystemView({ type: 'close' })
       return true
     }
     if (!store.get().terminals.activePanel) return false

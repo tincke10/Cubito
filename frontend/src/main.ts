@@ -11,6 +11,8 @@ import type { RawWorktreeRecord } from './domain/worktree-graph/build-graph'
 import { frameAll, frameIsland } from './presentation/camera/camera-framing'
 import type { Vec3 } from './presentation/camera/camera-framing'
 import { createFanOutBinder } from './bind-fan-out'
+import { createSystemViewBinder } from './bind-system-view'
+import { demoSystemGraph } from './demo-system-graph'
 import { createHudOverlay } from './presentation/hud/hud-overlay'
 import { hudModel } from './presentation/hud/hud-model'
 import { createKeyboardBar } from './presentation/hud/keyboard-bar'
@@ -102,8 +104,9 @@ const demoGateway: RuntimeGateway = {
 const container = document.getElementById('app')
 const hud = document.getElementById('hud')
 const keyboardBarSlot = document.getElementById('keyboard-bar')
-if (!container || !hud || !keyboardBarSlot) {
-  throw new Error('index.html must provide #app, #hud and #keyboard-bar')
+const systemSlot = document.getElementById('system')
+if (!container || !hud || !keyboardBarSlot || !systemSlot) {
+  throw new Error('index.html must provide #app, #hud, #system and #keyboard-bar')
 }
 const hudElement: HTMLElement = hud
 
@@ -154,6 +157,17 @@ const fanOutBinder = createFanOutBinder({
   animateTo: (framing, durationMs) => cameraRig.animateTo(framing, durationMs),
   focusDurationMs: FOCUS_DURATION_MS,
   demoGateway
+})
+
+// Sistema en vivo (design camada): eager, unlike terminal/spawn/projects — the demo graph port
+// works offline, so there is no lazy-on-connect gate. Hides the worktree HUD/keyboard-bar/3D
+// scene while open (bind-system-view.ts's onEnter/onExit seam).
+const systemViewBinder = createSystemViewBinder({
+  store,
+  systemSlot,
+  keyboardBarSlot,
+  demoGraphPort: demoSystemGraph,
+  worktreeChrome: [container, hud, keyboardBar.root]
 })
 
 // Shared by the keyboard controller and the eager command-palette controller below — both talk
@@ -225,6 +239,7 @@ store.subscribe((state) => {
   spawnController?.sync(state.spawnMenu, state.graph)
   projectSelectorController?.sync(state.projectSelector, state.repos)
   fanOutBinder.sync()
+  systemViewBinder.sync()
   commandPaletteController.sync(state.commandPalette, state)
   if (!framed && state.graph.nodes.size > 0) {
     framed = true

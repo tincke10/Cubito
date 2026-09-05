@@ -13,6 +13,10 @@ export type NavCommand =
   | { kind: 'open-projects' }
   | { kind: 'open-palette' }
   | { kind: 'open-fan-out' }
+  | { kind: 'open-system' }
+  /** Bare 'g' — closes the system view / returns to the worktree graph (no other bare-key
+   *  meaning currently claims 'g'). No-op when the system view is already closed. */
+  | { kind: 'close-system' }
 
 type Modifiers = { alt: boolean; ctrl: boolean; meta: boolean; shift: boolean }
 type Platform = { isMac: boolean }
@@ -96,6 +100,12 @@ export function resolveNavCommand(
   }
   if (key === 'Escape') {
     return { kind: 'escape' }
+  }
+  if (key === 'x') {
+    return { kind: 'open-system' }
+  }
+  if (key === 'g') {
+    return { kind: 'close-system' }
   }
   return null
 }

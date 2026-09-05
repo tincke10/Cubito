@@ -22,7 +22,7 @@ describe('resolveNavCommand', () => {
   })
 
   it('returns null for any other key', () => {
-    expect(resolveNavCommand('x', noModifiers, LINUX)).toBeNull()
+    expect(resolveNavCommand('q', noModifiers, LINUX)).toBeNull()
     expect(resolveNavCommand('Enter', noModifiers, LINUX)).toBeNull()
     expect(resolveNavCommand('', noModifiers, LINUX)).toBeNull()
   })
@@ -39,6 +39,20 @@ describe('resolveNavCommand', () => {
 
   it.each(['t', 'Tab', 's', 'Escape'] as const)(
     'returns null for terminal/spawn key %s when any modifier is held',
+    (key) => {
+      expect(resolveNavCommand(key, { ...noModifiers, ctrl: true }, LINUX)).toBeNull()
+    }
+  )
+
+  it.each([
+    ['x', { kind: 'open-system' }],
+    ['g', { kind: 'close-system' }]
+  ] as const)('maps %s with no modifiers to %o', (key, expected) => {
+    expect(resolveNavCommand(key, noModifiers, LINUX)).toEqual(expected)
+  })
+
+  it.each(['x', 'g'] as const)(
+    'returns null for system-view key %s when any modifier is held',
     (key) => {
       expect(resolveNavCommand(key, { ...noModifiers, ctrl: true }, LINUX)).toBeNull()
     }

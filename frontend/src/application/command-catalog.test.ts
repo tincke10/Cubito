@@ -36,7 +36,7 @@ describe('commandCatalog', () => {
   const mac = commandCatalog({ isMac: true })
   const other = commandCatalog({ isMac: false })
 
-  it('orders the 7 commands per the proposal', () => {
+  it('orders the 8 commands per the proposal', () => {
     expect(mac.map((c) => c.id)).toEqual([
       'focus',
       'fit-all',
@@ -44,7 +44,8 @@ describe('commandCatalog', () => {
       'open-spawn',
       'open-projects',
       'add-repo',
-      'fan-out'
+      'fan-out',
+      'open-system'
     ])
   })
 
@@ -64,6 +65,10 @@ describe('commandCatalog', () => {
       keybindingHint: '—'
     })
     expect(findCommand(mac, 'fan-out')).toMatchObject({ label: 'fan-out', keybindingHint: '—' })
+    expect(findCommand(mac, 'open-system')).toMatchObject({
+      label: 'sistema en vivo',
+      keybindingHint: 'x'
+    })
   })
 
   it('open-projects hint is ⌘P on Mac and Ctrl+P elsewhere', () => {
@@ -91,7 +96,9 @@ describe('commandCatalog', () => {
     ['add-repo', { hasSelection: false, isConnected: false }, false],
     ['fan-out', { hasSelection: true, isConnected: true }, true],
     ['fan-out', { hasSelection: false, isConnected: true }, false],
-    ['fan-out', { hasSelection: true, isConnected: false }, false]
+    ['fan-out', { hasSelection: true, isConnected: false }, false],
+    ['open-system', { hasSelection: true, isConnected: false }, true],
+    ['open-system', { hasSelection: false, isConnected: true }, false]
   ]
 
   it.each(matrix)('%s isAvailable(%o) => %s', (id, availability, expected) => {

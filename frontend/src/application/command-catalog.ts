@@ -8,6 +8,7 @@ export type CommandId =
   | 'open-projects'
   | 'add-repo'
   | 'fan-out'
+  | 'open-system'
 
 export type CommandAvailability = { readonly hasSelection: boolean; readonly isConnected: boolean }
 
@@ -59,5 +60,12 @@ export const commandCatalog = (platform: { isMac: boolean }): readonly PaletteCo
     label: 'fan-out',
     keybindingHint: '—',
     isAvailable: (a) => a.hasSelection && a.isConnected
+  },
+  {
+    id: 'open-system',
+    label: 'sistema en vivo',
+    keybindingHint: 'x',
+    // Unlike open-terminal, no isConnected gate — the demo graph stub works offline.
+    isAvailable: (a) => a.hasSelection
   }
 ]

@@ -662,4 +662,91 @@ describe('createKeyboardController', () => {
       expect(cameraRig.animateTo).not.toHaveBeenCalled()
     })
   })
+
+  describe('x/g sistema en vivo (system view) precedence', () => {
+    it('x dispatches system-view open for the selected node', () => {
+      const { store, controller } = setup('a')
+      const handled = controller.handleKeyDown(baseEvent({ key: 'x' }))
+      expect(handled).toBe(true)
+      expect(store.get().systemView).toMatchObject({ view: 'open', focusedNodeId: 'a' })
+    })
+
+    it('x with no node selected is a no-op', () => {
+      const { store, controller } = setup(null)
+      const handled = controller.handleKeyDown(baseEvent({ key: 'x' }))
+      expect(handled).toBe(false)
+      expect(store.get().systemView.view).toBe('closed')
+    })
+
+    it('g closes an open system view', () => {
+      const { store, controller } = setup('a')
+      controller.handleKeyDown(baseEvent({ key: 'x' }))
+      const handled = controller.handleKeyDown(baseEvent({ key: 'g' }))
+      expect(handled).toBe(true)
+      expect(store.get().systemView.view).toBe('closed')
+    })
+
+    it('g with the system view already closed is a no-op', () => {
+      const { store, controller } = setup('a')
+      const handled = controller.handleKeyDown(baseEvent({ key: 'g' }))
+      expect(handled).toBe(false)
+      expect(store.get().systemView.view).toBe('closed')
+    })
+
+    it('while open, suppresses graph-nav (h/j/k/l), terminal (t), spawn (s) and re-pressing x — all handled no-ops', () => {
+      const { store, terminal, controller } = setup('a')
+      controller.handleKeyDown(baseEvent({ key: 'x' }))
+      const selectedBefore = store.get().selection.selectedId
+
+      expect(controller.handleKeyDown(baseEvent({ key: 'h' }))).toBe(true)
+      expect(controller.handleKeyDown(baseEvent({ key: 't' }))).toBe(true)
+      expect(controller.handleKeyDown(baseEvent({ key: 's' }))).toBe(true)
+      expect(controller.handleKeyDown(baseEvent({ key: 'x' }))).toBe(true)
+
+      expect(store.get().selection.selectedId).toBe(selectedBefore)
+      expect(store.get().terminals.activePanel).toBeNull()
+      expect(store.get().spawnMenu.view).toBe('closed')
+      expect(terminal.focusActivePanel).not.toHaveBeenCalled()
+      expect(store.get().systemView.view).toBe('open') // still open, untouched by the no-ops
+    })
+
+    it('⌘K/Ctrl+K and ⌘P/Ctrl+P still work while the system view is open', () => {
+      const { store, controller } = setup('a', MAC)
+      controller.handleKeyDown(baseEvent({ key: 'x' }))
+
+      expect(controller.handleKeyDown(baseEvent({ key: 'k', metaKey: true }))).toBe(true)
+      expect(store.get().commandPalette.view).toBe('open')
+
+      expect(controller.handleKeyDown(baseEvent({ key: 'p', metaKey: true }))).toBe(true)
+      expect(store.get().projectSelector.view).toBe('open')
+    })
+
+    it('Escape precedence: palette > selector > spawn > system > terminal', () => {
+      const { store, terminal, controller } = setup('a')
+      controller.handleKeyDown(baseEvent({ key: 't' })) // terminal open
+      controller.handleKeyDown(baseEvent({ key: 'x' })) // system open (suppresses further hjkl/t/s)
+      store.dispatchSpawn({ type: 'open-for-node', nodeId: 'a' })
+      store.dispatchProjectSelector({ type: 'open' })
+      store.dispatchCommandPalette({ type: 'open' })
+
+      expect(controller.handleKeyDown(baseEvent({ key: 'Escape' }))).toBe(true) // closes palette
+      expect(store.get().commandPalette.view).toBe('closed')
+      expect(store.get().systemView.view).toBe('open')
+
+      expect(controller.handleKeyDown(baseEvent({ key: 'Escape' }))).toBe(true) // closes selector
+      expect(store.get().projectSelector.view).toBe('closed')
+      expect(store.get().systemView.view).toBe('open')
+
+      expect(controller.handleKeyDown(baseEvent({ key: 'Escape' }))).toBe(true) // closes spawn
+      expect(store.get().spawnMenu.view).toBe('closed')
+      expect(store.get().systemView.view).toBe('open')
+
+      expect(controller.handleKeyDown(baseEvent({ key: 'Escape' }))).toBe(true) // closes system
+      expect(store.get().systemView.view).toBe('closed')
+      expect(terminal.closeActiveSession).not.toHaveBeenCalled()
+
+      expect(controller.handleKeyDown(baseEvent({ key: 'Escape' }))).toBe(true) // finally terminal
+      expect(terminal.closeActiveSession).toHaveBeenCalledOnce()
+    })
+  })
 })
