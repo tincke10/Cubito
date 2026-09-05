@@ -9,6 +9,7 @@ import { emptyReposSlice } from './repos-model'
 import { emptyProjectSelectorSlice } from './project-selector-model'
 import { emptyCommandPaletteSlice } from './command-palette-model'
 import { emptyFanOutSlice } from './fan-out-model'
+import { emptySystemViewSlice } from './system-view-model'
 
 const state = (overrides: Partial<SceneState> = {}): SceneState => ({
   graph: emptyWorktreeGraph(),
@@ -21,6 +22,7 @@ const state = (overrides: Partial<SceneState> = {}): SceneState => ({
   projectSelector: emptyProjectSelectorSlice(),
   commandPalette: emptyCommandPaletteSlice(),
   fanOut: emptyFanOutSlice(),
+  systemView: emptySystemViewSlice(),
   ...overrides
 })
 

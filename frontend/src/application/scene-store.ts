@@ -12,6 +12,8 @@ import { emptyCommandPaletteSlice, reduceCommandPalette } from './command-palett
 import type { CommandPaletteAction, CommandPaletteSlice } from './command-palette-model'
 import { composeFanOutGraph, emptyFanOutSlice, reduceFanOut } from './fan-out-model'
 import type { FanOutAction, FanOutSlice } from './fan-out-model'
+import { emptySystemViewSlice, reduceSystemView } from './system-view-model'
+import type { SystemViewAction, SystemViewSlice } from './system-view-model'
 
 export type SyncStatus =
   | { state: 'idle' }
@@ -36,6 +38,7 @@ export type SceneState = {
   projectSelector: ProjectSelectorSlice
   commandPalette: CommandPaletteSlice
   fanOut: FanOutSlice
+  systemView: SystemViewSlice
 }
 
 export type SceneStore = {
@@ -54,6 +57,8 @@ export type SceneStore = {
   dispatchCommandPalette(action: CommandPaletteAction): void
   /** Drives the fanOut slice through fan-out-model's reducer and recomposes graph, one notify. */
   dispatchFanOut(action: FanOutAction): void
+  /** Drives the systemView slice through system-view-model's reducer, one notify. Doesn't touch `graph`. */
+  dispatchSystemView(action: SystemViewAction): void
   subscribe(listener: (state: SceneState) => void): () => void
 }
 
@@ -67,7 +72,8 @@ const initialSceneState = (): SceneState => ({
   repos: emptyReposSlice(),
   projectSelector: emptyProjectSelectorSlice(),
   commandPalette: emptyCommandPaletteSlice(),
-  fanOut: emptyFanOutSlice()
+  fanOut: emptyFanOutSlice(),
+  systemView: emptySystemViewSlice()
 })
 
 /** Minimal observable store; swap for a richer signal system when the UI grows. */
@@ -112,6 +118,10 @@ export function createSceneStore(): SceneStore {
     dispatchFanOut(action) {
       const fanOut = reduceFanOut(state.fanOut, action)
       state = { ...state, fanOut, graph: composeFanOutGraph(state.graph, fanOut) }
+      notify()
+    },
+    dispatchSystemView(action) {
+      state = { ...state, systemView: reduceSystemView(state.systemView, action) }
       notify()
     },
     subscribe(listener) {

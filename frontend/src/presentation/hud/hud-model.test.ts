@@ -10,6 +10,7 @@ import { emptyReposSlice } from '../../application/repos-model'
 import { emptyProjectSelectorSlice } from '../../application/project-selector-model'
 import { emptyCommandPaletteSlice } from '../../application/command-palette-model'
 import { emptyFanOutSlice } from '../../application/fan-out-model'
+import { emptySystemViewSlice } from '../../application/system-view-model'
 import type { SceneState } from '../../application/scene-store'
 import { buildWorktreeGraph } from '../../domain/worktree-graph/build-graph'
 
@@ -24,6 +25,7 @@ const baseState = (overrides: Partial<SceneState> = {}): SceneState => ({
   projectSelector: emptyProjectSelectorSlice(),
   commandPalette: emptyCommandPaletteSlice(),
   fanOut: emptyFanOutSlice(),
+  systemView: emptySystemViewSlice(),
   ...overrides
 })
 

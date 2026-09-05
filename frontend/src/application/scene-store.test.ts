@@ -7,6 +7,7 @@ import { emptyReposSlice } from './repos-model'
 import { emptyProjectSelectorSlice } from './project-selector-model'
 import { emptyCommandPaletteSlice } from './command-palette-model'
 import { emptyFanOutSlice, FANOUT_PLACEHOLDER_PREFIX } from './fan-out-model'
+import { emptySystemViewSlice } from './system-view-model'
 import { inertActivity } from '../domain/worktree-graph/node-activity'
 import type { WorktreeGraph, WorktreeNode } from '../domain/worktree-graph/types'
 
@@ -294,5 +295,37 @@ describe('createSceneStore', () => {
     const after = store.get()
     expect(after.terminals).toBe(before.terminals)
     expect(after.spawnMenu).toBe(before.spawnMenu)
+  })
+
+  it('starts with a closed systemView slice', () => {
+    const store = createSceneStore()
+    expect(store.get().systemView).toEqual(emptySystemViewSlice())
+  })
+
+  it('dispatchSystemView() drives the systemView slice through the reducer', () => {
+    const store = createSceneStore()
+    store.dispatchSystemView({ type: 'open', nodeId: 'w1' })
+    expect(store.get().systemView).toMatchObject({ view: 'open', focusedNodeId: 'w1' })
+  })
+
+  it('dispatchSystemView() notifies subscribers once and leaves the rest of SceneState untouched', () => {
+    const store = createSceneStore()
+    const listener = vi.fn()
+    store.subscribe(listener)
+    const before = store.get()
+    store.dispatchSystemView({ type: 'open', nodeId: 'w1' })
+    expect(listener).toHaveBeenCalledTimes(1)
+    const after = store.get()
+    expect(after.graph).toBe(before.graph)
+    expect(after.fanOut).toBe(before.fanOut)
+    expect(after.systemView).not.toBe(before.systemView)
+  })
+
+  it('dispatchSystemView() does not recompose the worktree graph', () => {
+    const store = createSceneStore()
+    store.update({ graph: graphOf([node()]) })
+    const before = store.get().graph
+    store.dispatchSystemView({ type: 'open', nodeId: 'w1' })
+    expect(store.get().graph).toBe(before)
   })
 })
