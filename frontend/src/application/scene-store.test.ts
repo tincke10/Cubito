@@ -6,6 +6,29 @@ import { emptySpawnMenuSlice } from './spawn-menu-model'
 import { emptyReposSlice } from './repos-model'
 import { emptyProjectSelectorSlice } from './project-selector-model'
 import { emptyCommandPaletteSlice } from './command-palette-model'
+import { emptyFanOutSlice, FANOUT_PLACEHOLDER_PREFIX } from './fan-out-model'
+import { inertActivity } from '../domain/worktree-graph/node-activity'
+import type { WorktreeGraph, WorktreeNode } from '../domain/worktree-graph/types'
+
+const node = (overrides: Partial<WorktreeNode> = {}): WorktreeNode => ({
+  id: 'w1',
+  repoId: 'repo',
+  branch: 'refs/heads/main',
+  path: '/w1',
+  status: 'in-progress',
+  isMain: true,
+  kind: 'root',
+  parentId: null,
+  childIds: [],
+  activity: inertActivity(),
+  ...overrides
+})
+
+const graphOf = (nodes: readonly WorktreeNode[]): WorktreeGraph => ({
+  nodes: new Map(nodes.map((n) => [n.id, n])),
+  edges: [],
+  rootIds: nodes.filter((n) => n.parentId === null).map((n) => n.id)
+})
 
 describe('createSceneStore', () => {
   it('starts idle with an empty graph and no connection/selection', () => {
@@ -234,5 +257,42 @@ describe('createSceneStore', () => {
     expect(after.graph).toBe(before.graph)
     expect(after.projectSelector).toBe(before.projectSelector)
     expect(after.commandPalette).not.toBe(before.commandPalette)
+  })
+
+  it('starts with a closed fan-out slice', () => {
+    const store = createSceneStore()
+    expect(store.get().fanOut).toEqual(emptyFanOutSlice())
+  })
+
+  it('dispatchFanOut() drives the fanOut slice through the reducer and recomposes graph, notifying once', () => {
+    const store = createSceneStore()
+    store.update({ graph: graphOf([node()]) })
+    const listener = vi.fn()
+    store.subscribe(listener)
+
+    store.dispatchFanOut({ type: 'open-for-node', nodeId: 'w1' })
+    expect(listener).toHaveBeenCalledTimes(1)
+    expect(store.get().fanOut).toMatchObject({ view: 'form', parentId: 'w1' })
+
+    store.dispatchFanOut({ type: 'set-repo-selector', repoSelector: 'id:repo' })
+    store.dispatchFanOut({ type: 'submit', mutationIds: ['m1', 'm2'] })
+    expect(listener).toHaveBeenCalledTimes(3)
+    const state = store.get()
+    expect(state.fanOut).toMatchObject({ view: 'running' })
+    expect(state.graph.nodes.has(`${FANOUT_PLACEHOLDER_PREFIX}m1`)).toBe(true)
+    expect(state.graph.nodes.has(`${FANOUT_PLACEHOLDER_PREFIX}m2`)).toBe(true)
+    expect(state.graph.nodes.get('w1')?.childIds).toEqual([
+      `${FANOUT_PLACEHOLDER_PREFIX}m1`,
+      `${FANOUT_PLACEHOLDER_PREFIX}m2`
+    ])
+  })
+
+  it('dispatchFanOut() leaves the rest of SceneState untouched', () => {
+    const store = createSceneStore()
+    const before = store.get()
+    store.dispatchFanOut({ type: 'open-for-node', nodeId: 'w1' })
+    const after = store.get()
+    expect(after.terminals).toBe(before.terminals)
+    expect(after.spawnMenu).toBe(before.spawnMenu)
   })
 })

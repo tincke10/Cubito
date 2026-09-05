@@ -8,6 +8,7 @@ import { emptySpawnMenuSlice } from './spawn-menu-model'
 import { emptyReposSlice } from './repos-model'
 import { emptyProjectSelectorSlice } from './project-selector-model'
 import { emptyCommandPaletteSlice } from './command-palette-model'
+import { emptyFanOutSlice } from './fan-out-model'
 
 const state = (overrides: Partial<SceneState> = {}): SceneState => ({
   graph: emptyWorktreeGraph(),
@@ -19,6 +20,7 @@ const state = (overrides: Partial<SceneState> = {}): SceneState => ({
   repos: emptyReposSlice(),
   projectSelector: emptyProjectSelectorSlice(),
   commandPalette: emptyCommandPaletteSlice(),
+  fanOut: emptyFanOutSlice(),
   ...overrides
 })
 

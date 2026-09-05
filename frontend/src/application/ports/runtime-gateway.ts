@@ -26,6 +26,12 @@ export type CreateWorktreeResult = {
   warnings?: readonly string[]
 }
 
+/** One `worktree.ps` row: which worktree, and its live agent-process status. */
+export type WorktreePsRow = {
+  worktreeId: string
+  status: string
+}
+
 /**
  * Port to the orcad runtime. The application layer depends on this shape
  * only; infrastructure provides the RPC-backed implementation.
@@ -35,4 +41,5 @@ export type RuntimeGateway = {
   listRepos(): Promise<readonly RepoSummary[]>
   createWorktree(input: CreateWorktreeInput): Promise<CreateWorktreeResult>
   addRepo(input: { path: string; kind?: 'git' | 'folder' }): Promise<RepoSummary>
+  listWorktreePs(): Promise<readonly WorktreePsRow[]>
 }

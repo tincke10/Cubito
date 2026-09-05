@@ -1,5 +1,6 @@
 import { buildWorktreeGraph } from '../domain/worktree-graph/build-graph'
 import { reconcileSelection } from '../presentation/navigation/selection-model'
+import { composeFanOutGraph } from './fan-out-model'
 import type { SceneStore } from './scene-store'
 import type { RuntimeGateway } from './ports/runtime-gateway'
 
@@ -22,7 +23,7 @@ export async function syncWorktreeGraph(
   ])
 
   if (worktreesResult.status === 'fulfilled') {
-    const graph = buildWorktreeGraph(worktreesResult.value)
+    const graph = composeFanOutGraph(buildWorktreeGraph(worktreesResult.value), store.get().fanOut)
     const selectedId = reconcileSelection(graph, store.get().selection.selectedId)
     store.update({ graph, sync: { state: 'synced', at: now() }, selection: { selectedId } })
   } else {

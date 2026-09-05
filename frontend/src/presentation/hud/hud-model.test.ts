@@ -9,6 +9,7 @@ import { emptySpawnMenuSlice } from '../../application/spawn-menu-model'
 import { emptyReposSlice } from '../../application/repos-model'
 import { emptyProjectSelectorSlice } from '../../application/project-selector-model'
 import { emptyCommandPaletteSlice } from '../../application/command-palette-model'
+import { emptyFanOutSlice } from '../../application/fan-out-model'
 import type { SceneState } from '../../application/scene-store'
 import { buildWorktreeGraph } from '../../domain/worktree-graph/build-graph'
 
@@ -22,6 +23,7 @@ const baseState = (overrides: Partial<SceneState> = {}): SceneState => ({
   repos: emptyReposSlice(),
   projectSelector: emptyProjectSelectorSlice(),
   commandPalette: emptyCommandPaletteSlice(),
+  fanOut: emptyFanOutSlice(),
   ...overrides
 })
 

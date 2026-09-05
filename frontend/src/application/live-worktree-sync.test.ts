@@ -68,7 +68,8 @@ function createFakeConnection(overrides?: {
       },
       addRepo: async () => {
         throw new Error('addRepo not implemented in this fake')
-      }
+      },
+      listWorktreePs: async () => []
     },
     terminals: createFakeTerminalsPort(),
     close() {

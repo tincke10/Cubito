@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createSceneStore } from './scene-store'
 import { syncWorktreeGraph } from './sync-worktree-graph'
+import { FANOUT_PLACEHOLDER_PREFIX } from './fan-out-model'
 import type { RepoSummary, RuntimeGateway } from './ports/runtime-gateway'
 import type { RawWorktreeRecord } from '../domain/worktree-graph/build-graph'
 
@@ -35,7 +36,8 @@ const fakeGateway = (
   },
   addRepo: async () => {
     throw new Error('addRepo not implemented in this fake')
-  }
+  },
+  listWorktreePs: async () => []
 })
 
 describe('syncWorktreeGraph', () => {
@@ -238,6 +240,75 @@ describe('syncWorktreeGraph', () => {
       const state = store.get()
       expect(state.selection.selectedId).toBeNull()
       expect(state.graph.nodes.has('repo::/b')).toBe(false)
+    })
+  })
+
+  describe('fan-out overlay (composeFanOutGraph on every poll)', () => {
+    it('drops a placeholder once its entry resolves to a real worktree id, and keeps the still-pending one', async () => {
+      const store = createSceneStore()
+      await syncWorktreeGraph(
+        fakeGateway(async () => records),
+        store,
+        () => 1
+      )
+      store.dispatchFanOut({ type: 'open-for-node', nodeId: 'repo::/a' })
+      store.dispatchFanOut({ type: 'set-repo-selector', repoSelector: 'id:repo' })
+      store.dispatchFanOut({ type: 'submit', mutationIds: ['m1', 'm2'] })
+      expect(store.get().graph.nodes.has(`${FANOUT_PLACEHOLDER_PREFIX}m1`)).toBe(true)
+
+      store.dispatchFanOut({ type: 'child-created', mutationId: 'm1', worktreeId: 'repo::/c' })
+      const recordsWithChild: RawWorktreeRecord[] = [
+        ...records,
+        {
+          id: 'repo::/c',
+          branch: 'refs/heads/fanout-1',
+          parentWorktreeId: 'repo::/a',
+          childWorktreeIds: [],
+          workspaceStatus: 'in-progress',
+          git: { path: '/c', isMainWorktree: false }
+        }
+      ]
+      await syncWorktreeGraph(
+        fakeGateway(async () => recordsWithChild),
+        store,
+        () => 2
+      )
+      const state = store.get()
+      expect(state.graph.nodes.has(`${FANOUT_PLACEHOLDER_PREFIX}m1`)).toBe(false)
+      expect(state.graph.nodes.has('repo::/c')).toBe(true)
+      expect(state.graph.nodes.has(`${FANOUT_PLACEHOLDER_PREFIX}m2`)).toBe(true)
+    })
+
+    it('overlays memberStatus onto a real node even though listWorktrees never carries agentStatus', async () => {
+      const store = createSceneStore()
+      await syncWorktreeGraph(
+        fakeGateway(async () => records),
+        store,
+        () => 1
+      )
+      store.dispatchFanOut({ type: 'open-for-node', nodeId: 'repo::/a' })
+      store.dispatchFanOut({ type: 'set-repo-selector', repoSelector: 'id:repo' })
+      store.dispatchFanOut({ type: 'submit', mutationIds: ['m1'] })
+      store.dispatchFanOut({ type: 'child-created', mutationId: 'm1', worktreeId: 'repo::/c' })
+      store.dispatchFanOut({ type: 'member-status', worktreeId: 'repo::/c', status: 'working' })
+
+      const recordsWithChild: RawWorktreeRecord[] = [
+        ...records,
+        {
+          id: 'repo::/c',
+          branch: 'refs/heads/fanout-1',
+          parentWorktreeId: 'repo::/a',
+          childWorktreeIds: [],
+          workspaceStatus: 'in-progress',
+          git: { path: '/c', isMainWorktree: false }
+        }
+      ]
+      await syncWorktreeGraph(
+        fakeGateway(async () => recordsWithChild),
+        store,
+        () => 2
+      )
+      expect(store.get().graph.nodes.get('repo::/c')?.activity.agentStatus).toBe('working')
     })
   })
 })

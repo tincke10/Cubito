@@ -10,6 +10,8 @@ import { emptyProjectSelectorSlice, reduceProjectSelector } from './project-sele
 import type { ProjectSelectorAction, ProjectSelectorSlice } from './project-selector-model'
 import { emptyCommandPaletteSlice, reduceCommandPalette } from './command-palette-model'
 import type { CommandPaletteAction, CommandPaletteSlice } from './command-palette-model'
+import { composeFanOutGraph, emptyFanOutSlice, reduceFanOut } from './fan-out-model'
+import type { FanOutAction, FanOutSlice } from './fan-out-model'
 
 export type SyncStatus =
   | { state: 'idle' }
@@ -33,6 +35,7 @@ export type SceneState = {
   repos: ReposSlice
   projectSelector: ProjectSelectorSlice
   commandPalette: CommandPaletteSlice
+  fanOut: FanOutSlice
 }
 
 export type SceneStore = {
@@ -49,6 +52,8 @@ export type SceneStore = {
   dispatchProjectSelector(action: ProjectSelectorAction): void
   /** Drives the commandPalette slice through command-palette-model's pure reducer, one notify. */
   dispatchCommandPalette(action: CommandPaletteAction): void
+  /** Drives the fanOut slice through fan-out-model's reducer and recomposes graph, one notify. */
+  dispatchFanOut(action: FanOutAction): void
   subscribe(listener: (state: SceneState) => void): () => void
 }
 
@@ -61,7 +66,8 @@ const initialSceneState = (): SceneState => ({
   spawnMenu: emptySpawnMenuSlice(),
   repos: emptyReposSlice(),
   projectSelector: emptyProjectSelectorSlice(),
-  commandPalette: emptyCommandPaletteSlice()
+  commandPalette: emptyCommandPaletteSlice(),
+  fanOut: emptyFanOutSlice()
 })
 
 /** Minimal observable store; swap for a richer signal system when the UI grows. */
@@ -101,6 +107,11 @@ export function createSceneStore(): SceneStore {
     },
     dispatchCommandPalette(action) {
       state = { ...state, commandPalette: reduceCommandPalette(state.commandPalette, action) }
+      notify()
+    },
+    dispatchFanOut(action) {
+      const fanOut = reduceFanOut(state.fanOut, action)
+      state = { ...state, fanOut, graph: composeFanOutGraph(state.graph, fanOut) }
       notify()
     },
     subscribe(listener) {

@@ -2,9 +2,18 @@ import type { RawWorktreeRecord } from '../../domain/worktree-graph/build-graph'
 import type {
   CreateWorktreeInput,
   RepoSummary,
-  RuntimeGateway
+  RuntimeGateway,
+  WorktreePsRow
 } from '../../application/ports/runtime-gateway'
 import type { RpcSuccessFrame } from './envelope'
+
+/** Projects a raw `worktree.ps` row onto the local `WorktreePsRow` shape. */
+function toWorktreePsRow(row: { worktreeId?: unknown; status?: unknown }): WorktreePsRow {
+  return {
+    worktreeId: typeof row.worktreeId === 'string' ? row.worktreeId : '',
+    status: typeof row.status === 'string' ? row.status : 'inactive'
+  }
+}
 
 /** Projects a raw `repo.list`/`repo.add` row onto the local `RepoSummary` shape. */
 function toRepoSummary(row: {
@@ -72,6 +81,14 @@ export function createOrcadGateway(
       return Array.isArray(result.warnings)
         ? { worktreeId, warnings: result.warnings as readonly string[] }
         : { worktreeId }
+    },
+    async listWorktreePs() {
+      const response = await connection.call('worktree.ps')
+      const result = response.result as { worktrees?: unknown }
+      if (!Array.isArray(result?.worktrees)) {
+        throw new Error('worktree.ps returned no worktrees array')
+      }
+      return (result.worktrees as Record<string, unknown>[]).map(toWorktreePsRow)
     }
   }
 }

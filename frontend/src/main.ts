@@ -94,7 +94,8 @@ const demoGateway: RuntimeGateway = {
   },
   addRepo: async () => {
     throw new Error('addRepo not implemented in the demo gateway')
-  }
+  },
+  listWorktreePs: async () => []
 }
 
 const container = document.getElementById('app')

@@ -68,14 +68,15 @@ describe('createOrcadGateway', () => {
     expect(onRuntimeId).not.toHaveBeenCalled()
   })
 
-  it('stays frozen at the proyectos-era method set — no undocumented methods added (CO-305 ratchet)', () => {
+  it('stays frozen at the fan-out-era method set — no undocumented methods added (CO-305 ratchet)', () => {
     const call: RpcCaller = vi.fn()
     const gateway = createOrcadGateway({ call })
     expect(Object.keys(gateway)).toEqual([
       'listWorktrees',
       'listRepos',
       'addRepo',
-      'createWorktree'
+      'createWorktree',
+      'listWorktreePs'
     ])
   })
 
@@ -199,5 +200,49 @@ describe('createOrcadGateway', () => {
     await expect(gateway.createWorktree({ repo: 'id:repo-1' })).rejects.toThrow(
       'connection dropped'
     )
+  })
+
+  it('lists worktree.ps via the worktree.ps method, mapping result.worktrees rows to WorktreePsRow', async () => {
+    const call: RpcCaller = vi.fn(async () => ({
+      id: 'x',
+      ok: true as const,
+      result: {
+        worktrees: [
+          { worktreeId: 'w1', status: 'working' },
+          { worktreeId: 'w2', status: 'idle' }
+        ]
+      },
+      _meta: { runtimeId: 'rt' }
+    }))
+    const gateway = createOrcadGateway({ call })
+    await expect(gateway.listWorktreePs()).resolves.toEqual([
+      { worktreeId: 'w1', status: 'working' },
+      { worktreeId: 'w2', status: 'idle' }
+    ])
+    expect(call).toHaveBeenCalledWith('worktree.ps')
+  })
+
+  it('throws when worktree.ps returns no worktrees array', async () => {
+    const call: RpcCaller = async () => ({
+      id: 'x',
+      ok: true as const,
+      result: { unexpected: true },
+      _meta: { runtimeId: 'rt' }
+    })
+    const gateway = createOrcadGateway({ call })
+    await expect(gateway.listWorktreePs()).rejects.toThrow(/worktree\.ps/)
+  })
+
+  it("coerces a non-string status to 'inactive'", async () => {
+    const call: RpcCaller = vi.fn(async () => ({
+      id: 'x',
+      ok: true as const,
+      result: { worktrees: [{ worktreeId: 'w1', status: 42 }] },
+      _meta: { runtimeId: 'rt' }
+    }))
+    const gateway = createOrcadGateway({ call })
+    await expect(gateway.listWorktreePs()).resolves.toEqual([
+      { worktreeId: 'w1', status: 'inactive' }
+    ])
   })
 })
