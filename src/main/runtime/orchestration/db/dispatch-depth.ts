@@ -26,6 +26,7 @@ export type DispatchCreator =
       /** Remote attachment matching requires the exact incarnation; local rows do not. */
       processIncarnation?: string
     }
+  | { kind: 'lease'; deviceId: string }
 
 /**
  * Attachment states in which the worker may still be running.
@@ -59,7 +60,7 @@ export class AmbiguousDispatchParentError extends Error {
  * it cannot let a deep worker pass as a shallow one.
  */
 export function resolveCreatorDepth(this: OrchestrationDb, creator: DispatchCreator): number {
-  if (creator.kind === 'system') {
+  if (creator.kind === 'system' || creator.kind === 'lease') {
     return ROOT_DISPATCH_DEPTH
   }
 

@@ -105,6 +105,24 @@ describe('nested worker depth', () => {
     expect(db.resolveCreatorDepth({ kind: 'terminal', handle: 'term_nobody' })).toBe(0)
   })
 
+  it('treats a GUI lease as a root, like the in-process coordinator loop', () => {
+    db = new OrchestrationDb(':memory:')
+    expect(db.resolveCreatorDepth({ kind: 'lease', deviceId: 'device_1' })).toBe(0)
+  })
+
+  it('stamps a dispatch created by a lease at child depth 1', () => {
+    db = new OrchestrationDb(':memory:')
+    const task = db.createTask({ spec: 'root task' })
+    const worker = db.createDispatchContext({
+      taskId: task.id,
+      assigneeHandle: 'term_worker',
+      assigneePaneKey: 'tab_worker:leaf_worker',
+      creator: { kind: 'lease', deviceId: 'device_1' },
+      maxDepth: UNCAPPED
+    })
+    expect(worker.depth).toBe(1)
+  })
+
   describe('remote attachments as parents', () => {
     const PANE = 'tab_remote:leaf_remote'
     const INCARNATION = 'inc-1'

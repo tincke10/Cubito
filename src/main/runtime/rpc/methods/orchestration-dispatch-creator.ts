@@ -10,9 +10,14 @@ import type { OrcaRuntimeService } from '../../orca-runtime'
  */
 export function resolveDispatchCreator(
   runtime: OrcaRuntimeService,
-  callerHandle: string | undefined
+  callerHandle: string | undefined,
+  deviceId?: string
 ): DispatchCreator {
   if (!callerHandle) {
+    if (deviceId) {
+      // Paired GUI lease, no terminal: a lease is a depth-0 root, like 'system'.
+      return { kind: 'lease', deviceId }
+    }
     // No declared caller means no resolvable parent. Depth 0 is the same answer
     // the pre-existing Run-binding check already gives this case.
     return { kind: 'system' }
