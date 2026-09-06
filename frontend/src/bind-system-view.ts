@@ -11,9 +11,6 @@ export type BindSystemViewDeps = {
   systemSlot: { appendChild(element: unknown): void }
   keyboardBarSlot: { appendChild(element: unknown): void }
   demoGraphPort: SystemGraphPort
-  /** Worktree HUD/keyboard-bar/scene chrome to hide while the system view owns the screen
-   *  (design: "hide worktree #hud/#keyboard-bar + graphView group") — plain `hidden` toggles. */
-  worktreeChrome: readonly { hidden: boolean }[]
 }
 
 export type SystemViewBinder = { sync(): void }
@@ -21,22 +18,17 @@ export type SystemViewBinder = { sync(): void }
 /**
  * Extracted out of main.ts (max-lines ratchet, mirrors bind-fan-out.ts): builds the system-view
  * controller + live driver once, starts/stops the driver on the systemView open/close transition
- * (detected by comparing against the previous sync's view), and owns the hide/show seam so
- * system-view-controller.ts stays DOM-scoped to #system (SV-601).
+ * (detected by comparing against the previous sync's view). Worktree-chrome hide/show is owned
+ * by main.ts's subscribe loop (order-independent with bind-diff-view.ts), not by onEnter/onExit
+ * here — keeping only the DOM-scoped #system mount/unmount lifecycle.
  */
 export function createSystemViewBinder(deps: BindSystemViewDeps): SystemViewBinder {
-  const setChromeHidden = (hidden: boolean): void => {
-    for (const el of deps.worktreeChrome) el.hidden = hidden
-  }
-
   const controller = createSystemViewController({
     createGraph: createSystemGraph,
     createFeed: createActivityFeed,
     createHud: createSystemHud,
     hud: deps.systemSlot,
-    keyboardBarSlot: deps.keyboardBarSlot,
-    onEnter: () => setChromeHidden(true),
-    onExit: () => setChromeHidden(false)
+    keyboardBarSlot: deps.keyboardBarSlot
   })
   const driver = createSystemLiveDriver({ store: deps.store, port: deps.demoGraphPort })
 

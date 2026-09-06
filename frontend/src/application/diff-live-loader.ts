@@ -38,6 +38,10 @@ export function createDiffLiveLoader(deps: DiffLiveLoaderDeps): DiffLiveLoader {
       if (stopped) return
       const slice = deps.store.get().diffView
       if (slice.view !== 'open' || slice.focusedNodeId !== nodeId) return // stale — node changed mid-flight
+      if (compare.status !== 'ready') {
+        dispatch({ type: 'rail-error', message: railErrorMessageFor(compare.status) })
+        return
+      }
       dispatch({
         type: 'rail-loaded',
         compare: { headOid: compare.headOid, mergeBase: compare.mergeBase },
@@ -109,4 +113,18 @@ type DiffCompareRef = { mergeBase: string; headOid: string }
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+/** Human copy for a non-'ready' BranchCompare status (git.branchCompare doesn't throw for these). */
+function railErrorMessageFor(status: string): string {
+  switch (status) {
+    case 'invalid-base':
+      return 'base inválida'
+    case 'unborn-head':
+      return 'rama sin commits'
+    case 'no-merge-base':
+      return 'sin ancestro común con la base'
+    default:
+      return status
+  }
 }

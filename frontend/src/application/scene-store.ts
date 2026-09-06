@@ -127,11 +127,21 @@ export function createSceneStore(): SceneStore {
       notify()
     },
     dispatchSystemView(action) {
-      state = { ...state, systemView: reduceSystemView(state.systemView, action) }
+      // [x] sistema and [d] diff are mutually exclusive scene modes — opening one closes the
+      // other at this chokepoint so no caller (keyboard, palette, ...) can leave both open.
+      const diffView =
+        action.type === 'open' && state.diffView.view === 'open'
+          ? reduceDiffView(state.diffView, { type: 'close' })
+          : state.diffView
+      state = { ...state, systemView: reduceSystemView(state.systemView, action), diffView }
       notify()
     },
     dispatchDiffView(action) {
-      state = { ...state, diffView: reduceDiffView(state.diffView, action) }
+      const systemView =
+        action.type === 'open' && state.systemView.view === 'open'
+          ? reduceSystemView(state.systemView, { type: 'close' })
+          : state.systemView
+      state = { ...state, diffView: reduceDiffView(state.diffView, action), systemView }
       notify()
     },
     subscribe(listener) {

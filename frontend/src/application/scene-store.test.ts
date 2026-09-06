@@ -361,4 +361,57 @@ describe('createSceneStore', () => {
     store.dispatchDiffView({ type: 'open', nodeId: 'w1', baseRef: 'main' })
     expect(store.get().graph).toBe(before)
   })
+
+  it('dispatchDiffView open closes an already-open systemView, notifying once, and never leaves both open', () => {
+    const store = createSceneStore()
+    store.dispatchSystemView({ type: 'open', nodeId: 'w1' })
+    const listener = vi.fn()
+    store.subscribe(listener)
+
+    store.dispatchDiffView({ type: 'open', nodeId: 'w1', baseRef: 'main' })
+
+    expect(listener).toHaveBeenCalledTimes(1)
+    expect(store.get().systemView.view).toBe('closed')
+    expect(store.get().diffView.view).toBe('open')
+  })
+
+  it('dispatchDiffView open is a no-op on systemView when systemView is already closed', () => {
+    const store = createSceneStore()
+    const before = store.get().systemView
+    store.dispatchDiffView({ type: 'open', nodeId: 'w1', baseRef: 'main' })
+    expect(store.get().systemView).toBe(before)
+  })
+
+  it('dispatchSystemView open closes an already-open diffView, notifying once, and never leaves both open', () => {
+    const store = createSceneStore()
+    store.dispatchDiffView({ type: 'open', nodeId: 'w1', baseRef: 'main' })
+    const listener = vi.fn()
+    store.subscribe(listener)
+
+    store.dispatchSystemView({ type: 'open', nodeId: 'w1' })
+
+    expect(listener).toHaveBeenCalledTimes(1)
+    expect(store.get().diffView.view).toBe('closed')
+    expect(store.get().systemView.view).toBe('open')
+  })
+
+  it('dispatchSystemView open is a no-op on diffView when diffView is already closed', () => {
+    const store = createSceneStore()
+    const before = store.get().diffView
+    store.dispatchSystemView({ type: 'open', nodeId: 'w1' })
+    expect(store.get().diffView).toBe(before)
+  })
+
+  it('non-open diffView/systemView actions never touch the other slice', () => {
+    const store = createSceneStore()
+    store.dispatchSystemView({ type: 'open', nodeId: 'w1' })
+    const systemBefore = store.get().systemView
+    store.dispatchDiffView({ type: 'close' })
+    expect(store.get().systemView).toBe(systemBefore)
+
+    store.dispatchDiffView({ type: 'open', nodeId: 'w1', baseRef: 'main' })
+    const diffBefore = store.get().diffView
+    store.dispatchSystemView({ type: 'close' })
+    expect(store.get().diffView).toBe(diffBefore)
+  })
 })

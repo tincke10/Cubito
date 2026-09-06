@@ -751,14 +751,14 @@ describe('createKeyboardController', () => {
       expect(terminal.closeActiveSession).toHaveBeenCalledOnce()
     })
 
-    it('Escape precedence: system beats diff when both are (abnormally) open', () => {
+    it('opening diff after system is already open closes system at the store chokepoint (scene-store.ts mutual exclusion) — a single Escape then closes diff', () => {
       const { store, controller } = setup('a')
       store.dispatchSystemView({ type: 'open', nodeId: 'a' })
       store.dispatchDiffView({ type: 'open', nodeId: 'a', baseRef: 'main' })
 
-      expect(controller.handleKeyDown(baseEvent({ key: 'Escape' }))).toBe(true)
+      // scene-store.ts's dispatchDiffView already closed system — both open is unreachable now.
       expect(store.get().systemView.view).toBe('closed')
-      expect(store.get().diffView.view).toBe('open') // untouched — system's rung wins first
+      expect(store.get().diffView.view).toBe('open')
 
       expect(controller.handleKeyDown(baseEvent({ key: 'Escape' }))).toBe(true)
       expect(store.get().diffView.view).toBe('closed')

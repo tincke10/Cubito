@@ -47,7 +47,7 @@ const branchCompare = (overrides: Partial<BranchCompare> = {}): BranchCompare =>
   baseRef: 'refs/heads/main',
   headOid: 'head-oid',
   mergeBase: 'merge-base',
-  status: 'ok',
+  status: 'ready',
   entries: [{ path: 'src/a.ts', status: 'modified', added: 3, removed: 1 }],
   ...overrides
 })
@@ -170,6 +170,49 @@ describe('createDiffLiveLoader', () => {
     const slice = store.get().diffView
     if (slice.view === 'open') {
       expect(slice.errorMessage).toBe('boom')
+    }
+    loader.stop()
+  })
+
+  it('dispatches rail-error (not rail-loaded) when gitBranchCompare resolves with a non-ready status', async () => {
+    setupGraph()
+    const gateway = createFakeGateway()
+    gateway.gitBranchCompareImpl = async () =>
+      branchCompare({ status: 'no-merge-base', entries: [] })
+    const loader = createDiffLiveLoader({ store, gateway })
+
+    loader.start('repo::child')
+    await vi.waitFor(() => {
+      const slice = store.get().diffView
+      expect(slice.view === 'open' && slice.status).toBe('error')
+    })
+    const slice = store.get().diffView
+    if (slice.view === 'open') {
+      expect(slice.errorMessage).toBe('sin ancestro común con la base')
+      expect(slice.files).toEqual([])
+    }
+    loader.stop()
+  })
+
+  it.each([
+    ['invalid-base', 'base inválida'],
+    ['unborn-head', 'rama sin commits'],
+    ['no-merge-base', 'sin ancestro común con la base'],
+    ['loading', 'loading']
+  ])('maps branch-compare status %s to the human message %s', async (status, message) => {
+    setupGraph()
+    const gateway = createFakeGateway()
+    gateway.gitBranchCompareImpl = async () => branchCompare({ status, entries: [] })
+    const loader = createDiffLiveLoader({ store, gateway })
+
+    loader.start('repo::child')
+    await vi.waitFor(() => {
+      const slice = store.get().diffView
+      expect(slice.view === 'open' && slice.status).toBe('error')
+    })
+    const slice = store.get().diffView
+    if (slice.view === 'open') {
+      expect(slice.errorMessage).toBe(message)
     }
     loader.stop()
   })

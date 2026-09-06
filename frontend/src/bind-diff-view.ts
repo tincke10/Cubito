@@ -11,9 +11,6 @@ export type BindDiffViewDeps = {
   diffSlot: { appendChild(element: unknown): void }
   keyboardBarSlot: { appendChild(element: unknown): void }
   demoGateway: DiffLiveLoaderGatewayPort
-  /** Worktree HUD/keyboard-bar/scene chrome to hide while the diff view owns the screen
-   *  (mirrors bind-system-view.ts) — plain `hidden` toggles. */
-  worktreeChrome: readonly { hidden: boolean }[]
 }
 
 export type DiffViewBinder = {
@@ -24,14 +21,12 @@ export type DiffViewBinder = {
 /**
  * Extracted out of main.ts (max-lines ratchet, mirrors bind-system-view.ts): builds the
  * diff-view controller + live loader once, starts/stops/selects on that loader on the diffView
- * open/close/select transitions (detected by comparing against the previous sync's view), and
- * owns the hide/show seam so diff-view-controller.ts stays DOM-scoped to #diff.
+ * open/close/select transitions (detected by comparing against the previous sync's view).
+ * Worktree-chrome hide/show is owned by main.ts's subscribe loop (order-independent with
+ * bind-system-view.ts), not by onEnter/onExit here — keeping only the DOM-scoped #diff
+ * mount/unmount lifecycle.
  */
 export function createDiffViewBinder(deps: BindDiffViewDeps): DiffViewBinder {
-  const setChromeHidden = (hidden: boolean): void => {
-    for (const el of deps.worktreeChrome) el.hidden = hidden
-  }
-
   const loader = createDiffLiveLoader({ store: deps.store, gateway: deps.demoGateway })
 
   const controller = createDiffViewController({
@@ -40,9 +35,7 @@ export function createDiffViewBinder(deps: BindDiffViewDeps): DiffViewBinder {
     createHud: createDiffHud,
     hud: deps.diffSlot,
     keyboardBarSlot: deps.keyboardBarSlot,
-    onSelect: (path) => loader.select(path),
-    onEnter: () => setChromeHidden(true),
-    onExit: () => setChromeHidden(false)
+    onSelect: (path) => loader.select(path)
   })
 
   let wasOpen = false

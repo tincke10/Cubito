@@ -79,6 +79,62 @@ describe('resolveBaseRef', () => {
     expect(resolveBaseRef(graph, 'repo::ghost')).toBeNull()
   })
 
+  it('treats an empty-string baseRef as unresolved, falling through to the parent branch', () => {
+    const main = node({ id: 'repo::main', isMain: true, branch: 'refs/heads/main' })
+    const child = node({
+      id: 'repo::child',
+      isMain: false,
+      branch: 'refs/heads/child',
+      parentId: 'repo::main',
+      baseRef: ''
+    })
+    const graph = graphOf([main, child])
+    expect(resolveBaseRef(graph, 'repo::child')).toBe('refs/heads/main')
+  })
+
+  it('treats a whitespace-only baseRef as unresolved', () => {
+    const main = node({ id: 'repo::main', isMain: true, branch: 'refs/heads/main' })
+    const child = node({
+      id: 'repo::child',
+      isMain: false,
+      branch: 'refs/heads/child',
+      parentId: 'repo::main',
+      baseRef: '   '
+    })
+    const graph = graphOf([main, child])
+    expect(resolveBaseRef(graph, 'repo::child')).toBe('refs/heads/main')
+  })
+
+  it('treats an empty-string parent branch as unresolved, falling through to the repo main branch', () => {
+    const main = node({ id: 'repo::main', isMain: true, branch: 'refs/heads/main' })
+    const parent = node({
+      id: 'repo::parent',
+      isMain: false,
+      branch: '',
+      parentId: 'repo::main'
+    })
+    const child = node({
+      id: 'repo::child',
+      isMain: false,
+      branch: 'refs/heads/child',
+      parentId: 'repo::parent'
+    })
+    const graph = graphOf([main, parent, child])
+    expect(resolveBaseRef(graph, 'repo::child')).toBe('refs/heads/main')
+  })
+
+  it('returns null when every candidate resolves to an empty/whitespace branch', () => {
+    const main = node({ id: 'repo::main', isMain: true, branch: '   ' })
+    const orphan = node({
+      id: 'repo::orphan',
+      isMain: false,
+      branch: 'refs/heads/orphan',
+      parentId: null
+    })
+    const graph = graphOf([main, orphan])
+    expect(resolveBaseRef(graph, 'repo::orphan')).toBeNull()
+  })
+
   it('does not use the main branch of a different repo', () => {
     const otherMain = node({
       id: 'other::main',

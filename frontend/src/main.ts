@@ -176,26 +176,29 @@ const fanOutBinder = createFanOutBinder({
 })
 
 // Sistema en vivo (design camada): eager, unlike terminal/spawn/projects — the demo graph port
-// works offline, so there is no lazy-on-connect gate. Hides the worktree HUD/keyboard-bar/3D
-// scene while open (bind-system-view.ts's onEnter/onExit seam).
+// works offline, so there is no lazy-on-connect gate.
 const systemViewBinder = createSystemViewBinder({
   store,
   systemSlot,
   keyboardBarSlot,
-  demoGraphPort: demoSystemGraph,
-  worktreeChrome: [container, hud, keyboardBar.root]
+  demoGraphPort: demoSystemGraph
 })
 
-// Diff (design camada): same eager-and-hide-worktree-chrome pattern as sistema en vivo —
-// unlike terminal/spawn/projects, no lazy-on-connect gate; the demo gateway's stubs let
-// `pnpm dev` open diff mode too. `rebindGateway` below swaps in the real gateway on connect.
+// Diff (design camada): same eager pattern as sistema en vivo — unlike terminal/spawn/projects,
+// no lazy-on-connect gate; the demo gateway's stubs let `pnpm dev` open diff mode too.
+// `rebindGateway` below swaps in the real gateway on connect.
 const diffViewBinder = createDiffViewBinder({
   store,
   diffSlot,
   keyboardBarSlot,
-  demoGateway,
-  worktreeChrome: [container, hud, keyboardBar.root]
+  demoGateway
 })
+
+// Worktree HUD/keyboard-bar/3D scene chrome, hidden while EITHER scene-replacing mode (sistema
+// en vivo or diff) owns the screen. Single source of truth (main.ts, not each binder's own
+// onEnter/onExit) so opening one mode right after the other can't race and strand chrome hidden
+// or restore it early — see CRITICAL 1 in the diff-mode integration-seam fixes.
+const worktreeChrome = [container, hud, keyboardBar.root]
 
 // Shared by the keyboard controller and the eager command-palette controller below — both talk
 // to the terminal panel through the same closure-backed proxy (built before it exists).
@@ -268,6 +271,8 @@ store.subscribe((state) => {
   fanOutBinder.sync()
   systemViewBinder.sync()
   diffViewBinder.sync()
+  const sceneModeOpen = state.systemView.view === 'open' || state.diffView.view === 'open'
+  for (const el of worktreeChrome) el.hidden = sceneModeOpen
   commandPaletteController.sync(state.commandPalette, state)
   if (!framed && state.graph.nodes.size > 0) {
     framed = true
