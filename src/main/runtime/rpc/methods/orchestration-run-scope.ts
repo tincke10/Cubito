@@ -1,6 +1,7 @@
 import type { OrchestrationCompatibilityEvidence } from '../../../../shared/orchestration-compatibility-evidence'
 import { orchestrationSkillRecoveryData } from '../../../../shared/orchestration-rpc-contract'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
+import { buildLeaseHandle, buildLeasePaneKey } from '../../orchestration/lease-key-format'
 import type { RunRow } from '../../orchestration/types'
 import type {
   OrcaRuntimeService,
@@ -81,15 +82,8 @@ export function resolveOrchestrationCaller(
   return paneKey ?? null
 }
 
-/** Synthetic per-Run pane key for a paired-device lease. Two colons, so `parsePaneKey` rejects it. */
-export function buildLeasePaneKey(deviceId: string, runId: string): string {
-  return `lease:${deviceId}:${runId}`
-}
-
-/** Synthetic coordinator handle for a paired-device lease. */
-export function buildLeaseHandle(deviceId: string): string {
-  return `lease:${deviceId}`
-}
+// Re-exported for callers that reach the lease-key formatters through this module (the rpc surface).
+export { buildLeasePaneKey, buildLeaseHandle }
 
 export type LeaseCaller = {
   handle: string

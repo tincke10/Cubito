@@ -1,4 +1,5 @@
 import type { RunRow } from '../../types'
+import { buildLeaseHandle, buildLeasePaneKey } from '../../lease-key-format'
 import { generateId } from '../generated-id'
 import type { OrchestrationDb } from '../orchestration-db'
 
@@ -33,15 +34,6 @@ export function createRun(
   return this.getRun(id) as RunRow
 }
 
-// Why: mirrors buildLeasePaneKey/buildLeaseHandle (rpc/methods/orchestration-run-scope.ts);
-// duplicated here rather than imported to avoid a db → rpc → orca-runtime → db import cycle.
-function leasePaneKey(deviceId: string, runId: string): string {
-  return `lease:${deviceId}:${runId}`
-}
-function leaseHandle(deviceId: string): string {
-  return `lease:${deviceId}`
-}
-
 /** Mints a Run for a paired GUI device lease: no terminal, no pane, ownership is the device id. */
 export function createLeaseRun(
   this: OrchestrationDb,
@@ -53,8 +45,8 @@ export function createLeaseRun(
   const id = generateId('run')
   // Why: the pane key embeds this fresh id, so it can never collide with a prior Run —
   // unlike terminal createRun, no unbindOtherRunsForPane call is needed.
-  const coordinatorPaneKey = leasePaneKey(params.deviceId, id)
-  const coordinatorHandle = leaseHandle(params.deviceId)
+  const coordinatorPaneKey = buildLeasePaneKey(params.deviceId, id)
+  const coordinatorHandle = buildLeaseHandle(params.deviceId)
   this.db.exec('BEGIN IMMEDIATE')
   try {
     this.db
