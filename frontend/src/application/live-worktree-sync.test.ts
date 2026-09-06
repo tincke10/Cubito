@@ -83,7 +83,8 @@ function createFakeConnection(overrides?: {
       }),
       gitBranchDiff: async () => {
         throw new Error('gitBranchDiff not implemented in this fake')
-      }
+      },
+      systemSnapshot: async () => ({ nodes: [], edges: [] })
     },
     terminals: createFakeTerminalsPort(),
     close() {

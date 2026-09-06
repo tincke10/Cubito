@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createOrcadGateway } from './orcad-gateway'
 import type { RpcCaller } from './orcad-gateway'
+import { RpcCallError } from './rpc-connection'
 
 describe('createOrcadGateway', () => {
   it('lists worktrees via worktree.list', async () => {
@@ -68,7 +69,7 @@ describe('createOrcadGateway', () => {
     expect(onRuntimeId).not.toHaveBeenCalled()
   })
 
-  it('stays frozen at the diff-content-gateway-era method set — no undocumented methods added (CO-305 ratchet)', () => {
+  it('stays frozen at the system-snapshot-gateway-era method set — no undocumented methods added (CO-305 ratchet)', () => {
     const call: RpcCaller = vi.fn()
     const gateway = createOrcadGateway({ call })
     expect(Object.keys(gateway)).toEqual([
@@ -79,7 +80,8 @@ describe('createOrcadGateway', () => {
       'listWorktreePs',
       'gitStatus',
       'gitBranchCompare',
-      'gitBranchDiff'
+      'gitBranchDiff',
+      'systemSnapshot'
     ])
   })
 
@@ -474,5 +476,72 @@ describe('createOrcadGateway', () => {
     await expect(gateway.listWorktreePs()).resolves.toEqual([
       { worktreeId: 'w1', status: 'inactive' }
     ])
+  })
+
+  it('systemSnapshot maps a system.snapshot response into SystemGraphSnapshot', async () => {
+    const call: RpcCaller = vi.fn(async () => ({
+      id: 'x',
+      ok: true as const,
+      result: {
+        nodes: [
+          { id: 'router', kind: 'router', label: 'router', diff: null },
+          {
+            id: 'POST /auth/retry',
+            kind: 'endpoint',
+            label: 'POST /auth/retry',
+            method: 'POST',
+            path: '/auth/retry',
+            diff: null
+          },
+          { id: 'weird', kind: 'unknown-kind', label: 'weird', diff: null }
+        ],
+        edges: [
+          { from: 'router', to: 'POST /auth/retry', kind: 'flow' },
+          { from: 'router', to: 'weird', kind: 'unknown-kind' }
+        ]
+      },
+      _meta: { runtimeId: 'rt' }
+    }))
+    const gateway = createOrcadGateway({ call })
+    await expect(gateway.systemSnapshot('/wt/beta')).resolves.toEqual({
+      nodes: [
+        { id: 'router', kind: 'router', label: 'router', diff: null },
+        {
+          id: 'POST /auth/retry',
+          kind: 'endpoint',
+          label: 'POST /auth/retry',
+          method: 'POST',
+          path: '/auth/retry',
+          diff: null
+        },
+        { id: 'weird', kind: 'service', label: 'weird', diff: null }
+      ],
+      edges: [
+        { from: 'router', to: 'POST /auth/retry', kind: 'flow' },
+        { from: 'router', to: 'weird', kind: 'normal' }
+      ]
+    })
+    expect(call).toHaveBeenCalledWith('system.snapshot', { worktree: '/wt/beta' })
+  })
+
+  it('systemSnapshot guards a missing nodes/edges array', async () => {
+    const call: RpcCaller = vi.fn(async () => ({
+      id: 'x',
+      ok: true as const,
+      result: {},
+      _meta: { runtimeId: 'rt' }
+    }))
+    const gateway = createOrcadGateway({ call })
+    await expect(gateway.systemSnapshot('/wt/beta')).resolves.toEqual({ nodes: [], edges: [] })
+  })
+
+  it('systemSnapshot lets a method_not_found RpcCallError propagate untouched (old host, no system.snapshot)', async () => {
+    const call: RpcCaller = vi.fn(async () => {
+      throw new RpcCallError('method_not_found', "Unknown method 'system.snapshot'.")
+    })
+    const gateway = createOrcadGateway({ call })
+    const rejection = gateway.systemSnapshot('/wt/beta')
+    await expect(rejection).rejects.toBeInstanceOf(RpcCallError)
+    await expect(rejection).rejects.toMatchObject({ code: 'method_not_found' })
   })
 })

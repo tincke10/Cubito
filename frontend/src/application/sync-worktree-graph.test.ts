@@ -51,7 +51,8 @@ const fakeGateway = (
   }),
   gitBranchDiff: async () => {
     throw new Error('gitBranchDiff not implemented in this fake')
-  }
+  },
+  systemSnapshot: async () => ({ nodes: [], edges: [] })
 })
 
 describe('syncWorktreeGraph', () => {

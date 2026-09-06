@@ -66,6 +66,29 @@ export type DiffFileContent =
   | { kind: 'text'; originalContent: string; modifiedContent: string; truncated: boolean }
   | { kind: 'binary'; mimeType?: string; modifiedDeleted?: boolean }
 
+/** One `system.snapshot` node. Local mirror (rpc-purity) of the engine wire shape — no `state`,
+ *  that ladder is derived frontend-side. `diff` is always null until Change D adds real git diff. */
+export type SystemSnapshotNode = {
+  id: string
+  kind: 'router' | 'endpoint' | 'service' | 'database'
+  label: string
+  method?: string
+  path?: string
+  diff: null
+}
+
+export type SystemSnapshotEdge = {
+  from: string
+  to: string
+  kind: 'normal' | 'flow' | 'faint'
+}
+
+/** Minimal projection of `system.snapshot` — the live system graph for one worktree. */
+export type SystemGraphSnapshot = {
+  nodes: readonly SystemSnapshotNode[]
+  edges: readonly SystemSnapshotEdge[]
+}
+
 /**
  * Port to the orcad runtime. The application layer depends on this shape
  * only; infrastructure provides the RPC-backed implementation.
@@ -84,4 +107,5 @@ export type RuntimeGateway = {
     filePath: string,
     oldPath?: string
   ): Promise<DiffFileContent>
+  systemSnapshot(worktree: string): Promise<SystemGraphSnapshot>
 }

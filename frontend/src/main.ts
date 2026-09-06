@@ -113,7 +113,8 @@ const demoGateway: RuntimeGateway = {
   }),
   gitBranchDiff: async () => {
     throw new Error('gitBranchDiff not implemented in the demo gateway')
-  }
+  },
+  systemSnapshot: async () => ({ nodes: [], edges: [] })
 }
 
 const container = document.getElementById('app')

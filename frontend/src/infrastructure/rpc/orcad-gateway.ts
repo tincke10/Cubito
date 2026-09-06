@@ -7,6 +7,9 @@ import type {
   GitStatusRow,
   RepoSummary,
   RuntimeGateway,
+  SystemGraphSnapshot,
+  SystemSnapshotEdge,
+  SystemSnapshotNode,
   WorktreePsRow
 } from '../../application/ports/runtime-gateway'
 import type { RpcSuccessFrame } from './envelope'
@@ -124,6 +127,56 @@ function toDiffFileContent(result: {
   }
 }
 
+const SNAPSHOT_NODE_KINDS = ['router', 'endpoint', 'service', 'database'] as const
+const SNAPSHOT_EDGE_KINDS = ['normal', 'flow', 'faint'] as const
+
+/** Projects a raw `system.snapshot` node onto the local `SystemSnapshotNode` shape. */
+function toSystemSnapshotNode(node: {
+  id?: unknown
+  kind?: unknown
+  label?: unknown
+  method?: unknown
+  path?: unknown
+}): SystemSnapshotNode {
+  return {
+    id: typeof node.id === 'string' ? node.id : '',
+    kind: (SNAPSHOT_NODE_KINDS as readonly unknown[]).includes(node.kind)
+      ? (node.kind as SystemSnapshotNode['kind'])
+      : 'service',
+    label: typeof node.label === 'string' ? node.label : '',
+    ...(typeof node.method === 'string' ? { method: node.method } : {}),
+    ...(typeof node.path === 'string' ? { path: node.path } : {}),
+    diff: null
+  }
+}
+
+/** Projects a raw `system.snapshot` edge onto the local `SystemSnapshotEdge` shape. */
+function toSystemSnapshotEdge(edge: {
+  from?: unknown
+  to?: unknown
+  kind?: unknown
+}): SystemSnapshotEdge {
+  return {
+    from: typeof edge.from === 'string' ? edge.from : '',
+    to: typeof edge.to === 'string' ? edge.to : '',
+    kind: (SNAPSHOT_EDGE_KINDS as readonly unknown[]).includes(edge.kind)
+      ? (edge.kind as SystemSnapshotEdge['kind'])
+      : 'normal'
+  }
+}
+
+/** Projects a raw `system.snapshot` result onto the local `SystemGraphSnapshot` shape. */
+function toSystemGraphSnapshot(result: { nodes?: unknown; edges?: unknown }): SystemGraphSnapshot {
+  return {
+    nodes: Array.isArray(result.nodes)
+      ? (result.nodes as Record<string, unknown>[]).map(toSystemSnapshotNode)
+      : [],
+    edges: Array.isArray(result.edges)
+      ? (result.edges as Record<string, unknown>[]).map(toSystemSnapshotEdge)
+      : []
+  }
+}
+
 /** The one method of RpcConnection the gateway needs; eases test doubles. */
 export type RpcCaller = (method: string, params?: unknown) => Promise<RpcSuccessFrame>
 
@@ -202,6 +255,10 @@ export function createOrcadGateway(
         ...(oldPath !== undefined ? { oldPath } : {})
       })
       return toDiffFileContent(response.result as Parameters<typeof toDiffFileContent>[0])
+    },
+    async systemSnapshot(worktree: string) {
+      const response = await connection.call('system.snapshot', { worktree })
+      return toSystemGraphSnapshot(response.result as Parameters<typeof toSystemGraphSnapshot>[0])
     }
   }
 }
