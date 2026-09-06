@@ -173,6 +173,18 @@ function startSubmit(slice: FanOutSlice, mutationIds: readonly string[]): FanOut
   }
 }
 
+/** camada-<mutationId prefix> — the litter's worktree name and (Change B) lease task/worker displayName. */
+export function cubeNameFor(mutationId: string): string {
+  return `camada-${mutationId.replace(/-/g, '').slice(0, 10)}`
+}
+
+/** Run objective / task spec text (Change B lease path): the litter prompt if given, else a
+ *  generated default — the engine's `requiredString` rejects an empty objective/spec. */
+export function fanOutObjectiveText(fields: FanOutFormFields): string {
+  const prompt = fields.prompt.trim()
+  return prompt !== '' ? prompt : `Camada de ${fields.count} cubos`
+}
+
 /** Maps form fields + parent lineage + resolved repo selector to N `worktree.create` params. */
 export function toFanOutInputs(
   slice: FanOutSlice,
@@ -187,7 +199,7 @@ export function toFanOutInputs(
       parentWorktree: parentId,
       clientMutationId: mutationId,
       // Why: fan-out has no name field (litter names are auto); the host rejects an empty name.
-      name: `camada-${mutationId.replace(/-/g, '').slice(0, 10)}`,
+      name: cubeNameFor(mutationId),
       nameWasGenerated: true
     }
     if (fields.agent !== 'none') {
