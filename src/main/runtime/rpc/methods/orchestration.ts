@@ -1476,7 +1476,16 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'orchestration.taskCreate',
     params: TaskCreateParams,
-    handler: (params, { orchestrationCompatibilityEvidence, runtime, legacyCoordinatorRunId }) => {
+    handler: (
+      params,
+      {
+        orchestrationCompatibilityEvidence,
+        runtime,
+        legacyCoordinatorRunId,
+        pairedDeviceId,
+        clientKind
+      }
+    ) => {
       const db = runtime.getOrchestrationDb()
       let deps: string[] | undefined
       if (params.deps) {
@@ -1490,12 +1499,16 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           throw new Error('Invalid --deps: must be a JSON array of task IDs')
         }
       }
+      // Why: a paired GUI device with no callerTerminalHandle and no terminal evidence is a lease caller.
+      const isLeaseCaller =
+        !params.callerTerminalHandle && pairedDeviceId !== undefined && clientKind === 'runtime'
       const run = resolveRunScope(runtime, {
         runId: params.run,
         callerTerminalHandle: params.callerTerminalHandle,
         requireCurrentConsumer: true,
         legacyCoordinatorRunId,
-        callerEvidence: orchestrationCompatibilityEvidence
+        callerEvidence: orchestrationCompatibilityEvidence,
+        leaseDeviceId: isLeaseCaller ? pairedDeviceId : undefined
       })
       const creatorAuthority = params.callerTerminalHandle
         ? runtime.getOrchestrationDispatchAuthority(params.callerTerminalHandle)

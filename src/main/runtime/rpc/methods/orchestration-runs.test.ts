@@ -232,6 +232,97 @@ describe('orchestration RPC methods', () => {
     })
   })
 
+  describe('lease Runs (paired GUI device, Wave 3)', () => {
+    function leaseCtx(deviceId: string): RpcContext {
+      return { runtime, pairedDeviceId: deviceId, clientKind: 'runtime' }
+    }
+
+    it('mints a lease Run with no terminal and no stable pane requirement', async () => {
+      setup(false)
+      const created = (await h.call(
+        'orchestration.runCreate',
+        { objective: 'GUI fan-out' },
+        leaseCtx('device_1')
+      )) as {
+        run: {
+          id: string
+          coordinator_pane_key: string
+          coordinator_handle: string
+          legacy: number
+        }
+      }
+
+      expect(created.run.coordinator_handle).toBe('lease:device_1')
+      expect(created.run.coordinator_pane_key).toBe(`lease:device_1:${created.run.id}`)
+      expect(created.run.legacy).toBe(0)
+    })
+
+    it('keeps the terminal runCreate branch byte-identical when `from` is present', async () => {
+      setup(false)
+      vi.spyOn(runtime, 'getTerminalPaneKey').mockReturnValue(coordinatorPaneKey)
+
+      const created = (await call('orchestration.runCreate', {
+        objective: 'terminal still works',
+        from: 'term_coord'
+      })) as { run: { coordinator_handle: string; coordinator_pane_key: string; legacy: number } }
+
+      expect(created.run.coordinator_handle).toBe('term_coord')
+      expect(created.run.coordinator_pane_key).toBe(coordinatorPaneKey)
+      expect(created.run.legacy).toBe(0)
+    })
+
+    it('isolates two lease Runs minted by the same device', async () => {
+      setup(false)
+      const first = (await h.call(
+        'orchestration.runCreate',
+        { objective: 'first' },
+        leaseCtx('device_1')
+      )) as { run: { id: string; coordinator_pane_key: string } }
+      const second = (await h.call(
+        'orchestration.runCreate',
+        { objective: 'second' },
+        leaseCtx('device_1')
+      )) as { run: { id: string; coordinator_pane_key: string } }
+
+      expect(first.run.id).not.toBe(second.run.id)
+      expect(first.run.coordinator_pane_key).not.toBe(second.run.coordinator_pane_key)
+    })
+
+    it('lets the lease owner create tasks on its own Run', async () => {
+      setup(false)
+      const created = (await h.call(
+        'orchestration.runCreate',
+        { objective: 'lease tasks' },
+        leaseCtx('device_1')
+      )) as { run: { id: string } }
+
+      const taskResult = (await h.call(
+        'orchestration.taskCreate',
+        { spec: 'lease work', run: created.run.id },
+        leaseCtx('device_1')
+      )) as { task: { id: string; run_id: string } }
+
+      expect(taskResult.task.run_id).toBe(created.run.id)
+    })
+
+    it('fences a lease taskCreate against another device Run', async () => {
+      setup(false)
+      const created = (await h.call(
+        'orchestration.runCreate',
+        { objective: 'owned by device_1' },
+        leaseCtx('device_1')
+      )) as { run: { id: string } }
+
+      await expect(
+        h.call(
+          'orchestration.taskCreate',
+          { spec: 'not yours', run: created.run.id },
+          leaseCtx('device_2')
+        )
+      ).rejects.toMatchObject({ code: 'consumer_fenced' })
+    })
+  })
+
   describe('orchestration.reset', () => {
     function seedResetState(): void {
       db.insertMessage({ from: 'a', to: 'b', subject: 'test' })

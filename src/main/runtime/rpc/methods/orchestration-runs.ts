@@ -10,7 +10,8 @@ import {
 
 const RunCreateParams = z.object({
   objective: requiredString('Missing --objective'),
-  from: requiredString('Missing coordinator terminal')
+  // Why: absent for a paired-device lease caller (no terminal); required otherwise.
+  from: OptionalString
 })
 
 const RunUseParams = z.object({
@@ -30,13 +31,27 @@ export const ORCHESTRATION_RUN_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'orchestration.runCreate',
     params: RunCreateParams,
-    handler: (params, { orchestrationCompatibilityEvidence, runtime }) => {
+    handler: (
+      params,
+      { orchestrationCompatibilityEvidence, runtime, pairedDeviceId, clientKind }
+    ) => {
+      const db = runtime.getOrchestrationDb()
+      // Why: a paired GUI device with no `from` and no terminal evidence is a lease caller —
+      // deviceId comes from the authenticated ctx only, never from a user param.
+      if (!params.from && pairedDeviceId && clientKind === 'runtime') {
+        const run = db.createLeaseRun({ objective: params.objective, deviceId: pairedDeviceId })
+        return { run, binding: { consumerGeneration: run.consumer_generation } }
+      }
+      if (!params.from) {
+        throw new OrchestrationError('run_required', 'Missing coordinator terminal', {
+          effectsApplied: false
+        })
+      }
       const paneKey = resolveOrchestrationCaller(runtime, {
         callerTerminalHandle: params.from,
         callerEvidence: orchestrationCompatibilityEvidence,
         requireStablePane: true
       })
-      const db = runtime.getOrchestrationDb()
       const priorRun = db.getCurrentRunForPane(paneKey)
       const run = db.createRun({
         objective: params.objective,
