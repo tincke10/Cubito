@@ -8,6 +8,7 @@ type FakeElement = {
   readonly children: FakeElement[]
   className: string
   textContent: string
+  hidden: boolean
   appendChild(child: FakeElement): FakeElement
   replaceChildren(): void
   remove(): void
@@ -20,6 +21,7 @@ const createFakeElement = (tag: string): FakeElement => {
     children: [],
     className: '',
     textContent: '',
+    hidden: false,
     appendChild(child) {
       el.children.push(child)
       return child
@@ -40,6 +42,7 @@ const rootOf = (handle: ReturnType<typeof createActivityFeed>) =>
 const headerOf = (root: FakeElement) => root.children[0]!
 const rowsOf = (root: FakeElement) => root.children[1]!
 const footerOf = (root: FakeElement) => root.children[2]!
+const placeholderOf = (root: FakeElement) => root.children[3]!
 
 const row = (
   overrides: Partial<ActivityFeedRowView> & Pick<ActivityFeedRowView, 'id' | 'glyph' | 'cssClass'>
@@ -123,6 +126,24 @@ describe('createActivityFeed', () => {
     expect(subtitle.textContent).toBe('claude · POST /auth/retry con backoff')
     feed.setSubtitle(null)
     expect(subtitle.textContent).toBe('')
+  })
+
+  it('apply([]) shows the empty-feed placeholder and hides the footer', () => {
+    const feed = createActivityFeed(createFakeDocument())
+    const root = rootOf(feed)
+    feed.apply([])
+    expect(placeholderOf(root).hidden).toBe(false)
+    expect(placeholderOf(root).textContent).toBe('aún no hay actividad')
+    expect(footerOf(root).hidden).toBe(true)
+  })
+
+  it('apply([row]) hides the placeholder, shows the footer, and renders the row', () => {
+    const feed = createActivityFeed(createFakeDocument())
+    const root = rootOf(feed)
+    feed.apply([row({ id: 'a', glyph: '⏺', cssClass: 'activity-row--read' })])
+    expect(placeholderOf(root).hidden).toBe(true)
+    expect(footerOf(root).hidden).toBe(false)
+    expect(rowsOf(root).children).toHaveLength(1)
   })
 
   it('dispose removes the root element', () => {

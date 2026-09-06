@@ -3,6 +3,7 @@ import type { ActivityFeedRowView } from './activity-feed-model'
 const TITLE = 'actividad del agente'
 const FOOTER_LABEL = 'escribiendo …'
 const FOOTER_CURSOR_GLYPH = '▮'
+const PLACEHOLDER_TEXT = 'aún no hay actividad'
 
 const buildRow = (doc: Document, row: ActivityFeedRowView): HTMLElement => {
   const rowElement = doc.createElement('div')
@@ -88,9 +89,15 @@ export function createActivityFeed(doc: Document = document): ActivityFeedHandle
   footer.appendChild(cursor)
   footer.appendChild(footerLabel)
 
+  const placeholder = doc.createElement('div')
+  placeholder.className = 'cubito-activity-feed__placeholder'
+  placeholder.textContent = PLACEHOLDER_TEXT
+  placeholder.hidden = true
+
   root.appendChild(header)
   root.appendChild(rows)
   root.appendChild(footer)
+  root.appendChild(placeholder)
 
   return {
     element: root,
@@ -99,6 +106,9 @@ export function createActivityFeed(doc: Document = document): ActivityFeedHandle
       for (const row of rowViews) {
         rows.appendChild(buildRow(doc, row))
       }
+      const isEmpty = rowViews.length === 0
+      placeholder.hidden = !isEmpty
+      footer.hidden = isEmpty
     },
     setSubtitle(text: string | null) {
       subtitle.textContent = text ?? ''
