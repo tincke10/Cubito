@@ -71,6 +71,26 @@ describe('reduceSystemView — apply-delta', () => {
   })
 })
 
+describe('reduceSystemView — replace-graph', () => {
+  it('replaces the graph wholesale when open, preserving feed and highlight', () => {
+    const row = { id: 'f1', time: '14:03:05', kind: 'read' as const, text: 'leyendo auth.ts' }
+    const slice = openSlice({
+      graph: graphOf([systemNode({ id: 'old' })]),
+      feed: [row],
+      highlightedNodeId: 'old'
+    })
+    const nextGraph = graphOf([systemNode({ id: 'new' })])
+    const result = reduceSystemView(slice, { type: 'replace-graph', graph: nextGraph })
+    expect(result).toEqual(openSlice({ graph: nextGraph, feed: [row], highlightedNodeId: 'old' }))
+  })
+
+  it('is a no-op when closed', () => {
+    const closed = emptySystemViewSlice()
+    const result = reduceSystemView(closed, { type: 'replace-graph', graph: graphOf([]) })
+    expect(result).toBe(closed)
+  })
+})
+
 describe('reduceSystemView — append-feed', () => {
   it('appends a feed row when open', () => {
     const row = { id: 'f1', time: '14:03:05', kind: 'read' as const, text: 'leyendo auth.ts' }

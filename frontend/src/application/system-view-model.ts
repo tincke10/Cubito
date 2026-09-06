@@ -24,6 +24,7 @@ export type SystemViewAction =
   | { type: 'open'; nodeId: SystemNodeId }
   | { type: 'close' }
   | { type: 'apply-delta'; delta: SystemGraphDelta }
+  | { type: 'replace-graph'; graph: SystemGraph }
   | { type: 'append-feed'; row: FeedRow }
   | { type: 'set-highlight'; nodeId: SystemNodeId | null }
 
@@ -40,6 +41,8 @@ export function reduceSystemView(
       return slice.view === 'open'
         ? { ...slice, graph: applySystemGraphDelta(slice.graph, action.delta) }
         : slice
+    case 'replace-graph':
+      return slice.view === 'open' ? { ...slice, graph: action.graph } : slice
     case 'append-feed':
       return slice.view === 'open' ? { ...slice, feed: [...slice.feed, action.row] } : slice
     case 'set-highlight':
