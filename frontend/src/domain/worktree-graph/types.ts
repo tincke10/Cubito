@@ -16,6 +16,8 @@ export type WorktreeNode = {
   parentId: WorktreeId | null
   childIds: readonly WorktreeId[]
   activity: NodeActivity
+  /** Persisted create-base for diff mode; absent when the record never had one. */
+  baseRef?: string
 }
 
 /** Directed lineage edge: the worktree at `from` spawned the one at `to`. */

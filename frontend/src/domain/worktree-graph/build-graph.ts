@@ -24,6 +24,8 @@ export type RawWorktreeRecord = {
   isArchived?: boolean
   diff?: DiffSummary
   spawn?: SpawnProgress
+  /** Persisted create-base for stale-base probes; diff mode's baseRef resolution truth. */
+  baseRef?: string
 }
 
 /** Overrides only the optional fields a record actually supplies; the rest stays inert. */
@@ -72,7 +74,8 @@ export function buildWorktreeGraph(records: readonly RawWorktreeRecord[]): Workt
       kind: raw.git.isMainWorktree ? 'root' : 'worktree',
       parentId: raw.parentWorktreeId,
       childIds: [...raw.childWorktreeIds],
-      activity: activityFromRecord(raw)
+      activity: activityFromRecord(raw),
+      ...(raw.baseRef !== undefined ? { baseRef: raw.baseRef } : {})
     })
   }
 

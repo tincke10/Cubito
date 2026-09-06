@@ -130,4 +130,15 @@ describe('buildWorktreeGraph', () => {
     const graph = buildWorktreeGraph([record({ id: 'fallback-repo::/path/main' })])
     expect(graph.nodes.get('fallback-repo::/path/main')?.repoId).toBe('fallback-repo')
   })
+
+  it('projects baseRef when the record carries one', () => {
+    const graph = buildWorktreeGraph([record({ baseRef: 'refs/heads/develop' })])
+    expect(graph.nodes.get('repo::/path/main')?.baseRef).toBe('refs/heads/develop')
+  })
+
+  it('omits baseRef when the record has none', () => {
+    const graph = buildWorktreeGraph([record()])
+    expect(graph.nodes.get('repo::/path/main')?.baseRef).toBeUndefined()
+    expect('baseRef' in (graph.nodes.get('repo::/path/main') ?? {})).toBe(false)
+  })
 })
