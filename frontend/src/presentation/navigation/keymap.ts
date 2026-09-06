@@ -59,7 +59,13 @@ const isPaletteChord = (key: string, modifiers: Modifiers, platform: Platform): 
 /** Shift+F — platform-uniform (no meta/ctrl branch, unlike the chords above); bare `f` still
  *  falls through to `focus`. */
 const isFanOutChord = (key: string, modifiers: Modifiers): boolean =>
-  key === 'f' && modifiers.shift && !modifiers.alt && !modifiers.ctrl && !modifiers.meta
+  // toLowerCase: a real Shift+F yields event.key 'F', not 'f' (the only shift+letter chord — the
+  // meta/ctrl chords above never shift the letter, so this case-fold is unique to fan-out).
+  key.toLowerCase() === 'f' &&
+  modifiers.shift &&
+  !modifiers.alt &&
+  !modifiers.ctrl &&
+  !modifiers.meta
 
 /** `h/l/k/j` move the selection, `f` focuses, `v` fits all; any modifier or unmapped key yields `null`. */
 export function resolveNavCommand(

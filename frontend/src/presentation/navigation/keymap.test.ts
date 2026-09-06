@@ -174,6 +174,15 @@ describe('shift+f fan-out chord — platform-uniform, targeted exception to the 
     })
   })
 
+  it('resolves the REAL browser key: Shift+F yields event.key "F" (uppercase), not "f"', () => {
+    expect(resolveNavCommand('F', { ...noModifiers, shift: true }, MAC)).toEqual({
+      kind: 'open-fan-out'
+    })
+    expect(resolveNavCommand('F', { ...noModifiers, shift: true }, LINUX)).toEqual({
+      kind: 'open-fan-out'
+    })
+  })
+
   it('bare f (no modifier) still resolves to focus on either platform', () => {
     expect(resolveNavCommand('f', noModifiers, MAC)).toEqual({ kind: 'focus' })
     expect(resolveNavCommand('f', noModifiers, LINUX)).toEqual({ kind: 'focus' })
