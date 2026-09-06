@@ -272,6 +272,51 @@ describe('connectOrcad', () => {
     }
   })
 
+  it('gitStatus()/gitBranchCompare() map served git.status/git.branchCompare payloads (diff-stat gateway)', async () => {
+    const server = await startFakeOrcadServer({
+      handleRequest: (method) => {
+        if (method === 'git.status') {
+          return {
+            ok: true,
+            result: {
+              entries: [{ path: 'a.ts', status: 'modified', added: 3, removed: 1 }],
+              branch: 'cubito-beta',
+              branchLineTotal: { added: 3, removed: 1, mergeBase: 'deadbeef' }
+            }
+          }
+        }
+        if (method === 'git.branchCompare') {
+          return {
+            ok: true,
+            result: {
+              summary: { changedFiles: 1, commitsAhead: 2, commitsBehind: 0 },
+              entries: [{ path: 'a.ts', status: 'modified', added: 3, removed: 1 }]
+            }
+          }
+        }
+        return { ok: true, result: { worktrees: [] } }
+      }
+    })
+    servers.push(server)
+
+    const connection = await connectOrcad(offerFor(server))
+    try {
+      await expect(connection.gateway.gitStatus('/wt/beta')).resolves.toEqual({
+        entries: [{ path: 'a.ts', status: 'modified', added: 3, removed: 1 }],
+        branch: 'cubito-beta',
+        branchLineTotal: 4
+      })
+      await expect(connection.gateway.gitBranchCompare('/wt/beta', 'main')).resolves.toEqual({
+        changedFiles: 1,
+        commitsAhead: 2,
+        commitsBehind: 0,
+        entries: [{ path: 'a.ts', status: 'modified', added: 3, removed: 1 }]
+      })
+    } finally {
+      connection.close()
+    }
+  })
+
   it('rejects with remote_runtime_unavailable if no handshake response arrives within timeoutMs', async () => {
     const wss = new WebSocketServer({ port: 0 })
     await new Promise<void>((resolve) => wss.once('listening', resolve))

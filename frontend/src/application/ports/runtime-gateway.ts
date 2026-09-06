@@ -34,6 +34,29 @@ export type WorktreePsRow = {
   status: string
 }
 
+/** One per-file row from `git.status`/`git.branchCompare` entries. */
+export type GitStatusRow = {
+  path: string
+  status: string
+  added: number
+  removed: number
+}
+
+/** Minimal projection of `git.status` — not the full result; only what diff-mode/live-sync/fan-out need. */
+export type GitStatus = {
+  entries: readonly GitStatusRow[]
+  branch: string
+  branchLineTotal: number
+}
+
+/** Minimal projection of `git.branchCompare`. */
+export type BranchCompare = {
+  changedFiles: number
+  commitsAhead: number
+  commitsBehind: number
+  entries: readonly GitStatusRow[]
+}
+
 /**
  * Port to the orcad runtime. The application layer depends on this shape
  * only; infrastructure provides the RPC-backed implementation.
@@ -44,4 +67,6 @@ export type RuntimeGateway = {
   createWorktree(input: CreateWorktreeInput): Promise<CreateWorktreeResult>
   addRepo(input: { path: string; kind?: 'git' | 'folder' }): Promise<RepoSummary>
   listWorktreePs(): Promise<readonly WorktreePsRow[]>
+  gitStatus(worktree: string): Promise<GitStatus>
+  gitBranchCompare(worktree: string, baseRef?: string): Promise<BranchCompare>
 }

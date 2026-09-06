@@ -69,7 +69,14 @@ function createFakeConnection(overrides?: {
       addRepo: async () => {
         throw new Error('addRepo not implemented in this fake')
       },
-      listWorktreePs: async () => []
+      listWorktreePs: async () => [],
+      gitStatus: async () => ({ entries: [], branch: '', branchLineTotal: 0 }),
+      gitBranchCompare: async () => ({
+        changedFiles: 0,
+        commitsAhead: 0,
+        commitsBehind: 0,
+        entries: []
+      })
     },
     terminals: createFakeTerminalsPort(),
     close() {

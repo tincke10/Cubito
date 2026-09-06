@@ -68,7 +68,7 @@ describe('createOrcadGateway', () => {
     expect(onRuntimeId).not.toHaveBeenCalled()
   })
 
-  it('stays frozen at the fan-out-era method set — no undocumented methods added (CO-305 ratchet)', () => {
+  it('stays frozen at the diff-stat-gateway-era method set — no undocumented methods added (CO-305 ratchet)', () => {
     const call: RpcCaller = vi.fn()
     const gateway = createOrcadGateway({ call })
     expect(Object.keys(gateway)).toEqual([
@@ -76,8 +76,89 @@ describe('createOrcadGateway', () => {
       'listRepos',
       'addRepo',
       'createWorktree',
-      'listWorktreePs'
+      'listWorktreePs',
+      'gitStatus',
+      'gitBranchCompare'
     ])
+  })
+
+  it('gitStatus maps a git.status response into GitStatus (per-file added/removed + branchLineTotal)', async () => {
+    const call: RpcCaller = vi.fn(async () => ({
+      id: 'x',
+      ok: true as const,
+      result: {
+        entries: [
+          { path: 'a.ts', status: 'modified', area: 'unstaged', added: 3, removed: 1 },
+          { path: 'b.ts', status: 'added', area: 'untracked', added: 10, removed: 0 }
+        ],
+        branch: 'cubito-beta',
+        branchLineTotal: { added: 40, removed: 5, mergeBase: 'deadbeef' }
+      },
+      _meta: { runtimeId: 'rt' }
+    }))
+    const gateway = createOrcadGateway({ call })
+    await expect(gateway.gitStatus('/wt/beta')).resolves.toEqual({
+      entries: [
+        { path: 'a.ts', status: 'modified', added: 3, removed: 1 },
+        { path: 'b.ts', status: 'added', added: 10, removed: 0 }
+      ],
+      branch: 'cubito-beta',
+      branchLineTotal: 45
+    })
+    expect(call).toHaveBeenCalledWith('git.status', { worktree: '/wt/beta' })
+  })
+
+  it('gitStatus guards a missing entries array / coerces missing numbers to 0', async () => {
+    const call: RpcCaller = vi.fn(async () => ({
+      id: 'x',
+      ok: true as const,
+      result: { branch: 'main' },
+      _meta: { runtimeId: 'rt' }
+    }))
+    const gateway = createOrcadGateway({ call })
+    await expect(gateway.gitStatus('/wt/main')).resolves.toEqual({
+      entries: [],
+      branch: 'main',
+      branchLineTotal: 0
+    })
+  })
+
+  it('gitBranchCompare maps a git.branchCompare response into BranchCompare (summary + entries)', async () => {
+    const call: RpcCaller = vi.fn(async () => ({
+      id: 'x',
+      ok: true as const,
+      result: {
+        summary: { changedFiles: 2, commitsAhead: 3, commitsBehind: 1 },
+        entries: [{ path: 'a.ts', status: 'modified', added: 3, removed: 1 }]
+      },
+      _meta: { runtimeId: 'rt' }
+    }))
+    const gateway = createOrcadGateway({ call })
+    await expect(gateway.gitBranchCompare('/wt/beta', 'main')).resolves.toEqual({
+      changedFiles: 2,
+      commitsAhead: 3,
+      commitsBehind: 1,
+      entries: [{ path: 'a.ts', status: 'modified', added: 3, removed: 1 }]
+    })
+  })
+
+  it('gitBranchCompare passes baseRef when provided / omits it when not', async () => {
+    const call: RpcCaller = vi.fn(async () => ({
+      id: 'x',
+      ok: true as const,
+      result: { summary: {}, entries: [] },
+      _meta: { runtimeId: 'rt' }
+    }))
+    const gateway = createOrcadGateway({ call })
+
+    await gateway.gitBranchCompare('/wt/beta', 'main')
+    expect(call).toHaveBeenNthCalledWith(1, 'git.branchCompare', {
+      worktree: '/wt/beta',
+      baseRef: 'main'
+    })
+
+    await gateway.gitBranchCompare('/wt/beta')
+    expect(call).toHaveBeenNthCalledWith(2, 'git.branchCompare', { worktree: '/wt/beta' })
   })
 
   it('lists repos via repo.list', async () => {

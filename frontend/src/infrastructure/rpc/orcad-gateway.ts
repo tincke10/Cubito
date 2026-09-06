@@ -1,6 +1,9 @@
 import type { RawWorktreeRecord } from '../../domain/worktree-graph/build-graph'
 import type {
+  BranchCompare,
   CreateWorktreeInput,
+  GitStatus,
+  GitStatusRow,
   RepoSummary,
   RuntimeGateway,
   WorktreePsRow
@@ -30,6 +33,55 @@ function toRepoSummary(row: {
     path: typeof row.path === 'string' ? row.path : '',
     displayName: typeof row.displayName === 'string' ? row.displayName : row.id,
     kind: row.kind === 'git' || row.kind === 'folder' ? row.kind : null
+  }
+}
+
+/** Projects a raw `git.status`/`git.branchCompare` entry onto the local `GitStatusRow` shape. */
+function toGitStatusRow(row: {
+  path?: unknown
+  status?: unknown
+  added?: unknown
+  removed?: unknown
+}): GitStatusRow {
+  return {
+    path: typeof row.path === 'string' ? row.path : '',
+    status: typeof row.status === 'string' ? row.status : 'modified',
+    added: typeof row.added === 'number' ? row.added : 0,
+    removed: typeof row.removed === 'number' ? row.removed : 0
+  }
+}
+
+/** Projects a raw `git.status` result onto the local `GitStatus` shape (per-file stats + worktree total). */
+function toGitStatus(result: {
+  entries?: unknown
+  branch?: unknown
+  branchLineTotal?: { added?: unknown; removed?: unknown }
+}): GitStatus {
+  const total = result.branchLineTotal
+  const added = typeof total?.added === 'number' ? total.added : 0
+  const removed = typeof total?.removed === 'number' ? total.removed : 0
+  return {
+    entries: Array.isArray(result.entries)
+      ? (result.entries as Record<string, unknown>[]).map(toGitStatusRow)
+      : [],
+    branch: typeof result.branch === 'string' ? result.branch : '',
+    branchLineTotal: added + removed
+  }
+}
+
+/** Projects a raw `git.branchCompare` result onto the local `BranchCompare` shape. */
+function toBranchCompare(result: {
+  summary?: { changedFiles?: unknown; commitsAhead?: unknown; commitsBehind?: unknown }
+  entries?: unknown
+}): BranchCompare {
+  const summary = result.summary
+  return {
+    changedFiles: typeof summary?.changedFiles === 'number' ? summary.changedFiles : 0,
+    commitsAhead: typeof summary?.commitsAhead === 'number' ? summary.commitsAhead : 0,
+    commitsBehind: typeof summary?.commitsBehind === 'number' ? summary.commitsBehind : 0,
+    entries: Array.isArray(result.entries)
+      ? (result.entries as Record<string, unknown>[]).map(toGitStatusRow)
+      : []
   }
 }
 
@@ -89,6 +141,17 @@ export function createOrcadGateway(
         throw new Error('worktree.ps returned no worktrees array')
       }
       return (result.worktrees as Record<string, unknown>[]).map(toWorktreePsRow)
+    },
+    async gitStatus(worktree: string) {
+      const response = await connection.call('git.status', { worktree })
+      return toGitStatus(response.result as Parameters<typeof toGitStatus>[0])
+    },
+    async gitBranchCompare(worktree: string, baseRef?: string) {
+      const response = await connection.call(
+        'git.branchCompare',
+        baseRef === undefined ? { worktree } : { worktree, baseRef }
+      )
+      return toBranchCompare(response.result as Parameters<typeof toBranchCompare>[0])
     }
   }
 }
