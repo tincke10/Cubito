@@ -10,6 +10,7 @@ import { emptyProjectSelectorSlice } from './project-selector-model'
 import { emptyCommandPaletteSlice } from './command-palette-model'
 import { emptyFanOutSlice } from './fan-out-model'
 import { emptySystemViewSlice } from './system-view-model'
+import { emptyDiffViewSlice } from './diff-view-model'
 
 const state = (overrides: Partial<SceneState> = {}): SceneState => ({
   graph: emptyWorktreeGraph(),
@@ -23,6 +24,7 @@ const state = (overrides: Partial<SceneState> = {}): SceneState => ({
   commandPalette: emptyCommandPaletteSlice(),
   fanOut: emptyFanOutSlice(),
   systemView: emptySystemViewSlice(),
+  diffView: emptyDiffViewSlice(),
   ...overrides
 })
 

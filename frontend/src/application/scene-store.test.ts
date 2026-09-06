@@ -8,6 +8,7 @@ import { emptyProjectSelectorSlice } from './project-selector-model'
 import { emptyCommandPaletteSlice } from './command-palette-model'
 import { emptyFanOutSlice, FANOUT_PLACEHOLDER_PREFIX } from './fan-out-model'
 import { emptySystemViewSlice } from './system-view-model'
+import { emptyDiffViewSlice } from './diff-view-model'
 import { inertActivity } from '../domain/worktree-graph/node-activity'
 import type { WorktreeGraph, WorktreeNode } from '../domain/worktree-graph/types'
 
@@ -326,6 +327,38 @@ describe('createSceneStore', () => {
     store.update({ graph: graphOf([node()]) })
     const before = store.get().graph
     store.dispatchSystemView({ type: 'open', nodeId: 'w1' })
+    expect(store.get().graph).toBe(before)
+  })
+
+  it('starts with a closed diffView slice', () => {
+    const store = createSceneStore()
+    expect(store.get().diffView).toEqual(emptyDiffViewSlice())
+  })
+
+  it('dispatchDiffView() drives the diffView slice through the reducer', () => {
+    const store = createSceneStore()
+    store.dispatchDiffView({ type: 'open', nodeId: 'w1', baseRef: 'main' })
+    expect(store.get().diffView).toMatchObject({ view: 'open', focusedNodeId: 'w1' })
+  })
+
+  it('dispatchDiffView() notifies subscribers once and leaves the rest of SceneState untouched', () => {
+    const store = createSceneStore()
+    const listener = vi.fn()
+    store.subscribe(listener)
+    const before = store.get()
+    store.dispatchDiffView({ type: 'open', nodeId: 'w1', baseRef: 'main' })
+    expect(listener).toHaveBeenCalledTimes(1)
+    const after = store.get()
+    expect(after.graph).toBe(before.graph)
+    expect(after.systemView).toBe(before.systemView)
+    expect(after.diffView).not.toBe(before.diffView)
+  })
+
+  it('dispatchDiffView() does not recompose the worktree graph', () => {
+    const store = createSceneStore()
+    store.update({ graph: graphOf([node()]) })
+    const before = store.get().graph
+    store.dispatchDiffView({ type: 'open', nodeId: 'w1', baseRef: 'main' })
     expect(store.get().graph).toBe(before)
   })
 })

@@ -14,6 +14,8 @@ import { composeFanOutGraph, emptyFanOutSlice, reduceFanOut } from './fan-out-mo
 import type { FanOutAction, FanOutSlice } from './fan-out-model'
 import { emptySystemViewSlice, reduceSystemView } from './system-view-model'
 import type { SystemViewAction, SystemViewSlice } from './system-view-model'
+import { emptyDiffViewSlice, reduceDiffView } from './diff-view-model'
+import type { DiffViewAction, DiffViewSlice } from './diff-view-model'
 
 export type SyncStatus =
   | { state: 'idle' }
@@ -39,6 +41,7 @@ export type SceneState = {
   commandPalette: CommandPaletteSlice
   fanOut: FanOutSlice
   systemView: SystemViewSlice
+  diffView: DiffViewSlice
 }
 
 export type SceneStore = {
@@ -59,6 +62,8 @@ export type SceneStore = {
   dispatchFanOut(action: FanOutAction): void
   /** Drives the systemView slice through system-view-model's reducer, one notify. Doesn't touch `graph`. */
   dispatchSystemView(action: SystemViewAction): void
+  /** Drives the diffView slice through diff-view-model's reducer, one notify. Doesn't touch `graph`. */
+  dispatchDiffView(action: DiffViewAction): void
   subscribe(listener: (state: SceneState) => void): () => void
 }
 
@@ -73,7 +78,8 @@ const initialSceneState = (): SceneState => ({
   projectSelector: emptyProjectSelectorSlice(),
   commandPalette: emptyCommandPaletteSlice(),
   fanOut: emptyFanOutSlice(),
-  systemView: emptySystemViewSlice()
+  systemView: emptySystemViewSlice(),
+  diffView: emptyDiffViewSlice()
 })
 
 /** Minimal observable store; swap for a richer signal system when the UI grows. */
@@ -122,6 +128,10 @@ export function createSceneStore(): SceneStore {
     },
     dispatchSystemView(action) {
       state = { ...state, systemView: reduceSystemView(state.systemView, action) }
+      notify()
+    },
+    dispatchDiffView(action) {
+      state = { ...state, diffView: reduceDiffView(state.diffView, action) }
       notify()
     },
     subscribe(listener) {
