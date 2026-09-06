@@ -4,8 +4,18 @@ import type { FanOutControllerDeps } from './fan-out-controller'
 import { emptyFanOutSlice } from '../../application/fan-out-model'
 import type { FanOutAction, FanOutSlice } from '../../application/fan-out-model'
 import type {
+  runCamadaLeaseSubmit,
+  FanOutLeaseSubmitResult
+} from '../../application/fan-out-lease-submit'
+import type {
   CreateWorktreeInput,
   CreateWorktreeResult,
+  LeaseRunCreateInput,
+  LeaseRunCreateResult,
+  LeaseTaskCreateInput,
+  LeaseTaskCreateResult,
+  LeaseWorkerStartInput,
+  LeaseWorkerStartResult,
   RepoSummary,
   WorktreePsRow
 } from '../../application/ports/runtime-gateway'
@@ -82,7 +92,22 @@ const createFakeGateway = () => ({
   createWorktree: vi.fn<(input: CreateWorktreeInput) => Promise<CreateWorktreeResult>>(
     async () => ({ worktreeId: 'wt-1' })
   ),
-  listWorktreePs: vi.fn<() => Promise<readonly WorktreePsRow[]>>(async () => [])
+  listWorktreePs: vi.fn<() => Promise<readonly WorktreePsRow[]>>(async () => []),
+  orchestrationRunCreate: vi.fn<(input: LeaseRunCreateInput) => Promise<LeaseRunCreateResult>>(
+    async () => {
+      throw new Error('orchestrationRunCreate not implemented in this fake')
+    }
+  ),
+  orchestrationTaskCreate: vi.fn<(input: LeaseTaskCreateInput) => Promise<LeaseTaskCreateResult>>(
+    async () => {
+      throw new Error('orchestrationTaskCreate not implemented in this fake')
+    }
+  ),
+  orchestrationWorkerStart: vi.fn<
+    (input: LeaseWorkerStartInput) => Promise<LeaseWorkerStartResult>
+  >(async () => {
+    throw new Error('orchestrationWorkerStart not implemented in this fake')
+  })
 })
 
 const createFakePoll = () => ({
@@ -91,7 +116,7 @@ const createFakePoll = () => ({
   rebindGateway: vi.fn()
 })
 
-const setup = () => {
+const setup = (overrides: Partial<FanOutControllerDeps> = {}) => {
   const gateway = createFakeGateway()
   const forms: FakeForm[] = []
   const hud = { appendChild: vi.fn() }
@@ -112,7 +137,8 @@ const setup = () => {
     focusLitter,
     memberPoll,
     refetch,
-    generateMutationId: () => `mutation-${++mutationCounter}`
+    generateMutationId: () => `mutation-${++mutationCounter}`,
+    ...overrides
   }
   const controller = createFanOutController(deps)
   return { controller, gateway, forms, hud, dispatch, refetch, focusLitter, memberPoll, deps }
@@ -338,5 +364,122 @@ describe('createFanOutController', () => {
     controller.dispose()
     expect(forms[0]!.disposed).toBe(true)
     expect(memberPoll.stop).toHaveBeenCalled()
+  })
+})
+
+const leaseResult = (
+  overrides: Partial<FanOutLeaseSubmitResult> = {}
+): FanOutLeaseSubmitResult => ({
+  localSlice: {
+    view: 'running',
+    parentId: 'w1',
+    fields: { count: 1, agent: 'claude', prompt: '' },
+    repoSelector: 'id:repo-1',
+    batch: [
+      {
+        mutationId: 'mutation-1',
+        worktreeId: 'wt-lease',
+        failed: false,
+        dispatchId: 'dispatch-1',
+        taskId: 'task-1'
+      }
+    ],
+    memberStatus: {},
+    runId: 'run-1'
+  },
+  runCreateFailed: false,
+  ...overrides
+})
+
+describe('createFanOutController — lease path (Change B)', () => {
+  it('uses the lease planner when leaseCapable() and an agent is chosen — threads ids into focus/poll/refetch', async () => {
+    const leasePlanner = vi.fn<typeof runCamadaLeaseSubmit>(async () => leaseResult())
+    const { controller, gateway, forms, focusLitter, memberPoll, refetch } = setup({
+      leaseCapable: () => true,
+      leasePlanner
+    })
+    controller.sync(
+      formSlice({ repoSelector: 'id:repo-1', fields: { count: 1, agent: 'claude', prompt: '' } }),
+      emptyWorktreeGraph()
+    )
+    forms[0]!.emitSubmit()
+    await flush()
+
+    expect(leasePlanner).toHaveBeenCalledOnce()
+    const [passedSlice, passedRepo, passedMutationIds, passedDeps] = leasePlanner.mock.calls[0]!
+    expect(passedSlice.view).toBe('form')
+    expect(passedRepo).toBe('id:repo-1')
+    expect(passedMutationIds).toEqual(['mutation-1'])
+    expect(passedDeps.gateway).toBe(gateway)
+    expect(gateway.createWorktree).not.toHaveBeenCalled()
+    expect(focusLitter).toHaveBeenCalledWith(['w1', 'wt-lease'])
+    expect(memberPoll.start).toHaveBeenCalledOnce()
+    expect(refetch).toHaveBeenCalledOnce()
+  })
+
+  it('falls back to the v1 loop when leaseCapable() is false, even with an agent chosen', async () => {
+    const leasePlanner = vi.fn<typeof runCamadaLeaseSubmit>(async () => leaseResult())
+    const { controller, gateway, forms } = setup({ leaseCapable: () => false, leasePlanner })
+    controller.sync(
+      formSlice({ repoSelector: 'id:repo-1', fields: { count: 1, agent: 'claude', prompt: '' } }),
+      emptyWorktreeGraph()
+    )
+    forms[0]!.emitSubmit()
+    await flush()
+    expect(leasePlanner).not.toHaveBeenCalled()
+    expect(gateway.createWorktree).toHaveBeenCalledOnce()
+  })
+
+  it('falls back to the v1 loop when the agent is none, even with leaseCapable() true', async () => {
+    const leasePlanner = vi.fn<typeof runCamadaLeaseSubmit>(async () => leaseResult())
+    const { controller, gateway, forms } = setup({ leaseCapable: () => true, leasePlanner })
+    controller.sync(
+      formSlice({ repoSelector: 'id:repo-1', fields: { count: 1, agent: 'none', prompt: '' } }),
+      emptyWorktreeGraph()
+    )
+    forms[0]!.emitSubmit()
+    await flush()
+    expect(leasePlanner).not.toHaveBeenCalled()
+    expect(gateway.createWorktree).toHaveBeenCalledOnce()
+  })
+
+  it('a runCreate failure falls back to the v1 loop, still using the ids seeded by the planner', async () => {
+    const leasePlanner = vi.fn<typeof runCamadaLeaseSubmit>(async () =>
+      leaseResult({
+        runCreateFailed: true,
+        localSlice: {
+          view: 'running',
+          parentId: 'w1',
+          fields: { count: 1, agent: 'claude', prompt: '' },
+          repoSelector: 'id:repo-1',
+          batch: [
+            {
+              mutationId: 'mutation-1',
+              worktreeId: null,
+              failed: false,
+              dispatchId: null,
+              taskId: null
+            }
+          ],
+          memberStatus: {},
+          runId: null
+        }
+      })
+    )
+    const { controller, gateway, forms, focusLitter } = setup({
+      leaseCapable: () => true,
+      leasePlanner
+    })
+    gateway.createWorktree.mockResolvedValueOnce({ worktreeId: 'wt-v1-fallback' })
+    controller.sync(
+      formSlice({ repoSelector: 'id:repo-1', fields: { count: 1, agent: 'claude', prompt: '' } }),
+      emptyWorktreeGraph()
+    )
+    forms[0]!.emitSubmit()
+    await flush()
+
+    expect(leasePlanner).toHaveBeenCalledOnce()
+    expect(gateway.createWorktree).toHaveBeenCalledOnce()
+    expect(focusLitter).toHaveBeenCalledWith(['w1', 'wt-v1-fallback'])
   })
 })

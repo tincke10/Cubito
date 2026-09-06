@@ -9,6 +9,8 @@ import type { CameraFraming, Vec3 } from './presentation/camera/camera-framing'
 import { createFanOutForm } from './presentation/hud/fan-out-element'
 import { createFanOutController } from './presentation/hud/fan-out-controller'
 import type { FanOutController } from './presentation/hud/fan-out-controller'
+import { runCamadaLeaseSubmit } from './application/fan-out-lease-submit'
+import { GUI_RUN_LEASE_CAPABILITY } from './application/runtime-capability-keys'
 
 export type BindFanOutDeps = {
   store: SceneStore
@@ -32,10 +34,12 @@ export type FanOutBinder = {
 export function createFanOutBinder(deps: BindFanOutDeps): FanOutBinder {
   let fanOutController: FanOutController | null = null
   let fanOutGateway: RuntimeGateway = deps.demoGateway
+  let capabilities: readonly string[] = []
 
   return {
     bind(connection: LiveSyncConnection): void {
       fanOutGateway = connection.gateway
+      capabilities = connection.capabilities
       if (fanOutController) {
         fanOutController.rebindGateway(connection.gateway)
         return
@@ -51,7 +55,9 @@ export function createFanOutBinder(deps: BindFanOutDeps): FanOutBinder {
         },
         memberPoll: createCamadaMemberPoll({ gateway: connection.gateway, store: deps.store }),
         refetch: () => syncWorktreeGraph(fanOutGateway, deps.store),
-        activeRepoId: () => deps.store.get().repos.activeRepoId
+        activeRepoId: () => deps.store.get().repos.activeRepoId,
+        leaseCapable: () => capabilities.includes(GUI_RUN_LEASE_CAPABILITY),
+        leasePlanner: runCamadaLeaseSubmit
       })
       fanOutController.sync(deps.store.get().fanOut, deps.store.get().graph)
     },

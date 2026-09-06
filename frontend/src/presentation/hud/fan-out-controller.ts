@@ -6,16 +6,23 @@ import {
   toFanOutInputs
 } from '../../application/fan-out-model'
 import type { FanOutAction, FanOutSlice } from '../../application/fan-out-model'
-import type { RuntimeGateway } from '../../application/ports/runtime-gateway'
+import type { CreateWorktreeInput, RuntimeGateway } from '../../application/ports/runtime-gateway'
 import type { CamadaMemberPoll } from '../../application/camada-member-poll'
+import { runCamadaLeaseSubmit } from '../../application/fan-out-lease-submit'
 import type { FanOutFormHandle } from './fan-out-element'
 import { fanOutViewModel } from './fan-out-view-model'
 
-/** listRepos/createWorktree for the controller, listWorktreePs for the member poll it owns —
- *  one port satisfies both, so rebindGateway can hand the same object to each. */
+/** listRepos/createWorktree/listWorktreePs for the v1 loop and the member poll it owns, plus
+ *  the 3 lease verbs the Change B path calls — one port satisfies both, so rebindGateway can
+ *  hand the same object to the member poll and the lease planner alike. */
 export type FanOutGatewayPort = Pick<
   RuntimeGateway,
-  'listRepos' | 'createWorktree' | 'listWorktreePs'
+  | 'listRepos'
+  | 'createWorktree'
+  | 'listWorktreePs'
+  | 'orchestrationRunCreate'
+  | 'orchestrationTaskCreate'
+  | 'orchestrationWorkerStart'
 >
 
 export type FanOutControllerDeps = {
@@ -33,6 +40,10 @@ export type FanOutControllerDeps = {
   generateMutationId?: () => string
   /** Repos slice's active repo (mirrors spawn-menu-controller) — preferred over `repos[0]`. */
   activeRepoId?: () => string | null
+  /** True when the paired host announced the lease capability (Change B); defaults to v1-only. */
+  leaseCapable?: () => boolean
+  /** Injectable for deterministic tests; defaults to the real lease-run planner. */
+  leasePlanner?: typeof runCamadaLeaseSubmit
 }
 
 export type FanOutController = {
@@ -55,6 +66,8 @@ export function createFanOutController(deps: FanOutControllerDeps): FanOutContro
 
   const generateMutationId = deps.generateMutationId ?? (() => crypto.randomUUID())
   const activeRepoId = deps.activeRepoId ?? (() => null)
+  const leaseCapable = deps.leaseCapable ?? (() => false)
+  const leasePlanner = deps.leasePlanner ?? runCamadaLeaseSubmit
 
   const unmount = (): void => {
     if (!element) return
@@ -90,22 +103,14 @@ export function createFanOutController(deps: FanOutControllerDeps): FanOutContro
       })
   }
 
-  const handleSubmit = async (): Promise<void> => {
-    const slice = currentSlice
-    if (slice.view !== 'form') return
-    if (slice.repoSelector === null) {
-      deps.dispatch({ type: 'form-error', message: 'repositorio aún no resuelto' })
-      return
-    }
-    const repoSelector = slice.repoSelector
-    const mutationIds = Array.from({ length: slice.fields.count }, () => generateMutationId())
-    deps.dispatch({ type: 'submit', mutationIds })
-
-    // Local mirror of the reducer transition — lets the loop compute member ids for the camera
-    // and poll start without depending on the store round-tripping through sync() mid-flight.
-    let localSlice = reduceFanOut(slice, { type: 'submit', mutationIds })
-    const inputs = toFanOutInputs(slice, repoSelector, mutationIds)
-
+  // v1 worktree-only loop (design camada, pre-lease): sequential createWorktree, continue-on-error.
+  // Shared by the plain v1 path and the lease path's runCreate-failure fallback.
+  const runV1Batch = async (
+    inputs: readonly CreateWorktreeInput[],
+    mutationIds: readonly string[],
+    startSlice: FanOutSlice
+  ): Promise<FanOutSlice> => {
+    let localSlice = startSlice
     for (let i = 0; i < mutationIds.length; i++) {
       const mutationId = mutationIds[i]!
       try {
@@ -120,6 +125,39 @@ export function createFanOutController(deps: FanOutControllerDeps): FanOutContro
         localSlice = reduceFanOut(localSlice, { type: 'child-failed', mutationId })
         deps.dispatch({ type: 'child-failed', mutationId })
       }
+    }
+    return localSlice
+  }
+
+  const handleSubmit = async (): Promise<void> => {
+    const slice = currentSlice
+    if (slice.view !== 'form') return
+    if (slice.repoSelector === null) {
+      deps.dispatch({ type: 'form-error', message: 'repositorio aún no resuelto' })
+      return
+    }
+    const repoSelector = slice.repoSelector
+    const mutationIds = Array.from({ length: slice.fields.count }, () => generateMutationId())
+    deps.dispatch({ type: 'submit', mutationIds })
+
+    // Local mirror of the reducer transition — lets the loop compute member ids for the camera
+    // and poll start without depending on the store round-tripping through sync() mid-flight.
+    let localSlice: FanOutSlice
+
+    if (leaseCapable() && slice.fields.agent !== 'none') {
+      const leaseResult = await leasePlanner(slice, repoSelector, mutationIds, {
+        gateway,
+        dispatch: deps.dispatch
+      })
+      localSlice = leaseResult.localSlice
+      if (leaseResult.runCreateFailed) {
+        const inputs = toFanOutInputs(slice, repoSelector, mutationIds)
+        localSlice = await runV1Batch(inputs, mutationIds, localSlice)
+      }
+    } else {
+      localSlice = reduceFanOut(slice, { type: 'submit', mutationIds })
+      const inputs = toFanOutInputs(slice, repoSelector, mutationIds)
+      localSlice = await runV1Batch(inputs, mutationIds, localSlice)
     }
 
     deps.focusLitter(fanOutMemberIds(localSlice))
