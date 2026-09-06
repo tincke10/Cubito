@@ -32,6 +32,7 @@ export type SystemNode = {
   kind: SystemNodeKind
   label: string
   method?: string
+  path?: string
   state: SystemNodeState
   diff: SystemDiff | null
   note?: string
