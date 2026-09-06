@@ -14,6 +14,8 @@ import type {
   LeaseRunCreateResult,
   LeaseTaskCreateInput,
   LeaseTaskCreateResult,
+  LeaseWorkerListInput,
+  LeaseWorkerListResult,
   LeaseWorkerStartInput,
   LeaseWorkerStartResult,
   RepoSummary,
@@ -107,7 +109,10 @@ const createFakeGateway = () => ({
     (input: LeaseWorkerStartInput) => Promise<LeaseWorkerStartResult>
   >(async () => {
     throw new Error('orchestrationWorkerStart not implemented in this fake')
-  })
+  }),
+  orchestrationWorkerList: vi.fn<(input: LeaseWorkerListInput) => Promise<LeaseWorkerListResult>>(
+    async () => ({ workers: [] })
+  )
 })
 
 const createFakePoll = () => ({

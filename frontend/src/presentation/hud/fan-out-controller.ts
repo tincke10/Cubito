@@ -23,6 +23,7 @@ export type FanOutGatewayPort = Pick<
   | 'orchestrationRunCreate'
   | 'orchestrationTaskCreate'
   | 'orchestrationWorkerStart'
+  | 'orchestrationWorkerList'
 >
 
 export type FanOutControllerDeps = {

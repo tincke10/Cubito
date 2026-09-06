@@ -3,19 +3,25 @@ import { createCamadaMemberPoll, CAMADA_POLL_INTERVAL_MS } from './camada-member
 import type { CamadaPollGatewayPort } from './camada-member-poll'
 import { createSceneStore } from './scene-store'
 import type { SceneStore } from './scene-store'
-import type { FanOutSlice } from './fan-out-model'
-import type { WorktreePsRow } from './ports/runtime-gateway'
+import type { FanOutBatchEntry, FanOutSlice } from './fan-out-model'
+import type {
+  LeaseWorkerListResult,
+  WorkerDispatchStateRow,
+  WorktreePsRow
+} from './ports/runtime-gateway'
 import type { AgentStatus } from '../domain/worktree-graph/node-activity'
 import type { WorktreeId } from '../domain/worktree-graph/types'
 
-type Deferred<T> = { promise: Promise<T>; resolve: (v: T) => void }
+type Deferred<T> = { promise: Promise<T>; resolve: (v: T) => void; reject: (e: unknown) => void }
 
 function deferred<T>(): Deferred<T> {
   let resolve!: (v: T) => void
-  const promise = new Promise<T>((res) => {
+  let reject!: (e: unknown) => void
+  const promise = new Promise<T>((res, rej) => {
     resolve = res
+    reject = rej
   })
-  return { promise, resolve }
+  return { promise, resolve, reject }
 }
 
 const runningSlice = (memberStatus: Record<WorktreeId, AgentStatus> = {}): FanOutSlice => ({
@@ -30,19 +36,43 @@ const runningSlice = (memberStatus: Record<WorktreeId, AgentStatus> = {}): FanOu
   runId: null
 })
 
+const leaseRunningSlice = (
+  batch: readonly FanOutBatchEntry[],
+  memberStatus: Record<WorktreeId, AgentStatus> = {}
+): FanOutSlice => ({
+  view: 'running',
+  parentId: 'repo::/parent',
+  fields: { count: batch.length, agent: 'claude', prompt: '' },
+  repoSelector: 'repo',
+  batch,
+  memberStatus,
+  runId: 'run-1'
+})
+
 type FakeGateway = CamadaPollGatewayPort & {
   calls: number
+  workerListCalls: number
   listWorktreePsImpl?: () => Promise<readonly WorktreePsRow[]>
+  orchestrationWorkerListImpl?: () => Promise<LeaseWorkerListResult>
 }
 
-/** Fake gateway: `listWorktreePs` resolution timing and rows are test-controlled. */
-function createFakeGateway(rows: readonly WorktreePsRow[] = []): FakeGateway {
+/** Fake gateway: `listWorktreePs`/`orchestrationWorkerList` resolution timing and rows are test-controlled. */
+function createFakeGateway(
+  rows: readonly WorktreePsRow[] = [],
+  workers: readonly WorkerDispatchStateRow[] = []
+): FakeGateway {
   const gw: FakeGateway = {
     calls: 0,
+    workerListCalls: 0,
     listWorktreePs: async () => {
       gw.calls += 1
       if (gw.listWorktreePsImpl) return gw.listWorktreePsImpl()
       return rows
+    },
+    orchestrationWorkerList: async () => {
+      gw.workerListCalls += 1
+      if (gw.orchestrationWorkerListImpl) return gw.orchestrationWorkerListImpl()
+      return { workers }
     }
   }
   return gw
@@ -236,5 +266,203 @@ describe('createCamadaMemberPoll', () => {
     await vi.advanceTimersByTimeAsync(CAMADA_POLL_INTERVAL_MS * 5)
     expect(setIntervalSpy).not.toHaveBeenCalled()
     poll.stop()
+  })
+
+  describe('lease Run backing the batch (runId !== null): orchestration.workerList branch', () => {
+    it('polls orchestrationWorkerList({run}) instead of listWorktreePs when runId is set', async () => {
+      const gateway = createFakeGateway([{ worktreeId: 'repo::/child', status: 'working' }])
+      const batch: FanOutBatchEntry[] = [
+        {
+          mutationId: 'm1',
+          worktreeId: 'repo::/child',
+          failed: false,
+          dispatchId: 'dispatch-1',
+          taskId: 'task-1'
+        }
+      ]
+      store.update({ fanOut: leaseRunningSlice(batch) })
+      const poll = createCamadaMemberPoll({
+        gateway,
+        store,
+        setTimer: setTimerSpy,
+        clearTimer: clearTimerSpy
+      })
+      poll.start()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(gateway.workerListCalls).toBe(1)
+      expect(gateway.calls).toBe(0)
+      poll.stop()
+    })
+
+    it('maps a row to member-status via dispatchId -> entry.worktreeId correlation', async () => {
+      const gateway = createFakeGateway(
+        [],
+        [
+          {
+            dispatchId: 'dispatch-1',
+            workerState: 'ready',
+            dispatchStatus: 'dispatched',
+            worktreeId: null
+          }
+        ]
+      )
+      const batch: FanOutBatchEntry[] = [
+        {
+          mutationId: 'm1',
+          worktreeId: 'repo::/child',
+          failed: false,
+          dispatchId: 'dispatch-1',
+          taskId: 'task-1'
+        }
+      ]
+      store.update({ fanOut: leaseRunningSlice(batch) })
+      const poll = createCamadaMemberPoll({
+        gateway,
+        store,
+        setTimer: setTimerSpy,
+        clearTimer: clearTimerSpy
+      })
+      poll.start()
+      await vi.advanceTimersByTimeAsync(0)
+      const slice = store.get().fanOut
+      if (slice.view === 'running') {
+        expect(slice.memberStatus).toEqual({ 'repo::/child': 'working' })
+      }
+      poll.stop()
+    })
+
+    it('a failed row dispatches child-failed keyed by mutationId, not member-status', async () => {
+      const gateway = createFakeGateway(
+        [],
+        [
+          {
+            dispatchId: 'dispatch-1',
+            workerState: 'failed',
+            dispatchStatus: 'dispatched',
+            worktreeId: null
+          }
+        ]
+      )
+      const batch: FanOutBatchEntry[] = [
+        {
+          mutationId: 'm1',
+          worktreeId: 'repo::/child',
+          failed: false,
+          dispatchId: 'dispatch-1',
+          taskId: 'task-1'
+        }
+      ]
+      store.update({ fanOut: leaseRunningSlice(batch) })
+      const poll = createCamadaMemberPoll({
+        gateway,
+        store,
+        setTimer: setTimerSpy,
+        clearTimer: clearTimerSpy
+      })
+      poll.start()
+      await vi.advanceTimersByTimeAsync(0)
+      const slice = store.get().fanOut
+      if (slice.view === 'running') {
+        expect(slice.batch[0]?.failed).toBe(true)
+        expect(slice.memberStatus).toEqual({})
+      }
+      poll.stop()
+    })
+
+    it('skips a row whose dispatchId matches no batch entry', async () => {
+      const gateway = createFakeGateway(
+        [],
+        [
+          {
+            dispatchId: 'unknown-dispatch',
+            workerState: 'ready',
+            dispatchStatus: 'dispatched',
+            worktreeId: null
+          }
+        ]
+      )
+      const batch: FanOutBatchEntry[] = [
+        {
+          mutationId: 'm1',
+          worktreeId: 'repo::/child',
+          failed: false,
+          dispatchId: 'dispatch-1',
+          taskId: 'task-1'
+        }
+      ]
+      store.update({ fanOut: leaseRunningSlice(batch) })
+      const poll = createCamadaMemberPoll({
+        gateway,
+        store,
+        setTimer: setTimerSpy,
+        clearTimer: clearTimerSpy
+      })
+      poll.start()
+      await vi.advanceTimersByTimeAsync(0)
+      const slice = store.get().fanOut
+      if (slice.view === 'running') {
+        expect(slice.memberStatus).toEqual({})
+      }
+      poll.stop()
+    })
+
+    it('a workerList throw still schedules the next tick — loss-of-contact is not process death', async () => {
+      const gateway = createFakeGateway()
+      gateway.orchestrationWorkerListImpl = () => Promise.reject(new Error('network blip'))
+      const batch: FanOutBatchEntry[] = [
+        {
+          mutationId: 'm1',
+          worktreeId: 'repo::/child',
+          failed: false,
+          dispatchId: 'dispatch-1',
+          taskId: 'task-1'
+        }
+      ]
+      store.update({ fanOut: leaseRunningSlice(batch) })
+      const poll = createCamadaMemberPoll({
+        gateway,
+        store,
+        setTimer: setTimerSpy,
+        clearTimer: clearTimerSpy
+      })
+      poll.start()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(gateway.workerListCalls).toBe(1)
+      // slice untouched by the failed poll, but the loop is still alive
+      expect(store.get().fanOut).toEqual(leaseRunningSlice(batch))
+
+      await vi.advanceTimersByTimeAsync(CAMADA_POLL_INTERVAL_MS)
+      expect(gateway.workerListCalls).toBe(2) // next tick was scheduled despite the throw
+      poll.stop()
+    })
+
+    it('stop() during an in-flight workerList throw does not schedule a next tick', async () => {
+      const gate = deferred<LeaseWorkerListResult>()
+      const gateway = createFakeGateway()
+      gateway.orchestrationWorkerListImpl = () => gate.promise
+      const batch: FanOutBatchEntry[] = [
+        {
+          mutationId: 'm1',
+          worktreeId: 'repo::/child',
+          failed: false,
+          dispatchId: 'dispatch-1',
+          taskId: 'task-1'
+        }
+      ]
+      store.update({ fanOut: leaseRunningSlice(batch) })
+      const poll = createCamadaMemberPoll({
+        gateway,
+        store,
+        setTimer: setTimerSpy,
+        clearTimer: clearTimerSpy
+      })
+      poll.start()
+      await vi.advanceTimersByTimeAsync(0)
+      const callsBeforeStop = setTimerSpy.mock.calls.length
+      poll.stop()
+      gate.reject(new Error('network blip'))
+      await vi.advanceTimersByTimeAsync(0)
+      expect(setTimerSpy.mock.calls.length).toBe(callsBeforeStop)
+    })
   })
 })
