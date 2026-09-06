@@ -177,12 +177,15 @@ const fanOutBinder = createFanOutBinder({
 })
 
 // Sistema en vivo (design camada): eager, unlike terminal/spawn/projects — the demo graph port
-// works offline, so there is no lazy-on-connect gate.
+// works offline, so there is no lazy-on-connect gate. `rebindGateway` below swaps in the real
+// gateway on connect, same as diffViewBinder; until then (or on an old host) it stays on the
+// scripted stub via demoGraphPort.
 const systemViewBinder = createSystemViewBinder({
   store,
   systemSlot,
   keyboardBarSlot,
-  demoGraphPort: demoSystemGraph
+  demoGraphPort: demoSystemGraph,
+  demoGateway
 })
 
 // Diff (design camada): same eager pattern as sistema en vivo — unlike terminal/spawn/projects,
@@ -371,6 +374,7 @@ if (pairingEntry.kind === 'connect') {
       bindSpawn(connection)
       bindProjects(connection)
       fanOutBinder.bind(connection)
+      systemViewBinder.rebindGateway(connection.gateway)
       diffViewBinder.rebindGateway(connection.gateway)
     },
     onDisconnected: () => store.dispatchTerminal({ type: 'connection-lost' })
