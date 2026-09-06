@@ -26,7 +26,8 @@ const COLOR_CHECKED_DIRS = [
   SCENE_DIR,
   path.join(PRESENTATION_DIR, 'hud'),
   path.join(PRESENTATION_DIR, 'input'),
-  path.join(PRESENTATION_DIR, 'system')
+  path.join(PRESENTATION_DIR, 'system'),
+  path.join(PRESENTATION_DIR, 'diff')
 ]
 
 /**
