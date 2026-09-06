@@ -289,7 +289,15 @@ describe('connectOrcad', () => {
           return {
             ok: true,
             result: {
-              summary: { changedFiles: 1, commitsAhead: 2, commitsBehind: 0 },
+              summary: {
+                changedFiles: 1,
+                commitsAhead: 2,
+                commitsBehind: 0,
+                baseRef: 'main',
+                headOid: 'aaaa000011112222333344445555666677778888',
+                mergeBase: 'bbbb000011112222333344445555666677778888',
+                status: 'ready'
+              },
               entries: [{ path: 'a.ts', status: 'modified', added: 3, removed: 1 }]
             }
           }
@@ -310,7 +318,53 @@ describe('connectOrcad', () => {
         changedFiles: 1,
         commitsAhead: 2,
         commitsBehind: 0,
+        baseRef: 'main',
+        headOid: 'aaaa000011112222333344445555666677778888',
+        mergeBase: 'bbbb000011112222333344445555666677778888',
+        status: 'ready',
         entries: [{ path: 'a.ts', status: 'modified', added: 3, removed: 1 }]
+      })
+    } finally {
+      connection.close()
+    }
+  })
+
+  it('gitBranchDiff() maps a served git.branchDiff text payload into DiffFileContent', async () => {
+    const server = await startFakeOrcadServer({
+      handleRequest: (method) => {
+        if (method === 'git.branchDiff') {
+          return {
+            ok: true,
+            result: {
+              kind: 'text',
+              originalContent: 'before\n',
+              modifiedContent: 'after\n',
+              originalIsBinary: false,
+              modifiedIsBinary: false
+            }
+          }
+        }
+        return { ok: true, result: { worktrees: [] } }
+      }
+    })
+    servers.push(server)
+
+    const connection = await connectOrcad(offerFor(server))
+    try {
+      await expect(
+        connection.gateway.gitBranchDiff(
+          '/wt/beta',
+          {
+            mergeBase: 'bbbb000011112222333344445555666677778888',
+            headOid: 'aaaa000011112222333344445555666677778888'
+          },
+          'src/a.ts'
+        )
+      ).resolves.toEqual({
+        kind: 'text',
+        originalContent: 'before\n',
+        modifiedContent: 'after\n',
+        truncated: false
       })
     } finally {
       connection.close()

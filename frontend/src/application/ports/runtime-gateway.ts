@@ -54,8 +54,17 @@ export type BranchCompare = {
   changedFiles: number
   commitsAhead: number
   commitsBehind: number
+  baseRef: string
+  headOid: string
+  mergeBase: string
+  status: string
   entries: readonly GitStatusRow[]
 }
+
+/** Per-file diff content from `git.branchDiff` — before/after text, or a binary marker. */
+export type DiffFileContent =
+  | { kind: 'text'; originalContent: string; modifiedContent: string; truncated: boolean }
+  | { kind: 'binary'; mimeType?: string; modifiedDeleted?: boolean }
 
 /**
  * Port to the orcad runtime. The application layer depends on this shape
@@ -68,5 +77,11 @@ export type RuntimeGateway = {
   addRepo(input: { path: string; kind?: 'git' | 'folder' }): Promise<RepoSummary>
   listWorktreePs(): Promise<readonly WorktreePsRow[]>
   gitStatus(worktree: string): Promise<GitStatus>
-  gitBranchCompare(worktree: string, baseRef?: string): Promise<BranchCompare>
+  gitBranchCompare(worktree: string, baseRef: string): Promise<BranchCompare>
+  gitBranchDiff(
+    worktree: string,
+    compare: { mergeBase: string; headOid: string },
+    filePath: string,
+    oldPath?: string
+  ): Promise<DiffFileContent>
 }

@@ -68,7 +68,7 @@ describe('createOrcadGateway', () => {
     expect(onRuntimeId).not.toHaveBeenCalled()
   })
 
-  it('stays frozen at the diff-stat-gateway-era method set — no undocumented methods added (CO-305 ratchet)', () => {
+  it('stays frozen at the diff-content-gateway-era method set — no undocumented methods added (CO-305 ratchet)', () => {
     const call: RpcCaller = vi.fn()
     const gateway = createOrcadGateway({ call })
     expect(Object.keys(gateway)).toEqual([
@@ -78,7 +78,8 @@ describe('createOrcadGateway', () => {
       'createWorktree',
       'listWorktreePs',
       'gitStatus',
-      'gitBranchCompare'
+      'gitBranchCompare',
+      'gitBranchDiff'
     ])
   })
 
@@ -138,11 +139,42 @@ describe('createOrcadGateway', () => {
       changedFiles: 2,
       commitsAhead: 3,
       commitsBehind: 1,
+      baseRef: '',
+      headOid: '',
+      mergeBase: '',
+      status: '',
       entries: [{ path: 'a.ts', status: 'modified', added: 3, removed: 1 }]
     })
   })
 
-  it('gitBranchCompare passes baseRef when provided / omits it when not', async () => {
+  it('gitBranchCompare surfaces headOid/mergeBase/baseRef/status from the summary', async () => {
+    const call: RpcCaller = vi.fn(async () => ({
+      id: 'x',
+      ok: true as const,
+      result: {
+        summary: {
+          baseRef: 'main',
+          headOid: 'aaaa000011112222333344445555666677778888',
+          mergeBase: 'bbbb000011112222333344445555666677778888',
+          status: 'ready',
+          changedFiles: 0,
+          commitsAhead: 0,
+          commitsBehind: 0
+        },
+        entries: []
+      },
+      _meta: { runtimeId: 'rt' }
+    }))
+    const gateway = createOrcadGateway({ call })
+    await expect(gateway.gitBranchCompare('/wt/beta', 'main')).resolves.toMatchObject({
+      baseRef: 'main',
+      headOid: 'aaaa000011112222333344445555666677778888',
+      mergeBase: 'bbbb000011112222333344445555666677778888',
+      status: 'ready'
+    })
+  })
+
+  it('gitBranchCompare always passes the required baseRef', async () => {
     const call: RpcCaller = vi.fn(async () => ({
       id: 'x',
       ok: true as const,
@@ -152,13 +184,130 @@ describe('createOrcadGateway', () => {
     const gateway = createOrcadGateway({ call })
 
     await gateway.gitBranchCompare('/wt/beta', 'main')
-    expect(call).toHaveBeenNthCalledWith(1, 'git.branchCompare', {
+    expect(call).toHaveBeenCalledWith('git.branchCompare', {
       worktree: '/wt/beta',
       baseRef: 'main'
     })
+  })
 
-    await gateway.gitBranchCompare('/wt/beta')
-    expect(call).toHaveBeenNthCalledWith(2, 'git.branchCompare', { worktree: '/wt/beta' })
+  it("gitBranchDiff maps a text GitDiffResult into {kind:'text', originalContent, modifiedContent, truncated}", async () => {
+    const call: RpcCaller = vi.fn(async () => ({
+      id: 'x',
+      ok: true as const,
+      result: {
+        kind: 'text',
+        originalContent: 'before\n',
+        modifiedContent: 'after\n',
+        originalIsBinary: false,
+        modifiedIsBinary: false
+      },
+      _meta: { runtimeId: 'rt' }
+    }))
+    const gateway = createOrcadGateway({ call })
+    await expect(
+      gateway.gitBranchDiff(
+        '/wt/beta',
+        {
+          mergeBase: 'bbbb000011112222333344445555666677778888',
+          headOid: 'aaaa000011112222333344445555666677778888'
+        },
+        'src/a.ts'
+      )
+    ).resolves.toEqual({
+      kind: 'text',
+      originalContent: 'before\n',
+      modifiedContent: 'after\n',
+      truncated: false
+    })
+  })
+
+  it('gitBranchDiff derives truncated:true from a limited largeDiffRenderLimit', async () => {
+    const call: RpcCaller = vi.fn(async () => ({
+      id: 'x',
+      ok: true as const,
+      result: {
+        kind: 'text',
+        originalContent: 'before\n',
+        modifiedContent: 'after\n',
+        originalIsBinary: false,
+        modifiedIsBinary: false,
+        largeDiffRenderLimit: { limited: true, reason: 'line-count' }
+      },
+      _meta: { runtimeId: 'rt' }
+    }))
+    const gateway = createOrcadGateway({ call })
+    await expect(
+      gateway.gitBranchDiff(
+        '/wt/beta',
+        {
+          mergeBase: 'bbbb000011112222333344445555666677778888',
+          headOid: 'aaaa000011112222333344445555666677778888'
+        },
+        'src/a.ts'
+      )
+    ).resolves.toMatchObject({ truncated: true })
+  })
+
+  it("gitBranchDiff maps a binary GitDiffResult into {kind:'binary', ...}", async () => {
+    const call: RpcCaller = vi.fn(async () => ({
+      id: 'x',
+      ok: true as const,
+      result: {
+        kind: 'binary',
+        originalContent: '',
+        modifiedContent: '',
+        originalIsBinary: true,
+        modifiedIsBinary: true,
+        mimeType: 'image/png'
+      },
+      _meta: { runtimeId: 'rt' }
+    }))
+    const gateway = createOrcadGateway({ call })
+    await expect(
+      gateway.gitBranchDiff(
+        '/wt/beta',
+        {
+          mergeBase: 'bbbb000011112222333344445555666677778888',
+          headOid: 'aaaa000011112222333344445555666677778888'
+        },
+        'assets/logo.png'
+      )
+    ).resolves.toEqual({ kind: 'binary', mimeType: 'image/png' })
+  })
+
+  it('gitBranchDiff passes compare oids + filePath (+oldPath when given)', async () => {
+    const call: RpcCaller = vi.fn(async () => ({
+      id: 'x',
+      ok: true as const,
+      result: {
+        kind: 'text',
+        originalContent: '',
+        modifiedContent: '',
+        originalIsBinary: false,
+        modifiedIsBinary: false
+      },
+      _meta: { runtimeId: 'rt' }
+    }))
+    const gateway = createOrcadGateway({ call })
+    const compare = {
+      mergeBase: 'bbbb000011112222333344445555666677778888',
+      headOid: 'aaaa000011112222333344445555666677778888'
+    }
+
+    await gateway.gitBranchDiff('/wt/beta', compare, 'src/a.ts')
+    expect(call).toHaveBeenNthCalledWith(1, 'git.branchDiff', {
+      worktree: '/wt/beta',
+      compare,
+      filePath: 'src/a.ts'
+    })
+
+    await gateway.gitBranchDiff('/wt/beta', compare, 'src/b.ts', 'src/old-b.ts')
+    expect(call).toHaveBeenNthCalledWith(2, 'git.branchDiff', {
+      worktree: '/wt/beta',
+      compare,
+      filePath: 'src/b.ts',
+      oldPath: 'src/old-b.ts'
+    })
   })
 
   it('lists repos via repo.list', async () => {

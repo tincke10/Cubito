@@ -75,8 +75,15 @@ function createFakeConnection(overrides?: {
         changedFiles: 0,
         commitsAhead: 0,
         commitsBehind: 0,
+        baseRef: '',
+        headOid: '',
+        mergeBase: '',
+        status: '',
         entries: []
-      })
+      }),
+      gitBranchDiff: async () => {
+        throw new Error('gitBranchDiff not implemented in this fake')
+      }
     },
     terminals: createFakeTerminalsPort(),
     close() {

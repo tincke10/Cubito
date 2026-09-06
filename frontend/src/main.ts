@@ -104,8 +104,15 @@ const demoGateway: RuntimeGateway = {
     changedFiles: 0,
     commitsAhead: 0,
     commitsBehind: 0,
+    baseRef: '',
+    headOid: '',
+    mergeBase: '',
+    status: '',
     entries: []
-  })
+  }),
+  gitBranchDiff: async () => {
+    throw new Error('gitBranchDiff not implemented in the demo gateway')
+  }
 }
 
 const container = document.getElementById('app')

@@ -2,6 +2,7 @@ import type { RawWorktreeRecord } from '../../domain/worktree-graph/build-graph'
 import type {
   BranchCompare,
   CreateWorktreeInput,
+  DiffFileContent,
   GitStatus,
   GitStatusRow,
   RepoSummary,
@@ -71,7 +72,15 @@ function toGitStatus(result: {
 
 /** Projects a raw `git.branchCompare` result onto the local `BranchCompare` shape. */
 function toBranchCompare(result: {
-  summary?: { changedFiles?: unknown; commitsAhead?: unknown; commitsBehind?: unknown }
+  summary?: {
+    changedFiles?: unknown
+    commitsAhead?: unknown
+    commitsBehind?: unknown
+    baseRef?: unknown
+    headOid?: unknown
+    mergeBase?: unknown
+    status?: unknown
+  }
   entries?: unknown
 }): BranchCompare {
   const summary = result.summary
@@ -79,9 +88,39 @@ function toBranchCompare(result: {
     changedFiles: typeof summary?.changedFiles === 'number' ? summary.changedFiles : 0,
     commitsAhead: typeof summary?.commitsAhead === 'number' ? summary.commitsAhead : 0,
     commitsBehind: typeof summary?.commitsBehind === 'number' ? summary.commitsBehind : 0,
+    baseRef: typeof summary?.baseRef === 'string' ? summary.baseRef : '',
+    headOid: typeof summary?.headOid === 'string' ? summary.headOid : '',
+    mergeBase: typeof summary?.mergeBase === 'string' ? summary.mergeBase : '',
+    status: typeof summary?.status === 'string' ? summary.status : '',
     entries: Array.isArray(result.entries)
       ? (result.entries as Record<string, unknown>[]).map(toGitStatusRow)
       : []
+  }
+}
+
+/** Projects a raw `git.branchDiff` result onto the local `DiffFileContent` shape. */
+function toDiffFileContent(result: {
+  kind?: unknown
+  originalContent?: unknown
+  modifiedContent?: unknown
+  mimeType?: unknown
+  modifiedDeleted?: unknown
+  largeDiffRenderLimit?: { limited?: unknown }
+}): DiffFileContent {
+  if (result.kind === 'binary') {
+    return {
+      kind: 'binary',
+      ...(typeof result.mimeType === 'string' ? { mimeType: result.mimeType } : {}),
+      ...(typeof result.modifiedDeleted === 'boolean'
+        ? { modifiedDeleted: result.modifiedDeleted }
+        : {})
+    }
+  }
+  return {
+    kind: 'text',
+    originalContent: typeof result.originalContent === 'string' ? result.originalContent : '',
+    modifiedContent: typeof result.modifiedContent === 'string' ? result.modifiedContent : '',
+    truncated: result.largeDiffRenderLimit?.limited === true
   }
 }
 
@@ -146,12 +185,23 @@ export function createOrcadGateway(
       const response = await connection.call('git.status', { worktree })
       return toGitStatus(response.result as Parameters<typeof toGitStatus>[0])
     },
-    async gitBranchCompare(worktree: string, baseRef?: string) {
-      const response = await connection.call(
-        'git.branchCompare',
-        baseRef === undefined ? { worktree } : { worktree, baseRef }
-      )
+    async gitBranchCompare(worktree: string, baseRef: string) {
+      const response = await connection.call('git.branchCompare', { worktree, baseRef })
       return toBranchCompare(response.result as Parameters<typeof toBranchCompare>[0])
+    },
+    async gitBranchDiff(
+      worktree: string,
+      compare: { mergeBase: string; headOid: string },
+      filePath: string,
+      oldPath?: string
+    ) {
+      const response = await connection.call('git.branchDiff', {
+        worktree,
+        compare,
+        filePath,
+        ...(oldPath !== undefined ? { oldPath } : {})
+      })
+      return toDiffFileContent(response.result as Parameters<typeof toDiffFileContent>[0])
     }
   }
 }
