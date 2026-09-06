@@ -21,7 +21,7 @@ export type SystemGraphHost = {
   resolveWorktree(worktreeId: string): { rootPath: string; connectionId: string | null } | null
   getFilesystemProvider(connectionId: string): IFilesystemProvider | undefined
   watchWorktreeFiles(
-    rootPath: string,
+    worktreeId: string,
     onEvents: (events: FsChangeEvent[]) => void,
     onTerminalError: (error: Error) => void
   ): Promise<() => Promise<void>>
@@ -118,7 +118,7 @@ export class SystemGraphService {
       void this.buildGraph(worktreeId)
     })
     const release = await this.host.watchWorktreeFiles(
-      resolved.rootPath,
+      worktreeId,
       (events: FsChangeEvent[]) => scheduler.push(events),
       () => {
         // Why (D9): a terminal watcher error means the underlying watch is dead —
@@ -127,6 +127,16 @@ export class SystemGraphService {
       }
     )
     this.watches.set(worktreeId, { release, scheduler })
+  }
+
+  /** Arms the watch + does the initial build, but only the first time — a repeat call would
+   * otherwise re-`watch()` (dispose + re-arm), dropping the live debounce for no reason. */
+  async ensureWatched(worktreeId: string): Promise<void> {
+    if (this.watches.has(worktreeId)) {
+      return
+    }
+    await this.watch(worktreeId)
+    await this.buildGraph(worktreeId)
   }
 
   /** Releases the watch (if any) for a worktree and cancels its pending debounce. Idempotent. */

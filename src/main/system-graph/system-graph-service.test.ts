@@ -90,9 +90,9 @@ type WatchHandlers = {
 /** Fake host that hands tests direct control over watcher event delivery and a spy
  * release fn per rootPath, plus a mutable live-ids set for reconcile() tests. */
 function watchableHost(worktrees: Record<string, FakeWorktree>): SystemGraphHost & {
-  emit: (rootPath: string, events: FsChangeEvent[]) => void
-  triggerTerminalError: (rootPath: string, error: Error) => void
-  releaseSpy: (rootPath: string) => ReturnType<typeof vi.fn> | undefined
+  emit: (worktreeId: string, events: FsChangeEvent[]) => void
+  triggerTerminalError: (worktreeId: string, error: Error) => void
+  releaseSpy: (worktreeId: string) => ReturnType<typeof vi.fn> | undefined
   liveWorktreeIds: Set<string>
 } {
   const providers = new Map<string, IFilesystemProvider>()
@@ -108,15 +108,15 @@ function watchableHost(worktrees: Record<string, FakeWorktree>): SystemGraphHost
       return worktree ? { rootPath: worktree.rootPath, connectionId: worktree.connectionId } : null
     },
     getFilesystemProvider: (connectionId) => providers.get(connectionId),
-    watchWorktreeFiles: async (rootPath, onEvents, onTerminalError) => {
+    watchWorktreeFiles: async (worktreeId, onEvents, onTerminalError) => {
       const release = vi.fn(async () => {})
-      handlers.set(rootPath, { onEvents, onTerminalError, release })
+      handlers.set(worktreeId, { onEvents, onTerminalError, release })
       return release
     },
     listLiveWorktreeIds: () => liveWorktreeIds,
-    emit: (rootPath, events) => handlers.get(rootPath)?.onEvents(events),
-    triggerTerminalError: (rootPath, error) => handlers.get(rootPath)?.onTerminalError(error),
-    releaseSpy: (rootPath) => handlers.get(rootPath)?.release,
+    emit: (worktreeId, events) => handlers.get(worktreeId)?.onEvents(events),
+    triggerTerminalError: (worktreeId, error) => handlers.get(worktreeId)?.onTerminalError(error),
+    releaseSpy: (worktreeId) => handlers.get(worktreeId)?.release,
     liveWorktreeIds
   }
 }
@@ -221,7 +221,7 @@ describe('SystemGraphService watch/dispose/reconcile', () => {
     const buildGraph = vi.spyOn(service, 'buildGraph')
 
     await service.watch('w1')
-    host.emit(EXPRESS_WORKTREE.rootPath, [{ kind: 'update', absolutePath: '/repo/server.ts' }])
+    host.emit('w1', [{ kind: 'update', absolutePath: '/repo/server.ts' }])
     expect(buildGraph).not.toHaveBeenCalled()
 
     await vi.advanceTimersByTimeAsync(WATCH_BATCH_MAX_WAIT_MS)
@@ -237,7 +237,7 @@ describe('SystemGraphService watch/dispose/reconcile', () => {
 
     await service.watch('w1')
     for (let i = 0; i < 5; i += 1) {
-      host.emit(EXPRESS_WORKTREE.rootPath, [{ kind: 'update', absolutePath: '/repo/server.ts' }])
+      host.emit('w1', [{ kind: 'update', absolutePath: '/repo/server.ts' }])
     }
     await vi.advanceTimersByTimeAsync(WATCH_BATCH_MAX_WAIT_MS)
 
@@ -250,7 +250,7 @@ describe('SystemGraphService watch/dispose/reconcile', () => {
     const buildGraph = vi.spyOn(service, 'buildGraph')
 
     await service.watch('w1')
-    host.emit(EXPRESS_WORKTREE.rootPath, [{ kind: 'overflow', absolutePath: '/repo' }])
+    host.emit('w1', [{ kind: 'overflow', absolutePath: '/repo' }])
     await vi.advanceTimersByTimeAsync(0)
 
     expect(buildGraph).toHaveBeenCalledTimes(1)
@@ -261,8 +261,8 @@ describe('SystemGraphService watch/dispose/reconcile', () => {
     const service = new SystemGraphService(host)
 
     await service.watch('w1')
-    const release = host.releaseSpy(EXPRESS_WORKTREE.rootPath)!
-    host.triggerTerminalError(EXPRESS_WORKTREE.rootPath, new Error('watch died'))
+    const release = host.releaseSpy('w1')!
+    host.triggerTerminalError('w1', new Error('watch died'))
     await vi.advanceTimersByTimeAsync(0)
 
     expect(release).toHaveBeenCalledTimes(1)
@@ -278,10 +278,10 @@ describe('SystemGraphService watch/dispose/reconcile', () => {
     const buildGraph = vi.spyOn(service, 'buildGraph')
 
     await service.watch('w1')
-    host.emit(EXPRESS_WORKTREE.rootPath, [{ kind: 'update', absolutePath: '/repo/server.ts' }])
+    host.emit('w1', [{ kind: 'update', absolutePath: '/repo/server.ts' }])
     await service.dispose('w1')
 
-    const release = host.releaseSpy(EXPRESS_WORKTREE.rootPath)!
+    const release = host.releaseSpy('w1')!
     expect(release).toHaveBeenCalledTimes(1)
 
     await vi.advanceTimersByTimeAsync(WATCH_BATCH_MAX_WAIT_MS)
@@ -299,8 +299,8 @@ describe('SystemGraphService watch/dispose/reconcile', () => {
     await service.watch('w2')
     await service.disposeAll()
 
-    expect(host.releaseSpy(EXPRESS_WORKTREE.rootPath)).toHaveBeenCalledTimes(1)
-    expect(host.releaseSpy(NON_EXPRESS_WORKTREE.rootPath)).toHaveBeenCalledTimes(1)
+    expect(host.releaseSpy('w1')).toHaveBeenCalledTimes(1)
+    expect(host.releaseSpy('w2')).toHaveBeenCalledTimes(1)
   })
 
   it('reconcile() drops graphs and watches for worktree ids no longer live', async () => {
@@ -314,15 +314,55 @@ describe('SystemGraphService watch/dispose/reconcile', () => {
 
     await service.reconcile()
 
-    expect(host.releaseSpy(EXPRESS_WORKTREE.rootPath)).toHaveBeenCalledTimes(1)
+    expect(host.releaseSpy('w1')).toHaveBeenCalledTimes(1)
     expect(service.getGraph('w1')).toBeUndefined()
-    expect(host.releaseSpy(NON_EXPRESS_WORKTREE.rootPath)).not.toHaveBeenCalled()
+    expect(host.releaseSpy('w2')).not.toHaveBeenCalled()
 
     // w2's watch must still be live after reconcile.
     const buildGraph = vi.spyOn(service, 'buildGraph')
-    host.emit(NON_EXPRESS_WORKTREE.rootPath, [{ kind: 'update', absolutePath: '/repo/x.ts' }])
+    host.emit('w2', [{ kind: 'update', absolutePath: '/repo/x.ts' }])
     await vi.advanceTimersByTimeAsync(WATCH_BATCH_MAX_WAIT_MS)
     expect(buildGraph).toHaveBeenCalledWith('w2')
+  })
+})
+
+describe('SystemGraphService.ensureWatched', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('arms the watch and populates the graph on first call', async () => {
+    const host = watchableHost({ w1: EXPRESS_WORKTREE })
+    const service = new SystemGraphService(host)
+
+    await service.ensureWatched('w1')
+
+    expect(service.getGraph('w1')?.nodes.size).toBeGreaterThan(0)
+    expect(host.releaseSpy('w1')).toBeDefined()
+  })
+
+  it('does not re-arm the watch or rebuild on a second call', async () => {
+    const host = watchableHost({ w1: EXPRESS_WORKTREE })
+    const service = new SystemGraphService(host)
+    const buildGraph = vi.spyOn(service, 'buildGraph')
+
+    await service.ensureWatched('w1')
+    await service.ensureWatched('w1')
+
+    expect(buildGraph).toHaveBeenCalledTimes(1)
+    // Re-arming would dispose() the first watch, releasing it — must not happen.
+    expect(host.releaseSpy('w1')).not.toHaveBeenCalled()
+  })
+
+  it('does not throw and leaves the graph empty for an unresolvable worktree id', async () => {
+    const service = new SystemGraphService(fakeHost({}))
+
+    await expect(service.ensureWatched('missing')).resolves.not.toThrow()
+    expect(service.getGraph('missing')).toBeUndefined()
   })
 })
 
