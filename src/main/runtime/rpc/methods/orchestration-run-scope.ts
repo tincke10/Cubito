@@ -15,6 +15,8 @@ export type RunScopeParams = {
   legacyCoordinatorRunId?: string
   // Why: the caller's declared handle is a user param; this is the attested one to check it against.
   callerEvidence?: OrchestrationCompatibilityEvidence
+  /** Paired-device lease caller (no terminal): binds by device ownership, not by pane. */
+  leaseDeviceId?: string
 }
 
 // Why: declared handles select mutable Run bindings, so attested callers may only name themselves.
@@ -79,12 +81,62 @@ export function resolveOrchestrationCaller(
   return paneKey ?? null
 }
 
+/** Synthetic per-Run pane key for a paired-device lease. Two colons, so `parsePaneKey` rejects it. */
+export function buildLeasePaneKey(deviceId: string, runId: string): string {
+  return `lease:${deviceId}:${runId}`
+}
+
+/** Synthetic coordinator handle for a paired-device lease. */
+export function buildLeaseHandle(deviceId: string): string {
+  return `lease:${deviceId}`
+}
+
+export type LeaseCaller = {
+  handle: string
+  /** Null when no Run exists yet to key it to (e.g. before run-create mints one). */
+  paneKey: string | null
+}
+
+// Why: a lease has no terminal, so it must never call getTerminalPaneKey or requireStablePane.
+export function resolveLeaseCaller(deviceId: string, runId?: string): LeaseCaller {
+  return {
+    handle: buildLeaseHandle(deviceId),
+    paneKey: runId ? buildLeasePaneKey(deviceId, runId) : null
+  }
+}
+
+// Why: pure string comparison against the Run row is the entire lease trust boundary.
+export function assertLeaseOwnership(run: RunRow, deviceId: string): void {
+  const owns =
+    run.legacy === 0 &&
+    run.coordinator_pane_key === buildLeasePaneKey(deviceId, run.id) &&
+    run.coordinator_handle === buildLeaseHandle(deviceId)
+  if (!owns) {
+    throw new OrchestrationError(
+      'consumer_fenced',
+      `This device is not the lease owner of Run ${run.id}.`
+    )
+  }
+}
+
 // Why: task and gate mutations must share one Run-binding rule.
 export function resolveRunScope(runtime: OrcaRuntimeService, params: RunScopeParams): RunRow {
   const db = runtime.getOrchestrationDb()
   const explicit = params.runId ? db.getRun(params.runId) : undefined
   if (params.runId && (!explicit || explicit.legacy === 1)) {
     throw new OrchestrationError('run_not_found', `Run ${params.runId} was not found.`)
+  }
+
+  if (params.leaseDeviceId) {
+    if (!explicit) {
+      throw new OrchestrationError(
+        'run_required',
+        'No Run is bound. Use orchestration run-create or run-use first. No effects were applied.',
+        orchestrationSkillRecoveryData()
+      )
+    }
+    assertLeaseOwnership(explicit, params.leaseDeviceId)
+    return explicit
   }
 
   if (!params.requireCurrentConsumer && explicit) {
