@@ -50,7 +50,8 @@ const runningSliceWithBatch = (batch: readonly FanOutBatchEntry[]): FanOutSlice 
   fields: { count: batch.length, agent: 'claude', prompt: '' },
   repoSelector: 'id:repo-a',
   batch,
-  memberStatus: {}
+  memberStatus: {},
+  runId: null
 })
 
 describe('emptyFanOutSlice', () => {
@@ -82,8 +83,11 @@ describe('reduceFanOut — open-for-node', () => {
       parentId: 'old',
       fields: { count: 5, agent: 'claude', prompt: 'go' },
       repoSelector: 'id:repo-a',
-      batch: [{ mutationId: 'm1', worktreeId: null, failed: false }],
-      memberStatus: {}
+      batch: [
+        { mutationId: 'm1', worktreeId: null, failed: false, dispatchId: null, taskId: null }
+      ],
+      memberStatus: {},
+      runId: null
     }
     const slice = reduceFanOut(running, { type: 'open-for-node', nodeId: 'w2' })
     expect(slice).toEqual({
@@ -168,7 +172,8 @@ describe('reduceFanOut — set-repo-selector', () => {
       fields: { count: 3, agent: 'none', prompt: '' },
       repoSelector: null,
       batch: [],
-      memberStatus: {}
+      memberStatus: {},
+      runId: null
     }
     const slice = reduceFanOut(running, { type: 'set-repo-selector', repoSelector: 'id:b' })
     expect(slice.repoSelector).toBe('id:b')
@@ -199,11 +204,12 @@ describe('reduceFanOut — submit', () => {
       fields: { count: 3, agent: 'none', prompt: '' },
       repoSelector: 'id:repo-a',
       batch: [
-        { mutationId: 'm1', worktreeId: null, failed: false },
-        { mutationId: 'm2', worktreeId: null, failed: false },
-        { mutationId: 'm3', worktreeId: null, failed: false }
+        { mutationId: 'm1', worktreeId: null, failed: false, dispatchId: null, taskId: null },
+        { mutationId: 'm2', worktreeId: null, failed: false, dispatchId: null, taskId: null },
+        { mutationId: 'm3', worktreeId: null, failed: false, dispatchId: null, taskId: null }
       ],
-      memberStatus: {}
+      memberStatus: {},
+      runId: null
     })
   })
 
@@ -248,34 +254,36 @@ describe('reduceFanOut — form-error', () => {
 describe('reduceFanOut — child-created / child-failed / member-status', () => {
   it('child-created fills in the worktreeId for the matching entry only', () => {
     const slice = runningSliceWithBatch([
-      { mutationId: 'm1', worktreeId: null, failed: false },
-      { mutationId: 'm2', worktreeId: null, failed: false }
+      { mutationId: 'm1', worktreeId: null, failed: false, dispatchId: null, taskId: null },
+      { mutationId: 'm2', worktreeId: null, failed: false, dispatchId: null, taskId: null }
     ])
     const next = reduceFanOut(slice, { type: 'child-created', mutationId: 'm1', worktreeId: 'w2' })
     expect(next).toMatchObject({
       batch: [
-        { mutationId: 'm1', worktreeId: 'w2', failed: false },
-        { mutationId: 'm2', worktreeId: null, failed: false }
+        { mutationId: 'm1', worktreeId: 'w2', failed: false, dispatchId: null, taskId: null },
+        { mutationId: 'm2', worktreeId: null, failed: false, dispatchId: null, taskId: null }
       ]
     })
   })
 
   it('child-failed marks the matching entry failed only', () => {
     const slice = runningSliceWithBatch([
-      { mutationId: 'm1', worktreeId: null, failed: false },
-      { mutationId: 'm2', worktreeId: null, failed: false }
+      { mutationId: 'm1', worktreeId: null, failed: false, dispatchId: null, taskId: null },
+      { mutationId: 'm2', worktreeId: null, failed: false, dispatchId: null, taskId: null }
     ])
     const next = reduceFanOut(slice, { type: 'child-failed', mutationId: 'm2' })
     expect(next).toMatchObject({
       batch: [
-        { mutationId: 'm1', worktreeId: null, failed: false },
-        { mutationId: 'm2', worktreeId: null, failed: true }
+        { mutationId: 'm1', worktreeId: null, failed: false, dispatchId: null, taskId: null },
+        { mutationId: 'm2', worktreeId: null, failed: true, dispatchId: null, taskId: null }
       ]
     })
   })
 
   it('member-status merges into the memberStatus map', () => {
-    const slice = runningSliceWithBatch([{ mutationId: 'm1', worktreeId: 'w2', failed: false }])
+    const slice = runningSliceWithBatch([
+      { mutationId: 'm1', worktreeId: 'w2', failed: false, dispatchId: null, taskId: null }
+    ])
     const next = reduceFanOut(slice, { type: 'member-status', worktreeId: 'w2', status: 'working' })
     expect(next).toMatchObject({ memberStatus: { w2: 'working' } })
   })
@@ -289,6 +297,71 @@ describe('reduceFanOut — child-created / child-failed / member-status', () => 
     expect(
       reduceFanOut(closed, { type: 'member-status', worktreeId: 'w2', status: 'working' })
     ).toBe(closed)
+  })
+})
+
+describe('reduceFanOut — run-created / child-dispatched (lease run, Change B)', () => {
+  it('run-created sets running.runId', () => {
+    const slice = runningSliceWithBatch([
+      { mutationId: 'm1', worktreeId: null, failed: false, dispatchId: null, taskId: null }
+    ])
+    const next = reduceFanOut(slice, { type: 'run-created', runId: 'run-1' })
+    expect(next).toMatchObject({ runId: 'run-1' })
+  })
+
+  it('run-created is a no-op outside the running view', () => {
+    const closed = emptyFanOutSlice()
+    expect(reduceFanOut(closed, { type: 'run-created', runId: 'run-1' })).toBe(closed)
+  })
+
+  it('child-dispatched sets dispatchId/taskId on the matching entry only', () => {
+    const slice = runningSliceWithBatch([
+      { mutationId: 'm1', worktreeId: null, failed: false, dispatchId: null, taskId: null },
+      { mutationId: 'm2', worktreeId: null, failed: false, dispatchId: null, taskId: null }
+    ])
+    const next = reduceFanOut(slice, {
+      type: 'child-dispatched',
+      mutationId: 'm1',
+      dispatchId: 'dispatch-1',
+      taskId: 'task-1'
+    })
+    expect(next).toMatchObject({
+      batch: [
+        { mutationId: 'm1', dispatchId: 'dispatch-1', taskId: 'task-1' },
+        { mutationId: 'm2', dispatchId: null, taskId: null }
+      ]
+    })
+  })
+
+  it('child-dispatched is a no-op outside the running view', () => {
+    const closed = emptyFanOutSlice()
+    expect(
+      reduceFanOut(closed, {
+        type: 'child-dispatched',
+        mutationId: 'm1',
+        dispatchId: 'dispatch-1',
+        taskId: 'task-1'
+      })
+    ).toBe(closed)
+  })
+})
+
+describe('reduceFanOut — submit seeds lease fields to null', () => {
+  it('startSubmit seeds running.runId and every batch entry dispatchId/taskId to null', () => {
+    const validForm: FanOutSlice = {
+      view: 'form',
+      parentId: 'w1',
+      fields: { count: 2, agent: 'claude', prompt: '' },
+      repoSelector: 'id:repo-a'
+    }
+    const slice = reduceFanOut(validForm, { type: 'submit', mutationIds: ['m1', 'm2'] })
+    expect(slice).toMatchObject({
+      runId: null,
+      batch: [
+        { mutationId: 'm1', dispatchId: null, taskId: null },
+        { mutationId: 'm2', dispatchId: null, taskId: null }
+      ]
+    })
   })
 })
 
@@ -315,7 +388,8 @@ describe('reduceFanOut — cancel / close', () => {
         fields: { count: 3, agent: 'none', prompt: '' },
         repoSelector: 'id:b',
         batch: [],
-        memberStatus: {}
+        memberStatus: {},
+        runId: null
       }
       expect(reduceFanOut(running, { type })).toEqual({ view: 'closed', repoSelector: 'id:b' })
     }
@@ -440,12 +514,13 @@ describe('fanOutMemberIds', () => {
       fields: { count: 3, agent: 'none', prompt: '' },
       repoSelector: null,
       batch: [
-        { mutationId: 'm1', worktreeId: 'w2', failed: false },
-        { mutationId: 'm2', worktreeId: null, failed: false },
-        { mutationId: 'm3', worktreeId: null, failed: true },
-        { mutationId: 'm4', worktreeId: 'w4', failed: false }
+        { mutationId: 'm1', worktreeId: 'w2', failed: false, dispatchId: null, taskId: null },
+        { mutationId: 'm2', worktreeId: null, failed: false, dispatchId: null, taskId: null },
+        { mutationId: 'm3', worktreeId: null, failed: true, dispatchId: null, taskId: null },
+        { mutationId: 'm4', worktreeId: 'w4', failed: false, dispatchId: null, taskId: null }
       ],
-      memberStatus: {}
+      memberStatus: {},
+      runId: null
     }
     expect(fanOutMemberIds(running)).toEqual(['w1', 'w2', 'w4'])
   })
@@ -470,13 +545,14 @@ describe('fanOutCounts', () => {
       fields: { count: 5, agent: 'claude', prompt: '' },
       repoSelector: 'id:a',
       batch: [
-        { mutationId: 'm1', worktreeId: 'w2', failed: false },
-        { mutationId: 'm2', worktreeId: 'w3', failed: false },
-        { mutationId: 'm3', worktreeId: 'w4', failed: false },
-        { mutationId: 'm4', worktreeId: 'w5', failed: false },
-        { mutationId: 'm5', worktreeId: null, failed: false }
+        { mutationId: 'm1', worktreeId: 'w2', failed: false, dispatchId: null, taskId: null },
+        { mutationId: 'm2', worktreeId: 'w3', failed: false, dispatchId: null, taskId: null },
+        { mutationId: 'm3', worktreeId: 'w4', failed: false, dispatchId: null, taskId: null },
+        { mutationId: 'm4', worktreeId: 'w5', failed: false, dispatchId: null, taskId: null },
+        { mutationId: 'm5', worktreeId: null, failed: false, dispatchId: null, taskId: null }
       ],
-      memberStatus: { w2: 'working', w3: 'working', w4: 'waiting-input', w5: 'idle' }
+      memberStatus: { w2: 'working', w3: 'working', w4: 'waiting-input', w5: 'idle' },
+      runId: null
     }
     expect(fanOutCounts(running)).toEqual({
       total: 5,
@@ -495,10 +571,11 @@ describe('fanOutCounts', () => {
       fields: { count: 2, agent: 'none', prompt: '' },
       repoSelector: null,
       batch: [
-        { mutationId: 'm1', worktreeId: null, failed: true },
-        { mutationId: 'm2', worktreeId: null, failed: false }
+        { mutationId: 'm1', worktreeId: null, failed: true, dispatchId: null, taskId: null },
+        { mutationId: 'm2', worktreeId: null, failed: false, dispatchId: null, taskId: null }
       ],
-      memberStatus: {}
+      memberStatus: {},
+      runId: null
     }
     expect(fanOutCounts(running)).toEqual({
       total: 2,
@@ -516,8 +593,11 @@ describe('fanOutCounts', () => {
       parentId: 'w1',
       fields: { count: 1, agent: 'none', prompt: '' },
       repoSelector: null,
-      batch: [{ mutationId: 'm1', worktreeId: 'w2', failed: false }],
-      memberStatus: {}
+      batch: [
+        { mutationId: 'm1', worktreeId: 'w2', failed: false, dispatchId: null, taskId: null }
+      ],
+      memberStatus: {},
+      runId: null
     }
     expect(fanOutCounts(running).created).toBe(1)
   })
@@ -539,10 +619,11 @@ describe('composeFanOutGraph', () => {
       fields: { count: 2, agent: 'claude', prompt: '' },
       repoSelector: 'id:a',
       batch: [
-        { mutationId: 'm1', worktreeId: null, failed: false },
-        { mutationId: 'm2', worktreeId: null, failed: false }
+        { mutationId: 'm1', worktreeId: null, failed: false, dispatchId: null, taskId: null },
+        { mutationId: 'm2', worktreeId: null, failed: false, dispatchId: null, taskId: null }
       ],
-      memberStatus: {}
+      memberStatus: {},
+      runId: null
     }
     const composed = composeFanOutGraph(graph, running)
 
@@ -563,8 +644,9 @@ describe('composeFanOutGraph', () => {
       parentId: 'w1',
       fields: { count: 1, agent: 'none', prompt: '' },
       repoSelector: null,
-      batch: [{ mutationId: 'm1', worktreeId: null, failed: true }],
-      memberStatus: {}
+      batch: [{ mutationId: 'm1', worktreeId: null, failed: true, dispatchId: null, taskId: null }],
+      memberStatus: {},
+      runId: null
     }
     const composed = composeFanOutGraph(graph, running)
     expect(composed.nodes.has(`${FANOUT_PLACEHOLDER_PREFIX}m1`)).toBe(false)
@@ -578,8 +660,11 @@ describe('composeFanOutGraph', () => {
       parentId: 'w1',
       fields: { count: 1, agent: 'none', prompt: '' },
       repoSelector: null,
-      batch: [{ mutationId: 'm1', worktreeId: 'w2', failed: false }],
-      memberStatus: { w2: 'working' }
+      batch: [
+        { mutationId: 'm1', worktreeId: 'w2', failed: false, dispatchId: null, taskId: null }
+      ],
+      memberStatus: { w2: 'working' },
+      runId: null
     }
     const composed = composeFanOutGraph(graph, running)
     expect(composed.nodes.has(`${FANOUT_PLACEHOLDER_PREFIX}m1`)).toBe(false)
@@ -593,8 +678,11 @@ describe('composeFanOutGraph', () => {
       parentId: 'w1',
       fields: { count: 1, agent: 'none', prompt: '' },
       repoSelector: null,
-      batch: [{ mutationId: 'm1', worktreeId: null, failed: false }],
-      memberStatus: {}
+      batch: [
+        { mutationId: 'm1', worktreeId: null, failed: false, dispatchId: null, taskId: null }
+      ],
+      memberStatus: {},
+      runId: null
     }
     const once = composeFanOutGraph(graph, running)
     const twice = composeFanOutGraph(once, running)

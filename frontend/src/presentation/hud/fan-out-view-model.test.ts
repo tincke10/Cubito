@@ -94,13 +94,14 @@ const runningSlice = (
   fields: { count: 5, agent: 'claude', prompt: '' },
   repoSelector: 'id:repo-1',
   batch: [
-    { mutationId: 'm1', worktreeId: 'w2', failed: false },
-    { mutationId: 'm2', worktreeId: 'w3', failed: false },
-    { mutationId: 'm3', worktreeId: 'w4', failed: false },
-    { mutationId: 'm4', worktreeId: 'w5', failed: false },
-    { mutationId: 'm5', worktreeId: null, failed: false }
+    { mutationId: 'm1', worktreeId: 'w2', failed: false, dispatchId: null, taskId: null },
+    { mutationId: 'm2', worktreeId: 'w3', failed: false, dispatchId: null, taskId: null },
+    { mutationId: 'm3', worktreeId: 'w4', failed: false, dispatchId: null, taskId: null },
+    { mutationId: 'm4', worktreeId: 'w5', failed: false, dispatchId: null, taskId: null },
+    { mutationId: 'm5', worktreeId: null, failed: false, dispatchId: null, taskId: null }
   ],
   memberStatus: { w2: 'working', w3: 'working', w4: 'waiting-input', w5: 'idle' },
+  runId: null,
   ...overrides
 })
 
@@ -122,8 +123,8 @@ describe('fanOutViewModel — running', () => {
     const withFailure = fanOutViewModel(
       runningSlice({
         batch: [
-          { mutationId: 'm1', worktreeId: null, failed: true },
-          { mutationId: 'm2', worktreeId: null, failed: false }
+          { mutationId: 'm1', worktreeId: null, failed: true, dispatchId: null, taskId: null },
+          { mutationId: 'm2', worktreeId: null, failed: false, dispatchId: null, taskId: null }
         ],
         memberStatus: {}
       })

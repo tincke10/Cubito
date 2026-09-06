@@ -15,11 +15,14 @@ export type FanOutFormFields = {
   prompt: string
 }
 
-/** One requested child in the batch: pending until `worktreeId` arrives, or `failed`. */
+/** One requested child in the batch: pending until `worktreeId` arrives, or `failed`.
+ *  `dispatchId`/`taskId` arrive only on the lease-run path (Change B); null on v1. */
 export type FanOutBatchEntry = {
   mutationId: string
   worktreeId: WorktreeId | null
   failed: boolean
+  dispatchId: string | null
+  taskId: string | null
 }
 
 /** closed → form (anchored to a node) → running (batch in flight) → closed. */
@@ -39,6 +42,8 @@ export type FanOutSlice =
       repoSelector: string | null
       batch: readonly FanOutBatchEntry[]
       memberStatus: Record<WorktreeId, AgentStatus>
+      /** The lease Run backing this batch (Change B); null on the v1 worktree-only path. */
+      runId: string | null
     }
 
 export const emptyFanOutSlice = (): FanOutSlice => ({ view: 'closed', repoSelector: null })
@@ -54,6 +59,8 @@ export type FanOutAction =
   | { type: 'child-created'; mutationId: string; worktreeId: WorktreeId }
   | { type: 'child-failed'; mutationId: string }
   | { type: 'member-status'; worktreeId: WorktreeId; status: AgentStatus }
+  | { type: 'run-created'; runId: string }
+  | { type: 'child-dispatched'; mutationId: string; dispatchId: string; taskId: string }
   | { type: 'cancel' }
   | { type: 'close' }
 
@@ -103,6 +110,19 @@ export function reduceFanOut(slice: FanOutSlice, action: FanOutAction): FanOutSl
       return slice.view === 'running'
         ? { ...slice, memberStatus: { ...slice.memberStatus, [action.worktreeId]: action.status } }
         : slice
+    case 'run-created':
+      return slice.view === 'running' ? { ...slice, runId: action.runId } : slice
+    case 'child-dispatched':
+      return slice.view === 'running'
+        ? {
+            ...slice,
+            batch: withEntry(slice.batch, action.mutationId, (e) => ({
+              ...e,
+              dispatchId: action.dispatchId,
+              taskId: action.taskId
+            }))
+          }
+        : slice
     case 'cancel':
     case 'close':
       return { view: 'closed', repoSelector: slice.repoSelector }
@@ -138,7 +158,9 @@ function startSubmit(slice: FanOutSlice, mutationIds: readonly string[]): FanOut
   const batch: FanOutBatchEntry[] = mutationIds.map((mutationId) => ({
     mutationId,
     worktreeId: null,
-    failed: false
+    failed: false,
+    dispatchId: null,
+    taskId: null
   }))
   return {
     view: 'running',
@@ -146,7 +168,8 @@ function startSubmit(slice: FanOutSlice, mutationIds: readonly string[]): FanOut
     fields: slice.fields,
     repoSelector: slice.repoSelector,
     batch,
-    memberStatus: {}
+    memberStatus: {},
+    runId: null
   }
 }
 

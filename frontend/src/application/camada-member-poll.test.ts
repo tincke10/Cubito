@@ -23,8 +23,11 @@ const runningSlice = (memberStatus: Record<WorktreeId, AgentStatus> = {}): FanOu
   parentId: 'repo::/parent',
   fields: { count: 2, agent: 'none', prompt: '' },
   repoSelector: 'repo',
-  batch: [{ mutationId: 'm1', worktreeId: 'repo::/child', failed: false }],
-  memberStatus
+  batch: [
+    { mutationId: 'm1', worktreeId: 'repo::/child', failed: false, dispatchId: null, taskId: null }
+  ],
+  memberStatus,
+  runId: null
 })
 
 type FakeGateway = CamadaPollGatewayPort & {
