@@ -123,6 +123,9 @@ const demoGateway: RuntimeGateway = {
   },
   orchestrationWorkerStart: async () => {
     throw new Error('orchestrationWorkerStart not implemented in the demo gateway')
+  },
+  orchestrationWorkerList: async () => {
+    throw new Error('orchestrationWorkerList not implemented in the demo gateway')
   }
 }
 

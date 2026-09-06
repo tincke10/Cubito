@@ -3,8 +3,11 @@ import type {
   LeaseRunCreateResult,
   LeaseTaskCreateInput,
   LeaseTaskCreateResult,
+  LeaseWorkerListInput,
+  LeaseWorkerListResult,
   LeaseWorkerStartInput,
-  LeaseWorkerStartResult
+  LeaseWorkerStartResult,
+  WorkerDispatchStateRow
 } from '../../application/ports/runtime-gateway'
 import type { RpcCaller } from './orcad-gateway'
 
@@ -12,6 +15,23 @@ export type OrchestrationLeaseMethods = {
   orchestrationRunCreate(input: LeaseRunCreateInput): Promise<LeaseRunCreateResult>
   orchestrationTaskCreate(input: LeaseTaskCreateInput): Promise<LeaseTaskCreateResult>
   orchestrationWorkerStart(input: LeaseWorkerStartInput): Promise<LeaseWorkerStartResult>
+  orchestrationWorkerList(input: LeaseWorkerListInput): Promise<LeaseWorkerListResult>
+}
+
+/** Projects a raw `orchestration.workerList` row: `worktreeId` is nested+nullable under `resource`. */
+function toWorkerDispatchStateRow(row: {
+  dispatchId?: unknown
+  workerState?: unknown
+  dispatchStatus?: unknown
+  resource?: { worktreeId?: unknown } | null
+}): WorkerDispatchStateRow {
+  return {
+    dispatchId: typeof row.dispatchId === 'string' ? row.dispatchId : '',
+    workerState: typeof row.workerState === 'string' ? row.workerState : '',
+    dispatchStatus: typeof row.dispatchStatus === 'string' ? row.dispatchStatus : '',
+    worktreeId:
+      row.resource && typeof row.resource.worktreeId === 'string' ? row.resource.worktreeId : null
+  }
 }
 
 /**
@@ -80,6 +100,19 @@ export function createOrchestrationLeaseMethods(connection: {
         taskId: result.taskId,
         state: result.state,
         stage: result.stage
+      }
+    },
+    async orchestrationWorkerList(input) {
+      const response = await connection.call('orchestration.workerList', {
+        run: input.run,
+        ...(input.terminalState !== undefined ? { terminalState: input.terminalState } : {})
+      })
+      const result = response.result as { workers?: unknown }
+      if (!Array.isArray(result?.workers)) {
+        throw new Error('orchestration.workerList returned no workers array')
+      }
+      return {
+        workers: (result.workers as Record<string, unknown>[]).map(toWorkerDispatchStateRow)
       }
     }
   }

@@ -93,6 +93,9 @@ function createFakeConnection(overrides?: {
       },
       orchestrationWorkerStart: async () => {
         throw new Error('orchestrationWorkerStart not implemented in this fake')
+      },
+      orchestrationWorkerList: async () => {
+        throw new Error('orchestrationWorkerList not implemented in this fake')
       }
     },
     terminals: createFakeTerminalsPort(),

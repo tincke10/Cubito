@@ -122,3 +122,80 @@ describe('createOrchestrationLeaseMethods — orchestrationWorkerStart', () => {
     ).rejects.toThrow(/orchestration\.workerStart/)
   })
 })
+
+describe('createOrchestrationLeaseMethods — orchestrationWorkerList', () => {
+  it('calls orchestration.workerList with {run} — no `from` (lease caller)', async () => {
+    const call: RpcCaller = vi.fn(async () => frame({ workers: [] }))
+    const methods = createOrchestrationLeaseMethods({ call })
+    await methods.orchestrationWorkerList({ run: 'run-1' })
+    expect(call).toHaveBeenCalledWith('orchestration.workerList', { run: 'run-1' })
+  })
+
+  it('passes terminalState through when given', async () => {
+    const call: RpcCaller = vi.fn(async () => frame({ workers: [] }))
+    const methods = createOrchestrationLeaseMethods({ call })
+    await methods.orchestrationWorkerList({ run: 'run-1', terminalState: 'active' })
+    expect(call).toHaveBeenCalledWith('orchestration.workerList', {
+      run: 'run-1',
+      terminalState: 'active'
+    })
+  })
+
+  it('projects dispatchId/workerState/dispatchStatus and resource.worktreeId -> worktreeId', async () => {
+    const call: RpcCaller = vi.fn(async () =>
+      frame({
+        workers: [
+          {
+            dispatchId: 'dispatch-1',
+            workerState: 'ready',
+            dispatchStatus: 'dispatched',
+            resource: { worktreeId: 'repo::/child' }
+          }
+        ]
+      })
+    )
+    const methods = createOrchestrationLeaseMethods({ call })
+    await expect(methods.orchestrationWorkerList({ run: 'run-1' })).resolves.toEqual({
+      workers: [
+        {
+          dispatchId: 'dispatch-1',
+          workerState: 'ready',
+          dispatchStatus: 'dispatched',
+          worktreeId: 'repo::/child'
+        }
+      ]
+    })
+  })
+
+  it('projects a null resource (or missing worktreeId) to worktreeId: null', async () => {
+    const call: RpcCaller = vi.fn(async () =>
+      frame({
+        workers: [
+          {
+            dispatchId: 'dispatch-1',
+            workerState: 'ready',
+            dispatchStatus: 'dispatched',
+            resource: null
+          },
+          {
+            dispatchId: 'dispatch-2',
+            workerState: 'ready',
+            dispatchStatus: 'dispatched',
+            resource: {}
+          }
+        ]
+      })
+    )
+    const methods = createOrchestrationLeaseMethods({ call })
+    const result = await methods.orchestrationWorkerList({ run: 'run-1' })
+    expect(result.workers.map((w) => w.worktreeId)).toEqual([null, null])
+  })
+
+  it('throws when the result carries no workers array', async () => {
+    const call: RpcCaller = vi.fn(async () => frame({}))
+    const methods = createOrchestrationLeaseMethods({ call })
+    await expect(methods.orchestrationWorkerList({ run: 'run-1' })).rejects.toThrow(
+      /orchestration\.workerList/
+    )
+  })
+})

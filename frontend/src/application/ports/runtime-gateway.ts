@@ -121,6 +121,19 @@ export type LeaseWorkerStartResult = {
   stage: string
 }
 
+/** `orchestration.workerList` scoped to a lease Run — no `from` (Change C). */
+export type LeaseWorkerListInput = { run: string; terminalState?: string }
+
+/** One `orchestration.workerList` row, projected to only what member-status correlation needs. */
+export type WorkerDispatchStateRow = {
+  dispatchId: string
+  workerState: string
+  dispatchStatus: string
+  worktreeId: string | null
+}
+
+export type LeaseWorkerListResult = { workers: readonly WorkerDispatchStateRow[] }
+
 /**
  * Port to the orcad runtime. The application layer depends on this shape
  * only; infrastructure provides the RPC-backed implementation.
@@ -143,4 +156,5 @@ export type RuntimeGateway = {
   orchestrationRunCreate(input: LeaseRunCreateInput): Promise<LeaseRunCreateResult>
   orchestrationTaskCreate(input: LeaseTaskCreateInput): Promise<LeaseTaskCreateResult>
   orchestrationWorkerStart(input: LeaseWorkerStartInput): Promise<LeaseWorkerStartResult>
+  orchestrationWorkerList(input: LeaseWorkerListInput): Promise<LeaseWorkerListResult>
 }
