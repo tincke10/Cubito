@@ -1,6 +1,10 @@
 import { inertActivity, type AgentStatus } from '../domain/worktree-graph/node-activity'
 import type { WorktreeGraph, WorktreeId, WorktreeNode } from '../domain/worktree-graph/types'
-import type { CreateWorktreeInput, SpawnAgent } from './ports/runtime-gateway'
+import type {
+  CreateWorktreeInput,
+  SpawnAgent,
+  WorkerDispatchStateRow
+} from './ports/runtime-gateway'
 
 export const MIN_FANOUT = 2
 export const MAX_FANOUT = 8
@@ -215,6 +219,24 @@ export function mapPsStatusToAgentStatus(psStatus: string): AgentStatus {
   if (psStatus === 'working') return 'working'
   if (psStatus === 'permission') return 'waiting-input'
   return 'idle'
+}
+
+const WORKING_DISPATCH_STATES = new Set(['ready', 'starting', 'start_unknown'])
+
+/** `orchestration.workerList` worker state → the graph's `AgentStatus` vocabulary. */
+export function mapDispatchStateToAgentStatus(workerState: string): AgentStatus {
+  return WORKING_DISPATCH_STATES.has(workerState) ? 'working' : 'idle'
+}
+
+/** Terminal-failure signal for a dispatch row: worker crashed, or the dispatch itself did. */
+export function isFailedDispatch(
+  row: Pick<WorkerDispatchStateRow, 'workerState' | 'dispatchStatus'>
+): boolean {
+  return (
+    row.workerState === 'failed' ||
+    row.dispatchStatus === 'failed' ||
+    row.dispatchStatus === 'circuit_broken'
+  )
 }
 
 /** Parent plus every batch entry that already has a real worktreeId (pending/failed excluded). */

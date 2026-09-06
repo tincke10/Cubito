@@ -8,6 +8,8 @@ import {
   emptyFanOutSlice,
   fanOutCounts,
   fanOutMemberIds,
+  isFailedDispatch,
+  mapDispatchStateToAgentStatus,
   mapPsStatusToAgentStatus,
   reduceFanOut,
   toFanOutInputs
@@ -489,6 +491,43 @@ describe('mapPsStatusToAgentStatus', () => {
     ['unknown-status', 'idle']
   ] as const)('maps %s to %s', (psStatus, expected) => {
     expect(mapPsStatusToAgentStatus(psStatus)).toBe(expected)
+  })
+})
+
+describe('mapDispatchStateToAgentStatus', () => {
+  it.each([
+    ['ready', 'working'],
+    ['starting', 'working'],
+    ['start_unknown', 'working'],
+    ['succeeded', 'idle'],
+    ['stopped', 'idle'],
+    ['stopping', 'idle'],
+    ['stop_unknown', 'idle'],
+    ['abandoned', 'idle'],
+    ['unsupervised', 'idle'],
+    ['failed', 'idle'],
+    ['unknown-state', 'idle']
+  ] as const)('maps %s to %s', (workerState, expected) => {
+    expect(mapDispatchStateToAgentStatus(workerState)).toBe(expected)
+  })
+})
+
+describe('isFailedDispatch', () => {
+  it('is true when workerState is failed', () => {
+    expect(isFailedDispatch({ workerState: 'failed', dispatchStatus: 'dispatched' })).toBe(true)
+  })
+
+  it('is true when dispatchStatus is failed', () => {
+    expect(isFailedDispatch({ workerState: 'ready', dispatchStatus: 'failed' })).toBe(true)
+  })
+
+  it('is true when dispatchStatus is circuit_broken', () => {
+    expect(isFailedDispatch({ workerState: 'ready', dispatchStatus: 'circuit_broken' })).toBe(true)
+  })
+
+  it('is false otherwise', () => {
+    expect(isFailedDispatch({ workerState: 'ready', dispatchStatus: 'dispatched' })).toBe(false)
+    expect(isFailedDispatch({ workerState: 'succeeded', dispatchStatus: 'completed' })).toBe(false)
   })
 })
 
