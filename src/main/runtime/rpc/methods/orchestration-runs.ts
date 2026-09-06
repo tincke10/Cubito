@@ -5,6 +5,7 @@ import { ORCHESTRATION_RUN_PAGE_LIMIT } from '../../../../shared/orchestration-r
 import { OrchestrationError } from '../../orchestration/orchestration-error'
 import {
   assertCallerHandleMatchesEvidence,
+  assertLeaseOwnership,
   resolveOrchestrationCaller
 } from './orchestration-run-scope'
 
@@ -138,10 +139,16 @@ export const ORCHESTRATION_RUN_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'orchestration.runShow',
     params: RunShowParams,
-    handler: (params, { runtime }) => {
+    handler: (params, { runtime, pairedDeviceId, clientKind }) => {
       const run = runtime.getOrchestrationDb().getRun(params.id)
       if (!run) {
         throw new OrchestrationError('run_not_found', `Run ${params.id} was not found.`)
+      }
+      // Why: a paired GUI lease caller may only read Runs it owns; a terminal/in-process
+      // caller (has `from`, or no paired device) reads unscoped, exactly as before.
+      const isLeaseCaller = !params.from && Boolean(pairedDeviceId) && clientKind === 'runtime'
+      if (isLeaseCaller) {
+        assertLeaseOwnership(run, pairedDeviceId!)
       }
       return { run }
     }

@@ -6,7 +6,7 @@ import {
 import { contextOnlyAbandonWarning } from '../../orchestration/context-only-dispatch-release'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
 import { defineMethod, type RpcMethod } from '../core'
-import { OptionalFiniteNumber, requiredString } from '../schemas'
+import { OptionalFiniteNumber, OptionalString, requiredString } from '../schemas'
 import {
   callFederatedWorkerShow,
   exposeWorker,
@@ -18,8 +18,11 @@ import { readArchivedWorkerOutput } from './orchestration-worker-archive-read'
 import { readLegacyFederatedTerminal } from './orchestration-worker-legacy-federated-read'
 import { readExactWorkerOutput } from './orchestration-worker-output'
 import { exposeWorkerTerminalResource } from './orchestration-worker-release-completion'
+import { resolveWorkerShowDispatch } from './orchestration-worker-show-lease-scope'
 
 const WorkerDispatchParams = z.object({ dispatch: requiredString('Missing --dispatch') })
+// Why: absent for a paired-device lease caller (no terminal); mirrors runShow/workerList.
+const WorkerShowParams = WorkerDispatchParams.extend({ from: OptionalString })
 const WorkerReadParams = WorkerDispatchParams.extend({
   cursor: z.union([z.number().int().nonnegative(), z.string().min(1).max(2_048)]).optional(),
   limit: OptionalFiniteNumber,
@@ -29,17 +32,17 @@ const WorkerReadParams = WorkerDispatchParams.extend({
 export const ORCHESTRATION_WORKER_CONTROL_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'orchestration.workerShow',
-    params: WorkerDispatchParams,
-    handler: async (params, { runtime }) => {
+    params: WorkerShowParams,
+    handler: async (params, { runtime, pairedDeviceId, clientKind }) => {
       const db = runtime.getOrchestrationDb()
-      const dispatch = db.getDispatchContextById(params.dispatch)
+      const dispatch = resolveWorkerShowDispatch({
+        db,
+        dispatchId: params.dispatch,
+        from: params.from,
+        pairedDeviceId,
+        clientKind
+      })
       let worker = db.getWorkerDispatch(params.dispatch)
-      if (!dispatch) {
-        throw new OrchestrationError(
-          'dispatch_not_found',
-          `Worker Dispatch ${params.dispatch} was not found.`
-        )
-      }
       const federated = db.getFederatedDispatch(params.dispatch)
       if (federated) {
         if (!worker) {

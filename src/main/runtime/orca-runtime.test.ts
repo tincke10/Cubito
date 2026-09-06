@@ -36,6 +36,7 @@ import {
 const ORIGIN_REMOTE_URL = 'git@example.com:group/repo.git'
 const ORIGIN_HEAD_COMPONENT = reviewHeadRemoteRefComponent('origin', ORIGIN_REMOTE_URL)
 import { detectAgentStatusFromTitle, MAX_OSC_TITLE_CHARS } from '../../shared/agent-detection'
+import { GUI_RUN_LEASE_RUNTIME_CAPABILITY } from '../../shared/protocol-version'
 import {
   addSparseWorktree,
   addWorktree,
@@ -2241,6 +2242,21 @@ describe('OrcaRuntimeService', () => {
     const runtime = createRuntime()
 
     expect(runtime.getStatus().capabilities).toContain('accounts.codex-reset-credit.v1')
+  })
+
+  it('advertises the GUI run-lease capability unconditionally, after negotiation', () => {
+    const runtime = createRuntime()
+
+    expect(runtime.getStatus().capabilities).toContain(GUI_RUN_LEASE_RUNTIME_CAPABILITY)
+  })
+
+  it('lets a peer without the GUI run-lease capability be told apart safely (old host)', () => {
+    const runtime = createRuntime()
+    const oldPeerCapabilities = runtime
+      .getStatus()
+      .capabilities?.filter((capability) => capability !== GUI_RUN_LEASE_RUNTIME_CAPABILITY)
+
+    expect(oldPeerCapabilities?.includes(GUI_RUN_LEASE_RUNTIME_CAPABILITY)).toBe(false)
   })
 
   it('routes mobile Codex reset consumption through the account mutation coordinator', async () => {

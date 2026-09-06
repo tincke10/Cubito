@@ -323,6 +323,57 @@ describe('orchestration RPC methods', () => {
     })
   })
 
+  describe('lease reads scoping (Wave 5)', () => {
+    function leaseCtx(deviceId: string): RpcContext {
+      return { runtime, pairedDeviceId: deviceId, clientKind: 'runtime' }
+    }
+
+    it('lets the lease owner read its own Run via runShow', async () => {
+      setup(false)
+      const created = (await h.call(
+        'orchestration.runCreate',
+        { objective: 'read me' },
+        leaseCtx('device_1')
+      )) as { run: { id: string } }
+
+      const shown = (await h.call(
+        'orchestration.runShow',
+        { id: created.run.id },
+        leaseCtx('device_1')
+      )) as { run: { id: string } }
+
+      expect(shown.run.id).toBe(created.run.id)
+    })
+
+    it('fences a lease runShow against a Run owned by another device', async () => {
+      setup(false)
+      const created = (await h.call(
+        'orchestration.runCreate',
+        { objective: 'owned by device_1' },
+        leaseCtx('device_1')
+      )) as { run: { id: string } }
+
+      await expect(
+        h.call('orchestration.runShow', { id: created.run.id }, leaseCtx('device_2'))
+      ).rejects.toMatchObject({ code: 'consumer_fenced' })
+    })
+
+    it('keeps terminal runShow unscoped (no `from`, no paired device)', async () => {
+      setup(false)
+      vi.spyOn(runtime, 'getTerminalPaneKey').mockReturnValue(coordinatorPaneKey)
+      const created = (await call('orchestration.runCreate', {
+        objective: 'terminal Run',
+        from: 'term_coord'
+      })) as { run: { id: string } }
+
+      const shown = (await call('orchestration.runShow', { id: created.run.id })) as {
+        run: { id: string }
+      }
+
+      expect(shown.run.id).toBe(created.run.id)
+    })
+  })
+
   describe('orchestration.reset', () => {
     function seedResetState(): void {
       db.insertMessage({ from: 'a', to: 'b', subject: 'test' })

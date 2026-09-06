@@ -197,7 +197,7 @@ function webClientPathForEndpoint(pathname: string): string {
   return `${pathname.replace(/\/$/, '')}/web-index.html`
 }
 
-const MOBILE_RPC_METHOD_ALLOWLIST = new Set([
+export const MOBILE_RPC_METHOD_ALLOWLIST = new Set([
   'accounts.list',
   'accounts.consumeCodexResetCredit',
   'accounts.selectClaude',
@@ -373,6 +373,15 @@ const MOBILE_RPC_METHOD_ALLOWLIST = new Set([
   'notifications.getMissedSince',
   'notifications.subscribe',
   'notifications.unsubscribe',
+  // Why: future-mobile + honest inventory only — a mobile-scope caller still has no
+  // paired-device lease predicate match (that requires clientKind 'runtime'), so the
+  // real gate for these verbs is the lease-ownership branch, not this allowlist.
+  'orchestration.runCreate',
+  'orchestration.runShow',
+  'orchestration.taskCreate',
+  'orchestration.workerList',
+  'orchestration.workerShow',
+  'orchestration.workerStart',
   'pairing.getEndpoints',
   'pairing.provisionRelay',
   'preflight.check',

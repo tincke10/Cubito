@@ -1,7 +1,9 @@
 import { z } from 'zod'
 import type { WorkerTerminalListState } from '../../orchestration/worker-terminal-ownership'
+import { OrchestrationError } from '../../orchestration/orchestration-error'
 import { defineMethod, type RpcMethod } from '../core'
-import { requiredString } from '../schemas'
+import { OptionalString, requiredString } from '../schemas'
+import { assertLeaseOwnership } from './orchestration-run-scope'
 import {
   archiveSummary,
   completeWorkerTerminalRelease,
@@ -22,7 +24,9 @@ const WORKER_TERMINAL_LIST_STATES = [
 
 const WorkerListParams = z.object({
   run: z.string().min(1).optional(),
-  terminalState: z.enum(WORKER_TERMINAL_LIST_STATES).optional()
+  terminalState: z.enum(WORKER_TERMINAL_LIST_STATES).optional(),
+  // Why: absent for a paired-device lease caller (no terminal); mirrors runShow.
+  from: OptionalString
 })
 
 export const ORCHESTRATION_WORKER_RELEASE_METHODS: RpcMethod[] = [
@@ -142,8 +146,25 @@ export const ORCHESTRATION_WORKER_RELEASE_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'orchestration.workerList',
     params: WorkerListParams,
-    handler: (params, { runtime }) => {
+    handler: (params, { runtime, pairedDeviceId, clientKind }) => {
       const db = runtime.getOrchestrationDb()
+      // Why: a paired GUI lease caller may only list workers for a Run it owns; a
+      // terminal/in-process caller (has `from`, or no paired device) is unscoped, as before.
+      const isLeaseCaller = !params.from && Boolean(pairedDeviceId) && clientKind === 'runtime'
+      if (isLeaseCaller) {
+        if (!params.run) {
+          throw new OrchestrationError(
+            'run_required',
+            'A GUI lease caller must provide --run; there is no coordinator terminal to infer it from.',
+            { effectsApplied: false }
+          )
+        }
+        const leaseRun = db.getRun(params.run)
+        if (!leaseRun) {
+          throw new OrchestrationError('run_not_found', `Run ${params.run} was not found.`)
+        }
+        assertLeaseOwnership(leaseRun, pairedDeviceId!)
+      }
       const rows = db.listWorkerTerminalResources({ runId: params.run })
       const workers = rows
         .filter((row) => !params.terminalState || row.terminalState === params.terminalState)
