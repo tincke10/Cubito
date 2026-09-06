@@ -422,6 +422,7 @@ const MOBILE_RPC_METHOD_ALLOWLIST = new Set([
   'speech.models.list',
   'stats.summary',
   'status.get',
+  'system.snapshot',
   'agentTeams.prepareLaunch',
   'agentTeams.tmuxCompat',
   'terminal.clearBuffer',
