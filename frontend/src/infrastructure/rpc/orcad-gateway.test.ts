@@ -76,6 +76,8 @@ describe('createOrcadGateway', () => {
       'orchestrationRunCreate',
       'orchestrationTaskCreate',
       'orchestrationWorkerStart',
+      'orchestrationWorkerList',
+      'orchestrationWorkerShow',
       'listWorktrees',
       'listRepos',
       'addRepo',

@@ -16,6 +16,8 @@ import type {
   LeaseTaskCreateResult,
   LeaseWorkerListInput,
   LeaseWorkerListResult,
+  LeaseWorkerShowInput,
+  LeaseWorkerShowResult,
   LeaseWorkerStartInput,
   LeaseWorkerStartResult,
   RepoSummary,
@@ -112,6 +114,9 @@ const createFakeGateway = () => ({
   }),
   orchestrationWorkerList: vi.fn<(input: LeaseWorkerListInput) => Promise<LeaseWorkerListResult>>(
     async () => ({ workers: [] })
+  ),
+  orchestrationWorkerShow: vi.fn<(input: LeaseWorkerShowInput) => Promise<LeaseWorkerShowResult>>(
+    async () => ({ awaitingInput: null })
   )
 })
 

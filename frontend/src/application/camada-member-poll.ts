@@ -12,10 +12,13 @@ import type { SceneStore } from './scene-store'
 
 export const CAMADA_POLL_INTERVAL_MS = 1500
 
+/** A non-terminal dispatch worth a workerShow call this tick (MINIMAL+ esperando recovery). */
+type LiveDispatch = { dispatchId: string; worktreeId: WorktreeId }
+
 /** Only the methods the camada poll needs — narrow like the other controller ports. */
 export type CamadaPollGatewayPort = Pick<
   RuntimeGateway,
-  'listWorktreePs' | 'orchestrationWorkerList'
+  'listWorktreePs' | 'orchestrationWorkerList' | 'orchestrationWorkerShow'
 >
 
 export type CamadaMemberPollDeps = {
@@ -119,20 +122,52 @@ export function createCamadaMemberPoll(deps: CamadaMemberPollDeps): CamadaMember
         entryByDispatchId.set(entry.dispatchId, entry)
       }
     }
+    const statusByWorktree = new Map<WorktreeId, AgentStatus>()
+    const liveDispatches: LiveDispatch[] = []
     for (const row of rows) {
       const entry = entryByDispatchId.get(row.dispatchId)
       if (!entry || entry.worktreeId === null) continue
       if (isFailedDispatch(row)) {
         deps.store.dispatchFanOut({ type: 'child-failed', mutationId: entry.mutationId })
-      } else {
-        deps.store.dispatchFanOut({
-          type: 'member-status',
-          worktreeId: entry.worktreeId,
-          status: mapDispatchStateToAgentStatus(row.workerState)
-        })
+        continue
+      }
+      const status = mapDispatchStateToAgentStatus(row.workerState)
+      statusByWorktree.set(entry.worktreeId, status)
+      // Only non-terminal dispatches need workerShow — bounds N-RPCs/tick to what's still live.
+      if (status === 'working') {
+        liveDispatches.push({ dispatchId: row.dispatchId, worktreeId: entry.worktreeId })
       }
     }
+    await recoverAwaitingInput(liveDispatches, statusByWorktree)
+
+    if (stopped) return
+    const afterSlice = deps.store.get().fanOut
+    if (afterSlice.view !== 'running') return // left running mid-flight — halt, no dispatch, no schedule
+    for (const [worktreeId, status] of statusByWorktree) {
+      deps.store.dispatchFanOut({ type: 'member-status', worktreeId, status })
+    }
     scheduleNextTick()
+  }
+
+  /** MINIMAL+: workerList has no waiting-for-human signal, so recover it per live dispatch via
+   *  workerShow. Bounded to live (non-terminal) dispatches; a throw on one must not affect the
+   *  others or kill the loop — the dispatch keeps its workerList-derived status on failure. */
+  async function recoverAwaitingInput(
+    liveDispatches: readonly LiveDispatch[],
+    statusByWorktree: Map<WorktreeId, AgentStatus>
+  ): Promise<void> {
+    await Promise.all(
+      liveDispatches.map(async ({ dispatchId, worktreeId }) => {
+        try {
+          const { awaitingInput } = await gateway.orchestrationWorkerShow({ dispatch: dispatchId })
+          if (awaitingInput === true) {
+            statusByWorktree.set(worktreeId, 'waiting-input')
+          }
+        } catch {
+          // resilient: an unreadable/unverifiable worker keeps its workerList-derived status
+        }
+      })
+    )
   }
 
   return {

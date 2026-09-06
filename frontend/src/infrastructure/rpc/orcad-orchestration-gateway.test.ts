@@ -199,3 +199,46 @@ describe('createOrchestrationLeaseMethods — orchestrationWorkerList', () => {
     )
   })
 })
+
+describe('createOrchestrationLeaseMethods — orchestrationWorkerShow (MINIMAL+)', () => {
+  it('calls orchestration.workerShow with only {dispatch} — no `from`, no `run`', async () => {
+    const call: RpcCaller = vi.fn(async () => frame({ observation: {} }))
+    const methods = createOrchestrationLeaseMethods({ call })
+    await methods.orchestrationWorkerShow({ dispatch: 'dispatch-1' })
+    expect(call).toHaveBeenCalledWith('orchestration.workerShow', { dispatch: 'dispatch-1' })
+  })
+
+  it('projects a present agentWait object to awaitingInput: true', async () => {
+    const call: RpcCaller = vi.fn(async () =>
+      frame({ observation: { agentWait: { source: 'hook', reason: 'permission' } } })
+    )
+    const methods = createOrchestrationLeaseMethods({ call })
+    await expect(methods.orchestrationWorkerShow({ dispatch: 'dispatch-1' })).resolves.toEqual({
+      awaitingInput: true
+    })
+  })
+
+  it('projects agentWait: null (looked, not waiting) to awaitingInput: false', async () => {
+    const call: RpcCaller = vi.fn(async () => frame({ observation: { agentWait: null } }))
+    const methods = createOrchestrationLeaseMethods({ call })
+    await expect(methods.orchestrationWorkerShow({ dispatch: 'dispatch-1' })).resolves.toEqual({
+      awaitingInput: false
+    })
+  })
+
+  it('projects an absent agentWait key (never looked) to awaitingInput: null', async () => {
+    const call: RpcCaller = vi.fn(async () => frame({ observation: {} }))
+    const methods = createOrchestrationLeaseMethods({ call })
+    await expect(methods.orchestrationWorkerShow({ dispatch: 'dispatch-1' })).resolves.toEqual({
+      awaitingInput: null
+    })
+  })
+
+  it('projects a missing observation to awaitingInput: null', async () => {
+    const call: RpcCaller = vi.fn(async () => frame({}))
+    const methods = createOrchestrationLeaseMethods({ call })
+    await expect(methods.orchestrationWorkerShow({ dispatch: 'dispatch-1' })).resolves.toEqual({
+      awaitingInput: null
+    })
+  })
+})

@@ -5,6 +5,8 @@ import type {
   LeaseTaskCreateResult,
   LeaseWorkerListInput,
   LeaseWorkerListResult,
+  LeaseWorkerShowInput,
+  LeaseWorkerShowResult,
   LeaseWorkerStartInput,
   LeaseWorkerStartResult,
   WorkerDispatchStateRow
@@ -16,6 +18,7 @@ export type OrchestrationLeaseMethods = {
   orchestrationTaskCreate(input: LeaseTaskCreateInput): Promise<LeaseTaskCreateResult>
   orchestrationWorkerStart(input: LeaseWorkerStartInput): Promise<LeaseWorkerStartResult>
   orchestrationWorkerList(input: LeaseWorkerListInput): Promise<LeaseWorkerListResult>
+  orchestrationWorkerShow(input: LeaseWorkerShowInput): Promise<LeaseWorkerShowResult>
 }
 
 /** Projects a raw `orchestration.workerList` row: `worktreeId` is nested+nullable under `resource`. */
@@ -32,6 +35,16 @@ function toWorkerDispatchStateRow(row: {
     worktreeId:
       row.resource && typeof row.resource.worktreeId === 'string' ? row.resource.worktreeId : null
   }
+}
+
+/** Projects `observation.agentWait`: absent key -> null (never looked), null -> false (looked,
+ *  not waiting), present object -> true (waiting on a human). JSON drops `undefined` keys, so an
+ *  absent key and an `undefined` value are indistinguishable here — both mean "never looked". */
+function toLeaseWorkerShowResult(result: {
+  observation?: { agentWait?: unknown }
+}): LeaseWorkerShowResult {
+  const agentWait = result.observation?.agentWait
+  return { awaitingInput: agentWait === undefined ? null : agentWait !== null }
 }
 
 /**
@@ -114,6 +127,14 @@ export function createOrchestrationLeaseMethods(connection: {
       return {
         workers: (result.workers as Record<string, unknown>[]).map(toWorkerDispatchStateRow)
       }
+    },
+    async orchestrationWorkerShow(input) {
+      const response = await connection.call('orchestration.workerShow', {
+        dispatch: input.dispatch
+      })
+      return toLeaseWorkerShowResult(
+        response.result as Parameters<typeof toLeaseWorkerShowResult>[0]
+      )
     }
   }
 }

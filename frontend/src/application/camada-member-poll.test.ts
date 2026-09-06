@@ -6,6 +6,7 @@ import type { SceneStore } from './scene-store'
 import type { FanOutBatchEntry, FanOutSlice } from './fan-out-model'
 import type {
   LeaseWorkerListResult,
+  LeaseWorkerShowResult,
   WorkerDispatchStateRow,
   WorktreePsRow
 } from './ports/runtime-gateway'
@@ -36,6 +37,13 @@ const runningSlice = (memberStatus: Record<WorktreeId, AgentStatus> = {}): FanOu
   runId: null
 })
 
+const liveRow = (dispatchId: string): WorkerDispatchStateRow => ({
+  dispatchId,
+  workerState: 'ready',
+  dispatchStatus: 'dispatched',
+  worktreeId: null
+})
+
 const leaseRunningSlice = (
   batch: readonly FanOutBatchEntry[],
   memberStatus: Record<WorktreeId, AgentStatus> = {}
@@ -52,11 +60,15 @@ const leaseRunningSlice = (
 type FakeGateway = CamadaPollGatewayPort & {
   calls: number
   workerListCalls: number
+  workerShowCalls: number
+  workerShowDispatchIds: string[]
   listWorktreePsImpl?: () => Promise<readonly WorktreePsRow[]>
   orchestrationWorkerListImpl?: () => Promise<LeaseWorkerListResult>
+  orchestrationWorkerShowImpl?: (dispatchId: string) => Promise<LeaseWorkerShowResult>
 }
 
-/** Fake gateway: `listWorktreePs`/`orchestrationWorkerList` resolution timing and rows are test-controlled. */
+/** Fake gateway: `listWorktreePs`/`orchestrationWorkerList`/`orchestrationWorkerShow` resolution
+ *  timing and payloads are test-controlled. */
 function createFakeGateway(
   rows: readonly WorktreePsRow[] = [],
   workers: readonly WorkerDispatchStateRow[] = []
@@ -64,6 +76,8 @@ function createFakeGateway(
   const gw: FakeGateway = {
     calls: 0,
     workerListCalls: 0,
+    workerShowCalls: 0,
+    workerShowDispatchIds: [],
     listWorktreePs: async () => {
       gw.calls += 1
       if (gw.listWorktreePsImpl) return gw.listWorktreePsImpl()
@@ -73,6 +87,12 @@ function createFakeGateway(
       gw.workerListCalls += 1
       if (gw.orchestrationWorkerListImpl) return gw.orchestrationWorkerListImpl()
       return { workers }
+    },
+    orchestrationWorkerShow: async ({ dispatch }) => {
+      gw.workerShowCalls += 1
+      gw.workerShowDispatchIds.push(dispatch)
+      if (gw.orchestrationWorkerShowImpl) return gw.orchestrationWorkerShowImpl(dispatch)
+      return { awaitingInput: null }
     }
   }
   return gw
@@ -463,6 +483,223 @@ describe('createCamadaMemberPoll', () => {
       gate.reject(new Error('network blip'))
       await vi.advanceTimersByTimeAsync(0)
       expect(setTimerSpy.mock.calls.length).toBe(callsBeforeStop)
+    })
+  })
+
+  describe('MINIMAL+: orchestration.workerShow recovers esperando/waiting-input', () => {
+    it('a live dispatch with awaitingInput:true surfaces waiting-input instead of working', async () => {
+      const gateway = createFakeGateway([], [liveRow('dispatch-1')])
+      gateway.orchestrationWorkerShowImpl = async () => ({ awaitingInput: true })
+      const batch: FanOutBatchEntry[] = [
+        {
+          mutationId: 'm1',
+          worktreeId: 'repo::/child',
+          failed: false,
+          dispatchId: 'dispatch-1',
+          taskId: 'task-1'
+        }
+      ]
+      store.update({ fanOut: leaseRunningSlice(batch) })
+      const poll = createCamadaMemberPoll({
+        gateway,
+        store,
+        setTimer: setTimerSpy,
+        clearTimer: clearTimerSpy
+      })
+      poll.start()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(gateway.workerShowDispatchIds).toEqual(['dispatch-1'])
+      const slice = store.get().fanOut
+      if (slice.view === 'running') {
+        expect(slice.memberStatus).toEqual({ 'repo::/child': 'waiting-input' })
+      }
+      poll.stop()
+    })
+
+    it.each([
+      ['false (observed, not waiting)', false],
+      ['null (never looked)', null]
+    ] as const)('awaitingInput: %s keeps the working status', async (_label, awaitingInput) => {
+      const gateway = createFakeGateway([], [liveRow('dispatch-1')])
+      gateway.orchestrationWorkerShowImpl = async () => ({ awaitingInput })
+      const batch: FanOutBatchEntry[] = [
+        {
+          mutationId: 'm1',
+          worktreeId: 'repo::/child',
+          failed: false,
+          dispatchId: 'dispatch-1',
+          taskId: 'task-1'
+        }
+      ]
+      store.update({ fanOut: leaseRunningSlice(batch) })
+      const poll = createCamadaMemberPoll({
+        gateway,
+        store,
+        setTimer: setTimerSpy,
+        clearTimer: clearTimerSpy
+      })
+      poll.start()
+      await vi.advanceTimersByTimeAsync(0)
+      const slice = store.get().fanOut
+      if (slice.view === 'running') {
+        expect(slice.memberStatus).toEqual({ 'repo::/child': 'working' })
+      }
+      poll.stop()
+    })
+
+    it('does not call workerShow for a terminal (non-working) dispatch', async () => {
+      const gateway = createFakeGateway(
+        [],
+        [
+          {
+            dispatchId: 'dispatch-1',
+            workerState: 'succeeded',
+            dispatchStatus: 'completed',
+            worktreeId: null
+          }
+        ]
+      )
+      const batch: FanOutBatchEntry[] = [
+        {
+          mutationId: 'm1',
+          worktreeId: 'repo::/child',
+          failed: false,
+          dispatchId: 'dispatch-1',
+          taskId: 'task-1'
+        }
+      ]
+      store.update({ fanOut: leaseRunningSlice(batch) })
+      const poll = createCamadaMemberPoll({
+        gateway,
+        store,
+        setTimer: setTimerSpy,
+        clearTimer: clearTimerSpy
+      })
+      poll.start()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(gateway.workerShowCalls).toBe(0)
+      poll.stop()
+    })
+
+    it('does not call workerShow for a failed dispatch', async () => {
+      const gateway = createFakeGateway(
+        [],
+        [
+          {
+            dispatchId: 'dispatch-1',
+            workerState: 'failed',
+            dispatchStatus: 'dispatched',
+            worktreeId: null
+          }
+        ]
+      )
+      const batch: FanOutBatchEntry[] = [
+        {
+          mutationId: 'm1',
+          worktreeId: 'repo::/child',
+          failed: false,
+          dispatchId: 'dispatch-1',
+          taskId: 'task-1'
+        }
+      ]
+      store.update({ fanOut: leaseRunningSlice(batch) })
+      const poll = createCamadaMemberPoll({
+        gateway,
+        store,
+        setTimer: setTimerSpy,
+        clearTimer: clearTimerSpy
+      })
+      poll.start()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(gateway.workerShowCalls).toBe(0)
+      poll.stop()
+    })
+
+    it('a workerShow throw for one dispatch does not affect another cube nor kill the loop', async () => {
+      const gateway = createFakeGateway([], [liveRow('dispatch-1'), liveRow('dispatch-2')])
+      gateway.orchestrationWorkerShowImpl = async (dispatchId) => {
+        if (dispatchId === 'dispatch-1') throw new Error('unreadable pane')
+        return { awaitingInput: true }
+      }
+      const batch: FanOutBatchEntry[] = [
+        {
+          mutationId: 'm1',
+          worktreeId: 'repo::/child-1',
+          failed: false,
+          dispatchId: 'dispatch-1',
+          taskId: 'task-1'
+        },
+        {
+          mutationId: 'm2',
+          worktreeId: 'repo::/child-2',
+          failed: false,
+          dispatchId: 'dispatch-2',
+          taskId: 'task-2'
+        }
+      ]
+      store.update({ fanOut: leaseRunningSlice(batch) })
+      const poll = createCamadaMemberPoll({
+        gateway,
+        store,
+        setTimer: setTimerSpy,
+        clearTimer: clearTimerSpy
+      })
+      poll.start()
+      await vi.advanceTimersByTimeAsync(0)
+      const slice = store.get().fanOut
+      if (slice.view === 'running') {
+        // dispatch-1 kept its workerList-derived status; dispatch-2 still recovered esperando
+        expect(slice.memberStatus).toEqual({
+          'repo::/child-1': 'working',
+          'repo::/child-2': 'waiting-input'
+        })
+      }
+
+      await vi.advanceTimersByTimeAsync(CAMADA_POLL_INTERVAL_MS)
+      expect(gateway.workerListCalls).toBe(2) // next tick was scheduled despite the throw
+      poll.stop()
+    })
+
+    it('bounds workerShow calls to live dispatches only, not every row in the batch', async () => {
+      const gateway = createFakeGateway(
+        [],
+        [
+          liveRow('dispatch-1'),
+          {
+            dispatchId: 'dispatch-2',
+            workerState: 'succeeded',
+            dispatchStatus: 'completed',
+            worktreeId: null
+          }
+        ]
+      )
+      const batch: FanOutBatchEntry[] = [
+        {
+          mutationId: 'm1',
+          worktreeId: 'repo::/child-1',
+          failed: false,
+          dispatchId: 'dispatch-1',
+          taskId: 'task-1'
+        },
+        {
+          mutationId: 'm2',
+          worktreeId: 'repo::/child-2',
+          failed: false,
+          dispatchId: 'dispatch-2',
+          taskId: 'task-2'
+        }
+      ]
+      store.update({ fanOut: leaseRunningSlice(batch) })
+      const poll = createCamadaMemberPoll({
+        gateway,
+        store,
+        setTimer: setTimerSpy,
+        clearTimer: clearTimerSpy
+      })
+      poll.start()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(gateway.workerShowDispatchIds).toEqual(['dispatch-1'])
+      poll.stop()
     })
   })
 })

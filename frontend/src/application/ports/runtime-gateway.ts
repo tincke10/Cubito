@@ -134,6 +134,15 @@ export type WorkerDispatchStateRow = {
 
 export type LeaseWorkerListResult = { workers: readonly WorkerDispatchStateRow[] }
 
+/** `orchestration.workerShow` for one live dispatch — no `from`, no `run` (Change C MINIMAL+):
+ *  the engine derives lease ownership from the dispatch's own run_id, so only `dispatch` is sent. */
+export type LeaseWorkerShowInput = { dispatch: string }
+
+/** Projects only the waiting-for-human signal (`observation.agentWait`): true when the worker
+ *  is parked on a prompt only a human can answer, false when observed and not waiting, null
+ *  when the engine never looked (older host, unverifiable identity, unreadable pane). */
+export type LeaseWorkerShowResult = { awaitingInput: boolean | null }
+
 /**
  * Port to the orcad runtime. The application layer depends on this shape
  * only; infrastructure provides the RPC-backed implementation.
@@ -157,4 +166,5 @@ export type RuntimeGateway = {
   orchestrationTaskCreate(input: LeaseTaskCreateInput): Promise<LeaseTaskCreateResult>
   orchestrationWorkerStart(input: LeaseWorkerStartInput): Promise<LeaseWorkerStartResult>
   orchestrationWorkerList(input: LeaseWorkerListInput): Promise<LeaseWorkerListResult>
+  orchestrationWorkerShow(input: LeaseWorkerShowInput): Promise<LeaseWorkerShowResult>
 }
