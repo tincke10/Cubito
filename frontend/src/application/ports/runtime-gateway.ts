@@ -89,6 +89,38 @@ export type SystemGraphSnapshot = {
   edges: readonly SystemSnapshotEdge[]
 }
 
+/** `orchestration.runCreate` with no `from` — a lease-run caller (Change B, camada lease). */
+export type LeaseRunCreateInput = { objective: string }
+export type LeaseRunCreateResult = { runId: string }
+
+/** `orchestration.taskCreate` with no `callerTerminalHandle` — same lease-caller branch. */
+export type LeaseTaskCreateInput = {
+  spec: string
+  run: string
+  taskTitle?: string
+  displayName?: string
+  deps?: readonly string[]
+}
+export type LeaseTaskCreateResult = { taskId: string }
+
+/** `orchestration.workerStart` with no `from`; `worktree` is required for a lease caller
+ *  (the engine rejects current/new-child/new-top-level placement for it). */
+export type LeaseWorkerStartInput = {
+  task: string
+  run: string
+  worktree: string
+  agent?: string
+  name?: string
+  displayName?: string
+}
+export type LeaseWorkerStartResult = {
+  dispatchId: string
+  runId: string
+  taskId: string
+  state: string
+  stage: string
+}
+
 /**
  * Port to the orcad runtime. The application layer depends on this shape
  * only; infrastructure provides the RPC-backed implementation.
@@ -108,4 +140,7 @@ export type RuntimeGateway = {
     oldPath?: string
   ): Promise<DiffFileContent>
   systemSnapshot(worktree: string): Promise<SystemGraphSnapshot>
+  orchestrationRunCreate(input: LeaseRunCreateInput): Promise<LeaseRunCreateResult>
+  orchestrationTaskCreate(input: LeaseTaskCreateInput): Promise<LeaseTaskCreateResult>
+  orchestrationWorkerStart(input: LeaseWorkerStartInput): Promise<LeaseWorkerStartResult>
 }

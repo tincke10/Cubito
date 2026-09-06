@@ -114,7 +114,16 @@ const demoGateway: RuntimeGateway = {
   gitBranchDiff: async () => {
     throw new Error('gitBranchDiff not implemented in the demo gateway')
   },
-  systemSnapshot: async () => ({ nodes: [], edges: [] })
+  systemSnapshot: async () => ({ nodes: [], edges: [] }),
+  orchestrationRunCreate: async () => {
+    throw new Error('orchestrationRunCreate not implemented in the demo gateway')
+  },
+  orchestrationTaskCreate: async () => {
+    throw new Error('orchestrationTaskCreate not implemented in the demo gateway')
+  },
+  orchestrationWorkerStart: async () => {
+    throw new Error('orchestrationWorkerStart not implemented in the demo gateway')
+  }
 }
 
 const container = document.getElementById('app')

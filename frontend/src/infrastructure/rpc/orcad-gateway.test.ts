@@ -73,6 +73,9 @@ describe('createOrcadGateway', () => {
     const call: RpcCaller = vi.fn()
     const gateway = createOrcadGateway({ call })
     expect(Object.keys(gateway)).toEqual([
+      'orchestrationRunCreate',
+      'orchestrationTaskCreate',
+      'orchestrationWorkerStart',
       'listWorktrees',
       'listRepos',
       'addRepo',

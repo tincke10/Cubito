@@ -52,7 +52,16 @@ const fakeGateway = (
   gitBranchDiff: async () => {
     throw new Error('gitBranchDiff not implemented in this fake')
   },
-  systemSnapshot: async () => ({ nodes: [], edges: [] })
+  systemSnapshot: async () => ({ nodes: [], edges: [] }),
+  orchestrationRunCreate: async () => {
+    throw new Error('orchestrationRunCreate not implemented in this fake')
+  },
+  orchestrationTaskCreate: async () => {
+    throw new Error('orchestrationTaskCreate not implemented in this fake')
+  },
+  orchestrationWorkerStart: async () => {
+    throw new Error('orchestrationWorkerStart not implemented in this fake')
+  }
 })
 
 describe('syncWorktreeGraph', () => {

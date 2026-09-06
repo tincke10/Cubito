@@ -13,6 +13,7 @@ import type {
   WorktreePsRow
 } from '../../application/ports/runtime-gateway'
 import type { RpcSuccessFrame } from './envelope'
+import { createOrchestrationLeaseMethods } from './orcad-orchestration-gateway'
 
 /** Projects a raw `worktree.ps` row onto the local `WorktreePsRow` shape. */
 function toWorktreePsRow(row: { worktreeId?: unknown; status?: unknown }): WorktreePsRow {
@@ -190,6 +191,7 @@ export function createOrcadGateway(
   options?: OrcadGatewayOptions
 ): RuntimeGateway {
   return {
+    ...createOrchestrationLeaseMethods(connection),
     async listWorktrees() {
       const response = await connection.call('worktree.list')
       const result = response.result as { worktrees?: unknown }
