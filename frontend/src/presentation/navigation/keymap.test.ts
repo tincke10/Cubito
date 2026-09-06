@@ -46,13 +46,14 @@ describe('resolveNavCommand', () => {
 
   it.each([
     ['x', { kind: 'open-system' }],
-    ['g', { kind: 'close-system' }]
+    ['d', { kind: 'open-diff' }],
+    ['g', { kind: 'close-scene-mode' }]
   ] as const)('maps %s with no modifiers to %o', (key, expected) => {
     expect(resolveNavCommand(key, noModifiers, LINUX)).toEqual(expected)
   })
 
-  it.each(['x', 'g'] as const)(
-    'returns null for system-view key %s when any modifier is held',
+  it.each(['x', 'd', 'g'] as const)(
+    'returns null for scene-mode key %s when any modifier is held',
     (key) => {
       expect(resolveNavCommand(key, { ...noModifiers, ctrl: true }, LINUX)).toBeNull()
     }

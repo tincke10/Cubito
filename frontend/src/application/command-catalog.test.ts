@@ -47,7 +47,8 @@ describe('commandCatalog', () => {
       'open-projects',
       'add-repo',
       'fan-out',
-      'open-system'
+      'open-system',
+      'open-diff'
     ])
   })
 
@@ -71,6 +72,7 @@ describe('commandCatalog', () => {
       label: 'sistema en vivo',
       keybindingHint: 'x'
     })
+    expect(findCommand(mac, 'open-diff')).toMatchObject({ label: 'diff', keybindingHint: 'd' })
   })
 
   it('open-projects hint is ⌘P on Mac and Ctrl+P elsewhere', () => {
@@ -100,7 +102,9 @@ describe('commandCatalog', () => {
     ['fan-out', { hasSelection: false, isConnected: true }, false],
     ['fan-out', { hasSelection: true, isConnected: false }, false],
     ['open-system', { hasSelection: true, isConnected: false }, true],
-    ['open-system', { hasSelection: false, isConnected: true }, false]
+    ['open-system', { hasSelection: false, isConnected: true }, false],
+    ['open-diff', { hasSelection: true, isConnected: false }, true],
+    ['open-diff', { hasSelection: false, isConnected: true }, false]
   ]
 
   it.each(matrix)('%s isAvailable(%o) => %s', (id, availability, expected) => {

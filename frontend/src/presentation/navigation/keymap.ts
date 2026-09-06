@@ -14,9 +14,11 @@ export type NavCommand =
   | { kind: 'open-palette' }
   | { kind: 'open-fan-out' }
   | { kind: 'open-system' }
-  /** Bare 'g' — closes the system view / returns to the worktree graph (no other bare-key
-   *  meaning currently claims 'g'). No-op when the system view is already closed. */
-  | { kind: 'close-system' }
+  | { kind: 'open-diff' }
+  /** Bare 'g' — closes whichever scene-replacing mode (system or diff) currently owns the
+   *  screen, returning to the worktree graph (no other bare-key meaning claims 'g'). No-op
+   *  when neither mode is open. */
+  | { kind: 'close-scene-mode' }
 
 type Modifiers = { alt: boolean; ctrl: boolean; meta: boolean; shift: boolean }
 type Platform = { isMac: boolean }
@@ -104,8 +106,11 @@ export function resolveNavCommand(
   if (key === 'x') {
     return { kind: 'open-system' }
   }
+  if (key === 'd') {
+    return { kind: 'open-diff' }
+  }
   if (key === 'g') {
-    return { kind: 'close-system' }
+    return { kind: 'close-scene-mode' }
   }
   return null
 }

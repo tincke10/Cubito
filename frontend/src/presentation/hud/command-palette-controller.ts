@@ -83,6 +83,13 @@ export function createCommandPaletteController(
       const selectedId = store.get().selection.selectedId
       if (selectedId === null) return
       store.dispatchSystemView({ type: 'open', nodeId: selectedId })
+    },
+    'open-diff': () => {
+      const selectedId = store.get().selection.selectedId
+      if (selectedId === null) return
+      // baseRef placeholder — bind-diff-view's loader.start() resolves the real base ref and
+      // re-dispatches 'open' synchronously right after, same as the keyboard controller's 'd'.
+      store.dispatchDiffView({ type: 'open', nodeId: selectedId, baseRef: '' })
     }
   }
 

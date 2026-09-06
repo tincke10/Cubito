@@ -13,6 +13,7 @@ import type { Vec3 } from './presentation/camera/camera-framing'
 import { createFanOutBinder } from './bind-fan-out'
 import { createSystemViewBinder } from './bind-system-view'
 import { demoSystemGraph } from './demo-system-graph'
+import { createDiffViewBinder } from './bind-diff-view'
 import { createHudOverlay } from './presentation/hud/hud-overlay'
 import { hudModel } from './presentation/hud/hud-model'
 import { createKeyboardBar } from './presentation/hud/keyboard-bar'
@@ -119,8 +120,9 @@ const container = document.getElementById('app')
 const hud = document.getElementById('hud')
 const keyboardBarSlot = document.getElementById('keyboard-bar')
 const systemSlot = document.getElementById('system')
-if (!container || !hud || !keyboardBarSlot || !systemSlot) {
-  throw new Error('index.html must provide #app, #hud, #system and #keyboard-bar')
+const diffSlot = document.getElementById('diff')
+if (!container || !hud || !keyboardBarSlot || !systemSlot || !diffSlot) {
+  throw new Error('index.html must provide #app, #hud, #system, #diff and #keyboard-bar')
 }
 const hudElement: HTMLElement = hud
 
@@ -181,6 +183,17 @@ const systemViewBinder = createSystemViewBinder({
   systemSlot,
   keyboardBarSlot,
   demoGraphPort: demoSystemGraph,
+  worktreeChrome: [container, hud, keyboardBar.root]
+})
+
+// Diff (design camada): same eager-and-hide-worktree-chrome pattern as sistema en vivo —
+// unlike terminal/spawn/projects, no lazy-on-connect gate; the demo gateway's stubs let
+// `pnpm dev` open diff mode too. `rebindGateway` below swaps in the real gateway on connect.
+const diffViewBinder = createDiffViewBinder({
+  store,
+  diffSlot,
+  keyboardBarSlot,
+  demoGateway,
   worktreeChrome: [container, hud, keyboardBar.root]
 })
 
@@ -254,6 +267,7 @@ store.subscribe((state) => {
   projectSelectorController?.sync(state.projectSelector, state.repos)
   fanOutBinder.sync()
   systemViewBinder.sync()
+  diffViewBinder.sync()
   commandPaletteController.sync(state.commandPalette, state)
   if (!framed && state.graph.nodes.size > 0) {
     framed = true
@@ -351,6 +365,7 @@ if (pairingEntry.kind === 'connect') {
       bindSpawn(connection)
       bindProjects(connection)
       fanOutBinder.bind(connection)
+      diffViewBinder.rebindGateway(connection.gateway)
     },
     onDisconnected: () => store.dispatchTerminal({ type: 'connection-lost' })
   }).start()

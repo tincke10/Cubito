@@ -9,6 +9,7 @@ export type CommandId =
   | 'add-repo'
   | 'fan-out'
   | 'open-system'
+  | 'open-diff'
 
 export type CommandAvailability = { readonly hasSelection: boolean; readonly isConnected: boolean }
 
@@ -66,6 +67,14 @@ export const commandCatalog = (platform: { isMac: boolean }): readonly PaletteCo
     label: 'sistema en vivo',
     keybindingHint: 'x',
     // Unlike open-terminal, no isConnected gate — the demo graph stub works offline.
+    isAvailable: (a) => a.hasSelection
+  },
+  {
+    id: 'open-diff',
+    label: 'diff',
+    keybindingHint: 'd',
+    // Mirrors open-system: hasSelection only — the demo gateway's gitBranchCompare stub
+    // resolves offline too, so no isConnected gate.
     isAvailable: (a) => a.hasSelection
   }
 ]

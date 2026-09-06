@@ -658,6 +658,116 @@
         color: var(--cubito-info);
         font-size: 12px;
       }
+      /* Diff (design camada) — own full-screen mode, mirrors #system's layout shape: a fixed
+         rail on the left, the line-diff panel filling the rest. Cubito is red-free: additions
+         use the green accent, deletions use amber (never a red token). */
+      #diff {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+      }
+      .cubito-diff-hud {
+        position: absolute;
+        inset: 12px 16px auto 16px;
+        font-size: 12px;
+        line-height: 1.6;
+        pointer-events: none;
+      }
+      .cubito-diff-rail {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 240px;
+        height: 100%;
+        overflow-y: auto;
+        background: var(--cubito-panel-surface);
+        border-right: 1px solid var(--cubito-panel-border);
+        font-size: 11.5px;
+        pointer-events: auto;
+      }
+      .cubito-diff-rail__empty {
+        padding: 14px 16px;
+        color: var(--cubito-text-faint);
+      }
+      .diff-rail__row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        cursor: pointer;
+        border-bottom: 1px solid var(--cubito-panel-border);
+        color: var(--cubito-text-dim);
+      }
+      .diff-rail__row--selected {
+        background: color-mix(in srgb, var(--cubito-info) 8%, transparent);
+        color: var(--cubito-text-primary);
+      }
+      .diff-rail__row--modified .diff-rail__path,
+      .diff-rail__row--added .diff-rail__path,
+      .diff-rail__row--deleted .diff-rail__path {
+        color: var(--cubito-text-primary);
+      }
+      .diff-rail__path {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .diff-rail__added {
+        color: var(--cubito-amber-ink);
+      }
+      .diff-rail__removed {
+        color: var(--cubito-amber);
+      }
+      .cubito-diff-panel {
+        position: absolute;
+        left: 240px;
+        top: 0;
+        width: calc(100% - 240px);
+        height: 100%;
+        overflow-y: auto;
+        font-family: 'Fira Code', 'SF Mono', ui-monospace, 'Cascadia Code', monospace;
+        font-size: 12px;
+        pointer-events: auto;
+      }
+      .cubito-diff-panel__lines {
+        display: flex;
+        flex-direction: column;
+      }
+      .diff-panel__gutter {
+        display: inline-block;
+        width: 44px;
+        padding: 0 8px;
+        text-align: right;
+        color: var(--cubito-text-faint);
+        user-select: none;
+      }
+      .diff-panel__text {
+        white-space: pre;
+        padding-left: 10px;
+      }
+      .diff-line--ctx {
+        color: var(--cubito-text-dim);
+      }
+      .diff-line--add {
+        color: var(--cubito-accent);
+        background: color-mix(in srgb, var(--cubito-accent) 8%, transparent);
+      }
+      .diff-line--del {
+        color: var(--cubito-amber);
+        background: color-mix(in srgb, var(--cubito-amber) 8%, transparent);
+      }
+      .cubito-diff-panel__truncated,
+      .cubito-diff-panel__binary,
+      .cubito-diff-panel__loading,
+      .cubito-diff-panel__idle,
+      .cubito-diff-panel__error {
+        padding: 14px 18px;
+        color: var(--cubito-text-faint);
+      }
+      .cubito-diff-panel__error {
+        color: var(--cubito-amber-ink);
+      }
     </style>
   </head>
   <body>
@@ -665,6 +775,7 @@
     <div id="vignette"></div>
     <div id="hud"></div>
     <div id="system"></div>
+    <div id="diff"></div>
     <div id="keyboard-bar"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
