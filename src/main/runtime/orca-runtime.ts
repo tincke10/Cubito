@@ -6181,6 +6181,11 @@ export class OrcaRuntimeService {
     return this.runtimeId
   }
 
+  /** Why: the system-graph runtime adapter resolves connectionId from repoId alone. */
+  getRepoConnectionId(repoId: string): string | null {
+    return this.store?.getRepo(repoId)?.connectionId ?? null
+  }
+
   resolveOrchestrationWorkerServer(selector: string): OrchestrationWorkerServer {
     if (!this.orchestrationEnvironmentTransport) {
       throw new OrchestrationError(
