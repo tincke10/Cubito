@@ -85,6 +85,22 @@ describe('RpcConnection', () => {
     await expect(pending).resolves.toMatchObject({ ok: true, result: [] })
   })
 
+  it('stamps the orchestration contract version on orchestration.* requests', () => {
+    connection.call('orchestration.runCreate', { objective: 'x' })
+    expect(JSON.parse(transport.sent[0] ?? '')).toEqual({
+      id: 'id-1',
+      deviceToken: 'tok',
+      method: 'orchestration.runCreate',
+      params: { objective: 'x' },
+      orchestrationContractVersion: 1
+    })
+  })
+
+  it('omits the orchestration contract version on non-orchestration methods', () => {
+    connection.call('worktree.list')
+    expect(JSON.parse(transport.sent[0] ?? '')).not.toHaveProperty('orchestrationContractVersion')
+  })
+
   it('correlates concurrent calls by response id', async () => {
     const first = connection.call('a')
     const second = connection.call('b')

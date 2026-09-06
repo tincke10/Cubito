@@ -11,6 +11,8 @@ export type RpcRequestFrame = {
   deviceToken: string
   method: string
   params?: unknown
+  /** Wire contract stamp the engine's orchestration mutation fence requires (top-level, additive). */
+  orchestrationContractVersion?: number
 }
 
 export type RpcSuccessFrame = {
@@ -43,6 +45,9 @@ export function encodeRpcRequest(request: RpcRequestFrame): string {
   }
   if (request.params !== undefined) {
     frame.params = request.params
+  }
+  if (request.orchestrationContractVersion !== undefined) {
+    frame.orchestrationContractVersion = request.orchestrationContractVersion
   }
   return JSON.stringify(frame)
 }

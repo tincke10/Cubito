@@ -48,6 +48,13 @@ export type RpcConnectionOptions = {
 
 const DEFAULT_TIMEOUT_MS = 30_000
 
+// Mirrors src/shared/protocol-version.ts ORCHESTRATION_CONTRACT_VERSION; kept local (rpc-purity —
+// no src/shared import). The engine's mutation fence rejects any orchestration.* mutation whose
+// request omits this stamp, exactly as the CLI stamps it by method prefix (cli/runtime/client.ts).
+const ORCHESTRATION_CONTRACT_VERSION = 1
+
+const isOrchestrationMethod = (method: string): boolean => method.startsWith('orchestration.')
+
 /**
  * Multiplexes RPC calls over one transport, correlating responses by id.
  * Keepalives and responses to unknown ids are ignored by contract.
@@ -90,6 +97,9 @@ export class RpcConnection {
       }
       if (params !== undefined) {
         request.params = params
+      }
+      if (isOrchestrationMethod(method)) {
+        request.orchestrationContractVersion = ORCHESTRATION_CONTRACT_VERSION
       }
       this.transport.send(encodeRpcRequest(request))
     })
