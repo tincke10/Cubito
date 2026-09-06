@@ -371,6 +371,61 @@ describe('connectOrcad', () => {
     }
   })
 
+  it('reads host capabilities via status.get and stashes them on the connection', async () => {
+    const server = await startFakeOrcadServer({
+      handleRequest: (method) => {
+        if (method === 'status.get') {
+          return { ok: true, result: { capabilities: ['orchestration.gui-run-lease.v1'] } }
+        }
+        return { ok: true, result: { worktrees: [] } }
+      }
+    })
+    servers.push(server)
+
+    const connection = await connectOrcad(offerFor(server))
+    try {
+      expect(connection.capabilities).toEqual(['orchestration.gui-run-lease.v1'])
+    } finally {
+      connection.close()
+    }
+  })
+
+  it('falls back to an empty capabilities list when status.get fails', async () => {
+    const server = await startFakeOrcadServer({
+      handleRequest: (method) => {
+        if (method === 'status.get') {
+          return { ok: false, error: { code: 'internal_error', message: 'boom' } }
+        }
+        return { ok: true, result: { worktrees: [] } }
+      }
+    })
+    servers.push(server)
+
+    const connection = await connectOrcad(offerFor(server))
+    try {
+      expect(connection.capabilities).toEqual([])
+    } finally {
+      connection.close()
+    }
+  })
+
+  it('falls back to an empty capabilities list when status.get returns no array', async () => {
+    const server = await startFakeOrcadServer({
+      handleRequest: (method) => {
+        if (method === 'status.get') return { ok: true, result: {} }
+        return { ok: true, result: { worktrees: [] } }
+      }
+    })
+    servers.push(server)
+
+    const connection = await connectOrcad(offerFor(server))
+    try {
+      expect(connection.capabilities).toEqual([])
+    } finally {
+      connection.close()
+    }
+  })
+
   it('rejects with remote_runtime_unavailable if no handshake response arrives within timeoutMs', async () => {
     const wss = new WebSocketServer({ port: 0 })
     await new Promise<void>((resolve) => wss.once('listening', resolve))

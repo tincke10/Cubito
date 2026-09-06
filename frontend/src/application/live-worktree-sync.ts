@@ -18,6 +18,8 @@ export type LiveSyncConnection = {
   gateway: RuntimeGateway
   terminals: TerminalStreamPort
   runtimeId?: string
+  /** Host-negotiated capability ids (Change B: e.g. `orchestration.gui-run-lease.v1`), read once via `status.get` at connect time. */
+  capabilities: readonly string[]
   close(): void
   onClose(cb: (reason: string) => void): void
 }

@@ -96,6 +96,7 @@ function createFakeConnection(overrides?: {
       }
     },
     terminals: createFakeTerminalsPort(),
+    capabilities: [],
     close() {
       connection.closed = true
     },

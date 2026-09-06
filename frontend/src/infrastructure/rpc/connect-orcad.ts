@@ -29,6 +29,8 @@ export type OrcadConnection = {
   gateway: RuntimeGateway
   terminals: TerminalStreamPort
   runtimeId?: string
+  /** Host-negotiated capability ids, read once via `status.get` at connect time (Change B). */
+  capabilities: readonly string[]
   close(): void
   onClose(cb: (reason: string) => void): void
 }
@@ -41,6 +43,7 @@ export async function connectOrcad(
   const transport = await connectWithTimeout(offer, timeoutMs)
   const rpcConnection = new RpcConnection(transport, { deviceToken: offer.deviceToken, timeoutMs })
   const terminals = await openTerminalsPort(rpcConnection)
+  const capabilities = await fetchCapabilities(rpcConnection)
 
   const connection: OrcadConnection = {
     gateway: createOrcadGateway(
@@ -52,6 +55,7 @@ export async function connectOrcad(
       }
     ),
     terminals,
+    capabilities,
     close: () => transport.close(),
     // The transport only surfaces a human close reason, never a stable code — every
     // socket-level loss is reported as `connection_closed` so `reconnect-backoff`/
@@ -89,6 +93,19 @@ async function openTerminalsPort(rpcConnection: RpcConnection): Promise<Terminal
     close: async (terminal) => {
       await rpcConnection.call('terminal.close', { terminal })
     }
+  }
+}
+
+/** Reads the host's negotiated capability list once per connect; an unreachable/old host
+ *  (no `status.get`, or one that rejects it) is treated as capability-less, never fatal. */
+async function fetchCapabilities(rpcConnection: RpcConnection): Promise<readonly string[]> {
+  try {
+    const response = await rpcConnection.call<{ capabilities?: unknown }>('status.get')
+    return Array.isArray(response.result.capabilities)
+      ? (response.result.capabilities as string[])
+      : []
+  } catch {
+    return []
   }
 }
 
