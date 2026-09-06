@@ -12,7 +12,8 @@ export const WorkerStartParams = z.object({
   task: requiredString('Missing --task'),
   on: OptionalString,
   run: OptionalString,
-  from: requiredString('Missing --from'),
+  // Why: absent for a paired-device lease caller (no terminal); required otherwise.
+  from: OptionalString,
   worktree: OptionalString,
   name: OptionalString,
   repo: OptionalString,

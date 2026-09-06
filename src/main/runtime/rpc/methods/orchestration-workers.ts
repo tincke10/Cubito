@@ -3,7 +3,6 @@ import { buildDispatchPreamble } from '../../orchestration/preamble'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
 import { defineMethod, type RpcMethod } from '../core'
 import { startFederatedWorker } from './orchestration-federated-worker-start'
-import { assertOrchestrationWorktreeCreationSupported } from './orchestration-folder-worktree-placement'
 import { WorkerStartParams } from './orchestration-worker-start-schema'
 import {
   createExistingWorktreeWorkerTerminal,
@@ -21,7 +20,9 @@ import {
 import { failWorkerStartWithReceipt } from './orchestration-worker-start-receipt'
 import { prepareLocalWorkerStart } from './orchestration-worker-start-validation'
 import { resolveDispatchCreator } from './orchestration-dispatch-creator'
-import { resolveOrchestrationCaller } from './orchestration-run-scope'
+import { buildLeaseHandle } from './orchestration-run-scope'
+import { resolveWorkerStartRunBinding } from './orchestration-worker-start-run-binding'
+import { resolveWorkerStartPlacement } from './orchestration-worker-start-placement'
 import {
   isWorkerStartTimeoutWithinTimerLimit,
   resolveWorkerStartReadinessTimeoutMs
@@ -33,7 +34,13 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
     params: WorkerStartParams,
     handler: async (
       params,
-      { runtime, orchestrationMutation, orchestrationCompatibilityEvidence }
+      {
+        runtime,
+        orchestrationMutation,
+        orchestrationCompatibilityEvidence,
+        pairedDeviceId,
+        clientKind
+      }
     ) => {
       if (!isWorkerStartTimeoutWithinTimerLimit(params.timeoutMs)) {
         throw new OrchestrationError(
@@ -43,19 +50,14 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
       }
       const readinessTimeoutMs = resolveWorkerStartReadinessTimeoutMs(params.timeoutMs)
       const db = runtime.getOrchestrationDb()
-      // Why: worker-start was the only Run-scoped verb that skipped this, so a
-      // declared --from could name someone else's pane and inherit their depth.
-      const coordinatorPane = resolveOrchestrationCaller(runtime, {
-        callerTerminalHandle: params.from,
-        callerEvidence: orchestrationCompatibilityEvidence
+      const { run, isLeaseCaller } = resolveWorkerStartRunBinding({
+        db,
+        runtime,
+        params,
+        orchestrationCompatibilityEvidence,
+        pairedDeviceId,
+        clientKind
       })
-      const run = coordinatorPane ? db.getCurrentRunForPane(coordinatorPane) : undefined
-      if (!run || (params.run && params.run !== run.id)) {
-        throw new OrchestrationError(
-          'consumer_fenced',
-          'worker-start requires the coordinator terminal currently bound to the Task Run.'
-        )
-      }
       const task = db.getTask(params.task)
       if (!task || task.run_id !== run.id) {
         throw new OrchestrationError(
@@ -75,27 +77,11 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
         })
       }
 
-      const requestedWorktree = params.worktree ?? 'current'
-      const createsWorktree =
-        requestedWorktree === 'new-child' || requestedWorktree === 'new-top-level'
+      const placement = await resolveWorkerStartPlacement({ runtime, params, isLeaseCaller })
+      const { requestedWorktree, createsWorktree, creationWorktree } = placement
+      let resolvedWorktree = placement.resolvedWorktree
       const { agent, launch } = prepareLocalWorkerStart({ params, createsWorktree, runtime })
 
-      const coordinatorTerminal = await runtime.showTerminal(params.from)
-      const creationWorktree = createsWorktree
-        ? await runtime.showManagedWorktree(`id:${coordinatorTerminal.worktreeId}`)
-        : undefined
-      if (creationWorktree) {
-        await assertOrchestrationWorktreeCreationSupported({
-          runtime,
-          repoSelector: params.repo ?? creationWorktree.repoId,
-          existingPlacement: 'current or an exact existing folder workspace'
-        })
-      }
-      let resolvedWorktree = creationWorktree
-        ? undefined
-        : requestedWorktree === 'current'
-          ? await runtime.showManagedTerminalWorkspace(`id:${coordinatorTerminal.worktreeId}`)
-          : await runtime.showManagedTerminalWorkspace(requestedWorktree)
       let explicitTerminal
       if (params.terminal) {
         explicitTerminal = await runtime.showTerminal(params.terminal)
@@ -131,7 +117,11 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
           : 'existing_worktree'
       }
       const started = db.createStartingWorkerDispatch({
-        creator: resolveDispatchCreator(runtime, params.from),
+        creator: resolveDispatchCreator(
+          runtime,
+          params.from,
+          isLeaseCaller ? pairedDeviceId : undefined
+        ),
         maxDepth: runtime.getNestedWorkerMaxDepth(),
         taskId: task.id,
         retryOf: params.retryOf,
@@ -166,7 +156,8 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
             dispatchId: started.dispatch.id,
             requestedWorktree,
             coordinatorWorktree: creationWorktree,
-            params,
+            // Why: only reached via the terminal (non-lease) branch, which already asserted `from`.
+            params: { ...params, from: params.from! },
             agent: agent as TuiAgent,
             launchPreferences: launch.preferences,
             effects
@@ -249,7 +240,7 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
           taskId: task.id,
           dispatchId: started.dispatch.id,
           taskSpec: task.spec,
-          coordinatorHandle: params.from,
+          coordinatorHandle: isLeaseCaller ? buildLeaseHandle(pairedDeviceId!) : params.from!,
           workerHandle: terminalHandle,
           dispatchCapability: capability,
           devMode: params.devMode,
