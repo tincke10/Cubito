@@ -15,8 +15,9 @@ export type NavCommand =
   | { kind: 'open-fan-out' }
   | { kind: 'open-system' }
   | { kind: 'open-diff' }
-  /** Bare 'g' — closes whichever scene-replacing mode (system or diff) currently owns the
-   *  screen, returning to the worktree graph (no other bare-key meaning claims 'g'). No-op
+  | { kind: 'open-compare' }
+  /** Bare 'g' — closes whichever scene-replacing mode (system, diff or compare) currently owns
+   *  the screen, returning to the worktree graph (no other bare-key meaning claims 'g'). No-op
    *  when neither mode is open. */
   | { kind: 'close-scene-mode' }
 
@@ -114,6 +115,9 @@ export function resolveNavCommand(
   }
   if (key === 'd') {
     return { kind: 'open-diff' }
+  }
+  if (key === 'c') {
+    return { kind: 'open-compare' }
   }
   if (key === 'g') {
     return { kind: 'close-scene-mode' }
