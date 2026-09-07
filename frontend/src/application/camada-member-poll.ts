@@ -9,6 +9,7 @@ import {
 } from './fan-out-model'
 import type { RuntimeGateway, WorkerDispatchStateRow } from './ports/runtime-gateway'
 import type { SceneStore } from './scene-store'
+import { fetchDecisionVisibility } from './camada-decision-visibility-fetch'
 
 export const CAMADA_POLL_INTERVAL_MS = 1500
 
@@ -18,7 +19,11 @@ type LiveDispatch = { dispatchId: string; worktreeId: WorktreeId }
 /** Only the methods the camada poll needs — narrow like the other controller ports. */
 export type CamadaPollGatewayPort = Pick<
   RuntimeGateway,
-  'listWorktreePs' | 'orchestrationWorkerList' | 'orchestrationWorkerShow'
+  | 'listWorktreePs'
+  | 'orchestrationWorkerList'
+  | 'orchestrationWorkerShow'
+  | 'orchestrationGateList'
+  | 'orchestrationQuestionList'
 >
 
 export type CamadaMemberPollDeps = {
@@ -26,6 +31,9 @@ export type CamadaMemberPollDeps = {
   store: SceneStore
   setTimer?: (fn: () => void, ms: number) => unknown
   clearTimer?: (handle: unknown) => void
+  /** Gates the gate/question fetch (Change C-EXTENDED); an old host lacks orchestration.questionList,
+   *  so this must default closed — mirrors leaseCapable in fan-out-controller.ts. */
+  gatesCapable?: () => boolean
 }
 
 export type CamadaMemberPoll = {
@@ -51,6 +59,7 @@ export function createCamadaMemberPoll(deps: CamadaMemberPollDeps): CamadaMember
   let gateway = deps.gateway
   let stopped = true
   let timerHandle: unknown = null
+  const gatesCapable = deps.gatesCapable ?? (() => false)
 
   function clearPendingTimer(): void {
     if (timerHandle !== null) {
@@ -146,7 +155,21 @@ export function createCamadaMemberPoll(deps: CamadaMemberPollDeps): CamadaMember
     for (const [worktreeId, status] of statusByWorktree) {
       deps.store.dispatchFanOut({ type: 'member-status', worktreeId, status })
     }
+    if (gatesCapable()) {
+      await pollDecisionVisibility(runId)
+    }
     scheduleNextTick()
+  }
+
+  /** Gate/question visibility (Change C-EXTENDED): independent of worker-state, which is already
+   *  dispatched above by the time this runs — a throw here must not block that update or the loop. */
+  async function pollDecisionVisibility(runId: string): Promise<void> {
+    const { gates, questions } = await fetchDecisionVisibility(gateway, runId)
+    if (stopped) return
+    const slice = deps.store.get().fanOut
+    if (slice.view !== 'running') return // left running mid-flight — halt, no dispatch
+    if (gates !== null) deps.store.dispatchFanOut({ type: 'gates-updated', gates })
+    if (questions !== null) deps.store.dispatchFanOut({ type: 'questions-updated', questions })
   }
 
   /** MINIMAL+: workerList has no waiting-for-human signal, so recover it per live dispatch via

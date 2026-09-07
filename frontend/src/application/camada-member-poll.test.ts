@@ -5,6 +5,10 @@ import { createSceneStore } from './scene-store'
 import type { SceneStore } from './scene-store'
 import type { FanOutBatchEntry, FanOutSlice } from './fan-out-model'
 import type {
+  LeaseGateListResult,
+  LeaseGateRow,
+  LeaseQuestionListResult,
+  LeaseQuestionRow,
   LeaseWorkerListResult,
   LeaseWorkerShowResult,
   WorkerDispatchStateRow,
@@ -62,13 +66,18 @@ type FakeGateway = CamadaPollGatewayPort & {
   workerListCalls: number
   workerShowCalls: number
   workerShowDispatchIds: string[]
+  gateListCalls: number
+  questionListCalls: number
   listWorktreePsImpl?: () => Promise<readonly WorktreePsRow[]>
   orchestrationWorkerListImpl?: () => Promise<LeaseWorkerListResult>
   orchestrationWorkerShowImpl?: (dispatchId: string) => Promise<LeaseWorkerShowResult>
+  orchestrationGateListImpl?: () => Promise<LeaseGateListResult>
+  orchestrationQuestionListImpl?: () => Promise<LeaseQuestionListResult>
 }
 
-/** Fake gateway: `listWorktreePs`/`orchestrationWorkerList`/`orchestrationWorkerShow` resolution
- *  timing and payloads are test-controlled. */
+/** Fake gateway: `listWorktreePs`/`orchestrationWorkerList`/`orchestrationWorkerShow`/
+ *  `orchestrationGateList`/`orchestrationQuestionList` resolution timing and payloads are
+ *  test-controlled. */
 function createFakeGateway(
   rows: readonly WorktreePsRow[] = [],
   workers: readonly WorkerDispatchStateRow[] = []
@@ -78,6 +87,8 @@ function createFakeGateway(
     workerListCalls: 0,
     workerShowCalls: 0,
     workerShowDispatchIds: [],
+    gateListCalls: 0,
+    questionListCalls: 0,
     listWorktreePs: async () => {
       gw.calls += 1
       if (gw.listWorktreePsImpl) return gw.listWorktreePsImpl()
@@ -93,10 +104,48 @@ function createFakeGateway(
       gw.workerShowDispatchIds.push(dispatch)
       if (gw.orchestrationWorkerShowImpl) return gw.orchestrationWorkerShowImpl(dispatch)
       return { awaitingInput: null }
+    },
+    orchestrationGateList: async () => {
+      gw.gateListCalls += 1
+      if (gw.orchestrationGateListImpl) return gw.orchestrationGateListImpl()
+      return { gates: [] }
+    },
+    orchestrationQuestionList: async () => {
+      gw.questionListCalls += 1
+      if (gw.orchestrationQuestionListImpl) return gw.orchestrationQuestionListImpl()
+      return { questions: [] }
     }
   }
   return gw
 }
+
+const gateRow = (overrides: Partial<LeaseGateRow> = {}): LeaseGateRow => ({
+  id: 'gate-1',
+  runId: 'run-1',
+  taskId: 'task-1',
+  question: 'Which approach?',
+  options: '[]',
+  status: 'pending',
+  resolution: null,
+  createdAt: '2026-01-01T00:00:00Z',
+  resolvedAt: null,
+  ...overrides
+})
+
+const questionRow = (overrides: Partial<LeaseQuestionRow> = {}): LeaseQuestionRow => ({
+  messageId: 'msg-1',
+  runId: 'run-1',
+  dispatchId: 'dispatch-1',
+  askerHandle: 'worker-1',
+  status: 'pending',
+  answerMessageId: null,
+  answerBody: null,
+  answeredByGeneration: null,
+  createdAt: '2026-01-01T00:00:00Z',
+  answeredAt: null,
+  closedAt: null,
+  ...overrides
+})
 
 describe('createCamadaMemberPoll', () => {
   let store: SceneStore
@@ -699,6 +748,108 @@ describe('createCamadaMemberPoll', () => {
       poll.start()
       await vi.advanceTimersByTimeAsync(0)
       expect(gateway.workerShowDispatchIds).toEqual(['dispatch-1'])
+      poll.stop()
+    })
+  })
+
+  describe('gate/question visibility fetch (Change C-EXTENDED, lease Run only)', () => {
+    const soloBatch: FanOutBatchEntry[] = [
+      {
+        mutationId: 'm1',
+        worktreeId: 'repo::/child',
+        failed: false,
+        dispatchId: 'dispatch-1',
+        taskId: 'task-1'
+      }
+    ]
+
+    it('gatesCapable + a lease Run fetches gates and questions and dispatches both', async () => {
+      const gateway = createFakeGateway([], [liveRow('dispatch-1')])
+      gateway.orchestrationGateListImpl = async () => ({ gates: [gateRow()] })
+      gateway.orchestrationQuestionListImpl = async () => ({ questions: [questionRow()] })
+      store.update({ fanOut: leaseRunningSlice(soloBatch) })
+      const poll = createCamadaMemberPoll({
+        gateway,
+        store,
+        setTimer: setTimerSpy,
+        clearTimer: clearTimerSpy,
+        gatesCapable: () => true
+      })
+      poll.start()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(gateway.gateListCalls).toBe(1)
+      expect(gateway.questionListCalls).toBe(1)
+      const slice = store.get().fanOut
+      if (slice.view === 'running') {
+        expect(slice.decisionVisibility).toEqual({
+          gatesByTaskId: { 'task-1': [gateRow()] },
+          questionsByDispatchId: { 'dispatch-1': [questionRow()] }
+        })
+      }
+      poll.stop()
+    })
+
+    it('not gatesCapable makes no gate/question call even with a lease Run', async () => {
+      const gateway = createFakeGateway([], [liveRow('dispatch-1')])
+      store.update({ fanOut: leaseRunningSlice(soloBatch) })
+      const poll = createCamadaMemberPoll({
+        gateway,
+        store,
+        setTimer: setTimerSpy,
+        clearTimer: clearTimerSpy
+        // gatesCapable omitted — defaults closed
+      })
+      poll.start()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(gateway.gateListCalls).toBe(0)
+      expect(gateway.questionListCalls).toBe(0)
+      poll.stop()
+    })
+
+    it('a gateList throw does not block the worker-state update nor kill the loop', async () => {
+      const gateway = createFakeGateway([], [liveRow('dispatch-1')])
+      gateway.orchestrationGateListImpl = () => Promise.reject(new Error('network blip'))
+      gateway.orchestrationQuestionListImpl = async () => ({ questions: [questionRow()] })
+      store.update({ fanOut: leaseRunningSlice(soloBatch) })
+      const poll = createCamadaMemberPoll({
+        gateway,
+        store,
+        setTimer: setTimerSpy,
+        clearTimer: clearTimerSpy,
+        gatesCapable: () => true
+      })
+      poll.start()
+      await vi.advanceTimersByTimeAsync(0)
+      const slice = store.get().fanOut
+      if (slice.view === 'running') {
+        // worker-state update still applied despite the gate-fetch throw
+        expect(slice.memberStatus).toEqual({ 'repo::/child': 'working' })
+        // the question fetch, independent of the failed gate fetch, still landed
+        expect(slice.decisionVisibility?.questionsByDispatchId).toEqual({
+          'dispatch-1': [questionRow()]
+        })
+        expect(slice.decisionVisibility?.gatesByTaskId ?? {}).toEqual({})
+      }
+
+      await vi.advanceTimersByTimeAsync(CAMADA_POLL_INTERVAL_MS)
+      expect(gateway.workerListCalls).toBe(2) // next tick was scheduled despite the throw
+      poll.stop()
+    })
+
+    it('does not fetch gates/questions on the v1 worktree.ps path (no runId to scope by)', async () => {
+      const gateway = createFakeGateway([{ worktreeId: 'repo::/child', status: 'working' }])
+      store.update({ fanOut: runningSlice() })
+      const poll = createCamadaMemberPoll({
+        gateway,
+        store,
+        setTimer: setTimerSpy,
+        clearTimer: clearTimerSpy,
+        gatesCapable: () => true
+      })
+      poll.start()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(gateway.gateListCalls).toBe(0)
+      expect(gateway.questionListCalls).toBe(0)
       poll.stop()
     })
   })

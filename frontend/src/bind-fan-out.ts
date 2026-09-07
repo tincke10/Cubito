@@ -10,7 +10,10 @@ import { createFanOutForm } from './presentation/hud/fan-out-element'
 import { createFanOutController } from './presentation/hud/fan-out-controller'
 import type { FanOutController } from './presentation/hud/fan-out-controller'
 import { runCamadaLeaseSubmit } from './application/fan-out-lease-submit'
-import { GUI_RUN_LEASE_CAPABILITY } from './application/runtime-capability-keys'
+import {
+  GUI_RUN_LEASE_CAPABILITY,
+  GUI_RUN_LEASE_GATES_CAPABILITY
+} from './application/runtime-capability-keys'
 
 export type BindFanOutDeps = {
   store: SceneStore
@@ -53,7 +56,11 @@ export function createFanOutBinder(deps: BindFanOutDeps): FanOutBinder {
           const framing = frameLitter(memberIds, deps.nodeCenter)
           deps.animateTo(framing, deps.focusDurationMs)
         },
-        memberPoll: createCamadaMemberPoll({ gateway: connection.gateway, store: deps.store }),
+        memberPoll: createCamadaMemberPoll({
+          gateway: connection.gateway,
+          store: deps.store,
+          gatesCapable: () => capabilities.includes(GUI_RUN_LEASE_GATES_CAPABILITY)
+        }),
         refetch: () => syncWorktreeGraph(fanOutGateway, deps.store),
         activeRepoId: () => deps.store.get().repos.activeRepoId,
         leaseCapable: () => capabilities.includes(GUI_RUN_LEASE_CAPABILITY),

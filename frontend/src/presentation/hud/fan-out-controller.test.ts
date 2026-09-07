@@ -10,6 +10,10 @@ import type {
 import type {
   CreateWorktreeInput,
   CreateWorktreeResult,
+  LeaseGateListInput,
+  LeaseGateListResult,
+  LeaseQuestionListInput,
+  LeaseQuestionListResult,
   LeaseRunCreateInput,
   LeaseRunCreateResult,
   LeaseTaskCreateInput,
@@ -117,7 +121,13 @@ const createFakeGateway = () => ({
   ),
   orchestrationWorkerShow: vi.fn<(input: LeaseWorkerShowInput) => Promise<LeaseWorkerShowResult>>(
     async () => ({ awaitingInput: null })
-  )
+  ),
+  orchestrationGateList: vi.fn<(input: LeaseGateListInput) => Promise<LeaseGateListResult>>(
+    async () => ({ gates: [] })
+  ),
+  orchestrationQuestionList: vi.fn<
+    (input: LeaseQuestionListInput) => Promise<LeaseQuestionListResult>
+  >(async () => ({ questions: [] }))
 })
 
 const createFakePoll = () => ({

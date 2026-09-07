@@ -25,6 +25,8 @@ export type FanOutGatewayPort = Pick<
   | 'orchestrationWorkerStart'
   | 'orchestrationWorkerList'
   | 'orchestrationWorkerShow'
+  | 'orchestrationGateList'
+  | 'orchestrationQuestionList'
 >
 
 export type FanOutControllerDeps = {
