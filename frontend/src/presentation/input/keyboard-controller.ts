@@ -5,6 +5,7 @@ import { moveSelection } from '../navigation/selection-model'
 import { frameAll, frameIsland, frameNode, isWithinFraming } from '../camera/camera-framing'
 import type { CameraFraming, Vec3 } from '../camera/camera-framing'
 import { nextIsland } from '../../application/repos-model'
+import { fanOutMemberIds } from '../../application/fan-out-model'
 import { FOCUS_DURATION_MS, NODE_SIZE } from '../theme/scene-metrics'
 
 /** The subset of camera-rig the controller drives — never the camera/frustum directly. */
@@ -110,16 +111,18 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
     if (!command) {
       return false
     }
-    // While the system view OR diff view owns the screen, every graph-nav/terminal/spawn/
-    // open-system/open-diff command is a handled no-op — only 'close-scene-mode' (bare g) and
-    // 'escape' (routed through the precedence ladder below) may act. ⌘K/⌘P already returned
-    // above, unaffected by this gate.
+    // While the system, diff OR compare view owns the screen, every graph-nav/terminal/spawn/
+    // open-system/open-diff/open-compare command is a handled no-op — only 'close-scene-mode'
+    // (bare g) and 'escape' (routed through the precedence ladder below) may act. ⌘K/⌘P already
+    // returned above, unaffected by this gate.
     const systemOpen = store.get().systemView.view === 'open'
     const diffOpen = store.get().diffView.view === 'open'
-    if ((systemOpen || diffOpen) && command.kind !== 'escape') {
+    const compareOpen = store.get().compareView.view === 'open'
+    if ((systemOpen || diffOpen || compareOpen) && command.kind !== 'escape') {
       if (command.kind === 'close-scene-mode') {
         if (systemOpen) store.dispatchSystemView({ type: 'close' })
         if (diffOpen) store.dispatchDiffView({ type: 'close' })
+        if (compareOpen) store.dispatchCompareView({ type: 'close' })
       }
       return true
     }
@@ -225,13 +228,24 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
       store.dispatchDiffView({ type: 'open', nodeId: selectedId, baseRef: '' })
       return true
     }
+    if (command.kind === 'open-compare') {
+      // Anchors on the RUNNING CAMADA, not selectedId — 'fanOut' never auto-closes while running,
+      // so it reliably holds the current litter regardless of what's selected in the graph.
+      const fanOut = store.get().fanOut
+      if (fanOut.view !== 'running') return false
+      const litter = fanOutMemberIds(fanOut).slice(1) // drop the parent, keep only the children
+      if (litter.length === 0) return false
+      store.dispatchCompareView({ type: 'open', members: litter })
+      return true
+    }
     if (command.kind === 'close-scene-mode') {
       // Only meaningful while open — that case already returned above via the scene-mode gate.
       return false
     }
-    // command.kind === 'escape' — palette-close wins over selector/spawn/system/diff/terminal-
-    // close, then selector-close wins over spawn/system/diff/terminal-close (PROJ-008); each
-    // modal's own query/path input already intercepts Escape above, this is belt-and-suspenders.
+    // command.kind === 'escape' — palette-close wins over selector/spawn/system/diff/compare/
+    // terminal-close, then selector-close wins over spawn/system/diff/compare/terminal-close
+    // (PROJ-008); each modal's own query/path input already intercepts Escape above, this is
+    // belt-and-suspenders.
     if (store.get().commandPalette.view !== 'closed') {
       store.dispatchCommandPalette({ type: 'close' })
       return true
@@ -250,6 +264,10 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
     }
     if (store.get().diffView.view === 'open') {
       store.dispatchDiffView({ type: 'close' })
+      return true
+    }
+    if (store.get().compareView.view === 'open') {
+      store.dispatchCompareView({ type: 'close' })
       return true
     }
     if (!store.get().terminals.activePanel) return false

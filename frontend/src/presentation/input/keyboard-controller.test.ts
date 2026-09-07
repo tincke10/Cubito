@@ -73,6 +73,22 @@ function fakeTerminalCommandPort() {
 const LINUX = { isMac: false }
 const MAC = { isMac: true }
 
+/** Drives fan-out-model's real reducer to a 'running' slice with real created children —
+ *  open-compare anchors on this slice, not on graph/selection. */
+function withRunningCamada(
+  store: ReturnType<typeof createSceneStore>,
+  parentId: string,
+  childWorktreeIds: readonly string[]
+): void {
+  store.dispatchFanOut({ type: 'open-for-node', nodeId: parentId })
+  store.dispatchFanOut({ type: 'set-repo-selector', repoSelector: 'id:repo-a' })
+  const mutationIds = childWorktreeIds.map((_, i) => `m${i}`)
+  store.dispatchFanOut({ type: 'submit', mutationIds })
+  mutationIds.forEach((mutationId, i) => {
+    store.dispatchFanOut({ type: 'child-created', mutationId, worktreeId: childWorktreeIds[i]! })
+  })
+}
+
 function setup(selectedId: string | null = 'b', platform = LINUX) {
   const store = createSceneStore()
   store.update({ graph: buildFanGraph(), selection: { selectedId } })
@@ -838,6 +854,132 @@ describe('createKeyboardController', () => {
       controller.handleKeyDown(baseEvent({ key: 'x' }))
       controller.handleKeyDown(baseEvent({ key: 'd' }))
       expect(store.get().diffView.view).toBe('closed')
+      expect(store.get().systemView.view).toBe('open')
+    })
+  })
+
+  describe('c/g compare view precedence — anchors on the running camada, not selectedId', () => {
+    it('c dispatches compareView open with the litter, parent dropped', () => {
+      const { store, controller } = setup(null)
+      withRunningCamada(store, 'root', ['child-1', 'child-2'])
+
+      const handled = controller.handleKeyDown(baseEvent({ key: 'c' }))
+
+      expect(handled).toBe(true)
+      expect(store.get().compareView).toMatchObject({
+        view: 'open',
+        members: ['child-1', 'child-2']
+      })
+    })
+
+    it('c ignores the current selection entirely — the running camada is the anchor', () => {
+      const { store, controller } = setup('b') // selectedId 'b' is unrelated to the camada below
+      withRunningCamada(store, 'root', ['child-1'])
+
+      controller.handleKeyDown(baseEvent({ key: 'c' }))
+
+      expect(store.get().compareView).toMatchObject({ view: 'open', members: ['child-1'] })
+    })
+
+    it('c with no camada (fanOut closed) is a no-op', () => {
+      const { store, controller } = setup('a')
+      const handled = controller.handleKeyDown(baseEvent({ key: 'c' }))
+      expect(handled).toBe(false)
+      expect(store.get().compareView.view).toBe('closed')
+    })
+
+    it('c with a running camada but no created children yet (empty litter) is a no-op', () => {
+      const { store, controller } = setup('a')
+      store.dispatchFanOut({ type: 'open-for-node', nodeId: 'root' })
+      store.dispatchFanOut({ type: 'set-repo-selector', repoSelector: 'id:repo-a' })
+      store.dispatchFanOut({ type: 'submit', mutationIds: ['m0', 'm1'] }) // still pending, no worktreeId yet
+
+      const handled = controller.handleKeyDown(baseEvent({ key: 'c' }))
+
+      expect(handled).toBe(false)
+      expect(store.get().compareView.view).toBe('closed')
+    })
+
+    it('g closes an open compareView', () => {
+      const { store, controller } = setup(null)
+      withRunningCamada(store, 'root', ['child-1'])
+      controller.handleKeyDown(baseEvent({ key: 'c' }))
+
+      const handled = controller.handleKeyDown(baseEvent({ key: 'g' }))
+
+      expect(handled).toBe(true)
+      expect(store.get().compareView.view).toBe('closed')
+    })
+
+    it('while open, suppresses graph-nav (h/j/k/l), terminal (t), spawn (s), open-system (x), open-diff (d) and re-pressing c — all handled no-ops', () => {
+      const { store, terminal, controller } = setup('a')
+      withRunningCamada(store, 'root', ['child-1'])
+      controller.handleKeyDown(baseEvent({ key: 'c' }))
+      const selectedBefore = store.get().selection.selectedId
+
+      expect(controller.handleKeyDown(baseEvent({ key: 'h' }))).toBe(true)
+      expect(controller.handleKeyDown(baseEvent({ key: 't' }))).toBe(true)
+      expect(controller.handleKeyDown(baseEvent({ key: 's' }))).toBe(true)
+      expect(controller.handleKeyDown(baseEvent({ key: 'x' }))).toBe(true)
+      expect(controller.handleKeyDown(baseEvent({ key: 'd' }))).toBe(true)
+      expect(controller.handleKeyDown(baseEvent({ key: 'c' }))).toBe(true)
+
+      expect(store.get().selection.selectedId).toBe(selectedBefore)
+      expect(store.get().terminals.activePanel).toBeNull()
+      expect(store.get().spawnMenu.view).toBe('closed')
+      expect(store.get().systemView.view).toBe('closed')
+      expect(store.get().diffView.view).toBe('closed')
+      expect(terminal.focusActivePanel).not.toHaveBeenCalled()
+      expect(store.get().compareView.view).toBe('open') // still open, untouched by the no-ops
+    })
+
+    it('⌘K/Ctrl+K and ⌘P/Ctrl+P still work while compare is open', () => {
+      const { store, controller } = setup(null, MAC)
+      withRunningCamada(store, 'root', ['child-1'])
+      controller.handleKeyDown(baseEvent({ key: 'c' }))
+
+      expect(controller.handleKeyDown(baseEvent({ key: 'k', metaKey: true }))).toBe(true)
+      expect(store.get().commandPalette.view).toBe('open')
+
+      expect(controller.handleKeyDown(baseEvent({ key: 'p', metaKey: true }))).toBe(true)
+      expect(store.get().projectSelector.view).toBe('open')
+    })
+
+    it('Escape closes an open compareView', () => {
+      const { store, controller } = setup(null)
+      withRunningCamada(store, 'root', ['child-1'])
+      controller.handleKeyDown(baseEvent({ key: 'c' }))
+
+      const handled = controller.handleKeyDown(baseEvent({ key: 'Escape' }))
+
+      expect(handled).toBe(true)
+      expect(store.get().compareView.view).toBe('closed')
+    })
+
+    it('x is a suppressed no-op while compare is open — system view never opens underneath it', () => {
+      const { store, controller } = setup('a')
+      withRunningCamada(store, 'root', ['child-1'])
+      controller.handleKeyDown(baseEvent({ key: 'c' }))
+      controller.handleKeyDown(baseEvent({ key: 'x' }))
+      expect(store.get().systemView.view).toBe('closed')
+      expect(store.get().compareView.view).toBe('open')
+    })
+
+    it('d is a suppressed no-op while compare is open — diff view never opens underneath it', () => {
+      const { store, controller } = setup('a')
+      withRunningCamada(store, 'root', ['child-1'])
+      controller.handleKeyDown(baseEvent({ key: 'c' }))
+      controller.handleKeyDown(baseEvent({ key: 'd' }))
+      expect(store.get().diffView.view).toBe('closed')
+      expect(store.get().compareView.view).toBe('open')
+    })
+
+    it('c is a suppressed no-op while system is open — compareView never opens underneath it', () => {
+      const { store, controller } = setup('a')
+      withRunningCamada(store, 'root', ['child-1'])
+      controller.handleKeyDown(baseEvent({ key: 'x' }))
+      controller.handleKeyDown(baseEvent({ key: 'c' }))
+      expect(store.get().compareView.view).toBe('closed')
       expect(store.get().systemView.view).toBe('open')
     })
   })
