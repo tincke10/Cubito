@@ -163,11 +163,18 @@ export type LeaseGateRow = {
 
 export type LeaseGateListResult = { gates: readonly LeaseGateRow[] }
 
+/** `orchestration.gateResolve` — a paired GUI lease caller resolving one of its Run's pending
+ *  gates (Change F); no `from` (routes via pairedDeviceId+clientKind like every lease verb). */
+export type LeaseGateResolveInput = { run: string; gateId: string; resolution: string }
+export type LeaseGateResolveResult = { gate: LeaseGateRow }
+
 /** `orchestration.questionList` scoped to a lease Run — no `from` (Change C-EXTENDED); the
  *  method itself is only reachable via a paired GUI Run lease (engine-side). */
 export type LeaseQuestionListInput = { run: string }
 
-/** One `orchestration.questionList` row: an inbox question thread on the lease Run. */
+/** One `orchestration.questionList` row: an inbox question thread on the lease Run. `question`
+ *  (the prompt text, LEFT JOINed from the source message) is optional — an older host may not
+ *  project it yet (Change F wave E4), so the reply UI falls back to asker/dispatch context. */
 export type LeaseQuestionRow = {
   messageId: string
   runId: string
@@ -180,9 +187,16 @@ export type LeaseQuestionRow = {
   createdAt: string
   answeredAt: string | null
   closedAt: string | null
+  question?: string
 }
 
 export type LeaseQuestionListResult = { questions: readonly LeaseQuestionRow[] }
+
+/** `orchestration.reply` on a question thread — a paired GUI lease caller answering one of its
+ *  Run's pending questions (Change F); no `from`. Wire method name is `orchestration.reply`
+ *  (also serves plain-message replies engine-side), but this port method is question-scoped only. */
+export type LeaseQuestionAnswerInput = { run: string; messageId: string; body: string }
+export type LeaseQuestionAnswerResult = { messageId: string; duplicate: boolean }
 
 /** `git.mergeWinnerIntoParent` result (Change E): LOCAL mirror of the engine's headless-merge
  *  outcome — clean moves the parent branch ref, conflict mutates nothing (file-name list only). */
@@ -215,7 +229,9 @@ export type RuntimeGateway = {
   orchestrationWorkerList(input: LeaseWorkerListInput): Promise<LeaseWorkerListResult>
   orchestrationWorkerShow(input: LeaseWorkerShowInput): Promise<LeaseWorkerShowResult>
   orchestrationGateList(input: LeaseGateListInput): Promise<LeaseGateListResult>
+  orchestrationGateResolve(input: LeaseGateResolveInput): Promise<LeaseGateResolveResult>
   orchestrationQuestionList(input: LeaseQuestionListInput): Promise<LeaseQuestionListResult>
+  orchestrationQuestionAnswer(input: LeaseQuestionAnswerInput): Promise<LeaseQuestionAnswerResult>
   /** Headless-merges the winner child's branch into the parent branch (Change E). `message`
    *  defaults host-side when omitted. */
   gitMergeWinnerIntoParent(

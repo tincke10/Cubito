@@ -1,7 +1,11 @@
 import type {
   LeaseGateListInput,
   LeaseGateListResult,
+  LeaseGateResolveInput,
+  LeaseGateResolveResult,
   LeaseGateRow,
+  LeaseQuestionAnswerInput,
+  LeaseQuestionAnswerResult,
   LeaseQuestionListInput,
   LeaseQuestionListResult,
   LeaseQuestionRow,
@@ -26,7 +30,9 @@ export type OrchestrationLeaseMethods = {
   orchestrationWorkerList(input: LeaseWorkerListInput): Promise<LeaseWorkerListResult>
   orchestrationWorkerShow(input: LeaseWorkerShowInput): Promise<LeaseWorkerShowResult>
   orchestrationGateList(input: LeaseGateListInput): Promise<LeaseGateListResult>
+  orchestrationGateResolve(input: LeaseGateResolveInput): Promise<LeaseGateResolveResult>
   orchestrationQuestionList(input: LeaseQuestionListInput): Promise<LeaseQuestionListResult>
+  orchestrationQuestionAnswer(input: LeaseQuestionAnswerInput): Promise<LeaseQuestionAnswerResult>
 }
 
 /** Projects a raw `orchestration.workerList` row: `worktreeId` is nested+nullable under `resource`. */
@@ -80,7 +86,8 @@ function toLeaseGateRow(row: {
   }
 }
 
-/** Projects a raw `orchestration.questionList` row: wire shape is the DB's snake_case QuestionRow. */
+/** Projects a raw `orchestration.questionList` row: wire shape is the DB's snake_case QuestionRow.
+ *  `question` (the prompt text, wave E4) is optional — omitted entirely by an older host. */
 function toLeaseQuestionRow(row: {
   message_id?: unknown
   run_id?: unknown
@@ -93,6 +100,7 @@ function toLeaseQuestionRow(row: {
   created_at?: unknown
   answered_at?: unknown
   closed_at?: unknown
+  question?: unknown
 }): LeaseQuestionRow {
   return {
     messageId: typeof row.message_id === 'string' ? row.message_id : '',
@@ -106,7 +114,8 @@ function toLeaseQuestionRow(row: {
       typeof row.answered_by_generation === 'number' ? row.answered_by_generation : null,
     createdAt: typeof row.created_at === 'string' ? row.created_at : '',
     answeredAt: typeof row.answered_at === 'string' ? row.answered_at : null,
-    closedAt: typeof row.closed_at === 'string' ? row.closed_at : null
+    closedAt: typeof row.closed_at === 'string' ? row.closed_at : null,
+    ...(typeof row.question === 'string' ? { question: row.question } : {})
   }
 }
 
@@ -207,6 +216,18 @@ export function createOrchestrationLeaseMethods(connection: {
       }
       return { gates: (result.gates as Record<string, unknown>[]).map(toLeaseGateRow) }
     },
+    async orchestrationGateResolve(input) {
+      const response = await connection.call('orchestration.gateResolve', {
+        run: input.run,
+        id: input.gateId,
+        resolution: input.resolution
+      })
+      const result = response.result as { gate?: unknown }
+      if (typeof result?.gate !== 'object' || result.gate === null) {
+        throw new Error('orchestration.gateResolve returned no gate')
+      }
+      return { gate: toLeaseGateRow(result.gate as Record<string, unknown>) }
+    },
     async orchestrationQuestionList(input) {
       const response = await connection.call('orchestration.questionList', { run: input.run })
       const result = response.result as { questions?: unknown }
@@ -214,6 +235,19 @@ export function createOrchestrationLeaseMethods(connection: {
         throw new Error('orchestration.questionList returned no questions array')
       }
       return { questions: (result.questions as Record<string, unknown>[]).map(toLeaseQuestionRow) }
+    },
+    async orchestrationQuestionAnswer(input) {
+      const response = await connection.call('orchestration.reply', {
+        run: input.run,
+        id: input.messageId,
+        body: input.body
+      })
+      const result = response.result as { message?: { id?: unknown }; duplicate?: unknown }
+      const messageId = result?.message?.id
+      if (typeof messageId !== 'string') {
+        throw new Error('orchestration.reply returned no message id')
+      }
+      return { messageId, duplicate: result.duplicate === true }
     }
   }
 }

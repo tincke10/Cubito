@@ -296,6 +296,55 @@ describe('createOrchestrationLeaseMethods — orchestrationGateList (Change C-EX
   })
 })
 
+describe('createOrchestrationLeaseMethods — orchestrationGateResolve (Change F)', () => {
+  it('calls orchestration.gateResolve with {run, id, resolution} — no `from` (lease caller)', async () => {
+    const call: RpcCaller = vi.fn(async () =>
+      frame({
+        gate: {
+          id: 'gate-1',
+          run_id: 'run-1',
+          task_id: 'task-1',
+          question: 'Which approach?',
+          options: '["a","b"]',
+          status: 'resolved',
+          resolution: 'a',
+          created_at: '2026-01-01T00:00:00Z',
+          resolved_at: '2026-01-01T00:05:00Z'
+        }
+      })
+    )
+    const methods = createOrchestrationLeaseMethods({ call })
+    await expect(
+      methods.orchestrationGateResolve({ run: 'run-1', gateId: 'gate-1', resolution: 'a' })
+    ).resolves.toEqual({
+      gate: {
+        id: 'gate-1',
+        runId: 'run-1',
+        taskId: 'task-1',
+        question: 'Which approach?',
+        options: '["a","b"]',
+        status: 'resolved',
+        resolution: 'a',
+        createdAt: '2026-01-01T00:00:00Z',
+        resolvedAt: '2026-01-01T00:05:00Z'
+      }
+    })
+    expect(call).toHaveBeenCalledWith('orchestration.gateResolve', {
+      run: 'run-1',
+      id: 'gate-1',
+      resolution: 'a'
+    })
+  })
+
+  it('throws when the result carries no gate', async () => {
+    const call: RpcCaller = vi.fn(async () => frame({}))
+    const methods = createOrchestrationLeaseMethods({ call })
+    await expect(
+      methods.orchestrationGateResolve({ run: 'run-1', gateId: 'gate-1', resolution: 'a' })
+    ).rejects.toThrow(/orchestration\.gateResolve/)
+  })
+})
+
 describe('createOrchestrationLeaseMethods — orchestrationQuestionList (Change C-EXTENDED)', () => {
   it('calls orchestration.questionList with only {run} — no `from` (lease caller)', async () => {
     const call: RpcCaller = vi.fn(async () => frame({ questions: [] }))
@@ -344,11 +393,97 @@ describe('createOrchestrationLeaseMethods — orchestrationQuestionList (Change 
     })
   })
 
+  it('projects an optional `question` field (wave E4) when the host includes it', async () => {
+    const call: RpcCaller = vi.fn(async () =>
+      frame({
+        questions: [
+          {
+            message_id: 'msg-1',
+            run_id: 'run-1',
+            dispatch_id: 'dispatch-1',
+            asker_handle: 'worker-1',
+            status: 'pending',
+            answer_message_id: null,
+            answer_body: null,
+            answered_by_generation: null,
+            created_at: '2026-01-01T00:00:00Z',
+            answered_at: null,
+            closed_at: null,
+            question: 'Which branch should we merge?'
+          }
+        ]
+      })
+    )
+    const methods = createOrchestrationLeaseMethods({ call })
+    const result = await methods.orchestrationQuestionList({ run: 'run-1' })
+    expect(result.questions[0]?.question).toBe('Which branch should we merge?')
+  })
+
+  it('omits `question` (never adds an undefined key) when the host does not include it', async () => {
+    const call: RpcCaller = vi.fn(async () =>
+      frame({
+        questions: [
+          {
+            message_id: 'msg-1',
+            run_id: 'run-1',
+            dispatch_id: 'dispatch-1',
+            asker_handle: 'worker-1',
+            status: 'pending',
+            answer_message_id: null,
+            answer_body: null,
+            answered_by_generation: null,
+            created_at: '2026-01-01T00:00:00Z',
+            answered_at: null,
+            closed_at: null
+          }
+        ]
+      })
+    )
+    const methods = createOrchestrationLeaseMethods({ call })
+    const result = await methods.orchestrationQuestionList({ run: 'run-1' })
+    expect('question' in (result.questions[0] as object)).toBe(false)
+  })
+
   it('throws when the result carries no questions array', async () => {
     const call: RpcCaller = vi.fn(async () => frame({}))
     const methods = createOrchestrationLeaseMethods({ call })
     await expect(methods.orchestrationQuestionList({ run: 'run-1' })).rejects.toThrow(
       /orchestration\.questionList/
     )
+  })
+})
+
+describe('createOrchestrationLeaseMethods — orchestrationQuestionAnswer (Change F)', () => {
+  it('calls orchestration.reply with {run, id, body} — no `from` (lease caller)', async () => {
+    const call: RpcCaller = vi.fn(async () =>
+      frame({ message: { id: 'msg-2' }, question: {}, duplicate: false })
+    )
+    const methods = createOrchestrationLeaseMethods({ call })
+    await expect(
+      methods.orchestrationQuestionAnswer({ run: 'run-1', messageId: 'msg-1', body: 'go with a' })
+    ).resolves.toEqual({ messageId: 'msg-2', duplicate: false })
+    expect(call).toHaveBeenCalledWith('orchestration.reply', {
+      run: 'run-1',
+      id: 'msg-1',
+      body: 'go with a'
+    })
+  })
+
+  it('projects duplicate:true on an idempotent re-answer', async () => {
+    const call: RpcCaller = vi.fn(async () =>
+      frame({ message: { id: 'msg-2' }, question: {}, duplicate: true })
+    )
+    const methods = createOrchestrationLeaseMethods({ call })
+    await expect(
+      methods.orchestrationQuestionAnswer({ run: 'run-1', messageId: 'msg-1', body: 'go with a' })
+    ).resolves.toEqual({ messageId: 'msg-2', duplicate: true })
+  })
+
+  it('throws when the result carries no message id', async () => {
+    const call: RpcCaller = vi.fn(async () => frame({}))
+    const methods = createOrchestrationLeaseMethods({ call })
+    await expect(
+      methods.orchestrationQuestionAnswer({ run: 'run-1', messageId: 'msg-1', body: 'go with a' })
+    ).rejects.toThrow(/orchestration\.reply/)
   })
 })

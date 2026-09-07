@@ -134,8 +134,14 @@ const demoGateway: RuntimeGateway = {
   orchestrationGateList: async () => {
     throw new Error('orchestrationGateList not implemented in the demo gateway')
   },
+  orchestrationGateResolve: async () => {
+    throw new Error('orchestrationGateResolve not implemented in the demo gateway')
+  },
   orchestrationQuestionList: async () => {
     throw new Error('orchestrationQuestionList not implemented in the demo gateway')
+  },
+  orchestrationQuestionAnswer: async () => {
+    throw new Error('orchestrationQuestionAnswer not implemented in the demo gateway')
   },
   gitMergeWinnerIntoParent: async () => {
     throw new Error('gitMergeWinnerIntoParent not implemented in the demo gateway')

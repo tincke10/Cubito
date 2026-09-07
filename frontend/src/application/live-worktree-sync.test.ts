@@ -103,8 +103,14 @@ function createFakeConnection(overrides?: {
       orchestrationGateList: async () => {
         throw new Error('orchestrationGateList not implemented in this fake')
       },
+      orchestrationGateResolve: async () => {
+        throw new Error('orchestrationGateResolve not implemented in this fake')
+      },
       orchestrationQuestionList: async () => {
         throw new Error('orchestrationQuestionList not implemented in this fake')
+      },
+      orchestrationQuestionAnswer: async () => {
+        throw new Error('orchestrationQuestionAnswer not implemented in this fake')
       },
       gitMergeWinnerIntoParent: async () => {
         throw new Error('gitMergeWinnerIntoParent not implemented in this fake')
