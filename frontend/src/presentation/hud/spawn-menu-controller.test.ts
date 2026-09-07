@@ -11,6 +11,8 @@ import type {
 import type { SpawnMenuHandle } from './spawn-menu-element'
 import type { SpawnFormHandle, SpawnFormField } from './spawn-form-element'
 import { emptyWorktreeGraph } from '../../domain/worktree-graph/types'
+import type { WorktreeGraph, WorktreeNode } from '../../domain/worktree-graph/types'
+import { inertActivity } from '../../domain/worktree-graph/node-activity'
 
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
 
@@ -112,6 +114,23 @@ const setup = () => {
 }
 
 const radialSlice = (): SpawnMenuSlice => ({ view: 'radial', nodeId: 'a', repoSelector: null })
+
+/** Graph whose only node `a` belongs to `repoId` — the anchor the radial/form is opened on. */
+const graphWithAnchor = (repoId: string): WorktreeGraph => {
+  const anchor: WorktreeNode = {
+    id: 'a',
+    repoId,
+    branch: 'refs/heads/master',
+    path: '/wt/a',
+    status: 'in-progress',
+    isMain: true,
+    kind: 'root',
+    parentId: null,
+    childIds: [],
+    activity: inertActivity()
+  }
+  return { ...emptyWorktreeGraph(), nodes: new Map([[anchor.id, anchor]]), rootIds: ['a'] }
+}
 const rootlessFormSlice = (): SpawnMenuSlice =>
   reduceSpawnMenu(emptySpawnMenuSlice(), { type: 'open-rootless' })
 
@@ -176,6 +195,33 @@ describe('createSpawnMenuController', () => {
     controller.sync({ ...radialSlice(), repoSelector: 'id:repo-1' }, emptyWorktreeGraph())
     await flush()
     expect(gateway.listRepos).not.toHaveBeenCalled()
+  })
+
+  // Why: the child must land in the ANCHOR's repo. Resolving from the active repo spawned a
+  // demo-repo-2 child into Cubito during live validation (spawn from `master` of another repo).
+  it('resolves the repo selector from the anchor node repoId without listing repos', async () => {
+    const { controller, gateway, dispatch } = setup()
+    controller.sync(radialSlice(), graphWithAnchor('repo-anchor'))
+    await flush()
+    expect(gateway.listRepos).not.toHaveBeenCalled()
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'set-repo-selector',
+      repoSelector: 'id:repo-anchor'
+    })
+  })
+
+  it('re-derives a cached selector that belongs to another repo than the anchor', async () => {
+    const { controller, gateway, dispatch } = setup()
+    controller.sync(
+      { ...radialSlice(), repoSelector: 'id:repo-stale' },
+      graphWithAnchor('repo-anchor')
+    )
+    await flush()
+    expect(gateway.listRepos).not.toHaveBeenCalled()
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'set-repo-selector',
+      repoSelector: 'id:repo-anchor'
+    })
   })
 
   it('prefers activeRepoId over the first listed repo when resolving the repo selector', async () => {

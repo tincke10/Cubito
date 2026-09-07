@@ -33,7 +33,25 @@ import type {
 } from '../../application/ports/runtime-gateway'
 import type { FanOutFormHandle } from './fan-out-element'
 import { emptyWorktreeGraph } from '../../domain/worktree-graph/types'
-import type { WorktreeId } from '../../domain/worktree-graph/types'
+import type { WorktreeGraph, WorktreeId, WorktreeNode } from '../../domain/worktree-graph/types'
+import { inertActivity } from '../../domain/worktree-graph/node-activity'
+
+/** Graph whose only node `w1` belongs to `repoId` — the parent the litter is anchored on. */
+const graphWithParent = (repoId: string): WorktreeGraph => {
+  const parent: WorktreeNode = {
+    id: 'w1',
+    repoId,
+    branch: 'refs/heads/master',
+    path: '/wt/w1',
+    status: 'in-progress',
+    isMain: true,
+    kind: 'root',
+    parentId: null,
+    childIds: [],
+    activity: inertActivity()
+  }
+  return { ...emptyWorktreeGraph(), nodes: new Map([[parent.id, parent]]), rootIds: ['w1'] }
+}
 
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
 
@@ -226,6 +244,29 @@ describe('createFanOutController', () => {
     controller.sync(emptyFanOutSlice(), emptyWorktreeGraph())
     controller.sync(formSlice(), emptyWorktreeGraph())
     expect(forms[0]!.focusFirstField).toHaveBeenCalledOnce()
+  })
+
+  // Why: the litter must land in the PARENT's repo, never the active one (see spawn-menu-controller).
+  it('resolves the repo selector from the parent node repoId without listing repos', async () => {
+    const { controller, gateway, dispatch } = setup()
+    controller.sync(formSlice(), graphWithParent('repo-parent'))
+    await flush()
+    expect(gateway.listRepos).not.toHaveBeenCalled()
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'set-repo-selector',
+      repoSelector: 'id:repo-parent'
+    })
+  })
+
+  it('re-derives a cached selector that belongs to another repo than the parent', async () => {
+    const { controller, gateway, dispatch } = setup()
+    controller.sync(formSlice({ repoSelector: 'id:repo-stale' }), graphWithParent('repo-parent'))
+    await flush()
+    expect(gateway.listRepos).not.toHaveBeenCalled()
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'set-repo-selector',
+      repoSelector: 'id:repo-parent'
+    })
   })
 
   it('fetches repos exactly once on first open and resolves the repo selector, preferring activeRepoId', async () => {

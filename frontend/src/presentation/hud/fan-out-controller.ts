@@ -8,6 +8,7 @@ import {
   toFanOutInputs
 } from '../../application/fan-out-model'
 import type { FanOutAction, FanOutSlice } from '../../application/fan-out-model'
+import { repoSelectorForNode } from '../../application/anchor-repo-selector'
 import type { CreateWorktreeInput, RuntimeGateway } from '../../application/ports/runtime-gateway'
 import type { CamadaMemberPoll } from '../../application/camada-member-poll'
 import { runCamadaLeaseSubmit } from '../../application/fan-out-lease-submit'
@@ -115,8 +116,18 @@ export function createFanOutController(deps: FanOutControllerDeps): FanOutContro
     return element
   }
 
-  const maybeFetchRepoSelector = (slice: FanOutSlice): void => {
-    if (slice.view === 'closed' || slice.repoSelector !== null || repoFetchInFlight) return
+  // The litter lands in the PARENT's repo, derived from the graph every sync (a selector cached
+  // from an earlier open on another repo never leaks); listRepos is only the no-graph fallback.
+  const maybeFetchRepoSelector = (slice: FanOutSlice, graph: WorktreeGraph): void => {
+    if (slice.view === 'closed') return
+    const anchored = repoSelectorForNode(graph, slice.parentId)
+    if (anchored !== null) {
+      if (slice.repoSelector !== anchored) {
+        deps.dispatch({ type: 'set-repo-selector', repoSelector: anchored })
+      }
+      return
+    }
+    if (slice.repoSelector !== null || repoFetchInFlight) return
     repoFetchInFlight = true
     void gateway
       .listRepos()
@@ -194,11 +205,9 @@ export function createFanOutController(deps: FanOutControllerDeps): FanOutContro
   }
 
   return {
-    // `graph` kept in the signature to mirror spawn/project-selector's sync(slice, graph)
-    // shape, though fanOutViewModel needs only the slice (no parent-branch title here).
-    sync(fanOut: FanOutSlice, _graph: WorktreeGraph): void {
+    sync(fanOut: FanOutSlice, graph: WorktreeGraph): void {
       currentSlice = fanOut
-      maybeFetchRepoSelector(fanOut)
+      maybeFetchRepoSelector(fanOut, graph)
       if (fanOut.view === 'closed') {
         unmount()
         deps.memberPoll.stop()

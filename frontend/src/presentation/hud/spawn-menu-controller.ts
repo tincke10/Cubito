@@ -2,6 +2,7 @@ import type { Vec3 } from '../camera/camera-framing'
 import type { WorktreeGraph, WorktreeId } from '../../domain/worktree-graph/types'
 import type { SpawnMenuAction, SpawnMenuSlice } from '../../application/spawn-menu-model'
 import { toCreateWorktreeInput } from '../../application/spawn-menu-model'
+import { repoSelectorForNode } from '../../application/anchor-repo-selector'
 import type { RuntimeGateway } from '../../application/ports/runtime-gateway'
 import type { SpawnMenuHandle } from './spawn-menu-element'
 import type { SpawnFormHandle } from './spawn-form-element'
@@ -84,8 +85,19 @@ export function createSpawnMenuController(deps: SpawnMenuControllerDeps): SpawnM
     return form
   }
 
-  const maybeFetchRepoSelector = (slice: SpawnMenuSlice): void => {
-    if (slice.view === 'closed' || slice.repoSelector !== null || repoFetchInFlight) return
+  // Anchored opens derive the repo from the node itself (re-derived every sync, so a selector
+  // cached from an earlier open on another repo never leaks); only rootless opens list repos.
+  const maybeFetchRepoSelector = (slice: SpawnMenuSlice, graph: WorktreeGraph): void => {
+    if (slice.view === 'closed') return
+    const anchorId = slice.view === 'radial' ? slice.nodeId : slice.parentId
+    const anchored = repoSelectorForNode(graph, anchorId)
+    if (anchored !== null) {
+      if (slice.repoSelector !== anchored) {
+        deps.dispatch({ type: 'set-repo-selector', repoSelector: anchored })
+      }
+      return
+    }
+    if (slice.repoSelector !== null || repoFetchInFlight) return
     repoFetchInFlight = true
     void gateway
       .listRepos()
@@ -126,7 +138,7 @@ export function createSpawnMenuController(deps: SpawnMenuControllerDeps): SpawnM
   return {
     sync(spawnMenu: SpawnMenuSlice, graph: WorktreeGraph): void {
       currentSlice = spawnMenu
-      maybeFetchRepoSelector(spawnMenu)
+      maybeFetchRepoSelector(spawnMenu, graph)
       const model = spawnViewModel(spawnMenu, graph)
       if (model === null) {
         unmountMenu()
