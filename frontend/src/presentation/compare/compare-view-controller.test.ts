@@ -6,6 +6,7 @@ import type { CompareViewSlice } from '../../application/compare-view-model'
 import type { ConnectionState } from '../../application/scene-store'
 import type { CompareRailHandle } from './compare-rail-element'
 import type { CompareHudHandle } from './compare-hud-element'
+import type { CompareMergeActionHandle } from './compare-merge-action-element'
 import type { DiffRailHandle } from '../diff/diff-rail-element'
 import type { DiffPanelHandle } from '../diff/diff-panel-element'
 
@@ -83,11 +84,32 @@ const createFakeHud = (): CompareHudHandle & { applyCalls: unknown[]; disposed: 
 
 const branchLabelFor = (childId: string): string => `cubito-${childId}`
 
+const createFakeMergeAction = (): CompareMergeActionHandle & {
+  applyCalls: unknown[]
+  disposed: boolean
+  emitMergeWinner(): void
+} => {
+  let mergeCb: (() => void) | null = null
+  const handle = {
+    root: {} as HTMLElement,
+    applyCalls: [] as unknown[],
+    disposed: false,
+    apply: vi.fn((model) => handle.applyCalls.push(model)),
+    onMergeWinner: vi.fn((cb: () => void) => (mergeCb = cb)),
+    dispose: vi.fn(() => (handle.disposed = true)),
+    emitMergeWinner() {
+      mergeCb?.()
+    }
+  }
+  return handle
+}
+
 const setup = () => {
   const childRails: ReturnType<typeof createFakeChildRail>[] = []
   const fileRails: ReturnType<typeof createFakeFileRail>[] = []
   const panels: ReturnType<typeof createFakePanel>[] = []
   const huds: ReturnType<typeof createFakeHud>[] = []
+  const mergeActions: ReturnType<typeof createFakeMergeAction>[] = []
   const hud = { appendChild: vi.fn() }
   const keyboardBarSlot = { appendChild: vi.fn() }
   const onEnter = vi.fn()
@@ -95,6 +117,7 @@ const setup = () => {
   const onFocusChild = vi.fn()
   const onSetWinner = vi.fn()
   const onSelectFile = vi.fn()
+  const onMergeWinner = vi.fn()
   const deps: CompareViewControllerDeps = {
     createChildRail: () => {
       const r = createFakeChildRail()
@@ -116,11 +139,17 @@ const setup = () => {
       huds.push(h)
       return h
     },
+    createMergeAction: () => {
+      const m = createFakeMergeAction()
+      mergeActions.push(m)
+      return m
+    },
     hud,
     keyboardBarSlot,
     onFocusChild,
     onSetWinner,
     onSelectFile,
+    onMergeWinner,
     onEnter,
     onExit
   }
@@ -131,13 +160,15 @@ const setup = () => {
     fileRails,
     panels,
     huds,
+    mergeActions,
     hud,
     keyboardBarSlot,
     onEnter,
     onExit,
     onFocusChild,
     onSetWinner,
-    onSelectFile
+    onSelectFile,
+    onMergeWinner
   }
 }
 
@@ -147,28 +178,31 @@ const openSlice = (members: readonly string[] = ['child-1', 'child-2']): Compare
 describe('createCompareViewController', () => {
   it('does nothing while closed', () => {
     const { controller, childRails } = setup()
-    controller.sync(emptyCompareViewSlice(), CONNECTED, branchLabelFor)
+    controller.sync(emptyCompareViewSlice(), CONNECTED, branchLabelFor, false)
     expect(childRails).toHaveLength(0)
   })
 
-  it('mounts child-rail/file-rail/panel/hud into the #compare slot and the keyboard bar into its own slot on open', () => {
-    const { controller, childRails, fileRails, panels, huds, hud, keyboardBarSlot } = setup()
-    controller.sync(openSlice(), CONNECTED, branchLabelFor)
+  it('mounts child-rail/file-rail/panel/hud/merge-action into the #compare slot and the keyboard bar into its own slot on open', () => {
+    const { controller, childRails, fileRails, panels, huds, mergeActions, hud, keyboardBarSlot } =
+      setup()
+    controller.sync(openSlice(), CONNECTED, branchLabelFor, false)
     expect(childRails).toHaveLength(1)
     expect(fileRails).toHaveLength(1)
     expect(panels).toHaveLength(1)
     expect(huds).toHaveLength(1)
+    expect(mergeActions).toHaveLength(1)
     expect(hud.appendChild).toHaveBeenCalledWith(huds[0]!.root)
     expect(hud.appendChild).toHaveBeenCalledWith(childRails[0]!.root)
     expect(hud.appendChild).toHaveBeenCalledWith(fileRails[0]!.root)
     expect(hud.appendChild).toHaveBeenCalledWith(panels[0]!.element)
+    expect(hud.appendChild).toHaveBeenCalledWith(mergeActions[0]!.root)
     expect(keyboardBarSlot.appendChild).toHaveBeenCalledWith(huds[0]!.keyboardBar.root)
   })
 
   it('calls onEnter once on the closed->open transition, not again on a later open sync', () => {
     const { controller, onEnter } = setup()
-    controller.sync(openSlice(), CONNECTED, branchLabelFor)
-    controller.sync(openSlice(), CONNECTED, branchLabelFor)
+    controller.sync(openSlice(), CONNECTED, branchLabelFor, false)
+    controller.sync(openSlice(), CONNECTED, branchLabelFor, false)
     expect(onEnter).toHaveBeenCalledOnce()
   })
 
@@ -177,7 +211,7 @@ describe('createCompareViewController', () => {
     let slice = openSlice(['child-1', 'child-2'])
     slice = reduceCompareView(slice, { type: 'focus-child', childId: 'child-1' })
     slice = reduceCompareView(slice, { type: 'set-winner', winnerId: 'child-2' })
-    controller.sync(slice, CONNECTED, branchLabelFor)
+    controller.sync(slice, CONNECTED, branchLabelFor, false)
 
     const rows = childRails[0]!.applyCalls[0] as Array<{
       childId: string
@@ -199,7 +233,7 @@ describe('createCompareViewController', () => {
       files: [{ path: 'x.ts', status: 'modified', added: 1, removed: 0 }]
     })
     slice = reduceCompareView(slice, { type: 'focus-child', childId: 'child-1' })
-    controller.sync(slice, CONNECTED, branchLabelFor)
+    controller.sync(slice, CONNECTED, branchLabelFor, false)
 
     expect(fileRails[0]!.applyCalls[0]).toMatchObject([{ path: 'x.ts' }])
     expect(panels[0]!.applyCalls[0]).toMatchObject({ kind: 'idle' })
@@ -207,7 +241,7 @@ describe('createCompareViewController', () => {
 
   it('shows an idle panel and empty file rail while no child is focused', () => {
     const { controller, fileRails, panels } = setup()
-    controller.sync(openSlice(), CONNECTED, branchLabelFor)
+    controller.sync(openSlice(), CONNECTED, branchLabelFor, false)
     expect(fileRails[0]!.applyCalls[0]).toEqual([])
     expect(panels[0]!.applyCalls[0]).toMatchObject({ kind: 'idle' })
   })
@@ -216,7 +250,7 @@ describe('createCompareViewController', () => {
     const { controller, huds } = setup()
     let slice = openSlice(['child-1', 'child-2'])
     slice = reduceCompareView(slice, { type: 'set-winner', winnerId: 'child-2' })
-    controller.sync(slice, CONNECTED, branchLabelFor)
+    controller.sync(slice, CONNECTED, branchLabelFor, false)
     expect(huds[0]!.applyCalls[0]).toMatchObject({
       connection: CONNECTED,
       membersCount: 2,
@@ -226,7 +260,7 @@ describe('createCompareViewController', () => {
 
   it('forwards child-rail focus/winner clicks and file-rail select clicks', () => {
     const { controller, childRails, fileRails, onFocusChild, onSetWinner, onSelectFile } = setup()
-    controller.sync(openSlice(), CONNECTED, branchLabelFor)
+    controller.sync(openSlice(), CONNECTED, branchLabelFor, false)
     childRails[0]!.emitFocus('child-2')
     childRails[0]!.emitWinner('child-1')
     fileRails[0]!.emitSelect('x.ts')
@@ -237,8 +271,8 @@ describe('createCompareViewController', () => {
 
   it('does not remount on a second open sync — same instances, apply called again', () => {
     const { controller, childRails, fileRails, panels, huds } = setup()
-    controller.sync(openSlice(), CONNECTED, branchLabelFor)
-    controller.sync(openSlice(), CONNECTED, branchLabelFor)
+    controller.sync(openSlice(), CONNECTED, branchLabelFor, false)
+    controller.sync(openSlice(), CONNECTED, branchLabelFor, false)
     expect(childRails).toHaveLength(1)
     expect(fileRails).toHaveLength(1)
     expect(panels).toHaveLength(1)
@@ -248,8 +282,8 @@ describe('createCompareViewController', () => {
 
   it('unmounts and calls onExit on close', () => {
     const { controller, childRails, fileRails, panels, huds, onExit } = setup()
-    controller.sync(openSlice(), CONNECTED, branchLabelFor)
-    controller.sync(emptyCompareViewSlice(), CONNECTED, branchLabelFor)
+    controller.sync(openSlice(), CONNECTED, branchLabelFor, false)
+    controller.sync(emptyCompareViewSlice(), CONNECTED, branchLabelFor, false)
     expect(childRails[0]!.disposed).toBe(true)
     expect(fileRails[0]!.disposed).toBe(true)
     expect(panels[0]!.disposed).toBe(true)
@@ -259,28 +293,64 @@ describe('createCompareViewController', () => {
 
   it('a second closed sync after unmount is idempotent — onExit not called again', () => {
     const { controller, onExit } = setup()
-    controller.sync(openSlice(), CONNECTED, branchLabelFor)
-    controller.sync(emptyCompareViewSlice(), CONNECTED, branchLabelFor)
-    controller.sync(emptyCompareViewSlice(), CONNECTED, branchLabelFor)
+    controller.sync(openSlice(), CONNECTED, branchLabelFor, false)
+    controller.sync(emptyCompareViewSlice(), CONNECTED, branchLabelFor, false)
+    controller.sync(emptyCompareViewSlice(), CONNECTED, branchLabelFor, false)
     expect(onExit).toHaveBeenCalledOnce()
   })
 
   it('reopening after a close mounts fresh instances and calls onEnter again', () => {
     const { controller, childRails, onEnter } = setup()
-    controller.sync(openSlice(), CONNECTED, branchLabelFor)
-    controller.sync(emptyCompareViewSlice(), CONNECTED, branchLabelFor)
-    controller.sync(openSlice(), CONNECTED, branchLabelFor)
+    controller.sync(openSlice(), CONNECTED, branchLabelFor, false)
+    controller.sync(emptyCompareViewSlice(), CONNECTED, branchLabelFor, false)
+    controller.sync(openSlice(), CONNECTED, branchLabelFor, false)
     expect(childRails).toHaveLength(2)
     expect(onEnter).toHaveBeenCalledTimes(2)
   })
 
   it('dispose() unmounts whatever is currently mounted', () => {
-    const { controller, childRails, fileRails, panels, huds } = setup()
-    controller.sync(openSlice(), CONNECTED, branchLabelFor)
+    const { controller, childRails, fileRails, panels, huds, mergeActions } = setup()
+    controller.sync(openSlice(), CONNECTED, branchLabelFor, false)
     controller.dispose()
     expect(childRails[0]!.disposed).toBe(true)
     expect(fileRails[0]!.disposed).toBe(true)
     expect(panels[0]!.disposed).toBe(true)
     expect(huds[0]!.disposed).toBe(true)
+    expect(mergeActions[0]!.disposed).toBe(true)
+  })
+})
+
+describe('createCompareViewController — winner-merge action (Change E)', () => {
+  it('is hidden while no winner is picked, visible once one is', () => {
+    const { controller, mergeActions } = setup()
+    controller.sync(openSlice(), CONNECTED, branchLabelFor, true)
+    expect(mergeActions[0]!.applyCalls[0]).toMatchObject({ visible: false })
+
+    const withWinner = reduceCompareView(openSlice(), { type: 'set-winner', winnerId: 'child-1' })
+    controller.sync(withWinner, CONNECTED, branchLabelFor, true)
+    expect(mergeActions[0]!.applyCalls[1]).toMatchObject({ visible: true })
+  })
+
+  it('forwards the sync mergeCapable flag straight through as capable', () => {
+    const { controller, mergeActions } = setup()
+    controller.sync(openSlice(), CONNECTED, branchLabelFor, false)
+    expect(mergeActions[0]!.applyCalls[0]).toMatchObject({ capable: false })
+
+    controller.sync(openSlice(), CONNECTED, branchLabelFor, true)
+    expect(mergeActions[0]!.applyCalls[1]).toMatchObject({ capable: true })
+  })
+
+  it('applies the merge slice state verbatim', () => {
+    const { controller, mergeActions } = setup()
+    const running = reduceCompareView(openSlice(), { type: 'merge-start' })
+    controller.sync(running, CONNECTED, branchLabelFor, true)
+    expect(mergeActions[0]!.applyCalls[0]).toMatchObject({ merge: { phase: 'running' } })
+  })
+
+  it('routes the merge action fire callback to onMergeWinner', () => {
+    const { controller, mergeActions, onMergeWinner } = setup()
+    controller.sync(openSlice(), CONNECTED, branchLabelFor, true)
+    mergeActions[0]!.emitMergeWinner()
+    expect(onMergeWinner).toHaveBeenCalledOnce()
   })
 })

@@ -3,21 +3,27 @@ import { createCompareRail } from './presentation/compare/compare-rail-element'
 import { createDiffRail } from './presentation/diff/diff-rail-element'
 import { createDiffPanel } from './presentation/diff/diff-panel-element'
 import { createCompareHud } from './presentation/compare/compare-hud-element'
+import { createCompareMergeAction } from './presentation/compare/compare-merge-action-element'
 import { createCompareLiveLoader } from './application/compare-live-loader'
 import type { CompareLiveLoaderGatewayPort } from './application/compare-live-loader'
+import { runCompareMerge } from './application/compare-merge-run'
+import type { CompareMergeGatewayPort } from './application/compare-merge-run'
+import { GIT_MERGE_WINNER_CAPABILITY } from './application/runtime-capability-keys'
 import type { SceneStore } from './application/scene-store'
 import type { WorktreeId } from './domain/worktree-graph/types'
+
+type CompareGatewayPort = CompareLiveLoaderGatewayPort & CompareMergeGatewayPort
 
 export type BindCompareViewDeps = {
   store: SceneStore
   compareSlot: { appendChild(element: unknown): void }
   keyboardBarSlot: { appendChild(element: unknown): void }
-  demoGateway: CompareLiveLoaderGatewayPort
+  demoGateway: CompareGatewayPort
 }
 
 export type CompareViewBinder = {
   sync(): void
-  rebindGateway(gateway: CompareLiveLoaderGatewayPort): void
+  rebindGateway(gateway: CompareGatewayPort, capabilities: readonly string[]): void
 }
 
 /**
@@ -31,12 +37,15 @@ export type CompareViewBinder = {
  */
 export function createCompareViewBinder(deps: BindCompareViewDeps): CompareViewBinder {
   const loader = createCompareLiveLoader({ store: deps.store, gateway: deps.demoGateway })
+  let mergeGateway: CompareMergeGatewayPort = deps.demoGateway
+  let capabilities: readonly string[] = []
 
   const controller = createCompareViewController({
     createChildRail: createCompareRail,
     createFileRail: createDiffRail,
     createPanel: createDiffPanel,
     createHud: createCompareHud,
+    createMergeAction: createCompareMergeAction,
     hud: deps.compareSlot,
     keyboardBarSlot: deps.keyboardBarSlot,
     onFocusChild: (childId) => deps.store.dispatchCompareView({ type: 'focus-child', childId }),
@@ -45,6 +54,13 @@ export function createCompareViewBinder(deps: BindCompareViewDeps): CompareViewB
       const compareView = deps.store.get().compareView
       if (compareView.view !== 'open' || compareView.focusedChildId === null) return
       loader.select(compareView.focusedChildId, path)
+    },
+    onMergeWinner: () => {
+      const state = deps.store.get()
+      void runCompareMerge(state.compareView, state.fanOut, {
+        gateway: mergeGateway,
+        dispatch: (action) => deps.store.dispatchCompareView(action)
+      })
     }
   })
 
@@ -64,10 +80,17 @@ export function createCompareViewBinder(deps: BindCompareViewDeps): CompareViewB
       if (transitionToOpen && compareView.view === 'open') loader.start(compareView.members)
       if (transitionToClosed) loader.stop()
 
-      controller.sync(compareView, state.connection, branchLabelFor)
+      controller.sync(
+        compareView,
+        state.connection,
+        branchLabelFor,
+        capabilities.includes(GIT_MERGE_WINNER_CAPABILITY)
+      )
     },
-    rebindGateway(gateway: CompareLiveLoaderGatewayPort): void {
+    rebindGateway(gateway: CompareGatewayPort, nextCapabilities: readonly string[]): void {
       loader.rebindGateway(gateway)
+      mergeGateway = gateway
+      capabilities = nextCapabilities
     }
   }
 }

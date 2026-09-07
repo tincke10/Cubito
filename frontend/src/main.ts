@@ -416,7 +416,7 @@ if (pairingEntry.kind === 'connect') {
       fanOutBinder.bind(connection)
       systemViewBinder.rebindGateway(connection.gateway)
       diffViewBinder.rebindGateway(connection.gateway)
-      compareViewBinder.rebindGateway(connection.gateway)
+      compareViewBinder.rebindGateway(connection.gateway, connection.capabilities)
     },
     onDisconnected: () => store.dispatchTerminal({ type: 'connection-lost' })
   }).start()

@@ -6,6 +6,7 @@ import { diffRailViewModel } from '../diff/diff-rail-model'
 import { diffPanelViewModel } from '../diff/diff-panel-model'
 import type { CompareRailHandle } from './compare-rail-element'
 import type { CompareHudHandle } from './compare-hud-element'
+import type { CompareMergeActionHandle } from './compare-merge-action-element'
 import type { DiffRailHandle } from '../diff/diff-rail-element'
 import type { DiffPanelHandle } from '../diff/diff-panel-element'
 
@@ -16,6 +17,8 @@ export type CompareViewControllerDeps = {
   /** Reused verbatim from diff mode — shows the selected file's unified diff (right column). */
   createPanel: () => DiffPanelHandle
   createHud: () => CompareHudHandle
+  /** Winner-merge action (Change E) — a real interactive button, not a keyboard-bar chip. */
+  createMergeAction: () => CompareMergeActionHandle
   /** The `#compare` slot — this controller mounts/unmounts into it and nothing else DOM-wise. */
   hud: { appendChild(element: unknown): void }
   /** Shared `#keyboard-bar` slot the worktree HUD's own bar already occupies. */
@@ -26,6 +29,8 @@ export type CompareViewControllerDeps = {
   onSetWinner: (childId: WorktreeId | null) => void
   /** Forwards a file-rail row click to the live loader (`loader.select(childId, path)`). */
   onSelectFile: (path: string) => void
+  /** Forwards the merge action's 2nd-click fire (never the 1st, arm-only) to the merge runner. */
+  onMergeWinner: () => void
   /** Fires once on the closed->open transition, after mounting — the seam for hiding the
    *  worktree HUD/keyboard-bar/3D scene, keeping this controller DOM-scoped to #compare. */
   onEnter?: () => void
@@ -37,7 +42,9 @@ export type CompareViewController = {
   sync(
     compareView: CompareViewSlice,
     connection: ConnectionState,
-    branchLabelFor: (childId: WorktreeId) => string
+    branchLabelFor: (childId: WorktreeId) => string,
+    /** Whether the host advertises `git.merge-winner.v1` — gates the merge action's button. */
+    mergeCapable: boolean
   ): void
   dispose(): void
 }
@@ -47,6 +54,7 @@ type Mounted = {
   fileRail: DiffRailHandle
   panel: DiffPanelHandle
   hud: CompareHudHandle
+  mergeAction: CompareMergeActionHandle
 }
 
 /**
@@ -65,15 +73,18 @@ export function createCompareViewController(
     const fileRail = deps.createFileRail()
     const panel = deps.createPanel()
     const hud = deps.createHud()
+    const mergeAction = deps.createMergeAction()
     childRail.onFocusChild((childId) => deps.onFocusChild(childId))
     childRail.onSetWinner((childId) => deps.onSetWinner(childId))
     fileRail.onSelect((path) => deps.onSelectFile(path))
+    mergeAction.onMergeWinner(() => deps.onMergeWinner())
     deps.hud.appendChild(hud.root)
     deps.hud.appendChild(childRail.root)
     deps.hud.appendChild(fileRail.root)
     deps.hud.appendChild(panel.element)
+    deps.hud.appendChild(mergeAction.root)
     deps.keyboardBarSlot.appendChild(hud.keyboardBar.root)
-    const entry: Mounted = { childRail, fileRail, panel, hud }
+    const entry: Mounted = { childRail, fileRail, panel, hud, mergeAction }
     mounted = entry
     return entry
   }
@@ -84,11 +95,12 @@ export function createCompareViewController(
     mounted.fileRail.dispose()
     mounted.panel.dispose()
     mounted.hud.dispose()
+    mounted.mergeAction.dispose()
     mounted = null
   }
 
   return {
-    sync(compareView, connection, branchLabelFor) {
+    sync(compareView, connection, branchLabelFor, mergeCapable) {
       if (compareView.view !== 'open') {
         if (mounted) {
           unmount()
@@ -123,6 +135,12 @@ export function createCompareViewController(
         connection,
         membersCount: compareView.members.length,
         winnerLabel: compareView.winnerId !== null ? branchLabelFor(compareView.winnerId) : null
+      })
+
+      entry.mergeAction.apply({
+        visible: compareView.winnerId !== null,
+        capable: mergeCapable,
+        merge: compareView.merge
       })
     },
     dispose(): void {

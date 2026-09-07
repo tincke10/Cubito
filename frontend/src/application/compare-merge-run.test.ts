@@ -1,0 +1,122 @@
+import { describe, expect, it, vi } from 'vitest'
+import { runCompareMerge } from './compare-merge-run'
+import type { CompareViewAction, CompareViewSlice } from './compare-view-model'
+import { emptyCompareViewSlice, reduceCompareView } from './compare-view-model'
+import type { FanOutSlice } from './fan-out-model'
+import type { MergeWinnerResult } from './ports/runtime-gateway'
+
+const openWithWinner = (winnerId: string | null = 'w-child-2'): CompareViewSlice => {
+  let slice = reduceCompareView(emptyCompareViewSlice(), {
+    type: 'open',
+    members: ['w-child-1', 'w-child-2']
+  })
+  slice = reduceCompareView(slice, { type: 'set-winner', winnerId })
+  return slice
+}
+
+const runningFanOut = (parentId = 'w-parent'): FanOutSlice => ({
+  view: 'running',
+  parentId,
+  fields: { count: 2, agent: 'claude', prompt: '' },
+  repoSelector: null,
+  batch: [],
+  memberStatus: {},
+  runId: null
+})
+
+const createFakeGateway = (impl?: () => Promise<MergeWinnerResult>) => ({
+  gitMergeWinnerIntoParent: vi.fn(
+    impl ?? (async () => ({ outcome: 'clean' as const, commitOid: 'abc123' }))
+  )
+})
+
+const setup = (gateway = createFakeGateway()) => {
+  const dispatch = vi.fn<(action: CompareViewAction) => void>()
+  return { gateway, dispatch }
+}
+
+describe('runCompareMerge — happy path', () => {
+  it('calls gitMergeWinnerIntoParent with (parent, winner) — parent is fanOutMemberIds[0]', async () => {
+    const { gateway, dispatch } = setup()
+    await runCompareMerge(openWithWinner('w-child-2'), runningFanOut('w-parent'), {
+      gateway,
+      dispatch
+    })
+    expect(gateway.gitMergeWinnerIntoParent).toHaveBeenCalledWith('w-parent', 'w-child-2')
+  })
+
+  it('dispatches merge-start, then merge-clean on a clean outcome', async () => {
+    const { gateway, dispatch } = setup()
+    await runCompareMerge(openWithWinner(), runningFanOut(), { gateway, dispatch })
+    expect(dispatch.mock.calls.map((c) => c[0])).toEqual([
+      { type: 'merge-start' },
+      { type: 'merge-clean', commitOid: 'abc123' }
+    ])
+  })
+
+  it('dispatches merge-conflict with the file list on a conflict outcome', async () => {
+    const gateway = createFakeGateway(async () => ({
+      outcome: 'conflict',
+      files: ['src/a.ts', 'src/b.ts']
+    }))
+    const { dispatch } = setup(gateway)
+    await runCompareMerge(openWithWinner(), runningFanOut(), { gateway, dispatch })
+    expect(dispatch).toHaveBeenLastCalledWith({
+      type: 'merge-conflict',
+      files: ['src/a.ts', 'src/b.ts']
+    })
+  })
+})
+
+describe('runCompareMerge — error branch', () => {
+  it('dispatches merge-error with the thrown message, resilient to gateway rejection', async () => {
+    const gateway = createFakeGateway()
+    gateway.gitMergeWinnerIntoParent.mockRejectedValueOnce(new Error('host unavailable'))
+    const { dispatch } = setup(gateway)
+    await runCompareMerge(openWithWinner(), runningFanOut(), { gateway, dispatch })
+    expect(dispatch).toHaveBeenLastCalledWith({
+      type: 'merge-error',
+      message: 'host unavailable'
+    })
+  })
+
+  it('stringifies a non-Error rejection', async () => {
+    const gateway = createFakeGateway()
+    gateway.gitMergeWinnerIntoParent.mockRejectedValueOnce('boom')
+    const { dispatch } = setup(gateway)
+    await runCompareMerge(openWithWinner(), runningFanOut(), { gateway, dispatch })
+    expect(dispatch).toHaveBeenLastCalledWith({ type: 'merge-error', message: 'boom' })
+  })
+})
+
+describe('runCompareMerge — guards (no-op, zero gateway calls)', () => {
+  it('is a no-op when compare view is closed', async () => {
+    const { gateway, dispatch } = setup()
+    await runCompareMerge(emptyCompareViewSlice(), runningFanOut(), { gateway, dispatch })
+    expect(gateway.gitMergeWinnerIntoParent).not.toHaveBeenCalled()
+    expect(dispatch).not.toHaveBeenCalled()
+  })
+
+  it('is a no-op when no winner is picked', async () => {
+    const { gateway, dispatch } = setup()
+    await runCompareMerge(openWithWinner(null), runningFanOut(), { gateway, dispatch })
+    expect(gateway.gitMergeWinnerIntoParent).not.toHaveBeenCalled()
+    expect(dispatch).not.toHaveBeenCalled()
+  })
+
+  it('is a no-op when a merge is already running', async () => {
+    const { gateway, dispatch } = setup()
+    const running = reduceCompareView(openWithWinner(), { type: 'merge-start' })
+    await runCompareMerge(running, runningFanOut(), { gateway, dispatch })
+    expect(gateway.gitMergeWinnerIntoParent).not.toHaveBeenCalled()
+    expect(dispatch).not.toHaveBeenCalled()
+  })
+
+  it('is a no-op when fan-out has no members (closed litter)', async () => {
+    const { gateway, dispatch } = setup()
+    const closedFanOut: FanOutSlice = { view: 'closed', repoSelector: null }
+    await runCompareMerge(openWithWinner(), closedFanOut, { gateway, dispatch })
+    expect(gateway.gitMergeWinnerIntoParent).not.toHaveBeenCalled()
+    expect(dispatch).not.toHaveBeenCalled()
+  })
+})
