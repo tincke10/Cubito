@@ -67,6 +67,12 @@ const fakeGateway = (
   },
   orchestrationWorkerShow: async () => {
     throw new Error('orchestrationWorkerShow not implemented in this fake')
+  },
+  orchestrationGateList: async () => {
+    throw new Error('orchestrationGateList not implemented in this fake')
+  },
+  orchestrationQuestionList: async () => {
+    throw new Error('orchestrationQuestionList not implemented in this fake')
   }
 })
 

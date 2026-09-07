@@ -242,3 +242,113 @@ describe('createOrchestrationLeaseMethods — orchestrationWorkerShow (MINIMAL+)
     })
   })
 })
+
+describe('createOrchestrationLeaseMethods — orchestrationGateList (Change C-EXTENDED)', () => {
+  it('calls orchestration.gateList with only {run} — no `from` (lease caller)', async () => {
+    const call: RpcCaller = vi.fn(async () => frame({ gates: [] }))
+    const methods = createOrchestrationLeaseMethods({ call })
+    await methods.orchestrationGateList({ run: 'run-1' })
+    expect(call).toHaveBeenCalledWith('orchestration.gateList', { run: 'run-1' })
+  })
+
+  it('projects a raw DecisionGateRow (snake_case wire shape) to camelCase LeaseGateRow', async () => {
+    const call: RpcCaller = vi.fn(async () =>
+      frame({
+        gates: [
+          {
+            id: 'gate-1',
+            run_id: 'run-1',
+            task_id: 'task-1',
+            question: 'Which approach?',
+            options: '["a","b"]',
+            status: 'pending',
+            resolution: null,
+            created_at: '2026-01-01T00:00:00Z',
+            resolved_at: null
+          }
+        ]
+      })
+    )
+    const methods = createOrchestrationLeaseMethods({ call })
+    await expect(methods.orchestrationGateList({ run: 'run-1' })).resolves.toEqual({
+      gates: [
+        {
+          id: 'gate-1',
+          runId: 'run-1',
+          taskId: 'task-1',
+          question: 'Which approach?',
+          options: '["a","b"]',
+          status: 'pending',
+          resolution: null,
+          createdAt: '2026-01-01T00:00:00Z',
+          resolvedAt: null
+        }
+      ]
+    })
+  })
+
+  it('throws when the result carries no gates array', async () => {
+    const call: RpcCaller = vi.fn(async () => frame({}))
+    const methods = createOrchestrationLeaseMethods({ call })
+    await expect(methods.orchestrationGateList({ run: 'run-1' })).rejects.toThrow(
+      /orchestration\.gateList/
+    )
+  })
+})
+
+describe('createOrchestrationLeaseMethods — orchestrationQuestionList (Change C-EXTENDED)', () => {
+  it('calls orchestration.questionList with only {run} — no `from` (lease caller)', async () => {
+    const call: RpcCaller = vi.fn(async () => frame({ questions: [] }))
+    const methods = createOrchestrationLeaseMethods({ call })
+    await methods.orchestrationQuestionList({ run: 'run-1' })
+    expect(call).toHaveBeenCalledWith('orchestration.questionList', { run: 'run-1' })
+  })
+
+  it('projects a raw QuestionRow (snake_case wire shape) to camelCase LeaseQuestionRow', async () => {
+    const call: RpcCaller = vi.fn(async () =>
+      frame({
+        questions: [
+          {
+            message_id: 'msg-1',
+            run_id: 'run-1',
+            dispatch_id: 'dispatch-1',
+            asker_handle: 'worker-1',
+            status: 'answered',
+            answer_message_id: 'msg-2',
+            answer_body: 'go with a',
+            answered_by_generation: 2,
+            created_at: '2026-01-01T00:00:00Z',
+            answered_at: '2026-01-01T00:05:00Z',
+            closed_at: null
+          }
+        ]
+      })
+    )
+    const methods = createOrchestrationLeaseMethods({ call })
+    await expect(methods.orchestrationQuestionList({ run: 'run-1' })).resolves.toEqual({
+      questions: [
+        {
+          messageId: 'msg-1',
+          runId: 'run-1',
+          dispatchId: 'dispatch-1',
+          askerHandle: 'worker-1',
+          status: 'answered',
+          answerMessageId: 'msg-2',
+          answerBody: 'go with a',
+          answeredByGeneration: 2,
+          createdAt: '2026-01-01T00:00:00Z',
+          answeredAt: '2026-01-01T00:05:00Z',
+          closedAt: null
+        }
+      ]
+    })
+  })
+
+  it('throws when the result carries no questions array', async () => {
+    const call: RpcCaller = vi.fn(async () => frame({}))
+    const methods = createOrchestrationLeaseMethods({ call })
+    await expect(methods.orchestrationQuestionList({ run: 'run-1' })).rejects.toThrow(
+      /orchestration\.questionList/
+    )
+  })
+})

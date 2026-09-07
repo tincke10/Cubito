@@ -1,4 +1,10 @@
 import type {
+  LeaseGateListInput,
+  LeaseGateListResult,
+  LeaseGateRow,
+  LeaseQuestionListInput,
+  LeaseQuestionListResult,
+  LeaseQuestionRow,
   LeaseRunCreateInput,
   LeaseRunCreateResult,
   LeaseTaskCreateInput,
@@ -19,6 +25,8 @@ export type OrchestrationLeaseMethods = {
   orchestrationWorkerStart(input: LeaseWorkerStartInput): Promise<LeaseWorkerStartResult>
   orchestrationWorkerList(input: LeaseWorkerListInput): Promise<LeaseWorkerListResult>
   orchestrationWorkerShow(input: LeaseWorkerShowInput): Promise<LeaseWorkerShowResult>
+  orchestrationGateList(input: LeaseGateListInput): Promise<LeaseGateListResult>
+  orchestrationQuestionList(input: LeaseQuestionListInput): Promise<LeaseQuestionListResult>
 }
 
 /** Projects a raw `orchestration.workerList` row: `worktreeId` is nested+nullable under `resource`. */
@@ -45,6 +53,61 @@ function toLeaseWorkerShowResult(result: {
 }): LeaseWorkerShowResult {
   const agentWait = result.observation?.agentWait
   return { awaitingInput: agentWait === undefined ? null : agentWait !== null }
+}
+
+/** Projects a raw `orchestration.gateList` row: wire shape is the DB's snake_case DecisionGateRow. */
+function toLeaseGateRow(row: {
+  id?: unknown
+  run_id?: unknown
+  task_id?: unknown
+  question?: unknown
+  options?: unknown
+  status?: unknown
+  resolution?: unknown
+  created_at?: unknown
+  resolved_at?: unknown
+}): LeaseGateRow {
+  return {
+    id: typeof row.id === 'string' ? row.id : '',
+    runId: typeof row.run_id === 'string' ? row.run_id : '',
+    taskId: typeof row.task_id === 'string' ? row.task_id : '',
+    question: typeof row.question === 'string' ? row.question : '',
+    options: typeof row.options === 'string' ? row.options : '',
+    status: typeof row.status === 'string' ? row.status : '',
+    resolution: typeof row.resolution === 'string' ? row.resolution : null,
+    createdAt: typeof row.created_at === 'string' ? row.created_at : '',
+    resolvedAt: typeof row.resolved_at === 'string' ? row.resolved_at : null
+  }
+}
+
+/** Projects a raw `orchestration.questionList` row: wire shape is the DB's snake_case QuestionRow. */
+function toLeaseQuestionRow(row: {
+  message_id?: unknown
+  run_id?: unknown
+  dispatch_id?: unknown
+  asker_handle?: unknown
+  status?: unknown
+  answer_message_id?: unknown
+  answer_body?: unknown
+  answered_by_generation?: unknown
+  created_at?: unknown
+  answered_at?: unknown
+  closed_at?: unknown
+}): LeaseQuestionRow {
+  return {
+    messageId: typeof row.message_id === 'string' ? row.message_id : '',
+    runId: typeof row.run_id === 'string' ? row.run_id : '',
+    dispatchId: typeof row.dispatch_id === 'string' ? row.dispatch_id : '',
+    askerHandle: typeof row.asker_handle === 'string' ? row.asker_handle : '',
+    status: typeof row.status === 'string' ? row.status : '',
+    answerMessageId: typeof row.answer_message_id === 'string' ? row.answer_message_id : null,
+    answerBody: typeof row.answer_body === 'string' ? row.answer_body : null,
+    answeredByGeneration:
+      typeof row.answered_by_generation === 'number' ? row.answered_by_generation : null,
+    createdAt: typeof row.created_at === 'string' ? row.created_at : '',
+    answeredAt: typeof row.answered_at === 'string' ? row.answered_at : null,
+    closedAt: typeof row.closed_at === 'string' ? row.closed_at : null
+  }
 }
 
 /**
@@ -135,6 +198,22 @@ export function createOrchestrationLeaseMethods(connection: {
       return toLeaseWorkerShowResult(
         response.result as Parameters<typeof toLeaseWorkerShowResult>[0]
       )
+    },
+    async orchestrationGateList(input) {
+      const response = await connection.call('orchestration.gateList', { run: input.run })
+      const result = response.result as { gates?: unknown }
+      if (!Array.isArray(result?.gates)) {
+        throw new Error('orchestration.gateList returned no gates array')
+      }
+      return { gates: (result.gates as Record<string, unknown>[]).map(toLeaseGateRow) }
+    },
+    async orchestrationQuestionList(input) {
+      const response = await connection.call('orchestration.questionList', { run: input.run })
+      const result = response.result as { questions?: unknown }
+      if (!Array.isArray(result?.questions)) {
+        throw new Error('orchestration.questionList returned no questions array')
+      }
+      return { questions: (result.questions as Record<string, unknown>[]).map(toLeaseQuestionRow) }
     }
   }
 }

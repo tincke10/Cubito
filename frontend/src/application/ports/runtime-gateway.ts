@@ -143,6 +143,47 @@ export type LeaseWorkerShowInput = { dispatch: string }
  *  when the engine never looked (older host, unverifiable identity, unreadable pane). */
 export type LeaseWorkerShowResult = { awaitingInput: boolean | null }
 
+/** `orchestration.gateList` scoped to a lease Run — no `from` (Change C-EXTENDED). */
+export type LeaseGateListInput = { run: string }
+
+/** One `orchestration.gateList` row: a decision gate raised on the lease Run's tasks.
+ *  `status`/other engine-owned enums stay plain `string` (mirrors `WorkerDispatchStateRow`) so a
+ *  future engine-side status value doesn't require a frontend type change. */
+export type LeaseGateRow = {
+  id: string
+  runId: string
+  taskId: string
+  question: string
+  options: string
+  status: string
+  resolution: string | null
+  createdAt: string
+  resolvedAt: string | null
+}
+
+export type LeaseGateListResult = { gates: readonly LeaseGateRow[] }
+
+/** `orchestration.questionList` scoped to a lease Run — no `from` (Change C-EXTENDED); the
+ *  method itself is only reachable via a paired GUI Run lease (engine-side). */
+export type LeaseQuestionListInput = { run: string }
+
+/** One `orchestration.questionList` row: an inbox question thread on the lease Run. */
+export type LeaseQuestionRow = {
+  messageId: string
+  runId: string
+  dispatchId: string
+  askerHandle: string
+  status: string
+  answerMessageId: string | null
+  answerBody: string | null
+  answeredByGeneration: number | null
+  createdAt: string
+  answeredAt: string | null
+  closedAt: string | null
+}
+
+export type LeaseQuestionListResult = { questions: readonly LeaseQuestionRow[] }
+
 /**
  * Port to the orcad runtime. The application layer depends on this shape
  * only; infrastructure provides the RPC-backed implementation.
@@ -167,4 +208,6 @@ export type RuntimeGateway = {
   orchestrationWorkerStart(input: LeaseWorkerStartInput): Promise<LeaseWorkerStartResult>
   orchestrationWorkerList(input: LeaseWorkerListInput): Promise<LeaseWorkerListResult>
   orchestrationWorkerShow(input: LeaseWorkerShowInput): Promise<LeaseWorkerShowResult>
+  orchestrationGateList(input: LeaseGateListInput): Promise<LeaseGateListResult>
+  orchestrationQuestionList(input: LeaseQuestionListInput): Promise<LeaseQuestionListResult>
 }
