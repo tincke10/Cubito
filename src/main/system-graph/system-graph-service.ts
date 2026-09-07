@@ -51,6 +51,7 @@ function extractDependencyNames(packageJson: unknown): string[] {
 export class SystemGraphService {
   private readonly graphs = new Map<string, EngineSystemGraph>()
   private readonly watches = new Map<string, WatchEntry>()
+  private readonly listeners = new Map<string, Set<() => void>>()
 
   constructor(private readonly host: SystemGraphHost) {}
 
@@ -76,6 +77,7 @@ export class SystemGraphService {
       const framework = await detectFramework(reader)
       if (!framework) {
         this.graphs.set(worktreeId, emptyEngineSystemGraph())
+        this.notify(worktreeId)
         return
       }
 
@@ -95,6 +97,7 @@ export class SystemGraphService {
 
       const packageDependencies = extractDependencyNames(await reader.readPackageJson())
       this.graphs.set(worktreeId, assembleSystemGraph({ routeFiles, packageDependencies }))
+      this.notify(worktreeId)
     } catch {
       // Why (pinned): a catastrophic rebuild failure keeps the last-good graph in place —
       // Wave 5's watcher retries on the next file event, so a transient blip self-heals.
@@ -103,6 +106,24 @@ export class SystemGraphService {
 
   getGraph(worktreeId: string): EngineSystemGraph | undefined {
     return this.graphs.get(worktreeId)
+  }
+
+  /** Fires after each successful rebuild of this worktree's graph. Independent of the
+   * watch lifecycle: dispose()/reconcile() do not drop subscribers. */
+  subscribe(worktreeId: string, listener: () => void): () => void {
+    let set = this.listeners.get(worktreeId)
+    if (!set) {
+      set = new Set()
+      this.listeners.set(worktreeId, set)
+    }
+    set.add(listener)
+    return () => set!.delete(listener)
+  }
+
+  private notify(worktreeId: string): void {
+    for (const listener of this.listeners.get(worktreeId) ?? []) {
+      listener()
+    }
   }
 
   /** Starts watching the worktree's files and rebuilds the graph on debounced changes.

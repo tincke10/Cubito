@@ -366,6 +366,122 @@ describe('SystemGraphService.ensureWatched', () => {
   })
 })
 
+describe('SystemGraphService.subscribe', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('notifies a subscriber after a watcher-driven rebuild', async () => {
+    const host = watchableHost({ w1: EXPRESS_WORKTREE })
+    const service = new SystemGraphService(host)
+    const listener = vi.fn()
+    service.subscribe('w1', listener)
+
+    await service.watch('w1')
+    host.emit('w1', [{ kind: 'update', absolutePath: '/repo/server.ts' }])
+    expect(listener).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(WATCH_BATCH_MAX_WAIT_MS)
+
+    expect(listener).toHaveBeenCalledTimes(1)
+  })
+
+  it('coalesces a burst of events into a single notification', async () => {
+    const host = watchableHost({ w1: EXPRESS_WORKTREE })
+    const service = new SystemGraphService(host)
+    const listener = vi.fn()
+    service.subscribe('w1', listener)
+
+    await service.watch('w1')
+    for (let i = 0; i < 3; i += 1) {
+      host.emit('w1', [{ kind: 'update', absolutePath: '/repo/server.ts' }])
+    }
+    await vi.advanceTimersByTimeAsync(WATCH_BATCH_MAX_WAIT_MS)
+
+    expect(listener).toHaveBeenCalledTimes(1)
+  })
+
+  it('notifies immediately on an overflow event, without waiting for the trailing window', async () => {
+    const host = watchableHost({ w1: EXPRESS_WORKTREE })
+    const service = new SystemGraphService(host)
+    const listener = vi.fn()
+    service.subscribe('w1', listener)
+
+    await service.watch('w1')
+    host.emit('w1', [{ kind: 'overflow', absolutePath: '/repo' }])
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(listener).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops notifying after unsubscribe', async () => {
+    const host = watchableHost({ w1: EXPRESS_WORKTREE })
+    const service = new SystemGraphService(host)
+    const listener = vi.fn()
+    const unsubscribe = service.subscribe('w1', listener)
+    unsubscribe()
+
+    await service.watch('w1')
+    host.emit('w1', [{ kind: 'update', absolutePath: '/repo/server.ts' }])
+    await vi.advanceTimersByTimeAsync(WATCH_BATCH_MAX_WAIT_MS)
+
+    expect(listener).not.toHaveBeenCalled()
+  })
+
+  it('does not notify a subscriber of a different worktree', async () => {
+    const host = watchableHost({ w1: EXPRESS_WORKTREE, w2: NON_EXPRESS_WORKTREE })
+    const service = new SystemGraphService(host)
+    const listenerA = vi.fn()
+    service.subscribe('w1', listenerA)
+
+    await service.watch('w2')
+    host.emit('w2', [{ kind: 'update', absolutePath: '/repo/x.ts' }])
+    await vi.advanceTimersByTimeAsync(WATCH_BATCH_MAX_WAIT_MS)
+
+    expect(listenerA).not.toHaveBeenCalled()
+  })
+
+  it('keeps subscribers across dispose() and a subsequent rebuild', async () => {
+    const host = watchableHost({ w1: EXPRESS_WORKTREE })
+    const service = new SystemGraphService(host)
+    const listener = vi.fn()
+    service.subscribe('w1', listener)
+
+    await service.ensureWatched('w1')
+    expect(listener).toHaveBeenCalledTimes(1)
+
+    await service.dispose('w1')
+    await service.ensureWatched('w1')
+
+    expect(listener).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not notify when a rebuild resolves to no worktree', async () => {
+    const service = new SystemGraphService(fakeHost({}))
+    const listener = vi.fn()
+    service.subscribe('missing', listener)
+
+    await service.buildGraph('missing')
+
+    expect(listener).not.toHaveBeenCalled()
+  })
+
+  it('notifies a subscriber added before the first ensureWatched build', async () => {
+    const host = watchableHost({ w1: EXPRESS_WORKTREE })
+    const service = new SystemGraphService(host)
+    const listener = vi.fn()
+    service.subscribe('w1', listener)
+
+    await service.ensureWatched('w1')
+
+    expect(listener).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('getSystemGraphService', () => {
   it('returns the same service instance for the same runtime object', () => {
     const runtime = fakeHost({})
