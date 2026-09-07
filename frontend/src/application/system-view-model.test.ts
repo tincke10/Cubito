@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { emptySystemViewSlice, reduceSystemView, systemHudCounts } from './system-view-model'
+import {
+  emptySystemViewSlice,
+  reduceSystemView,
+  SYSTEM_FEED_MAX_ROWS,
+  systemHudCounts
+} from './system-view-model'
 import type { SystemViewSlice } from './system-view-model'
 import type { SystemGraph, SystemNode } from '../domain/system-graph/types'
 
@@ -15,6 +20,13 @@ const systemNode = (overrides: Partial<SystemNode> = {}): SystemNode => ({
 const graphOf = (nodes: readonly SystemNode[]): SystemGraph => ({
   nodes: new Map(nodes.map((n) => [n.id, n])),
   edges: []
+})
+
+const feedRowAt = (i: number) => ({
+  id: `f${i}`,
+  time: '14:03:05',
+  kind: 'read' as const,
+  text: `row ${i}`
 })
 
 const openSlice = (overrides: Partial<Extract<SystemViewSlice, { view: 'open' }>> = {}) => ({
@@ -102,6 +114,64 @@ describe('reduceSystemView — append-feed', () => {
     const closed = emptySystemViewSlice()
     const row = { id: 'f1', time: '14:03:05', kind: 'read' as const, text: 'leyendo auth.ts' }
     expect(reduceSystemView(closed, { type: 'append-feed', row })).toBe(closed)
+  })
+
+  it('caps at SYSTEM_FEED_MAX_ROWS, keeping the newest', () => {
+    let slice: SystemViewSlice = openSlice({
+      feed: Array.from({ length: SYSTEM_FEED_MAX_ROWS }, (_, i) => feedRowAt(i))
+    })
+    slice = reduceSystemView(slice, {
+      type: 'append-feed',
+      row: feedRowAt(SYSTEM_FEED_MAX_ROWS)
+    })
+    expect(slice.view).toBe('open')
+    if (slice.view !== 'open') throw new Error('unreachable')
+    expect(slice.feed.length).toBe(SYSTEM_FEED_MAX_ROWS)
+    expect(slice.feed[0]).toEqual(feedRowAt(1))
+    expect(slice.feed.at(-1)).toEqual(feedRowAt(SYSTEM_FEED_MAX_ROWS))
+  })
+})
+
+describe('reduceSystemView — append-feed-rows', () => {
+  it('appends N rows in order in one action', () => {
+    const rows = [feedRowAt(1), feedRowAt(2), feedRowAt(3)]
+    const slice = reduceSystemView(openSlice(), { type: 'append-feed-rows', rows })
+    expect(slice).toEqual(openSlice({ feed: rows }))
+  })
+
+  it('caps at SYSTEM_FEED_MAX_ROWS, keeping the newest', () => {
+    const existing = Array.from({ length: SYSTEM_FEED_MAX_ROWS - 2 }, (_, i) => feedRowAt(i))
+    const incoming = [feedRowAt(1000), feedRowAt(1001), feedRowAt(1002), feedRowAt(1003)]
+    const slice = reduceSystemView(openSlice({ feed: existing }), {
+      type: 'append-feed-rows',
+      rows: incoming
+    })
+    expect(slice.view).toBe('open')
+    if (slice.view !== 'open') throw new Error('unreachable')
+    expect(slice.feed.length).toBe(SYSTEM_FEED_MAX_ROWS)
+    expect(slice.feed.at(-1)).toEqual(feedRowAt(1003))
+    expect(slice.feed[0]).toEqual(feedRowAt(2))
+  })
+
+  it('is a no-op when closed', () => {
+    const closed = emptySystemViewSlice()
+    expect(reduceSystemView(closed, { type: 'append-feed-rows', rows: [feedRowAt(1)] })).toBe(
+      closed
+    )
+  })
+})
+
+describe('reduceSystemView — reset-feed', () => {
+  it('clears feed and leaves graph/focusedNodeId untouched', () => {
+    const row = { id: 'f1', time: '14:03:05', kind: 'read' as const, text: 'leyendo auth.ts' }
+    const graph = graphOf([systemNode()])
+    const slice = reduceSystemView(openSlice({ feed: [row], graph }), { type: 'reset-feed' })
+    expect(slice).toEqual(openSlice({ feed: [], graph }))
+  })
+
+  it('is a no-op when closed', () => {
+    const closed = emptySystemViewSlice()
+    expect(reduceSystemView(closed, { type: 'reset-feed' })).toBe(closed)
   })
 })
 

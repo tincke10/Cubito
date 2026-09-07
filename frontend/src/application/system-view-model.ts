@@ -20,13 +20,26 @@ export type SystemViewSlice =
 
 export const emptySystemViewSlice = (): SystemViewSlice => ({ view: 'closed' })
 
+/** Feed ring cap (design): oldest rows drop once a batch pushes past this count. */
+export const SYSTEM_FEED_MAX_ROWS = 50
+
 export type SystemViewAction =
   | { type: 'open'; nodeId: SystemNodeId }
   | { type: 'close' }
   | { type: 'apply-delta'; delta: SystemGraphDelta }
   | { type: 'replace-graph'; graph: SystemGraph }
   | { type: 'append-feed'; row: FeedRow }
+  | { type: 'append-feed-rows'; rows: readonly FeedRow[] }
+  | { type: 'reset-feed' }
   | { type: 'set-highlight'; nodeId: SystemNodeId | null }
+
+/** Appends rows and caps to the newest SYSTEM_FEED_MAX_ROWS. */
+function appendFeedRows(feed: readonly FeedRow[], rows: readonly FeedRow[]): readonly FeedRow[] {
+  const merged = [...feed, ...rows]
+  return merged.length > SYSTEM_FEED_MAX_ROWS
+    ? merged.slice(merged.length - SYSTEM_FEED_MAX_ROWS)
+    : merged
+}
 
 export function reduceSystemView(
   slice: SystemViewSlice,
@@ -44,7 +57,15 @@ export function reduceSystemView(
     case 'replace-graph':
       return slice.view === 'open' ? { ...slice, graph: action.graph } : slice
     case 'append-feed':
-      return slice.view === 'open' ? { ...slice, feed: [...slice.feed, action.row] } : slice
+      return slice.view === 'open'
+        ? { ...slice, feed: appendFeedRows(slice.feed, [action.row]) }
+        : slice
+    case 'append-feed-rows':
+      return slice.view === 'open'
+        ? { ...slice, feed: appendFeedRows(slice.feed, action.rows) }
+        : slice
+    case 'reset-feed':
+      return slice.view === 'open' ? { ...slice, feed: [] } : slice
     case 'set-highlight':
       return slice.view === 'open' ? withHighlight(slice, action.nodeId) : slice
     default:
