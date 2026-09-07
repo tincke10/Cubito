@@ -1,4 +1,4 @@
-import type { MessageRow, QuestionRow } from '../../types'
+import type { MessageRow, QuestionRow, QuestionStatus } from '../../types'
 import { OrchestrationError } from '../../orchestration-error'
 import { exposeQuestionTimestamps } from '../utc-timestamp'
 import type { OrchestrationDb } from '../orchestration-db'
@@ -157,12 +157,31 @@ export function closeQuestionsForDispatch(this: OrchestrationDb, dispatchId: str
   return rows.map((row) => row.message_id)
 }
 
+/** Lease-scoped inbox read: every question thread opened on a Run, oldest first. */
+export function listQuestionsForRun(
+  this: OrchestrationDb,
+  runId: string,
+  status?: QuestionStatus
+): QuestionRow[] {
+  const rows = status
+    ? this.db
+        .prepare(
+          'SELECT * FROM question_threads WHERE run_id = ? AND status = ? ORDER BY created_at'
+        )
+        .all(runId, status)
+    : this.db
+        .prepare('SELECT * FROM question_threads WHERE run_id = ? ORDER BY created_at')
+        .all(runId)
+  return (rows as QuestionRow[]).map(exposeQuestionTimestamps)
+}
+
 export type QuestionThreadsMethods = {
   createQuestion: typeof createQuestion
   getQuestion: typeof getQuestion
   getQuestionRaw: typeof getQuestionRaw
   answerQuestion: typeof answerQuestion
   closeQuestionsForDispatch: typeof closeQuestionsForDispatch
+  listQuestionsForRun: typeof listQuestionsForRun
 }
 
 export function attachQuestionThreads(ctor: { prototype: object }): void {
@@ -171,6 +190,7 @@ export function attachQuestionThreads(ctor: { prototype: object }): void {
     getQuestion,
     getQuestionRaw,
     answerQuestion,
-    closeQuestionsForDispatch
+    closeQuestionsForDispatch,
+    listQuestionsForRun
   })
 }
