@@ -40,6 +40,8 @@ type FakeForm = FanOutFormHandle & {
   emitPromptChange(prompt: string): void
   emitSubmit(): void
   emitCancel(): void
+  emitResolveGate(gateId: string, resolution: string): Promise<void> | void
+  emitAnswerQuestion(messageId: string, body: string): Promise<void> | void
 }
 
 const createFakeForm = (): FakeForm => {
@@ -48,6 +50,8 @@ const createFakeForm = (): FakeForm => {
   let promptCb: ((prompt: string) => void) | null = null
   let submitCb: (() => void) | null = null
   let cancelCb: (() => void) | null = null
+  let resolveGateCb: ((gateId: string, resolution: string) => void | Promise<void>) | null = null
+  let answerQuestionCb: ((messageId: string, body: string) => void | Promise<void>) | null = null
   const form: FakeForm = {
     element: {} as HTMLElement,
     disposed: false,
@@ -72,6 +76,14 @@ const createFakeForm = (): FakeForm => {
       cancelCb = cb
       return () => (cancelCb = null)
     },
+    onResolveGate(cb) {
+      resolveGateCb = cb
+      return () => (resolveGateCb = null)
+    },
+    onAnswerQuestion(cb) {
+      answerQuestionCb = cb
+      return () => (answerQuestionCb = null)
+    },
     focusFirstField: vi.fn(),
     dispose: vi.fn(() => (form.disposed = true)),
     emitCountChange(count) {
@@ -88,6 +100,12 @@ const createFakeForm = (): FakeForm => {
     },
     emitCancel() {
       cancelCb?.()
+    },
+    emitResolveGate(gateId, resolution) {
+      return resolveGateCb?.(gateId, resolution)
+    },
+    emitAnswerQuestion(messageId, body) {
+      return answerQuestionCb?.(messageId, body)
     }
   }
   return form

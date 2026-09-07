@@ -1,5 +1,6 @@
 import type { SpawnAgent } from '../../application/ports/runtime-gateway'
 import type { FanOutFormViewModel, FanOutRunningViewModel } from './fan-out-view-model'
+import { createFanOutGateList } from './fan-out-gate-list-element'
 
 const AGENT_OPTIONS: readonly SpawnAgent[] = ['none', 'claude']
 
@@ -11,6 +12,8 @@ export type FanOutFormHandle = {
   onPromptChange(callback: (prompt: string) => void): () => void
   onSubmit(callback: () => void): () => void
   onCancel(callback: () => void): () => void
+  onResolveGate(callback: (gateId: string, resolution: string) => void | Promise<void>): () => void
+  onAnswerQuestion(callback: (messageId: string, body: string) => void | Promise<void>): () => void
   focusFirstField(): void
   dispose(): void
 }
@@ -59,6 +62,8 @@ export function createFanOutForm(doc: Document = document): FanOutFormHandle {
   const counters = doc.createElement('div')
   counters.className = 'cubito-fanout-form__counters'
 
+  const gateList = createFanOutGateList(doc)
+
   for (const child of [
     countInput,
     agentSelect,
@@ -71,6 +76,7 @@ export function createFanOutForm(doc: Document = document): FanOutFormHandle {
   ]) {
     root.appendChild(child)
   }
+  root.appendChild(gateList.element)
 
   let countChangeCallback: ((count: number) => void) | null = null
   let agentChangeCallback: ((agent: SpawnAgent) => void) | null = null
@@ -105,6 +111,7 @@ export function createFanOutForm(doc: Document = document): FanOutFormHandle {
     const display = visible ? '' : 'none'
     callout.style.display = display
     counters.style.display = display
+    gateList.element.style.display = display
   }
 
   return {
@@ -130,6 +137,7 @@ export function createFanOutForm(doc: Document = document): FanOutFormHandle {
       showRunning(true)
       callout.textContent = model.callout
       counters.textContent = model.counters
+      gateList.apply({ gates: model.gates, questions: model.questions })
     },
     onCountChange(callback) {
       countChangeCallback = callback
@@ -151,10 +159,17 @@ export function createFanOutForm(doc: Document = document): FanOutFormHandle {
       cancelCallback = callback
       return () => (cancelCallback = null)
     },
+    onResolveGate(callback) {
+      return gateList.onResolveGate(callback)
+    },
+    onAnswerQuestion(callback) {
+      return gateList.onAnswerQuestion(callback)
+    },
     focusFirstField() {
       countInput.focus()
     },
     dispose() {
+      gateList.dispose()
       root.remove()
     }
   }

@@ -14,6 +14,7 @@ type FakeElement = {
   addEventListener(type: string, cb: (event: unknown) => void): void
   removeEventListener(type: string, cb: (event: unknown) => void): void
   appendChild(child: FakeElement): FakeElement
+  replaceChildren(): void
   setAttribute(): void
   remove(): void
   focus(): void
@@ -40,6 +41,9 @@ const createFakeElement = (tag: string): FakeElement => {
     appendChild(child) {
       el.children.push(child)
       return child
+    },
+    replaceChildren() {
+      el.children.length = 0
     },
     setAttribute() {},
     remove() {},
