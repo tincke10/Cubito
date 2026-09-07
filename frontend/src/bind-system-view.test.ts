@@ -56,6 +56,20 @@ function setup(overrides: { gateway: SystemSnapshotPollGatewayPort; graphPort?: 
   return { store, binder, graphPort }
 }
 
+/** Never-'ready' by default (mirrors main.ts's demo gateway) — a test that cares about real
+ *  compare behavior overrides it explicitly. */
+const createNotReadyCompare = () =>
+  vi.fn(async () => ({
+    changedFiles: 0,
+    commitsAhead: 0,
+    commitsBehind: 0,
+    baseRef: '',
+    headOid: '',
+    mergeBase: '',
+    status: '',
+    entries: []
+  }))
+
 describe('createSystemViewBinder', () => {
   it('real gateway bound: opening starts the poll, and the mapped snapshot reaches the store', async () => {
     const snapshot: SystemGraphSnapshot = {
@@ -63,8 +77,9 @@ describe('createSystemViewBinder', () => {
       edges: []
     }
     const systemSnapshot = vi.fn(async () => snapshot)
-    const { store, binder } = setup({ gateway: { systemSnapshot } })
-    binder.rebindGateway({ systemSnapshot })
+    const gitBranchCompare = createNotReadyCompare()
+    const { store, binder } = setup({ gateway: { systemSnapshot, gitBranchCompare } })
+    binder.rebindGateway({ systemSnapshot, gitBranchCompare })
 
     store.dispatchSystemView({ type: 'open', nodeId: '/wt/alpha' })
     binder.sync()
@@ -80,9 +95,10 @@ describe('createSystemViewBinder', () => {
     const systemSnapshot = vi.fn(async () => {
       throw new RpcCallError('method_not_found', "Unknown method 'system.snapshot'.")
     })
+    const gitBranchCompare = createNotReadyCompare()
     const graphPort: SystemGraphPort = { loadSystemGraph: vi.fn(async () => emptySystemGraph()) }
-    const { store, binder } = setup({ gateway: { systemSnapshot }, graphPort })
-    binder.rebindGateway({ systemSnapshot })
+    const { store, binder } = setup({ gateway: { systemSnapshot, gitBranchCompare }, graphPort })
+    binder.rebindGateway({ systemSnapshot, gitBranchCompare })
 
     store.dispatchSystemView({ type: 'open', nodeId: '/wt/alpha' })
     binder.sync()
@@ -95,7 +111,8 @@ describe('createSystemViewBinder', () => {
   it('offline (no rebindGateway call): opening goes straight to the scripted stub driver', async () => {
     const graphPort: SystemGraphPort = { loadSystemGraph: vi.fn(async () => emptySystemGraph()) }
     const systemSnapshot = vi.fn(async () => ({ nodes: [], edges: [] }))
-    const { store, binder } = setup({ gateway: { systemSnapshot }, graphPort })
+    const gitBranchCompare = createNotReadyCompare()
+    const { store, binder } = setup({ gateway: { systemSnapshot, gitBranchCompare }, graphPort })
     // no binder.rebindGateway(...) — offline / `pnpm dev` path
 
     store.dispatchSystemView({ type: 'open', nodeId: '/wt/alpha' })
@@ -106,10 +123,24 @@ describe('createSystemViewBinder', () => {
     expect(graphPort.loadSystemGraph).toHaveBeenCalledWith('/wt/alpha')
   })
 
+  it('does not call gitBranchCompare while the system view is closed', async () => {
+    const systemSnapshot = vi.fn(async () => ({ nodes: [], edges: [] }))
+    const gitBranchCompare = createNotReadyCompare()
+    const { binder } = setup({ gateway: { systemSnapshot, gitBranchCompare } })
+    binder.rebindGateway({ systemSnapshot, gitBranchCompare })
+
+    binder.sync() // systemView stays closed — no open dispatched
+    await flush()
+
+    expect(systemSnapshot).not.toHaveBeenCalled()
+    expect(gitBranchCompare).not.toHaveBeenCalled()
+  })
+
   it('close stops both the poll and the stub driver — no further gateway calls after close', async () => {
     const systemSnapshot = vi.fn(async () => ({ nodes: [], edges: [] }))
-    const { store, binder } = setup({ gateway: { systemSnapshot } })
-    binder.rebindGateway({ systemSnapshot })
+    const gitBranchCompare = createNotReadyCompare()
+    const { store, binder } = setup({ gateway: { systemSnapshot, gitBranchCompare } })
+    binder.rebindGateway({ systemSnapshot, gitBranchCompare })
 
     store.dispatchSystemView({ type: 'open', nodeId: '/wt/alpha' })
     binder.sync()
