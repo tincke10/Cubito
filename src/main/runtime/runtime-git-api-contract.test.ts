@@ -26,6 +26,7 @@ const RPC_TO_RUNTIME_COMMAND = {
   'git.rebaseFromBase': 'rebaseRuntimeGitFromBase',
   'git.push': 'pushRuntimeGit',
   'git.commit': 'commitRuntimeGit',
+  'git.mergeWinnerIntoParent': 'mergeRuntimeGitWinnerIntoParent',
   'git.generateCommitMessage': 'generateRuntimeCommitMessage',
   'git.discoverCommitMessageModels': 'discoverRuntimeCommitMessageModels',
   'git.cancelGenerateCommitMessage': 'cancelRuntimeGenerateCommitMessage',

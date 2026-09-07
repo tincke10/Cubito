@@ -11282,6 +11282,8 @@ export class OrcaRuntimeService {
   commitRuntimeGit: RuntimeGitCommands['commitRuntimeGit'] = this.gitCommands.commitRuntimeGit.bind(
     this.gitCommands
   )
+  mergeRuntimeGitWinnerIntoParent: RuntimeGitCommands['mergeRuntimeGitWinnerIntoParent'] =
+    this.gitCommands.mergeRuntimeGitWinnerIntoParent.bind(this.gitCommands)
   generateRuntimeCommitMessage: RuntimeGitCommands['generateRuntimeCommitMessage'] =
     this.gitCommands.generateRuntimeCommitMessage.bind(this.gitCommands)
   discoverRuntimeCommitMessageModels: RuntimeGitCommands['discoverRuntimeCommitMessageModels'] =

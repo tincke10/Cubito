@@ -91,6 +91,18 @@ export const GitCommitDiff = GitFilePath.extend({
   oldPath: z.string().optional()
 })
 
+export const GitMergeWinnerIntoParent = z.object({
+  parent: z
+    .unknown()
+    .transform((v) => (typeof v === 'string' ? v : ''))
+    .pipe(z.string().min(1, 'Missing parent worktree selector')),
+  winner: z
+    .unknown()
+    .transform((v) => (typeof v === 'string' ? v : ''))
+    .pipe(z.string().min(1, 'Missing winner worktree selector')),
+  message: z.string().optional()
+})
+
 export const GitCommit = WorktreeSelector.extend({
   message: z
     .unknown()

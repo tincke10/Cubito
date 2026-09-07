@@ -2,6 +2,7 @@ import type { GitForkSyncExpectedUpstream, GitForkSyncResult } from '../../share
 import type { GitUpstreamStatus } from '../../shared/git-status-types'
 import type { GitPushTarget } from '../../shared/worktree/types'
 import { gitSyncForkDefaultBranch } from '../git/fork-sync'
+import { mergeWinnerIntoParent, type MergeWinnerResult } from '../git/merge-winner'
 import { gitFastForward, gitFetch, gitPull, gitPullRebaseFromBase, gitPush } from '../git/remote'
 import { abortMerge, abortRebase, commitChanges } from '../git/status'
 import { getUpstreamStatus } from '../git/upstream'
@@ -181,5 +182,38 @@ export class RuntimeGitSyncCommands {
       return provider.commit(target.worktree.path, message)
     }
     return commitChanges(target.worktree.path, message, localGitOptionsForTarget(target))
+  }
+
+  async mergeRuntimeGitWinnerIntoParent(
+    parentSelector: string,
+    winnerSelector: string,
+    message?: string
+  ): Promise<MergeWinnerResult> {
+    const parentTarget = await this.host.resolveRuntimeGitTarget(parentSelector)
+    const winnerTarget = await this.host.resolveRuntimeGitTarget(winnerSelector)
+    if (parentTarget.connectionId !== winnerTarget.connectionId) {
+      // Why: SSH-execution-boundary loud-fail — never silently merge across hosts.
+      throw new Error('Cannot merge across execution hosts')
+    }
+    const resolvedMessage =
+      message ??
+      `Merge ${winnerTarget.worktree.git.branch} into ${parentTarget.worktree.git.branch}`
+    if (parentTarget.connectionId) {
+      const provider = getSshGitProvider(parentTarget.connectionId)
+      if (!provider) {
+        throw new Error(SSH_GIT_PROVIDER_UNAVAILABLE_MESSAGE)
+      }
+      return provider.mergeWinnerIntoParent(
+        parentTarget.worktree.path,
+        winnerTarget.worktree.path,
+        resolvedMessage
+      )
+    }
+    return mergeWinnerIntoParent(
+      parentTarget.worktree.path,
+      winnerTarget.worktree.path,
+      resolvedMessage,
+      localGitOptionsForTarget(parentTarget)
+    )
   }
 }

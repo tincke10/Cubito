@@ -269,6 +269,7 @@ export const MOBILE_RPC_METHOD_ALLOWLIST = new Set([
   'git.generatePullRequestFields',
   'git.history',
   'git.localBranches',
+  'git.mergeWinnerIntoParent',
   'git.pull',
   'git.push',
   'git.rebaseFromBase',

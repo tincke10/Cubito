@@ -11,6 +11,7 @@ import {
   GitFilePath,
   GitForkSync,
   GitHistory,
+  GitMergeWinnerIntoParent,
   GitPush,
   GitRebaseFromBase,
   GitRemoteCommitUrl,
@@ -171,6 +172,12 @@ export const GIT_METHODS: RpcMethod[] = [
     params: GitCommit,
     handler: async (params, { runtime }) =>
       runtime.commitRuntimeGit(params.worktree, params.message)
+  }),
+  defineMethod({
+    name: 'git.mergeWinnerIntoParent',
+    params: GitMergeWinnerIntoParent,
+    handler: async (params, { runtime }) =>
+      runtime.mergeRuntimeGitWinnerIntoParent(params.parent, params.winner, params.message)
   }),
   ...GIT_COMMIT_MESSAGE_GENERATION_METHODS,
   defineMethod({

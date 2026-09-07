@@ -727,6 +727,49 @@ describe('git RPC methods', () => {
     expect(runtime.checkoutRuntimeGitBranch).not.toHaveBeenCalled()
   })
 
+  it('routes merge-winner requests to the runtime', async () => {
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      mergeRuntimeGitWinnerIntoParent: vi
+        .fn()
+        .mockResolvedValue({ outcome: 'clean', commitOid: 'c'.repeat(40) })
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: GIT_METHODS })
+
+    const response = await dispatcher.dispatch(
+      makeRequest('git.mergeWinnerIntoParent', {
+        parent: 'id:parent',
+        winner: 'id:winner',
+        message: 'Merge winner'
+      })
+    )
+
+    expect(runtime.mergeRuntimeGitWinnerIntoParent).toHaveBeenCalledWith(
+      'id:parent',
+      'id:winner',
+      'Merge winner'
+    )
+    expect(response).toMatchObject({
+      ok: true,
+      result: { outcome: 'clean', commitOid: 'c'.repeat(40) }
+    })
+  })
+
+  it('rejects merge-winner requests missing the winner selector', async () => {
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      mergeRuntimeGitWinnerIntoParent: vi.fn()
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: GIT_METHODS })
+
+    const response = await dispatcher.dispatch(
+      makeRequest('git.mergeWinnerIntoParent', { parent: 'id:parent' })
+    )
+
+    expect(response.ok).toBe(false)
+    expect(runtime.mergeRuntimeGitWinnerIntoParent).not.toHaveBeenCalled()
+  })
+
   it('lists local branches', async () => {
     const runtime = {
       getRuntimeId: () => 'test-runtime',

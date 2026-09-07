@@ -4,6 +4,7 @@ import type {
 } from '../../shared/git-diff-compare-types'
 import type { GitHistoryOptions, GitHistoryResult } from '../../shared/git-history'
 import type { GitConflictOperation } from '../../shared/git-status-types'
+import type { MergeWinnerResult } from '../git/merge-winner'
 import { SshGitNoninteractiveProvider } from './ssh-git-noninteractive-provider'
 
 export class SshGitWorkingTreeProvider extends SshGitNoninteractiveProvider {
@@ -34,6 +35,21 @@ export class SshGitWorkingTreeProvider extends SshGitNoninteractiveProvider {
           worktreePath,
           message
         })) as { success: boolean; error?: string }
+    )
+  }
+
+  async mergeWinnerIntoParent(
+    parentPath: string,
+    winnerPath: string,
+    message: string
+  ): Promise<MergeWinnerResult> {
+    return this.runWithGitReadInvalidation(
+      async () =>
+        (await this.mux.request('git.mergeWinnerIntoParent', {
+          parentPath,
+          winnerPath,
+          message
+        })) as MergeWinnerResult
     )
   }
 

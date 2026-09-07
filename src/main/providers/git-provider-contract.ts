@@ -10,6 +10,7 @@ import type {
   GitStatusResult,
   GitUpstreamStatus
 } from '../../shared/git-status-types'
+import type { MergeWinnerResult } from '../git/merge-winner'
 import type { RemoveWorktreeResult } from '../../shared/worktree/create-types'
 import type { GitPushTarget, GitWorktreeInfo } from '../../shared/worktree/types'
 import type { GitHistoryOptions, GitHistoryResult } from '../../shared/git-history'
@@ -28,6 +29,11 @@ export type IGitProvider = {
   checkIgnoredPaths(worktreePath: string, relativePaths: string[]): Promise<string[]>
   getHistory(worktreePath: string, options?: GitHistoryOptions): Promise<GitHistoryResult>
   commit(worktreePath: string, message: string): Promise<{ success: boolean; error?: string }>
+  mergeWinnerIntoParent(
+    parentPath: string,
+    winnerPath: string,
+    message: string
+  ): Promise<MergeWinnerResult>
   getStagedCommitContext(worktreePath: string): Promise<CommitMessageDraftContext | null>
   getDiff(
     worktreePath: string,
