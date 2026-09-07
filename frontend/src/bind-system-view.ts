@@ -5,18 +5,23 @@ import { createSystemHud } from './presentation/system/system-hud-element'
 import { createSystemLiveDriver } from './application/system-live-driver'
 import { createSystemSnapshotPoll } from './application/system-snapshot-poll'
 import type { SystemSnapshotPollGatewayPort } from './application/system-snapshot-poll'
+import { createAgentActivityPoll } from './application/agent-activity-poll'
+import type { AgentActivityPollGatewayPort } from './application/agent-activity-poll'
 import type { SceneStore } from './application/scene-store'
 import type { SystemGraphPort } from './application/ports/system-graph-port'
 import type { SystemGraphHandle } from './presentation/system/system-graph-element'
 import type { ActivityFeedHandle } from './presentation/system/activity-feed-element'
 import type { SystemHudHandle } from './presentation/system/system-hud-element'
 
+/** Both live-gateway ports the system view drives — the snapshot poll and the activity poll. */
+export type SystemViewGatewayPort = SystemSnapshotPollGatewayPort & AgentActivityPollGatewayPort
+
 export type BindSystemViewDeps = {
   store: SceneStore
   systemSlot: { appendChild(element: unknown): void }
   keyboardBarSlot: { appendChild(element: unknown): void }
   demoGraphPort: SystemGraphPort
-  demoGateway: SystemSnapshotPollGatewayPort
+  demoGateway: SystemViewGatewayPort
   /** DOM element factory overrides — tests substitute fakes, production uses the defaults. */
   createGraph?: () => SystemGraphHandle
   createFeed?: () => ActivityFeedHandle
@@ -25,7 +30,7 @@ export type BindSystemViewDeps = {
 
 export type SystemViewBinder = {
   sync(): void
-  rebindGateway(gateway: SystemSnapshotPollGatewayPort): void
+  rebindGateway(gateway: SystemViewGatewayPort): void
 }
 
 /**
@@ -60,6 +65,13 @@ export function createSystemViewBinder(deps: BindSystemViewDeps): SystemViewBind
       if (systemView.view === 'open') driver.start(systemView.focusedNodeId)
     }
   })
+  const activityPoll = createAgentActivityPoll({
+    store: deps.store,
+    gateway: deps.demoGateway,
+    // old host, no `agent.activity` — the placeholder feed stays; the snapshot poll/graph is
+    // unaffected, so no fallback to the scripted driver here (that's the snapshot poll's job).
+    onUnsupported: () => {}
+  })
 
   let wasOpen = false
 
@@ -76,11 +88,16 @@ export function createSystemViewBinder(deps: BindSystemViewDeps): SystemViewBind
       if (transitionToOpen && systemView.view === 'open') {
         // per-open attempt (not a one-time probe) — a later open retries the real gateway even
         // if an earlier one fell back, so a since-upgraded host is picked up automatically.
-        if (hasRealGateway) poll.start(systemView.focusedNodeId)
-        else driver.start(systemView.focusedNodeId)
+        if (hasRealGateway) {
+          poll.start(systemView.focusedNodeId)
+          activityPoll.start(systemView.focusedNodeId)
+        } else {
+          driver.start(systemView.focusedNodeId)
+        }
       }
       if (transitionToClosed) {
         poll.stop()
+        activityPoll.stop()
         driver.stop()
       }
 
@@ -89,9 +106,10 @@ export function createSystemViewBinder(deps: BindSystemViewDeps): SystemViewBind
         selectedId !== null ? (state.graph.nodes.get(selectedId)?.branch ?? '') : ''
       controller.sync(deps.store.get().systemView, state.connection, branchLabel)
     },
-    rebindGateway(gateway: SystemSnapshotPollGatewayPort): void {
+    rebindGateway(gateway: SystemViewGatewayPort): void {
       hasRealGateway = true
       poll.rebindGateway(gateway)
+      activityPoll.rebindGateway(gateway)
     }
   }
 }
