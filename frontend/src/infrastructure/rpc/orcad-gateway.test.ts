@@ -91,7 +91,8 @@ describe('createOrcadGateway', () => {
       'gitStatus',
       'gitBranchCompare',
       'gitBranchDiff',
-      'systemSnapshot'
+      'systemSnapshot',
+      'agentActivity'
     ])
   })
 

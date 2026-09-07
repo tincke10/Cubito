@@ -198,6 +198,28 @@ export type LeaseQuestionListResult = { questions: readonly LeaseQuestionRow[] }
 export type LeaseQuestionAnswerInput = { run: string; messageId: string; body: string }
 export type LeaseQuestionAnswerResult = { messageId: string; duplicate: boolean }
 
+/** Local mirror of the engine's `agent.activity` event kind (agent-activity-ring.ts). */
+export type AgentActivityKind = 'read' | 'edit' | 'create' | 'run'
+
+/** One `agent.activity` event, projected for the client — no `worktreeId`/`paneKey` (the caller
+ *  already scopes by worktree; pane identity is host-internal). */
+export type AgentActivityEvent = {
+  seq: number
+  at: number
+  kind: AgentActivityKind
+  tool: string
+  target: string
+  agent?: string
+}
+
+/** Minimal projection of `agent.activity` — one page of a worktree's activity ring. */
+export type AgentActivityPage = {
+  events: readonly AgentActivityEvent[]
+  latestSeq: number
+}
+
+export type AgentActivityInput = { worktree: string; sinceSeq?: number; limit?: number }
+
 /** `git.mergeWinnerIntoParent` result (Change E): LOCAL mirror of the engine's headless-merge
  *  outcome — clean moves the parent branch ref, conflict mutates nothing (file-name list only). */
 export type MergeWinnerResult =
@@ -239,4 +261,5 @@ export type RuntimeGateway = {
     winner: string,
     message?: string
   ): Promise<MergeWinnerResult>
+  agentActivity(input: AgentActivityInput): Promise<AgentActivityPage>
 }

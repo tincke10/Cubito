@@ -82,7 +82,8 @@ const fakeGateway = (
   },
   gitMergeWinnerIntoParent: async () => {
     throw new Error('gitMergeWinnerIntoParent not implemented in this fake')
-  }
+  },
+  agentActivity: async () => ({ events: [], latestSeq: 0 })
 })
 
 describe('syncWorktreeGraph', () => {

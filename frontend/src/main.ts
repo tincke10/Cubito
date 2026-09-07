@@ -145,7 +145,8 @@ const demoGateway: RuntimeGateway = {
   },
   gitMergeWinnerIntoParent: async () => {
     throw new Error('gitMergeWinnerIntoParent not implemented in the demo gateway')
-  }
+  },
+  agentActivity: async () => ({ events: [], latestSeq: 0 })
 }
 
 const container = document.getElementById('app')
