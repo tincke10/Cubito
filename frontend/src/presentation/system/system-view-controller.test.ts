@@ -85,13 +85,13 @@ const openSlice = (nodeId = 'router'): SystemViewSlice =>
 describe('createSystemViewController', () => {
   it('does nothing while closed', () => {
     const { controller, graphs } = setup()
-    controller.sync(emptySystemViewSlice(), CONNECTED, 'main')
+    controller.sync(emptySystemViewSlice(), CONNECTED, 'main', 'poll')
     expect(graphs).toHaveLength(0)
   })
 
   it('mounts graph/feed/hud into the #system slot and the keyboard bar into its own slot on open', () => {
     const { controller, graphs, feeds, huds, hud, keyboardBarSlot } = setup()
-    controller.sync(openSlice(), CONNECTED, 'main')
+    controller.sync(openSlice(), CONNECTED, 'main', 'poll')
     expect(graphs).toHaveLength(1)
     expect(feeds).toHaveLength(1)
     expect(huds).toHaveLength(1)
@@ -103,8 +103,8 @@ describe('createSystemViewController', () => {
 
   it('calls onEnter once on the closed->open transition, not again on a later open sync', () => {
     const { controller, onEnter } = setup()
-    controller.sync(openSlice(), CONNECTED, 'main')
-    controller.sync(openSlice(), CONNECTED, 'main')
+    controller.sync(openSlice(), CONNECTED, 'main', 'poll')
+    controller.sync(openSlice(), CONNECTED, 'main', 'poll')
     expect(onEnter).toHaveBeenCalledOnce()
   })
 
@@ -115,17 +115,27 @@ describe('createSystemViewController', () => {
       type: 'append-feed',
       row: { id: 'f1', time: '10:00', kind: 'read', text: 'leyó algo' }
     })
-    controller.sync(slice, CONNECTED, 'main')
+    controller.sync(slice, CONNECTED, 'main', 'poll')
 
     expect(graphs[0]!.applyCalls).toHaveLength(1)
     expect(feeds[0]!.applyCalls[0]).toMatchObject([{ id: 'f1', text: 'leyó algo' }])
     expect(huds[0]!.applyCalls[0]).toMatchObject({ connection: CONNECTED, branch: 'main' })
   })
 
+  it('forwards the source kind into the HUD model (Wave F4)', () => {
+    const { controller, huds } = setup()
+
+    controller.sync(openSlice(), CONNECTED, 'main', 'stream')
+    expect(huds[0]!.applyCalls[0]).toMatchObject({ source: 'stream' })
+
+    controller.sync(openSlice(), CONNECTED, 'main', 'demo')
+    expect(huds[0]!.applyCalls[1]).toMatchObject({ source: 'demo' })
+  })
+
   it('does not remount on a second open sync — same instances, apply called again', () => {
     const { controller, graphs, feeds, huds } = setup()
-    controller.sync(openSlice(), CONNECTED, 'main')
-    controller.sync(openSlice(), CONNECTED, 'main')
+    controller.sync(openSlice(), CONNECTED, 'main', 'poll')
+    controller.sync(openSlice(), CONNECTED, 'main', 'poll')
     expect(graphs).toHaveLength(1)
     expect(feeds).toHaveLength(1)
     expect(huds).toHaveLength(1)
@@ -134,8 +144,8 @@ describe('createSystemViewController', () => {
 
   it('unmounts and calls onExit on close', () => {
     const { controller, graphs, feeds, huds, onExit } = setup()
-    controller.sync(openSlice(), CONNECTED, 'main')
-    controller.sync(emptySystemViewSlice(), CONNECTED, 'main')
+    controller.sync(openSlice(), CONNECTED, 'main', 'poll')
+    controller.sync(emptySystemViewSlice(), CONNECTED, 'main', 'poll')
     expect(graphs[0]!.disposed).toBe(true)
     expect(feeds[0]!.disposed).toBe(true)
     expect(huds[0]!.disposed).toBe(true)
@@ -144,24 +154,24 @@ describe('createSystemViewController', () => {
 
   it('a second closed sync after unmount is idempotent — onExit not called again', () => {
     const { controller, onExit } = setup()
-    controller.sync(openSlice(), CONNECTED, 'main')
-    controller.sync(emptySystemViewSlice(), CONNECTED, 'main')
-    controller.sync(emptySystemViewSlice(), CONNECTED, 'main')
+    controller.sync(openSlice(), CONNECTED, 'main', 'poll')
+    controller.sync(emptySystemViewSlice(), CONNECTED, 'main', 'poll')
+    controller.sync(emptySystemViewSlice(), CONNECTED, 'main', 'poll')
     expect(onExit).toHaveBeenCalledOnce()
   })
 
   it('reopening after a close mounts fresh instances and calls onEnter again', () => {
     const { controller, graphs, onEnter } = setup()
-    controller.sync(openSlice(), CONNECTED, 'main')
-    controller.sync(emptySystemViewSlice(), CONNECTED, 'main')
-    controller.sync(openSlice(), CONNECTED, 'main')
+    controller.sync(openSlice(), CONNECTED, 'main', 'poll')
+    controller.sync(emptySystemViewSlice(), CONNECTED, 'main', 'poll')
+    controller.sync(openSlice(), CONNECTED, 'main', 'poll')
     expect(graphs).toHaveLength(2)
     expect(onEnter).toHaveBeenCalledTimes(2)
   })
 
   it('dispose() unmounts whatever is currently mounted', () => {
     const { controller, graphs, feeds, huds } = setup()
-    controller.sync(openSlice(), CONNECTED, 'main')
+    controller.sync(openSlice(), CONNECTED, 'main', 'poll')
     controller.dispose()
     expect(graphs[0]!.disposed).toBe(true)
     expect(feeds[0]!.disposed).toBe(true)

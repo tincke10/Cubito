@@ -105,7 +105,10 @@ export function createSystemViewBinder(deps: BindSystemViewDeps): SystemViewBind
       const selectedId = state.selection.selectedId
       const branchLabel =
         selectedId !== null ? (state.graph.nodes.get(selectedId)?.branch ?? '') : ''
-      controller.sync(deps.store.get().systemView, state.connection, branchLabel)
+      // Offline (no real gateway ever bound) always runs the scripted driver — the source itself
+      // never starts, so its own currentSource() would report a meaningless default.
+      const sourceKind = hasRealGateway ? source.currentSource() : 'demo'
+      controller.sync(deps.store.get().systemView, state.connection, branchLabel, sourceKind)
     },
     rebindGateway(gateway: SystemViewGatewayPort, streamPort?: SystemGraphStreamPort): void {
       hasRealGateway = true

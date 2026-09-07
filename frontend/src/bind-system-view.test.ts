@@ -50,6 +50,7 @@ function setup(overrides: { gateway: SystemViewGatewayPort; graphPort?: SystemGr
   const graphPort: SystemGraphPort = overrides.graphPort ?? {
     loadSystemGraph: vi.fn(async () => emptySystemGraph())
   }
+  const huds: ReturnType<typeof createFakeHud>[] = []
   const deps: BindSystemViewDeps = {
     store,
     systemSlot: { appendChild: vi.fn() },
@@ -58,10 +59,21 @@ function setup(overrides: { gateway: SystemViewGatewayPort; graphPort?: SystemGr
     demoGateway: overrides.gateway,
     createGraph: createFakeGraph,
     createFeed: createFakeFeed,
-    createHud: createFakeHud
+    createHud: () => {
+      const hud = createFakeHud()
+      huds.push(hud)
+      return hud
+    }
   }
   const binder = createSystemViewBinder(deps)
-  return { store, binder, graphPort }
+  return { store, binder, graphPort, huds }
+}
+
+/** Latest `source` field the HUD's `apply()` was called with. */
+const lastHudSource = (huds: ReturnType<typeof createFakeHud>[]): unknown => {
+  const hud = huds[huds.length - 1]
+  const apply = hud?.apply as ReturnType<typeof vi.fn>
+  return apply.mock.calls[apply.mock.calls.length - 1]?.[0]?.source
 }
 
 /** Never-'ready' by default (mirrors main.ts's demo gateway) — a test that cares about real
@@ -323,5 +335,47 @@ describe('createSystemViewBinder', () => {
 
     expect(watch).toHaveBeenCalledWith('/wt/alpha', expect.anything())
     expect(systemSnapshot).not.toHaveBeenCalled()
+  })
+
+  it('HUD data-source is "stream" while live, "poll" after method_not_found, and "demo" offline (Wave F4)', async () => {
+    // offline: no rebindGateway call at all — always the scripted driver.
+    const offlineGraphPort: SystemGraphPort = {
+      loadSystemGraph: vi.fn(async () => emptySystemGraph())
+    }
+    const offline = setup({
+      gateway: {
+        systemSnapshot: vi.fn(async () => ({ nodes: [], edges: [] })),
+        gitBranchCompare: createNotReadyCompare(),
+        agentActivity: createEmptyAgentActivity()
+      },
+      graphPort: offlineGraphPort
+    })
+    offline.store.dispatchSystemView({ type: 'open', nodeId: '/wt/alpha' })
+    offline.binder.sync()
+    await flush()
+    expect(lastHudSource(offline.huds)).toBe('demo')
+
+    // live: a real gateway + stream port bound.
+    const subscriptions: SystemGraphStreamHandlers[] = []
+    const watch = vi.fn((_worktree: string, handlers: SystemGraphStreamHandlers) => {
+      subscriptions.push(handlers)
+      return { close: vi.fn() }
+    })
+    const systemSnapshot = vi.fn(async () => ({ nodes: [], edges: [] }))
+    const gitBranchCompare = createNotReadyCompare()
+    const agentActivity = createEmptyAgentActivity()
+    const live = setup({ gateway: { systemSnapshot, gitBranchCompare, agentActivity } })
+    live.binder.rebindGateway({ systemSnapshot, gitBranchCompare, agentActivity }, { watch })
+
+    live.store.dispatchSystemView({ type: 'open', nodeId: '/wt/alpha' })
+    live.binder.sync()
+    await flush()
+    expect(lastHudSource(live.huds)).toBe('stream')
+
+    // the same connection's system.snapshot is unsupported too — falls all the way back to poll.
+    subscriptions[0]?.onUnsupported()
+    live.binder.sync()
+    await flush()
+    expect(lastHudSource(live.huds)).toBe('poll')
   })
 })

@@ -4,6 +4,7 @@ import type { ConnectionDotTone } from '../hud/hud-model'
 import type { KeyboardBarHandle } from '../hud/keyboard-bar'
 import type { ConnectionState } from '../../application/scene-store'
 import type { SystemHudCounts } from '../../application/system-view-model'
+import type { SystemGraphSourceKind } from '../../application/system-graph-source'
 
 /** Tone -> CSS custom property (mirrors hud-overlay.ts's own private DOT_VAR table). */
 const DOT_VAR: Record<ConnectionDotTone, string> = {
@@ -18,6 +19,9 @@ export type SystemHudModel = {
   connection: ConnectionState
   branch: string
   counts: SystemHudCounts
+  /** Live-validation proof (Wave F4): the WS payloads are E2EE so DevTools can't show which
+   *  transport is feeding the graph — the HUD root exposes it as a plain `data-source` attribute. */
+  source: SystemGraphSourceKind
 }
 
 export type SystemHudHandle = {
@@ -74,6 +78,7 @@ export function createSystemHud(doc: Document = document): SystemHudHandle {
       connectionText.textContent = connectionLabel(model.connection)
       modeLine.textContent = `${model.branch} · ${MODE_SUFFIX}`
       countersRest.textContent = ` · ${model.counts.tocados} endpoints tocados · ${model.counts.nuevo} nuevo`
+      root.dataset.source = model.source
     },
     dispose() {
       root.remove()

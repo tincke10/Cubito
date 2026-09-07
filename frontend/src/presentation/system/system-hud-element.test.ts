@@ -6,6 +6,7 @@ type FakeElement = {
   tagName: string
   readonly style: Record<string, string>
   readonly children: FakeElement[]
+  readonly dataset: Record<string, string>
   className: string
   textContent: string
   appendChild(child: FakeElement): FakeElement
@@ -18,6 +19,7 @@ const createFakeElement = (tag: string): FakeElement => {
     tagName: tag.toUpperCase(),
     style: {},
     children: [],
+    dataset: {},
     className: '',
     textContent: '',
     appendChild(child) {
@@ -56,7 +58,8 @@ describe('createSystemHud', () => {
     hud.apply({
       connection: connected(),
       branch: 'cubito/auth-retry',
-      counts: { tocados: 2, nuevo: 1 }
+      counts: { tocados: 2, nuevo: 1 },
+      source: 'stream'
     })
     const root = rootOf(hud)
     expect(connectionLineOf(root).children[1]!.textContent).toBe('conectado · runtime 4f2a9c')
@@ -68,7 +71,12 @@ describe('createSystemHud', () => {
   it('substitutes tocados/nuevo counts on line 3', () => {
     created = []
     const hud = createSystemHud(createFakeDocument())
-    hud.apply({ connection: connected(), branch: 'b', counts: { tocados: 0, nuevo: 5 } })
+    hud.apply({
+      connection: connected(),
+      branch: 'b',
+      counts: { tocados: 0, nuevo: 5 },
+      source: 'poll'
+    })
     expect(countersLineOf(rootOf(hud)).children[1]!.textContent).toBe(
       ' · 0 endpoints tocados · 5 nuevo'
     )
@@ -79,22 +87,59 @@ describe('createSystemHud', () => {
     const hud = createSystemHud(createFakeDocument())
     const dot = connectionLineOf(rootOf(hud)).children[0]!
 
-    hud.apply({ connection: connected(), branch: 'b', counts: { tocados: 0, nuevo: 0 } })
+    hud.apply({
+      connection: connected(),
+      branch: 'b',
+      counts: { tocados: 0, nuevo: 0 },
+      source: 'poll'
+    })
     expect(dot.style.backgroundColor).toBe('var(--cubito-accent)')
 
     hud.apply({
       connection: { state: 'connecting' },
       branch: 'b',
-      counts: { tocados: 0, nuevo: 0 }
+      counts: { tocados: 0, nuevo: 0 },
+      source: 'poll'
     })
     expect(dot.style.backgroundColor).toBe('var(--cubito-amber)')
 
     hud.apply({
       connection: { state: 'down', reason: 'timeout' },
       branch: 'b',
-      counts: { tocados: 0, nuevo: 0 }
+      counts: { tocados: 0, nuevo: 0 },
+      source: 'poll'
     })
     expect(dot.style.backgroundColor).toBe('var(--cubito-amber-dim)')
+  })
+
+  it('sets root.dataset.source to the HUD model source (stream/poll/demo)', () => {
+    created = []
+    const hud = createSystemHud(createFakeDocument())
+    const root = rootOf(hud)
+
+    hud.apply({
+      connection: connected(),
+      branch: 'b',
+      counts: { tocados: 0, nuevo: 0 },
+      source: 'stream'
+    })
+    expect(root.dataset.source).toBe('stream')
+
+    hud.apply({
+      connection: connected(),
+      branch: 'b',
+      counts: { tocados: 0, nuevo: 0 },
+      source: 'poll'
+    })
+    expect(root.dataset.source).toBe('poll')
+
+    hud.apply({
+      connection: connected(),
+      branch: 'b',
+      counts: { tocados: 0, nuevo: 0 },
+      source: 'demo'
+    })
+    expect(root.dataset.source).toBe('demo')
   })
 
   it('renders the shared [g][x][d][c][t] mode switcher, separate from the root', () => {

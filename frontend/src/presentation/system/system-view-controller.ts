@@ -1,6 +1,7 @@
 import type { ConnectionState } from '../../application/scene-store'
 import { systemHudCounts } from '../../application/system-view-model'
 import type { SystemViewSlice } from '../../application/system-view-model'
+import type { SystemGraphSourceKind } from '../../application/system-graph-source'
 import { systemGraphViewModel } from './system-graph-model'
 import { activityFeedViewModel } from './activity-feed-model'
 import type { SystemGraphHandle } from './system-graph-element'
@@ -23,7 +24,12 @@ export type SystemViewControllerDeps = {
 }
 
 export type SystemViewController = {
-  sync(systemView: SystemViewSlice, connection: ConnectionState, branchLabel: string): void
+  sync(
+    systemView: SystemViewSlice,
+    connection: ConnectionState,
+    branchLabel: string,
+    source: SystemGraphSourceKind
+  ): void
   dispose(): void
 }
 
@@ -59,7 +65,7 @@ export function createSystemViewController(deps: SystemViewControllerDeps): Syst
   }
 
   return {
-    sync(systemView, connection, branchLabel) {
+    sync(systemView, connection, branchLabel, source) {
       if (systemView.view !== 'open') {
         if (mounted) {
           unmount()
@@ -72,7 +78,12 @@ export function createSystemViewController(deps: SystemViewControllerDeps): Syst
       if (enteringNow) deps.onEnter?.()
       entry.graph.apply(systemGraphViewModel(systemView.graph, systemView.highlightedNodeId))
       entry.feed.apply(activityFeedViewModel(systemView.feed))
-      entry.hud.apply({ connection, branch: branchLabel, counts: systemHudCounts(systemView) })
+      entry.hud.apply({
+        connection,
+        branch: branchLabel,
+        counts: systemHudCounts(systemView),
+        source
+      })
     },
     dispose(): void {
       unmount()
