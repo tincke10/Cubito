@@ -184,6 +184,12 @@ export type LeaseQuestionRow = {
 
 export type LeaseQuestionListResult = { questions: readonly LeaseQuestionRow[] }
 
+/** `git.mergeWinnerIntoParent` result (Change E): LOCAL mirror of the engine's headless-merge
+ *  outcome — clean moves the parent branch ref, conflict mutates nothing (file-name list only). */
+export type MergeWinnerResult =
+  | { outcome: 'clean'; commitOid: string }
+  | { outcome: 'conflict'; files: readonly string[] }
+
 /**
  * Port to the orcad runtime. The application layer depends on this shape
  * only; infrastructure provides the RPC-backed implementation.
@@ -210,4 +216,11 @@ export type RuntimeGateway = {
   orchestrationWorkerShow(input: LeaseWorkerShowInput): Promise<LeaseWorkerShowResult>
   orchestrationGateList(input: LeaseGateListInput): Promise<LeaseGateListResult>
   orchestrationQuestionList(input: LeaseQuestionListInput): Promise<LeaseQuestionListResult>
+  /** Headless-merges the winner child's branch into the parent branch (Change E). `message`
+   *  defaults host-side when omitted. */
+  gitMergeWinnerIntoParent(
+    parent: string,
+    winner: string,
+    message?: string
+  ): Promise<MergeWinnerResult>
 }

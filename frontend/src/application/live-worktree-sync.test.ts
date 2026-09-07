@@ -105,6 +105,9 @@ function createFakeConnection(overrides?: {
       },
       orchestrationQuestionList: async () => {
         throw new Error('orchestrationQuestionList not implemented in this fake')
+      },
+      gitMergeWinnerIntoParent: async () => {
+        throw new Error('gitMergeWinnerIntoParent not implemented in this fake')
       }
     },
     terminals: createFakeTerminalsPort(),
