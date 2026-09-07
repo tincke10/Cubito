@@ -7,6 +7,7 @@ import {
   composeFanOutGraph,
   emptyFanOutSlice,
   fanOutCounts,
+  fanOutDecisionCounts,
   fanOutMemberIds,
   isFailedDispatch,
   mapDispatchStateToAgentStatus,
@@ -15,6 +16,7 @@ import {
   toFanOutInputs
 } from './fan-out-model'
 import type { FanOutBatchEntry, FanOutSlice } from './fan-out-model'
+import type { LeaseGateRow, LeaseQuestionRow } from './ports/runtime-gateway'
 import { childrenOf } from '../domain/worktree-graph/graph-traversal'
 import { inertActivity } from '../domain/worktree-graph/node-activity'
 import type { WorktreeGraph, WorktreeNode } from '../domain/worktree-graph/types'
@@ -211,7 +213,8 @@ describe('reduceFanOut — submit', () => {
         { mutationId: 'm3', worktreeId: null, failed: false, dispatchId: null, taskId: null }
       ],
       memberStatus: {},
-      runId: null
+      runId: null,
+      decisionVisibility: { gatesByTaskId: {}, questionsByDispatchId: {} }
     })
   })
 
@@ -345,6 +348,138 @@ describe('reduceFanOut — run-created / child-dispatched (lease run, Change B)'
         taskId: 'task-1'
       })
     ).toBe(closed)
+  })
+})
+
+const gateRow = (overrides: Partial<LeaseGateRow> = {}): LeaseGateRow => ({
+  id: 'gate-1',
+  runId: 'run-1',
+  taskId: 'task-1',
+  question: 'Which approach?',
+  options: '[]',
+  status: 'pending',
+  resolution: null,
+  createdAt: '2026-01-01T00:00:00Z',
+  resolvedAt: null,
+  ...overrides
+})
+
+const questionRow = (overrides: Partial<LeaseQuestionRow> = {}): LeaseQuestionRow => ({
+  messageId: 'msg-1',
+  runId: 'run-1',
+  dispatchId: 'dispatch-1',
+  askerHandle: 'worker-1',
+  status: 'pending',
+  answerMessageId: null,
+  answerBody: null,
+  answeredByGeneration: null,
+  createdAt: '2026-01-01T00:00:00Z',
+  answeredAt: null,
+  closedAt: null,
+  ...overrides
+})
+
+describe('reduceFanOut — gates-updated / questions-updated (Change C-EXTENDED)', () => {
+  it('gates-updated groups gates by taskId under decisionVisibility.gatesByTaskId', () => {
+    const slice = runningSliceWithBatch([
+      { mutationId: 'm1', worktreeId: 'w2', failed: false, dispatchId: null, taskId: 'task-1' }
+    ])
+    const gates = [
+      gateRow({ id: 'gate-1', taskId: 'task-1' }),
+      gateRow({ id: 'gate-2', taskId: 'task-2' })
+    ]
+    const next = reduceFanOut(slice, { type: 'gates-updated', gates })
+    expect(next).toMatchObject({
+      decisionVisibility: {
+        gatesByTaskId: {
+          'task-1': [gates[0]],
+          'task-2': [gates[1]]
+        }
+      }
+    })
+  })
+
+  it('gates-updated replaces the prior gate snapshot wholesale, not merges it', () => {
+    const slice = runningSliceWithBatch([])
+    const first = reduceFanOut(slice, {
+      type: 'gates-updated',
+      gates: [gateRow({ id: 'gate-1', taskId: 'task-1' })]
+    })
+    const second = reduceFanOut(first, {
+      type: 'gates-updated',
+      gates: [gateRow({ id: 'gate-2', taskId: 'task-2' })]
+    })
+    expect(second).toMatchObject({
+      decisionVisibility: {
+        gatesByTaskId: { 'task-2': [expect.objectContaining({ id: 'gate-2' })] }
+      }
+    })
+    if (second.view === 'running') {
+      expect(second.decisionVisibility?.gatesByTaskId['task-1']).toBeUndefined()
+    }
+  })
+
+  it('questions-updated groups questions by dispatchId under decisionVisibility.questionsByDispatchId', () => {
+    const slice = runningSliceWithBatch([
+      { mutationId: 'm1', worktreeId: 'w2', failed: false, dispatchId: 'dispatch-1', taskId: null }
+    ])
+    const questions = [questionRow({ messageId: 'msg-1', dispatchId: 'dispatch-1' })]
+    const next = reduceFanOut(slice, { type: 'questions-updated', questions })
+    expect(next).toMatchObject({
+      decisionVisibility: { questionsByDispatchId: { 'dispatch-1': questions } }
+    })
+  })
+
+  it('gates-updated/questions-updated preserve the other map untouched', () => {
+    const slice = runningSliceWithBatch([])
+    const withGates = reduceFanOut(slice, {
+      type: 'gates-updated',
+      gates: [gateRow({ taskId: 'task-1' })]
+    })
+    const withBoth = reduceFanOut(withGates, {
+      type: 'questions-updated',
+      questions: [questionRow({ dispatchId: 'dispatch-1' })]
+    })
+    expect(withBoth).toMatchObject({
+      decisionVisibility: {
+        gatesByTaskId: { 'task-1': [expect.objectContaining({ taskId: 'task-1' })] },
+        questionsByDispatchId: {
+          'dispatch-1': [expect.objectContaining({ dispatchId: 'dispatch-1' })]
+        }
+      }
+    })
+  })
+
+  it('gates-updated / questions-updated are a no-op outside the running view', () => {
+    const closed = emptyFanOutSlice()
+    expect(reduceFanOut(closed, { type: 'gates-updated', gates: [] })).toBe(closed)
+    expect(reduceFanOut(closed, { type: 'questions-updated', questions: [] })).toBe(closed)
+  })
+})
+
+describe('fanOutDecisionCounts', () => {
+  it('is all zero outside the running view', () => {
+    expect(fanOutDecisionCounts(emptyFanOutSlice())).toEqual({ gateCount: 0, questionCount: 0 })
+  })
+
+  it('is all zero for a running slice with no decisionVisibility set', () => {
+    expect(fanOutDecisionCounts(runningSliceWithBatch([]))).toEqual({
+      gateCount: 0,
+      questionCount: 0
+    })
+  })
+
+  it('sums gates/questions across every task/dispatch bucket', () => {
+    const slice = runningSliceWithBatch([])
+    const withGates = reduceFanOut(slice, {
+      type: 'gates-updated',
+      gates: [gateRow({ id: 'g1', taskId: 'task-1' }), gateRow({ id: 'g2', taskId: 'task-2' })]
+    })
+    const withBoth = reduceFanOut(withGates, {
+      type: 'questions-updated',
+      questions: [questionRow({ messageId: 'q1', dispatchId: 'dispatch-1' })]
+    })
+    expect(fanOutDecisionCounts(withBoth)).toEqual({ gateCount: 2, questionCount: 1 })
   })
 })
 

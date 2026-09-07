@@ -2,9 +2,18 @@ import { inertActivity, type AgentStatus } from '../domain/worktree-graph/node-a
 import type { WorktreeGraph, WorktreeId, WorktreeNode } from '../domain/worktree-graph/types'
 import type {
   CreateWorktreeInput,
+  LeaseGateRow,
+  LeaseQuestionRow,
   SpawnAgent,
   WorkerDispatchStateRow
 } from './ports/runtime-gateway'
+import {
+  decisionVisibilityCounts,
+  emptyDecisionVisibility,
+  withGates,
+  withQuestions,
+  type DecisionVisibility
+} from './fan-out-decision-visibility'
 
 export const MIN_FANOUT = 2
 export const MAX_FANOUT = 8
@@ -48,6 +57,9 @@ export type FanOutSlice =
       memberStatus: Record<WorktreeId, AgentStatus>
       /** The lease Run backing this batch (Change B); null on the v1 worktree-only path. */
       runId: string | null
+      /** Optional (Change C-EXTENDED): absent until the first `gates-updated`/`questions-updated`
+       *  dispatch — old running-slice literals stay valid. Read via `fanOutDecisionCounts`. */
+      decisionVisibility?: DecisionVisibility
     }
 
 export const emptyFanOutSlice = (): FanOutSlice => ({ view: 'closed', repoSelector: null })
@@ -65,6 +77,8 @@ export type FanOutAction =
   | { type: 'member-status'; worktreeId: WorktreeId; status: AgentStatus }
   | { type: 'run-created'; runId: string }
   | { type: 'child-dispatched'; mutationId: string; dispatchId: string; taskId: string }
+  | { type: 'gates-updated'; gates: readonly LeaseGateRow[] }
+  | { type: 'questions-updated'; questions: readonly LeaseQuestionRow[] }
   | { type: 'cancel' }
   | { type: 'close' }
 
@@ -116,6 +130,26 @@ export function reduceFanOut(slice: FanOutSlice, action: FanOutAction): FanOutSl
         : slice
     case 'run-created':
       return slice.view === 'running' ? { ...slice, runId: action.runId } : slice
+    case 'gates-updated':
+      return slice.view === 'running'
+        ? {
+            ...slice,
+            decisionVisibility: withGates(
+              slice.decisionVisibility ?? emptyDecisionVisibility(),
+              action.gates
+            )
+          }
+        : slice
+    case 'questions-updated':
+      return slice.view === 'running'
+        ? {
+            ...slice,
+            decisionVisibility: withQuestions(
+              slice.decisionVisibility ?? emptyDecisionVisibility(),
+              action.questions
+            )
+          }
+        : slice
     case 'child-dispatched':
       return slice.view === 'running'
         ? {
@@ -173,7 +207,8 @@ function startSubmit(slice: FanOutSlice, mutationIds: readonly string[]): FanOut
     repoSelector: slice.repoSelector,
     batch,
     memberStatus: {},
-    runId: null
+    runId: null,
+    decisionVisibility: emptyDecisionVisibility()
   }
 }
 
@@ -292,6 +327,15 @@ export function fanOutCounts(slice: FanOutSlice): FanOutCounts {
     else counts.created += 1
   }
   return counts
+}
+
+/** Run-level gate/question counts for the HUD line (Change C-EXTENDED); zero outside `running`. */
+export function fanOutDecisionCounts(slice: FanOutSlice): {
+  gateCount: number
+  questionCount: number
+} {
+  if (slice.view !== 'running') return { gateCount: 0, questionCount: 0 }
+  return decisionVisibilityCounts(slice.decisionVisibility ?? emptyDecisionVisibility())
 }
 
 const buildPlaceholder = (

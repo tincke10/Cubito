@@ -1,4 +1,9 @@
-import { MIN_FANOUT, MAX_FANOUT, fanOutCounts } from '../../application/fan-out-model'
+import {
+  MIN_FANOUT,
+  MAX_FANOUT,
+  fanOutCounts,
+  fanOutDecisionCounts
+} from '../../application/fan-out-model'
 import type { FanOutSlice } from '../../application/fan-out-model'
 import type { SpawnAgent } from '../../application/ports/runtime-gateway'
 
@@ -29,10 +34,12 @@ export type FanOutRunningViewModel = {
 
 export type FanOutViewModel = FanOutFormViewModel | FanOutRunningViewModel | null
 
-/** Mockup line order: trabajando · esperando · naciendo · listo, then an error tail if any failed. */
+/** Mockup line order: trabajando · esperando · naciendo · listo · compuertas · preguntas, then
+ *  an error tail if any failed. Gate/question counts are run-level aggregates (Change C-EXTENDED). */
 const countersLine = (slice: Extract<FanOutSlice, { view: 'running' }>): string => {
   const counts = fanOutCounts(slice)
-  const base = `${counts.working} trabajando · ${counts.waitingInput} esperando · ${counts.naciendo} naciendo · ${counts.created} listo`
+  const decision = fanOutDecisionCounts(slice)
+  const base = `${counts.working} trabajando · ${counts.waitingInput} esperando · ${counts.naciendo} naciendo · ${counts.created} listo · ${decision.gateCount} compuertas · ${decision.questionCount} preguntas`
   return counts.failed > 0 ? `${base} · ${counts.failed} error` : base
 }
 

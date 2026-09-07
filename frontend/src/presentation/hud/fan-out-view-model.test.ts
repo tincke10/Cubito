@@ -112,10 +112,12 @@ describe('fanOutViewModel — running', () => {
     expect(model.callout).toBe('fan-out · 5 × claude')
   })
 
-  it('matches the mockup fixture counters: 2 trabajando · 1 esperando · 1 naciendo · 1 listo', () => {
+  it('matches the mockup fixture counters: 2 trabajando · 1 esperando · 1 naciendo · 1 listo · 0 compuertas · 0 preguntas', () => {
     const model = fanOutViewModel(runningSlice())
     if (model?.view !== 'running') throw new Error('expected running')
-    expect(model.counters).toBe('2 trabajando · 1 esperando · 1 naciendo · 1 listo')
+    expect(model.counters).toBe(
+      '2 trabajando · 1 esperando · 1 naciendo · 1 listo · 0 compuertas · 0 preguntas'
+    )
   })
 
   it('appends the failed count only when at least one entry failed', () => {
@@ -133,6 +135,31 @@ describe('fanOutViewModel — running', () => {
       throw new Error('expected running')
     }
     expect(noFailures.counters).not.toContain('error')
-    expect(withFailure.counters).toBe('0 trabajando · 0 esperando · 1 naciendo · 0 listo · 1 error')
+    expect(withFailure.counters).toBe(
+      '0 trabajando · 0 esperando · 1 naciendo · 0 listo · 0 compuertas · 0 preguntas · 1 error'
+    )
+  })
+})
+
+describe('fanOutViewModel — running — decision visibility (Change C-EXTENDED)', () => {
+  it('appends run-level gate/question counts from decisionVisibility to the counters line', () => {
+    const model = fanOutViewModel(
+      runningSlice({
+        decisionVisibility: {
+          gatesByTaskId: { 'task-1': [{} as never], 'task-2': [{} as never] },
+          questionsByDispatchId: { 'dispatch-1': [{} as never] }
+        }
+      })
+    )
+    if (model?.view !== 'running') throw new Error('expected running')
+    expect(model.counters).toBe(
+      '2 trabajando · 1 esperando · 1 naciendo · 1 listo · 2 compuertas · 1 preguntas'
+    )
+  })
+
+  it('defaults to 0 compuertas · 0 preguntas when decisionVisibility is absent', () => {
+    const model = fanOutViewModel(runningSlice())
+    if (model?.view !== 'running') throw new Error('expected running')
+    expect(model.counters).toContain('0 compuertas · 0 preguntas')
   })
 })
