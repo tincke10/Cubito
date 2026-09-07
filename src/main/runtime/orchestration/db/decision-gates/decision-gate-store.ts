@@ -96,6 +96,13 @@ export function resolveGate(
   if (!gate) {
     return undefined
   }
+  if (gate.status !== 'pending') {
+    throw new OrchestrationError(
+      'gate_not_pending',
+      `Gate ${gateId} is already ${gate.status}; only a pending gate can be resolved.`,
+      { effectsApplied: false }
+    )
+  }
 
   this.db.exec('SAVEPOINT resolve_gate')
   try {
