@@ -1,5 +1,6 @@
 import { resolveBaseRef } from '../domain/worktree-graph/resolve-base-ref'
 import type { WorktreeId } from '../domain/worktree-graph/types'
+import { fetchBranchCompareEntries } from './branch-compare-entries-fetch'
 import type { RuntimeGateway } from './ports/runtime-gateway'
 import type { SceneStore } from './scene-store'
 
@@ -32,31 +33,32 @@ export function createDiffLiveLoader(deps: DiffLiveLoaderDeps): DiffLiveLoader {
     deps.store.dispatchDiffView(action)
   }
 
-  async function loadRail(nodeId: WorktreeId, baseRef: string): Promise<void> {
-    try {
-      const compare = await gateway.gitBranchCompare(nodeId, baseRef)
-      if (stopped) return
-      const slice = deps.store.get().diffView
-      if (slice.view !== 'open' || slice.focusedNodeId !== nodeId) return // stale — node changed mid-flight
-      if (compare.status !== 'ready') {
-        dispatch({ type: 'rail-error', message: railErrorMessageFor(compare.status) })
+  async function loadRail(nodeId: WorktreeId): Promise<void> {
+    const result = await fetchBranchCompareEntries(gateway, deps.store.get().graph, nodeId)
+    if (stopped) return
+    const slice = deps.store.get().diffView
+    if (slice.view !== 'open' || slice.focusedNodeId !== nodeId) return // stale — node changed mid-flight
+    switch (result.outcome) {
+      case 'ready':
+        dispatch({
+          type: 'rail-loaded',
+          compare: result.compare,
+          files: result.entries.map((entry) => ({
+            path: entry.path,
+            status: entry.status,
+            added: entry.added,
+            removed: entry.removed
+          }))
+        })
         return
-      }
-      dispatch({
-        type: 'rail-loaded',
-        compare: { headOid: compare.headOid, mergeBase: compare.mergeBase },
-        files: compare.entries.map((entry) => ({
-          path: entry.path,
-          status: entry.status,
-          added: entry.added,
-          removed: entry.removed
-        }))
-      })
-    } catch (error) {
-      if (stopped) return
-      const slice = deps.store.get().diffView
-      if (slice.view !== 'open' || slice.focusedNodeId !== nodeId) return
-      dispatch({ type: 'rail-error', message: messageOf(error) })
+      case 'not-ready':
+        dispatch({ type: 'rail-error', message: railErrorMessageFor(result.status) })
+        return
+      case 'failed':
+        dispatch({ type: 'rail-error', message: result.message })
+        return
+      case 'no-base-ref':
+        return // unreachable — start() already resolved a baseRef before calling loadRail
     }
   }
 
@@ -90,7 +92,7 @@ export function createDiffLiveLoader(deps: DiffLiveLoaderDeps): DiffLiveLoader {
         return
       }
       dispatch({ type: 'open', nodeId, baseRef })
-      void loadRail(nodeId, baseRef)
+      void loadRail(nodeId)
     },
     select(path) {
       const slice = deps.store.get().diffView
