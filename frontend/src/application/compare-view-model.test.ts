@@ -30,6 +30,7 @@ describe('reduceCompareView — open/close', () => {
       members: MEMBERS,
       focusedChildId: null,
       winnerId: null,
+      merge: { phase: 'idle' },
       childLoads: {
         'w-child-1': emptyCompareChildLoad(),
         'w-child-2': emptyCompareChildLoad()
@@ -48,6 +49,7 @@ describe('reduceCompareView — open/close', () => {
       members: ['w-child-3'],
       focusedChildId: null,
       winnerId: null,
+      merge: { phase: 'idle' },
       childLoads: { 'w-child-3': emptyCompareChildLoad() }
     })
   })
@@ -80,6 +82,66 @@ describe('reduceCompareView — set-winner', () => {
   it('is a no-op when closed', () => {
     const closed = emptyCompareViewSlice()
     expect(reduceCompareView(closed, { type: 'set-winner', winnerId: 'w-child-1' })).toBe(closed)
+  })
+})
+
+describe('reduceCompareView — merge (Change E)', () => {
+  it('open initializes merge to idle', () => {
+    expect(openSlice()).toMatchObject({ merge: { phase: 'idle' } })
+  })
+
+  it('merge-start sets phase to running', () => {
+    const slice = reduceCompareView(openSlice(), { type: 'merge-start' })
+    expect(slice).toMatchObject({ merge: { phase: 'running' } })
+  })
+
+  it('merge-clean sets phase to clean with the commitOid', () => {
+    const running = reduceCompareView(openSlice(), { type: 'merge-start' })
+    const slice = reduceCompareView(running, { type: 'merge-clean', commitOid: 'abc123' })
+    expect(slice).toMatchObject({ merge: { phase: 'clean', commitOid: 'abc123' } })
+  })
+
+  it('merge-conflict sets phase to conflict with the file list', () => {
+    const running = reduceCompareView(openSlice(), { type: 'merge-start' })
+    const slice = reduceCompareView(running, {
+      type: 'merge-conflict',
+      files: ['src/a.ts', 'src/b.ts']
+    })
+    expect(slice).toMatchObject({ merge: { phase: 'conflict', files: ['src/a.ts', 'src/b.ts'] } })
+  })
+
+  it('merge-error sets phase to error with the message', () => {
+    const running = reduceCompareView(openSlice(), { type: 'merge-start' })
+    const slice = reduceCompareView(running, { type: 'merge-error', message: 'host unavailable' })
+    expect(slice).toMatchObject({ merge: { phase: 'error', message: 'host unavailable' } })
+  })
+
+  it('merge-reset returns to idle from any phase', () => {
+    const clean = reduceCompareView(reduceCompareView(openSlice(), { type: 'merge-start' }), {
+      type: 'merge-clean',
+      commitOid: 'x'
+    })
+    expect(reduceCompareView(clean, { type: 'merge-reset' })).toMatchObject({
+      merge: { phase: 'idle' }
+    })
+  })
+
+  it('every merge action is a no-op when closed', () => {
+    const closed = emptyCompareViewSlice()
+    expect(reduceCompareView(closed, { type: 'merge-start' })).toBe(closed)
+    expect(reduceCompareView(closed, { type: 'merge-clean', commitOid: 'x' })).toBe(closed)
+    expect(reduceCompareView(closed, { type: 'merge-conflict', files: [] })).toBe(closed)
+    expect(reduceCompareView(closed, { type: 'merge-error', message: 'x' })).toBe(closed)
+    expect(reduceCompareView(closed, { type: 'merge-reset' })).toBe(closed)
+  })
+
+  it('re-opening resets merge back to idle', () => {
+    const clean = reduceCompareView(reduceCompareView(openSlice(), { type: 'merge-start' }), {
+      type: 'merge-clean',
+      commitOid: 'x'
+    })
+    const reopened = reduceCompareView(clean, { type: 'open', members: MEMBERS })
+    expect(reopened).toMatchObject({ merge: { phase: 'idle' } })
   })
 })
 

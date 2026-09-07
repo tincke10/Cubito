@@ -6,6 +6,17 @@ import type { CompareChildLoad, CompareChildLoadAction } from './compare-child-l
 
 export type { CompareChildLoad }
 
+/** Winner-merge state (Change E) — idle until fired; headless, so `clean` never touches the
+ *  parent worktree's working tree (the caller must warn the user to sync it). */
+export type CompareMergeState =
+  | { phase: 'idle' }
+  | { phase: 'running' }
+  | { phase: 'clean'; commitOid: string }
+  | { phase: 'conflict'; files: readonly string[] }
+  | { phase: 'error'; message: string }
+
+const idleMerge = (): CompareMergeState => ({ phase: 'idle' })
+
 /** closed → open (anchored to the running camada's litter, parent already dropped by the caller). */
 export type CompareViewSlice =
   | { view: 'closed' }
@@ -14,6 +25,7 @@ export type CompareViewSlice =
       members: readonly WorktreeId[]
       focusedChildId: WorktreeId | null
       winnerId: WorktreeId | null
+      merge: CompareMergeState
       childLoads: Record<WorktreeId, CompareChildLoad>
     }
 
@@ -33,6 +45,11 @@ export type CompareViewAction =
   | { type: 'child-panel-loaded'; childId: WorktreeId; path: string; content: DiffFileContent }
   | { type: 'child-panel-error'; childId: WorktreeId; path: string; message?: string }
   | { type: 'set-winner'; winnerId: WorktreeId | null }
+  | { type: 'merge-start' }
+  | { type: 'merge-clean'; commitOid: string }
+  | { type: 'merge-conflict'; files: readonly string[] }
+  | { type: 'merge-error'; message: string }
+  | { type: 'merge-reset' }
   | { type: 'close' }
 
 const isChildLoadAction = (action: CompareViewAction): action is CompareChildLoadAction =>
@@ -53,6 +70,7 @@ export function reduceCompareView(
         members: action.members,
         focusedChildId: null,
         winnerId: null,
+        merge: idleMerge(),
         childLoads: Object.fromEntries(
           action.members.map((childId) => [childId, emptyCompareChildLoad()])
         )
@@ -63,6 +81,22 @@ export function reduceCompareView(
       return slice.view === 'open' ? { ...slice, focusedChildId: action.childId } : slice
     case 'set-winner':
       return slice.view === 'open' ? { ...slice, winnerId: action.winnerId } : slice
+    case 'merge-start':
+      return slice.view === 'open' ? { ...slice, merge: { phase: 'running' } } : slice
+    case 'merge-clean':
+      return slice.view === 'open'
+        ? { ...slice, merge: { phase: 'clean', commitOid: action.commitOid } }
+        : slice
+    case 'merge-conflict':
+      return slice.view === 'open'
+        ? { ...slice, merge: { phase: 'conflict', files: action.files } }
+        : slice
+    case 'merge-error':
+      return slice.view === 'open'
+        ? { ...slice, merge: { phase: 'error', message: action.message } }
+        : slice
+    case 'merge-reset':
+      return slice.view === 'open' ? { ...slice, merge: idleMerge() } : slice
     default:
       if (slice.view !== 'open') return slice
       if (isChildLoadAction(action)) {
