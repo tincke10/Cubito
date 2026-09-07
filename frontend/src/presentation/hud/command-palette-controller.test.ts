@@ -308,6 +308,28 @@ describe('createCommandPaletteController', () => {
       expect(setupResult.store.get().diffView).toBe(before.diffView)
     })
 
+    it('open-compare dispatches compareView open with the running camada litter, closing the palette first', () => {
+      const setupResult = setup('a')
+      setupResult.store.dispatchFanOut({ type: 'open-for-node', nodeId: 'root' })
+      setupResult.store.dispatchFanOut({ type: 'set-repo-selector', repoSelector: 'id:repo-a' })
+      setupResult.store.dispatchFanOut({ type: 'submit', mutationIds: ['m0'] })
+      setupResult.store.dispatchFanOut({ type: 'child-created', mutationId: 'm0', worktreeId: 'a' })
+      openAndMount(setupResult)
+
+      setupResult.handles[0]!.emitActivate('open-compare')
+
+      expect(setupResult.store.get().commandPalette.view).toBe('closed')
+      expect(setupResult.store.get().compareView).toMatchObject({ view: 'open', members: ['a'] })
+    })
+
+    it('open-compare with no running camada is a no-op (guard; upstream isAvailable already gates it)', () => {
+      const setupResult = setup('a')
+      openAndMount(setupResult)
+      const before = setupResult.store.get()
+      setupResult.handles[0]!.emitActivate('open-compare')
+      expect(setupResult.store.get().compareView).toBe(before.compareView)
+    })
+
     it('activating a currently-disabled command no-ops entirely (guard, belt-and-suspenders)', () => {
       const setupResult = setup(null, false) // no selection, not connected
       openAndMount(setupResult)

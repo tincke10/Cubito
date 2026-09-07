@@ -11,6 +11,7 @@ import type {
 } from '../input/keyboard-controller'
 import { frameAll, frameNode } from '../camera/camera-framing'
 import { FOCUS_DURATION_MS } from '../theme/scene-metrics'
+import { fanOutMemberIds } from '../../application/fan-out-model'
 
 export type CommandPaletteControllerDeps = {
   store: SceneStore
@@ -90,6 +91,14 @@ export function createCommandPaletteController(
       // baseRef placeholder — bind-diff-view's loader.start() resolves the real base ref and
       // re-dispatches 'open' synchronously right after, same as the keyboard controller's 'd'.
       store.dispatchDiffView({ type: 'open', nodeId: selectedId, baseRef: '' })
+    },
+    'open-compare': () => {
+      // Anchors on the RUNNING CAMADA, not selection — same rule as the keyboard controller's 'c'.
+      const fanOut = store.get().fanOut
+      if (fanOut.view !== 'running') return
+      const litter = fanOutMemberIds(fanOut).slice(1) // drop the parent, keep only the children
+      if (litter.length === 0) return
+      store.dispatchCompareView({ type: 'open', members: litter })
     }
   }
 

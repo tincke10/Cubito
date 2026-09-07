@@ -5,8 +5,16 @@ import type { CommandPaletteSlice } from '../../application/command-palette-mode
 import type { CommandAvailability } from '../../application/command-catalog'
 
 const catalog = commandCatalog({ isMac: true })
-const allAvailable: CommandAvailability = { hasSelection: true, isConnected: true }
-const noneAvailable: CommandAvailability = { hasSelection: false, isConnected: false }
+const allAvailable: CommandAvailability = {
+  hasSelection: true,
+  isConnected: true,
+  hasRunningCamada: true
+}
+const noneAvailable: CommandAvailability = {
+  hasSelection: false,
+  isConnected: false,
+  hasRunningCamada: false
+}
 
 describe('commandPaletteViewModel', () => {
   it('returns null when closed', () => {

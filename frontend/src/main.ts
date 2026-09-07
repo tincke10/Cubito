@@ -14,6 +14,7 @@ import { createFanOutBinder } from './bind-fan-out'
 import { createSystemViewBinder } from './bind-system-view'
 import { demoSystemGraph } from './demo-system-graph'
 import { createDiffViewBinder } from './bind-diff-view'
+import { createCompareViewBinder } from './bind-compare-view'
 import { createHudOverlay } from './presentation/hud/hud-overlay'
 import { hudModel } from './presentation/hud/hud-model'
 import { createKeyboardBar } from './presentation/hud/keyboard-bar'
@@ -143,8 +144,9 @@ const hud = document.getElementById('hud')
 const keyboardBarSlot = document.getElementById('keyboard-bar')
 const systemSlot = document.getElementById('system')
 const diffSlot = document.getElementById('diff')
-if (!container || !hud || !keyboardBarSlot || !systemSlot || !diffSlot) {
-  throw new Error('index.html must provide #app, #hud, #system, #diff and #keyboard-bar')
+const compareSlot = document.getElementById('compare')
+if (!container || !hud || !keyboardBarSlot || !systemSlot || !diffSlot || !compareSlot) {
+  throw new Error('index.html must provide #app, #hud, #system, #diff, #compare and #keyboard-bar')
 }
 const hudElement: HTMLElement = hud
 
@@ -215,6 +217,16 @@ const systemViewBinder = createSystemViewBinder({
 const diffViewBinder = createDiffViewBinder({
   store,
   diffSlot,
+  keyboardBarSlot,
+  demoGateway
+})
+
+// Comparar la camada (design camada, Change D): same eager pattern as sistema en vivo/diff — no
+// lazy-on-connect gate; the demo gateway's gitBranchCompare stub lets `pnpm dev` open compare
+// mode too. `rebindGateway` below swaps in the real gateway on connect.
+const compareViewBinder = createCompareViewBinder({
+  store,
+  compareSlot,
   keyboardBarSlot,
   demoGateway
 })
@@ -296,7 +308,11 @@ store.subscribe((state) => {
   fanOutBinder.sync()
   systemViewBinder.sync()
   diffViewBinder.sync()
-  const sceneModeOpen = state.systemView.view === 'open' || state.diffView.view === 'open'
+  compareViewBinder.sync()
+  const sceneModeOpen =
+    state.systemView.view === 'open' ||
+    state.diffView.view === 'open' ||
+    state.compareView.view === 'open'
   for (const el of worktreeChrome) el.hidden = sceneModeOpen
   commandPaletteController.sync(state.commandPalette, state)
   if (!framed && state.graph.nodes.size > 0) {
@@ -397,6 +413,7 @@ if (pairingEntry.kind === 'connect') {
       fanOutBinder.bind(connection)
       systemViewBinder.rebindGateway(connection.gateway)
       diffViewBinder.rebindGateway(connection.gateway)
+      compareViewBinder.rebindGateway(connection.gateway)
     },
     onDisconnected: () => store.dispatchTerminal({ type: 'connection-lost' })
   }).start()

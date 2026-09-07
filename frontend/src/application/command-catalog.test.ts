@@ -36,11 +36,18 @@ const findCommand = (catalog: ReturnType<typeof commandCatalog>, id: CommandId) 
   return command
 }
 
+const avail = (overrides: Partial<CommandAvailability> = {}): CommandAvailability => ({
+  hasSelection: false,
+  isConnected: false,
+  hasRunningCamada: false,
+  ...overrides
+})
+
 describe('commandCatalog', () => {
   const mac = commandCatalog({ isMac: true })
   const other = commandCatalog({ isMac: false })
 
-  it('orders the 8 commands per the proposal', () => {
+  it('orders the 9 commands per the proposal', () => {
     expect(mac.map((c) => c.id)).toEqual([
       'focus',
       'fit-all',
@@ -50,7 +57,8 @@ describe('commandCatalog', () => {
       'add-repo',
       'fan-out',
       'open-system',
-      'open-diff'
+      'open-diff',
+      'open-compare'
     ])
   })
 
@@ -75,6 +83,10 @@ describe('commandCatalog', () => {
       keybindingHint: 'x'
     })
     expect(findCommand(mac, 'open-diff')).toMatchObject({ label: 'diff', keybindingHint: 'd' })
+    expect(findCommand(mac, 'open-compare')).toMatchObject({
+      label: 'comparar la camada',
+      keybindingHint: 'c'
+    })
   })
 
   it('open-projects hint is ⌘P on Mac and Ctrl+P elsewhere', () => {
@@ -89,24 +101,37 @@ describe('commandCatalog', () => {
   })
 
   const matrix: readonly [CommandId, CommandAvailability, boolean][] = [
-    ['focus', { hasSelection: true, isConnected: true }, true],
-    ['focus', { hasSelection: false, isConnected: true }, false],
-    ['fit-all', { hasSelection: false, isConnected: false }, true],
-    ['open-terminal', { hasSelection: true, isConnected: true }, true],
-    ['open-terminal', { hasSelection: true, isConnected: false }, false],
-    ['open-terminal', { hasSelection: false, isConnected: true }, false],
-    ['open-spawn', { hasSelection: false, isConnected: true }, true],
-    ['open-spawn', { hasSelection: false, isConnected: false }, false],
-    ['open-projects', { hasSelection: false, isConnected: false }, true],
-    ['add-repo', { hasSelection: false, isConnected: true }, true],
-    ['add-repo', { hasSelection: false, isConnected: false }, false],
-    ['fan-out', { hasSelection: true, isConnected: true }, true],
-    ['fan-out', { hasSelection: false, isConnected: true }, false],
-    ['fan-out', { hasSelection: true, isConnected: false }, false],
-    ['open-system', { hasSelection: true, isConnected: false }, true],
-    ['open-system', { hasSelection: false, isConnected: true }, false],
-    ['open-diff', { hasSelection: true, isConnected: false }, true],
-    ['open-diff', { hasSelection: false, isConnected: true }, false]
+    ['focus', avail({ hasSelection: true, isConnected: true }), true],
+    ['focus', avail({ hasSelection: false, isConnected: true }), false],
+    ['fit-all', avail({ hasSelection: false, isConnected: false }), true],
+    ['open-terminal', avail({ hasSelection: true, isConnected: true }), true],
+    ['open-terminal', avail({ hasSelection: true, isConnected: false }), false],
+    ['open-terminal', avail({ hasSelection: false, isConnected: true }), false],
+    ['open-spawn', avail({ hasSelection: false, isConnected: true }), true],
+    ['open-spawn', avail({ hasSelection: false, isConnected: false }), false],
+    ['open-projects', avail({ hasSelection: false, isConnected: false }), true],
+    ['add-repo', avail({ hasSelection: false, isConnected: true }), true],
+    ['add-repo', avail({ hasSelection: false, isConnected: false }), false],
+    ['fan-out', avail({ hasSelection: true, isConnected: true }), true],
+    ['fan-out', avail({ hasSelection: false, isConnected: true }), false],
+    ['fan-out', avail({ hasSelection: true, isConnected: false }), false],
+    ['open-system', avail({ hasSelection: true, isConnected: false }), true],
+    ['open-system', avail({ hasSelection: false, isConnected: true }), false],
+    ['open-diff', avail({ hasSelection: true, isConnected: false }), true],
+    ['open-diff', avail({ hasSelection: false, isConnected: true }), false],
+    ['open-compare', avail({ hasRunningCamada: true }), true],
+    ['open-compare', avail({ hasRunningCamada: false }), false],
+    // selection/connection are irrelevant to open-compare — only hasRunningCamada gates it.
+    [
+      'open-compare',
+      avail({ hasSelection: true, isConnected: true, hasRunningCamada: false }),
+      false
+    ],
+    [
+      'open-compare',
+      avail({ hasSelection: false, isConnected: false, hasRunningCamada: true }),
+      true
+    ]
   ]
 
   it.each(matrix)('%s isAvailable(%o) => %s', (id, availability, expected) => {
@@ -138,5 +163,36 @@ describe('toCommandAvailability', () => {
     expect(
       toCommandAvailability(state({ connection: { state: 'down', reason: 'x' } })).isConnected
     ).toBe(false)
+  })
+
+  it('hasRunningCamada reflects fanOut.view === "running", not form/closed', () => {
+    expect(toCommandAvailability(state()).hasRunningCamada).toBe(false)
+    expect(
+      toCommandAvailability(
+        state({
+          fanOut: {
+            view: 'form',
+            parentId: 'w1',
+            fields: { count: 3, agent: 'none', prompt: '' },
+            repoSelector: null
+          }
+        })
+      ).hasRunningCamada
+    ).toBe(false)
+    expect(
+      toCommandAvailability(
+        state({
+          fanOut: {
+            view: 'running',
+            parentId: 'w1',
+            fields: { count: 1, agent: 'none', prompt: '' },
+            repoSelector: 'id:repo-a',
+            batch: [],
+            memberStatus: {},
+            runId: null
+          }
+        })
+      ).hasRunningCamada
+    ).toBe(true)
   })
 })

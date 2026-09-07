@@ -10,8 +10,14 @@ export type CommandId =
   | 'fan-out'
   | 'open-system'
   | 'open-diff'
+  | 'open-compare'
 
-export type CommandAvailability = { readonly hasSelection: boolean; readonly isConnected: boolean }
+export type CommandAvailability = {
+  readonly hasSelection: boolean
+  readonly isConnected: boolean
+  /** True while the fanOut slice is 'running' — open-compare's anchor, not selection. */
+  readonly hasRunningCamada: boolean
+}
 
 export type PaletteCommand = {
   readonly id: CommandId
@@ -24,7 +30,8 @@ export type PaletteCommand = {
  *  'down' all count as not connected (commands stay disabled through connection blips). */
 export const toCommandAvailability = (state: SceneState): CommandAvailability => ({
   hasSelection: state.selection.selectedId !== null,
-  isConnected: state.connection.state === 'connected'
+  isConnected: state.connection.state === 'connected',
+  hasRunningCamada: state.fanOut.view === 'running'
 })
 
 /** Static, ordered ⌘K catalog (proposal order). Pure and deterministic given platform — the one
@@ -76,5 +83,12 @@ export const commandCatalog = (platform: { isMac: boolean }): readonly PaletteCo
     // Mirrors open-system: hasSelection only — the demo gateway's gitBranchCompare stub
     // resolves offline too, so no isConnected gate.
     isAvailable: (a) => a.hasSelection
+  },
+  {
+    id: 'open-compare',
+    label: 'comparar la camada',
+    keybindingHint: 'c',
+    // Anchor is the running camada, not selection — hasSelection is irrelevant here.
+    isAvailable: (a) => a.hasRunningCamada
   }
 ]
