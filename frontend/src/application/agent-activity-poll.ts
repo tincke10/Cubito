@@ -40,6 +40,9 @@ export function createAgentActivityPoll(deps: AgentActivityPollDeps): AgentActiv
   let timerHandle: unknown = null
   let lastWorktree: string | null = null
   let cursor = 0
+  // Why: stop()+start(other worktree) can leave a tick in flight; its page must neither be
+  // appended as the new worktree's rows nor reschedule a second loop. Each start owns a generation.
+  let generation = 0
 
   function clearPendingTimer(): void {
     if (timerHandle !== null) {
@@ -63,13 +66,14 @@ export function createAgentActivityPoll(deps: AgentActivityPollDeps): AgentActiv
   }
 
   async function pollOnce(worktree: string): Promise<void> {
+    const owned = generation
     try {
       const page = await gateway.agentActivity({
         worktree,
         sinceSeq: cursor,
         limit: AGENT_ACTIVITY_POLL_LIMIT
       })
-      if (stopped) return
+      if (stopped || owned !== generation) return
       if (deps.store.get().systemView.view !== 'open') return // left open mid-flight — no dispatch, no schedule
       if (page.latestSeq < cursor) {
         deps.store.dispatchSystemView({ type: 'reset-feed' })
@@ -84,7 +88,7 @@ export function createAgentActivityPoll(deps: AgentActivityPollDeps): AgentActiv
       cursor = Math.max(cursor, page.latestSeq)
       scheduleNextTick(worktree)
     } catch (error) {
-      if (stopped) return
+      if (stopped || owned !== generation) return
       if (deps.store.get().systemView.view !== 'open') return
       if (error instanceof RpcCallError && error.code === 'method_not_found') {
         stopped = true
@@ -99,6 +103,7 @@ export function createAgentActivityPoll(deps: AgentActivityPollDeps): AgentActiv
     start(worktree) {
       if (!stopped) return
       stopped = false
+      generation += 1
       if (worktree !== lastWorktree) {
         cursor = 0
         deps.store.dispatchSystemView({ type: 'reset-feed' })

@@ -324,6 +324,41 @@ describe('createAgentActivityPoll', () => {
     expect(gateway.calls.length).toBe(1)
   })
 
+  it('a tick left in flight by stop()+start(other worktree) neither dispatches nor reschedules', async () => {
+    store.dispatchSystemView({ type: 'open', nodeId: '/wt/alpha' })
+    const stale = deferred<AgentActivityPage>()
+    const gateway = createFakeGateway()
+    gateway.impl = async (worktree) =>
+      worktree === '/wt/alpha' ? stale.promise : { events: [eventAt(10)], latestSeq: 10 }
+    const poll = createAgentActivityPoll({
+      store,
+      gateway,
+      onUnsupported,
+      setTimer: setTimerSpy,
+      clearTimer: clearTimerSpy
+    })
+
+    poll.start('/wt/alpha')
+    await vi.advanceTimersByTimeAsync(0) // alpha's first tick is now in flight
+    poll.stop()
+    store.dispatchSystemView({ type: 'open', nodeId: '/wt/beta' })
+    poll.start('/wt/beta')
+    await vi.advanceTimersByTimeAsync(0)
+    stale.resolve({ events: [eventAt(1), eventAt(2)], latestSeq: 2 }) // alpha's page lands late
+    await vi.advanceTimersByTimeAsync(0)
+
+    const slice = store.get().systemView
+    if (slice.view === 'open') {
+      expect(slice.feed.map((r) => r.id)).toEqual(['activity-10'])
+    }
+    await vi.advanceTimersByTimeAsync(AGENT_ACTIVITY_POLL_INTERVAL_MS)
+    // Only beta's loop survives: one more call, with beta's cursor intact (not reset by the stale page).
+    expect(gateway.calls.slice(2)).toEqual([
+      { worktree: '/wt/beta', sinceSeq: 10, limit: AGENT_ACTIVITY_POLL_LIMIT }
+    ])
+    poll.stop()
+  })
+
   it('rebindGateway swaps the gateway used by the next tick', async () => {
     store.dispatchSystemView({ type: 'open', nodeId: '/wt/alpha' })
     const gatewayA = createFakeGateway()
