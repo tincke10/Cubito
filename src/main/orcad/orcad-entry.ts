@@ -192,6 +192,11 @@ async function startOrcadRuntime(
   // spawning an unauthenticated agent.
   registerHeadlessPtyRuntime(runtime, undefined, () => store.getSettings(), undefined, store)
 
+  // Why eager: a user who lets an agent work for 30s and only then opens the activity
+  // feed must not get an empty page — the ring has to be recording from process start.
+  const { ensureAgentActivityRecording } = await import('../agent-hooks/agent-activity-recording')
+  ensureAgentActivityRecording()
+
   // Why: same post-registration reconciliation `--serve` performs. Skipping it leaves
   // restored orchestration rows claiming an authority this host never took over.
   // Why before the RPC server binds: a client host attaching first would find no pages to recover.
