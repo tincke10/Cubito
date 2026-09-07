@@ -489,61 +489,22 @@ describe('createOrcadGateway', () => {
     ])
   })
 
-  it('systemSnapshot maps a system.snapshot response into SystemGraphSnapshot', async () => {
+  it('systemSnapshot calls system.snapshot with the worktree and maps the result via the shared projection', async () => {
     const call: RpcCaller = vi.fn(async () => ({
       id: 'x',
       ok: true as const,
       result: {
-        nodes: [
-          { id: 'router', kind: 'router', label: 'router', diff: null },
-          {
-            id: 'POST /auth/retry',
-            kind: 'endpoint',
-            label: 'POST /auth/retry',
-            method: 'POST',
-            path: '/auth/retry',
-            diff: null
-          },
-          { id: 'weird', kind: 'unknown-kind', label: 'weird', diff: null }
-        ],
-        edges: [
-          { from: 'router', to: 'POST /auth/retry', kind: 'flow' },
-          { from: 'router', to: 'weird', kind: 'unknown-kind' }
-        ]
+        nodes: [{ id: 'router', kind: 'router', label: 'router', diff: null }],
+        edges: []
       },
       _meta: { runtimeId: 'rt' }
     }))
     const gateway = createOrcadGateway({ call })
     await expect(gateway.systemSnapshot('/wt/beta')).resolves.toEqual({
-      nodes: [
-        { id: 'router', kind: 'router', label: 'router', diff: null },
-        {
-          id: 'POST /auth/retry',
-          kind: 'endpoint',
-          label: 'POST /auth/retry',
-          method: 'POST',
-          path: '/auth/retry',
-          diff: null
-        },
-        { id: 'weird', kind: 'service', label: 'weird', diff: null }
-      ],
-      edges: [
-        { from: 'router', to: 'POST /auth/retry', kind: 'flow' },
-        { from: 'router', to: 'weird', kind: 'normal' }
-      ]
+      nodes: [{ id: 'router', kind: 'router', label: 'router', diff: null }],
+      edges: []
     })
     expect(call).toHaveBeenCalledWith('system.snapshot', { worktree: '/wt/beta' })
-  })
-
-  it('systemSnapshot guards a missing nodes/edges array', async () => {
-    const call: RpcCaller = vi.fn(async () => ({
-      id: 'x',
-      ok: true as const,
-      result: {},
-      _meta: { runtimeId: 'rt' }
-    }))
-    const gateway = createOrcadGateway({ call })
-    await expect(gateway.systemSnapshot('/wt/beta')).resolves.toEqual({ nodes: [], edges: [] })
   })
 
   it('systemSnapshot lets a method_not_found RpcCallError propagate untouched (old host, no system.snapshot)', async () => {

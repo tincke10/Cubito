@@ -164,6 +164,27 @@ describe('connectOrcad', () => {
     }
   })
 
+  it('exposes a systemGraphStream port that opens system.watch with the worktree', async () => {
+    const server = await startFakeOrcadServer()
+    servers.push(server)
+
+    const connection = await connectOrcad(offerFor(server))
+    try {
+      const subscription = connection.systemGraphStream.watch('/wt/alpha', {
+        onFrame: () => {},
+        onUnsupported: () => {},
+        onClosed: () => {}
+      })
+      await vi.waitFor(() => expect(server.requestMethods).toContain('system.watch'))
+      expect(server.requestFrames.find((frame) => frame.method === 'system.watch')?.params).toEqual(
+        { worktree: '/wt/alpha' }
+      )
+      subscription.close()
+    } finally {
+      connection.close()
+    }
+  })
+
   it('adds a repo via repo.add, in the shape addRepo resolves (no server change)', async () => {
     const repo = { id: 'repo-2', path: '/abs/repo-2', displayName: 'Repo Two', kind: 'git' }
     const server = await startFakeOrcadServer({

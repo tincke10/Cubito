@@ -7,15 +7,13 @@ import type {
   GitStatusRow,
   RepoSummary,
   RuntimeGateway,
-  SystemGraphSnapshot,
-  SystemSnapshotEdge,
-  SystemSnapshotNode,
   WorktreePsRow
 } from '../../application/ports/runtime-gateway'
 import type { RpcSuccessFrame } from './envelope'
 import { createOrchestrationLeaseMethods } from './orcad-orchestration-gateway'
 import { createGitMergeMethods } from './orcad-git-merge-gateway'
 import { createAgentActivityMethods } from './orcad-agent-activity-gateway'
+import { toSystemGraphSnapshot } from './system-graph-snapshot-projection'
 
 /** Projects a raw `worktree.ps` row onto the local `WorktreePsRow` shape. */
 function toWorktreePsRow(row: { worktreeId?: unknown; status?: unknown }): WorktreePsRow {
@@ -127,56 +125,6 @@ function toDiffFileContent(result: {
     originalContent: typeof result.originalContent === 'string' ? result.originalContent : '',
     modifiedContent: typeof result.modifiedContent === 'string' ? result.modifiedContent : '',
     truncated: result.largeDiffRenderLimit?.limited === true
-  }
-}
-
-const SNAPSHOT_NODE_KINDS = ['router', 'endpoint', 'service', 'database'] as const
-const SNAPSHOT_EDGE_KINDS = ['normal', 'flow', 'faint'] as const
-
-/** Projects a raw `system.snapshot` node onto the local `SystemSnapshotNode` shape. */
-function toSystemSnapshotNode(node: {
-  id?: unknown
-  kind?: unknown
-  label?: unknown
-  method?: unknown
-  path?: unknown
-}): SystemSnapshotNode {
-  return {
-    id: typeof node.id === 'string' ? node.id : '',
-    kind: (SNAPSHOT_NODE_KINDS as readonly unknown[]).includes(node.kind)
-      ? (node.kind as SystemSnapshotNode['kind'])
-      : 'service',
-    label: typeof node.label === 'string' ? node.label : '',
-    ...(typeof node.method === 'string' ? { method: node.method } : {}),
-    ...(typeof node.path === 'string' ? { path: node.path } : {}),
-    diff: null
-  }
-}
-
-/** Projects a raw `system.snapshot` edge onto the local `SystemSnapshotEdge` shape. */
-function toSystemSnapshotEdge(edge: {
-  from?: unknown
-  to?: unknown
-  kind?: unknown
-}): SystemSnapshotEdge {
-  return {
-    from: typeof edge.from === 'string' ? edge.from : '',
-    to: typeof edge.to === 'string' ? edge.to : '',
-    kind: (SNAPSHOT_EDGE_KINDS as readonly unknown[]).includes(edge.kind)
-      ? (edge.kind as SystemSnapshotEdge['kind'])
-      : 'normal'
-  }
-}
-
-/** Projects a raw `system.snapshot` result onto the local `SystemGraphSnapshot` shape. */
-function toSystemGraphSnapshot(result: { nodes?: unknown; edges?: unknown }): SystemGraphSnapshot {
-  return {
-    nodes: Array.isArray(result.nodes)
-      ? (result.nodes as Record<string, unknown>[]).map(toSystemSnapshotNode)
-      : [],
-    edges: Array.isArray(result.edges)
-      ? (result.edges as Record<string, unknown>[]).map(toSystemSnapshotEdge)
-      : []
   }
 }
 
