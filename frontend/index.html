@@ -54,6 +54,10 @@
         border-radius: 50%;
         vertical-align: middle;
       }
+      /* Any class-level `display` beats the UA's [hidden] rule — main.ts hides chrome via `el.hidden`. */
+      [hidden] {
+        display: none !important;
+      }
       #keyboard-bar {
         position: fixed;
         left: 16px;
