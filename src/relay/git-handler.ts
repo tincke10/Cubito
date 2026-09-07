@@ -105,6 +105,7 @@ import { clearGitStatusLineStatsCache } from '../shared/git-status-line-stats-ca
 import { invalidateGitBranchLineTotalInFlight } from '../shared/git-branch-line-total'
 import { streamRelayGitStdout } from './git-stdout-stream'
 import { runProcess } from '../shared/child-process/run-process'
+import { mergeWinnerIntoParentRelayOp } from './git-handler-merge-winner-ops'
 
 const execFileAsync = promisify(execFile)
 const MAX_GIT_BUFFER = 10 * 1024 * 1024
@@ -264,6 +265,9 @@ export class GitHandler {
     this.dispatcher.onRequest('git.checkIgnored', (p) => this.checkIgnored(p))
     this.dispatcher.onRequest('git.history', (p) => this.history(p))
     this.dispatcher.onRequest('git.commit', (p) => this.commit(p))
+    this.dispatcher.onRequest('git.mergeWinnerIntoParent', (p, context) =>
+      this.mergeWinnerIntoParent(p, context)
+    )
     this.dispatcher.onRequest('git.diff', (p, context) => this.getDiff(p, context))
     this.dispatcher.onRequest('git.stage', (p) => this.stage(p))
     this.dispatcher.onRequest('git.unstage', (p) => this.unstage(p))
@@ -590,6 +594,26 @@ export class GitHandler {
     } finally {
       this.clearGitMutationReadCaches()
     }
+  }
+
+  private async mergeWinnerIntoParent(params: Record<string, unknown>, context?: RequestContext) {
+    const parentPath = params.parentPath as string
+    const winnerPath = params.winnerPath as string
+    const message = params.message as string
+    return runWithGitWorktreeOperationLock(parentPath, context?.signal, async () => {
+      this.clearGitMutationReadCaches()
+      try {
+        return await mergeWinnerIntoParentRelayOp(
+          this.git.bind(this),
+          this.gitCapabilities,
+          parentPath,
+          winnerPath,
+          message
+        )
+      } finally {
+        this.clearGitMutationReadCaches()
+      }
+    })
   }
 
   private async unstage(params: Record<string, unknown>) {
