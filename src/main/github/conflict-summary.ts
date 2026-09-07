@@ -1,13 +1,7 @@
 import type { PRConflictSummary } from '../../shared/github/pull-request-types'
-import {
-  isUnsupportedMergeTreeMergeBaseError,
-  isUnsupportedMergeTreeWriteTreeError
-} from '../../shared/git-merge-tree-capability'
 import { gitExecFileAsync } from '../git/runner'
-import {
-  clearGitCapabilityStateForTests,
-  withLocalGitCapabilityCacheForExecution
-} from '../git/git-capability-state'
+import { clearGitCapabilityStateForTests } from '../git/git-capability-state'
+import { mergeTreeWriteTree } from '../git/merge-tree-write-tree'
 import {
   __resetPRConflictSummaryDerivationCachesForTests,
   buildConflictSummaryCacheKey,
@@ -219,102 +213,8 @@ async function loadConflictingFiles(
   baseOid: string,
   localGitOptions: LocalGitExecOptions
 ): Promise<string[]> {
-  const modernArgs = [
-    'merge-tree',
-    '--write-tree',
-    '--name-only',
-    '-z',
-    '--no-messages',
-    '--merge-base',
-    mergeBase,
-    headOid,
-    baseOid
-  ]
-  const legacyArgs = [
-    'merge-tree',
-    '--write-tree',
-    '--name-only',
-    '-z',
-    '--no-messages',
-    headOid,
-    baseOid
-  ]
-
-  return withLocalGitCapabilityCacheForExecution(
-    { cwd: repoPath, wslDistro: localGitOptions.wslDistro },
-    (capabilities) =>
-      capabilities.runWithFallback(
-        'merge-tree-write-tree',
-        () =>
-          capabilities.runWithFallback(
-            'merge-tree-merge-base',
-            async () => {
-              try {
-                const result = await gitExecFileAsync(modernArgs, {
-                  cwd: repoPath,
-                  ...(localGitOptions.wslDistro ? { wslDistro: localGitOptions.wslDistro } : {})
-                })
-                return parseMergeTreeNameOnlyOutput(result.stdout)
-              } catch (error) {
-                if (isUnsupportedMergeTreeWriteTreeError(error)) {
-                  throw error
-                }
-                // Why: `git merge-tree --write-tree` exits 1 for conflicts but still
-                // writes the useful file list; only option rejection reaches fallback.
-                const stdoutFromError = getGitErrorOutput(error, 'stdout')
-                if (stdoutFromError) {
-                  return parseMergeTreeNameOnlyOutput(stdoutFromError)
-                }
-                throw error
-              }
-            },
-            () => loadConflictingFilesWithLegacyMergeTree(repoPath, legacyArgs, localGitOptions),
-            isUnsupportedMergeTreeMergeBaseError
-          ),
-        async () => {
-          // Why: Git before 2.38 cannot derive a reliable real-merge conflict list;
-          // fail closed without respawning the same rejected command every refresh.
-          throw new Error('Git merge-tree --write-tree is unavailable on this execution host.')
-        },
-        isUnsupportedMergeTreeWriteTreeError
-      )
-  )
-}
-
-async function loadConflictingFilesWithLegacyMergeTree(
-  repoPath: string,
-  legacyArgs: string[],
-  localGitOptions: LocalGitExecOptions
-): Promise<string[]> {
-  try {
-    const result = await gitExecFileAsync(legacyArgs, {
-      cwd: repoPath,
-      ...(localGitOptions.wslDistro ? { wslDistro: localGitOptions.wslDistro } : {})
-    })
-    return parseMergeTreeNameOnlyOutput(result.stdout)
-  } catch (fallbackError) {
-    const fallbackStdout = getGitErrorOutput(fallbackError, 'stdout')
-    if (fallbackStdout) {
-      return parseMergeTreeNameOnlyOutput(fallbackStdout)
-    }
-    throw fallbackError
-  }
-}
-
-function parseMergeTreeNameOnlyOutput(stdout: string): string[] {
-  const entries = stdout.split('\0').filter(Boolean)
-  if (entries.length === 0) {
-    return []
-  }
-
-  const [, ...files] = entries
-  return files
-}
-
-function getGitErrorOutput(error: unknown, key: 'stdout' | 'stderr'): string {
-  if (typeof error !== 'object' || error === null) {
-    return ''
-  }
-  const output = (error as Partial<Record<'stdout' | 'stderr', unknown>>)[key]
-  return typeof output === 'string' ? output : ''
+  const { conflictedFiles } = await mergeTreeWriteTree(repoPath, mergeBase, headOid, baseOid, {
+    wslDistro: localGitOptions.wslDistro
+  })
+  return conflictedFiles
 }
