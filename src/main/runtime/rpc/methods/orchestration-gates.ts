@@ -154,18 +154,30 @@ export const ORCHESTRATION_GATE_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'orchestration.gateResolve',
     params: GateResolveParams,
-    handler: (params, { orchestrationCompatibilityEvidence, runtime, legacyCoordinatorRunId }) => {
+    handler: (
+      params,
+      {
+        orchestrationCompatibilityEvidence,
+        runtime,
+        legacyCoordinatorRunId,
+        pairedDeviceId,
+        clientKind
+      }
+    ) => {
       const db = runtime.getOrchestrationDb()
       const existing = db.getGate(params.id)
       if (!existing) {
         throw new Error(`Gate not found: ${params.id}`)
       }
+      // Why: mirrors gateList/taskCreate — a paired GUI device with no `from` is a lease caller.
+      const isLeaseCaller = !params.from && pairedDeviceId !== undefined && clientKind === 'runtime'
       const run = resolveRunScope(runtime, {
         runId: params.run,
         callerTerminalHandle: params.from,
         requireCurrentConsumer: true,
         legacyCoordinatorRunId,
-        callerEvidence: orchestrationCompatibilityEvidence
+        callerEvidence: orchestrationCompatibilityEvidence,
+        leaseDeviceId: isLeaseCaller ? pairedDeviceId : undefined
       })
       // Why: a gate outside the caller's Run is indistinguishable from a missing one, so probing cannot map foreign Runs.
       if (existing.run_id !== run.id) {

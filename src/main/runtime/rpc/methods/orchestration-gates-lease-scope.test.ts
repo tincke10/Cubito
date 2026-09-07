@@ -61,3 +61,66 @@ describe('orchestration.gateList: lease ownership scoping', () => {
     expect(listed.count).toBe(1)
   })
 })
+
+// Why: mirrors gateList's isLeaseCaller branch — a paired GUI device with no
+// callerTerminalHandle resolving a gate must go through assertLeaseOwnership too.
+describe('orchestration.gateResolve: lease ownership scoping', () => {
+  const h = createOrchestrationRpcHarness()
+
+  afterEach(() => h.cleanup())
+
+  it('lets the lease owner resolve a gate on its own Run', async () => {
+    const { db, runtime } = h.setup(false)
+    const run = db.createLeaseRun({ objective: 'lease gate resolve', deviceId: DEVICE_ID })
+    const task = db.createTask({ spec: 'lease gate fixture', runId: run.id })
+    const gate = db.createGate({ taskId: task.id, question: 'Proceed?' })
+    const ctx: RpcContext = { runtime, pairedDeviceId: DEVICE_ID, clientKind: 'runtime' }
+
+    const resolved = (await h.call(
+      'orchestration.gateResolve',
+      { id: gate.id, resolution: 'yes', run: run.id },
+      ctx
+    )) as { gate: { status: string; resolution: string } }
+
+    expect(resolved.gate.status).toBe('resolved')
+    expect(resolved.gate.resolution).toBe('yes')
+  })
+
+  it('requires --run for a lease gateResolve caller', async () => {
+    const { db, runtime } = h.setup(false)
+    const run = db.createLeaseRun({ objective: 'no run given', deviceId: DEVICE_ID })
+    const task = db.createTask({ spec: 'lease gate fixture', runId: run.id })
+    const gate = db.createGate({ taskId: task.id, question: 'Proceed?' })
+    const ctx: RpcContext = { runtime, pairedDeviceId: DEVICE_ID, clientKind: 'runtime' }
+
+    await expect(
+      h.call('orchestration.gateResolve', { id: gate.id, resolution: 'yes' }, ctx)
+    ).rejects.toMatchObject({ code: 'run_required' })
+  })
+
+  it('fences a lease gateResolve against a Run owned by another device', async () => {
+    const { db, runtime } = h.setup(false)
+    const run = db.createLeaseRun({ objective: 'owned by device_1', deviceId: DEVICE_ID })
+    const task = db.createTask({ spec: 'lease gate fixture', runId: run.id })
+    const gate = db.createGate({ taskId: task.id, question: 'Proceed?' })
+    const ctx: RpcContext = { runtime, pairedDeviceId: OTHER_DEVICE_ID, clientKind: 'runtime' }
+
+    await expect(
+      h.call('orchestration.gateResolve', { id: gate.id, resolution: 'yes', run: run.id }, ctx)
+    ).rejects.toMatchObject({ code: 'consumer_fenced' })
+  })
+
+  it('keeps terminal gateResolve unscoped (no paired device)', async () => {
+    const { db, activeRunId, ctx } = h.setup(true)
+    const task = db.createTask({ spec: 'terminal gate fixture' })
+    const gate = db.createGate({ taskId: task.id, question: 'Proceed?' })
+
+    const resolved = (await h.call(
+      'orchestration.gateResolve',
+      { id: gate.id, resolution: 'yes', run: activeRunId },
+      ctx
+    )) as { gate: { status: string } }
+
+    expect(resolved.gate.status).toBe('resolved')
+  })
+})
