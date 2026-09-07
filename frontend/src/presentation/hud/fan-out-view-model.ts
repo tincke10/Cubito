@@ -6,6 +6,9 @@ import {
 } from '../../application/fan-out-model'
 import type { FanOutSlice } from '../../application/fan-out-model'
 import type { SpawnAgent } from '../../application/ports/runtime-gateway'
+import { emptyDecisionVisibility } from '../../application/fan-out-decision-visibility'
+import { pendingGatesViewModel, pendingQuestionsViewModel } from './fan-out-decision-view-model'
+import type { FanOutGateViewModel, FanOutQuestionViewModel } from './fan-out-decision-view-model'
 
 export type FanOutStepperViewModel = {
   readonly value: number
@@ -30,6 +33,8 @@ export type FanOutRunningViewModel = {
   readonly view: 'running'
   readonly callout: string
   readonly counters: string
+  readonly gates: readonly FanOutGateViewModel[]
+  readonly questions: readonly FanOutQuestionViewModel[]
 }
 
 export type FanOutViewModel = FanOutFormViewModel | FanOutRunningViewModel | null
@@ -63,9 +68,12 @@ export function fanOutViewModel(slice: FanOutSlice): FanOutViewModel {
     }
   }
 
+  const visibility = slice.decisionVisibility ?? emptyDecisionVisibility()
   return {
     view: 'running',
     callout: `fan-out · ${slice.fields.count} × ${slice.fields.agent}`,
-    counters: countersLine(slice)
+    counters: countersLine(slice),
+    gates: pendingGatesViewModel(visibility),
+    questions: pendingQuestionsViewModel(visibility)
   }
 }

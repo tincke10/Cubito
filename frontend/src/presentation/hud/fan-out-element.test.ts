@@ -68,6 +68,8 @@ const runningModel = (overrides: Partial<FanOutRunningViewModel> = {}): FanOutRu
   view: 'running',
   callout: 'fan-out · 5 × claude',
   counters: '2 trabajando · 1 esperando · 1 naciendo · 1 listo',
+  gates: [],
+  questions: [],
   ...overrides
 })
 

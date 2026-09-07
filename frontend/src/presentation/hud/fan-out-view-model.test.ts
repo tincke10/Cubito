@@ -163,3 +163,60 @@ describe('fanOutViewModel — running — decision visibility (Change C-EXTENDED
     expect(model.counters).toContain('0 compuertas · 0 preguntas')
   })
 })
+
+describe('fanOutViewModel — running — gate/question rows (Change F)', () => {
+  it('projects pending gates and questions from decisionVisibility onto the running model', () => {
+    const model = fanOutViewModel(
+      runningSlice({
+        decisionVisibility: {
+          gatesByTaskId: {
+            'task-1': [
+              {
+                id: 'gate-1',
+                runId: 'run-1',
+                taskId: 'task-1',
+                question: 'Which approach?',
+                options: '["a","b"]',
+                status: 'pending',
+                resolution: null,
+                createdAt: '2026-01-01T00:00:00Z',
+                resolvedAt: null
+              }
+            ]
+          },
+          questionsByDispatchId: {
+            'dispatch-1': [
+              {
+                messageId: 'msg-1',
+                runId: 'run-1',
+                dispatchId: 'dispatch-1',
+                askerHandle: 'worker-1',
+                status: 'pending',
+                answerMessageId: null,
+                answerBody: null,
+                answeredByGeneration: null,
+                createdAt: '2026-01-01T00:00:00Z',
+                answeredAt: null,
+                closedAt: null
+              }
+            ]
+          }
+        }
+      })
+    )
+    if (model?.view !== 'running') throw new Error('expected running')
+    expect(model.gates).toEqual([
+      { gateId: 'gate-1', taskId: 'task-1', question: 'Which approach?', options: ['a', 'b'] }
+    ])
+    expect(model.questions).toEqual([
+      { messageId: 'msg-1', dispatchId: 'dispatch-1', askerHandle: 'worker-1' }
+    ])
+  })
+
+  it('defaults gates/questions to empty arrays when decisionVisibility is absent', () => {
+    const model = fanOutViewModel(runningSlice())
+    if (model?.view !== 'running') throw new Error('expected running')
+    expect(model.gates).toEqual([])
+    expect(model.questions).toEqual([])
+  })
+})
