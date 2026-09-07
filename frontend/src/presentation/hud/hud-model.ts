@@ -8,6 +8,16 @@ export type ConnectionDotTone = 'accent' | 'amber' | 'amberDim'
 
 export type HudChip = { key: string; description: string }
 
+/** The [g][x][d][c][t] switcher every scene-replacing mode (sistema/diff/compare) renders in its
+ *  own keyboard bar — one list so a new mode's chip lands in all of them at once. */
+export const SCENE_MODE_SWITCHER_CHIPS: readonly HudChip[] = [
+  { key: 'g', description: 'grafo de worktrees' },
+  { key: 'x', description: 'sistema en vivo' },
+  { key: 'd', description: 'diff' },
+  { key: 'c', description: 'comparar la camada' },
+  { key: 't', description: 'terminal' }
+]
+
 export type HudModel = {
   connection: { label: string; dotColor: ConnectionDotTone }
   repo: { displayName: string; nodeCount: number } | null

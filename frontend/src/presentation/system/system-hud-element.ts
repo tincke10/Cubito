@@ -1,6 +1,6 @@
-import { connectionDotColor, connectionLabel } from '../hud/hud-model'
+import { SCENE_MODE_SWITCHER_CHIPS, connectionDotColor, connectionLabel } from '../hud/hud-model'
 import { createKeyboardBar } from '../hud/keyboard-bar'
-import type { ConnectionDotTone, HudChip } from '../hud/hud-model'
+import type { ConnectionDotTone } from '../hud/hud-model'
 import type { KeyboardBarHandle } from '../hud/keyboard-bar'
 import type { ConnectionState } from '../../application/scene-store'
 import type { SystemHudCounts } from '../../application/system-view-model'
@@ -13,15 +13,6 @@ const DOT_VAR: Record<ConnectionDotTone, string> = {
 }
 
 const MODE_SUFFIX = 'sistema en vivo'
-
-/** The mode's own [g][x][d][t] switcher, per VistaSistema.dc.html's keyboard bar — distinct
- *  from the worktree graph's hjkl/f/v/s bar (hud-model.ts's chipsFor). */
-const SYSTEM_KEYBOARD_CHIPS: readonly HudChip[] = [
-  { key: 'g', description: 'grafo de worktrees' },
-  { key: 'x', description: 'sistema en vivo' },
-  { key: 'd', description: 'diff' },
-  { key: 't', description: 'terminal' }
-]
 
 export type SystemHudModel = {
   connection: ConnectionState
@@ -72,7 +63,8 @@ export function createSystemHud(doc: Document = document): SystemHudHandle {
   root.appendChild(countersLine)
 
   const keyboardBar = createKeyboardBar(doc)
-  keyboardBar.apply(SYSTEM_KEYBOARD_CHIPS)
+  // Per VistaSistema.dc.html: the mode switcher, not the graph's hjkl/f/v/s bar (chipsFor).
+  keyboardBar.apply(SCENE_MODE_SWITCHER_CHIPS)
 
   return {
     root,

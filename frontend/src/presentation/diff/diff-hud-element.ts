@@ -1,6 +1,6 @@
-import { connectionDotColor, connectionLabel } from '../hud/hud-model'
+import { SCENE_MODE_SWITCHER_CHIPS, connectionDotColor, connectionLabel } from '../hud/hud-model'
 import { createKeyboardBar } from '../hud/keyboard-bar'
-import type { ConnectionDotTone, HudChip } from '../hud/hud-model'
+import type { ConnectionDotTone } from '../hud/hud-model'
 import type { KeyboardBarHandle } from '../hud/keyboard-bar'
 import type { ConnectionState } from '../../application/scene-store'
 import type { DiffHudCounts } from '../../application/diff-view-model'
@@ -13,14 +13,6 @@ const DOT_VAR: Record<ConnectionDotTone, string> = {
 }
 
 const MODE_SUFFIX = 'diff'
-
-/** Same [g][x][d][t] mode switcher system-hud-element.ts renders — each mode owns its copy. */
-const DIFF_KEYBOARD_CHIPS: readonly HudChip[] = [
-  { key: 'g', description: 'grafo de worktrees' },
-  { key: 'x', description: 'sistema en vivo' },
-  { key: 'd', description: 'diff' },
-  { key: 't', description: 'terminal' }
-]
 
 export type DiffHudModel = {
   connection: ConnectionState
@@ -64,7 +56,7 @@ export function createDiffHud(doc: Document = document): DiffHudHandle {
   root.appendChild(countsLine)
 
   const keyboardBar = createKeyboardBar(doc)
-  keyboardBar.apply(DIFF_KEYBOARD_CHIPS)
+  keyboardBar.apply(SCENE_MODE_SWITCHER_CHIPS)
 
   return {
     root,

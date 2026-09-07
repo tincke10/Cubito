@@ -97,14 +97,14 @@ describe('createSystemHud', () => {
     expect(dot.style.backgroundColor).toBe('var(--cubito-amber-dim)')
   })
 
-  it('renders its own [g][x][d][t] keyboard bar, separate from the root', () => {
+  it('renders the shared [g][x][d][c][t] mode switcher, separate from the root', () => {
     created = []
     const hud = createSystemHud(createFakeDocument())
     expect(hud.keyboardBar.root).not.toBe(hud.root)
     const bar = hud.keyboardBar.root as unknown as FakeElement
-    expect(bar.children).toHaveLength(4)
+    expect(bar.children).toHaveLength(5)
     const keys = bar.children.map((chip) => chip.children[0]!.textContent)
-    expect(keys).toEqual(['g', 'x', 'd', 't'])
+    expect(keys).toEqual(['g', 'x', 'd', 'c', 't'])
   })
 
   it('dispose removes the root and disposes the keyboard bar', () => {

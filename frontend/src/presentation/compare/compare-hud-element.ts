@@ -1,6 +1,6 @@
-import { connectionDotColor, connectionLabel } from '../hud/hud-model'
+import { SCENE_MODE_SWITCHER_CHIPS, connectionDotColor, connectionLabel } from '../hud/hud-model'
 import { createKeyboardBar } from '../hud/keyboard-bar'
-import type { ConnectionDotTone, HudChip } from '../hud/hud-model'
+import type { ConnectionDotTone } from '../hud/hud-model'
 import type { KeyboardBarHandle } from '../hud/keyboard-bar'
 import type { ConnectionState } from '../../application/scene-store'
 
@@ -13,15 +13,6 @@ const DOT_VAR: Record<ConnectionDotTone, string> = {
 
 const MODE_SUFFIX = 'comparar la camada'
 const NO_WINNER_TEXT = 'sin elegir'
-
-/** Same [g][x][d][t] mode switcher every scene-replacing mode renders, plus this mode's own 'c'. */
-const COMPARE_KEYBOARD_CHIPS: readonly HudChip[] = [
-  { key: 'g', description: 'grafo de worktrees' },
-  { key: 'x', description: 'sistema en vivo' },
-  { key: 'd', description: 'diff' },
-  { key: 'c', description: 'comparar la camada' },
-  { key: 't', description: 'terminal' }
-]
 
 export type CompareHudModel = {
   connection: ConnectionState
@@ -67,7 +58,7 @@ export function createCompareHud(doc: Document = document): CompareHudHandle {
   root.appendChild(winnerLine)
 
   const keyboardBar = createKeyboardBar(doc)
-  keyboardBar.apply(COMPARE_KEYBOARD_CHIPS)
+  keyboardBar.apply(SCENE_MODE_SWITCHER_CHIPS)
 
   return {
     root,
