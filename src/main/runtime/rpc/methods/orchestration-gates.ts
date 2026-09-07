@@ -3,7 +3,7 @@ import { defineMethod, type RpcMethod } from '../core'
 import { OptionalFiniteNumber, OptionalString, requiredString } from '../schemas'
 import type { GateStatus } from '../../orchestration/db'
 import { Coordinator } from '../../orchestration/coordinator'
-import { resolveRunScope } from './orchestration-run-scope'
+import { assertLeaseOwnership, resolveRunScope } from './orchestration-run-scope'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
 
 // Why: the coordinator instance is stored at module scope so orchestration.runStop
@@ -182,8 +182,39 @@ export const ORCHESTRATION_GATE_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'orchestration.gateList',
     params: GateListParams,
-    handler: (params, { orchestrationCompatibilityEvidence, runtime, legacyCoordinatorRunId }) => {
+    handler: (
+      params,
+      {
+        orchestrationCompatibilityEvidence,
+        runtime,
+        legacyCoordinatorRunId,
+        pairedDeviceId,
+        clientKind
+      }
+    ) => {
       const db = runtime.getOrchestrationDb()
+      // Why: a paired GUI lease caller may only list gates for a Run it owns; a
+      // terminal/in-process caller (has `from`, or no paired device) is unscoped, as before.
+      // Closes a pre-existing hole: an explicit --run with no `from` previously skipped ownership.
+      const isLeaseCaller = !params.from && Boolean(pairedDeviceId) && clientKind === 'runtime'
+      if (isLeaseCaller) {
+        if (!params.run) {
+          throw new OrchestrationError(
+            'run_required',
+            'A GUI lease caller must provide --run; there is no coordinator terminal to infer it from.',
+            { effectsApplied: false }
+          )
+        }
+        const leaseRun = db.getRun(params.run)
+        if (!leaseRun) {
+          throw new OrchestrationError('run_not_found', `Run ${params.run} was not found.`)
+        }
+        assertLeaseOwnership(leaseRun, pairedDeviceId!)
+        const gates = db
+          .listGates({ taskId: params.task, status: params.status as GateStatus })
+          .filter((gate) => gate.run_id === leaseRun.id)
+        return { runId: leaseRun.id, gates, count: gates.length }
+      }
       const explicitRun = params.run ? db.getRun(params.run) : undefined
       // Why: same read posture as taskList — an explicitly named Run is inspectable, an unnamed one means the caller's own.
       const run =
