@@ -1,7 +1,9 @@
 import type { WorktreeGraph, WorktreeId } from '../../domain/worktree-graph/types'
 import {
+  FANOUT_REPO_UNRESOLVED_MESSAGE,
   emptyFanOutSlice,
   fanOutMemberIds,
+  fanOutSubmitBlocker,
   reduceFanOut,
   toFanOutInputs
 } from '../../application/fan-out-model'
@@ -156,8 +158,10 @@ export function createFanOutController(deps: FanOutControllerDeps): FanOutContro
   const handleSubmit = async (): Promise<void> => {
     const slice = currentSlice
     if (slice.view !== 'form') return
-    if (slice.repoSelector === null) {
-      deps.dispatch({ type: 'form-error', message: 'repositorio aún no resuelto' })
+    const blocker = fanOutSubmitBlocker(slice)
+    // The explicit null re-check only narrows repoSelector for TS; the blocker already rejects it.
+    if (blocker !== null || slice.repoSelector === null) {
+      deps.dispatch({ type: 'form-error', message: blocker ?? FANOUT_REPO_UNRESOLVED_MESSAGE })
       return
     }
     const repoSelector = slice.repoSelector

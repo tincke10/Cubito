@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   FANOUT_PLACEHOLDER_PREFIX,
+  FANOUT_PROMPT_REQUIRED_MESSAGE,
   MAX_FANOUT,
   MIN_FANOUT,
   clampFanOutCount,
@@ -9,6 +10,8 @@ import {
   fanOutCounts,
   fanOutDecisionCounts,
   fanOutMemberIds,
+  fanOutObjectiveText,
+  fanOutSubmitBlocker,
   isFailedDispatch,
   mapDispatchStateToAgentStatus,
   mapPsStatusToAgentStatus,
@@ -235,6 +238,72 @@ describe('reduceFanOut — submit', () => {
     const slice = reduceFanOut(outOfBounds, { type: 'submit', mutationIds: ['m1'] })
     expect(slice.view).toBe('form')
     expect((slice as { errorMessage?: string }).errorMessage).toBeDefined()
+  })
+
+  // Why: a blank prompt used to become the placeholder spec "Camada de N cubos" — workers got
+  // dispatched with nothing actionable. An agent without a task is never a valid litter.
+  it('produces a form-error when an agent is chosen but the prompt is blank', () => {
+    const agentNoPrompt: FanOutSlice = {
+      ...validForm,
+      fields: { count: 3, agent: 'claude', prompt: '   ' }
+    }
+    const slice = reduceFanOut(agentNoPrompt, { type: 'submit', mutationIds: ['m1'] })
+    expect(slice.view).toBe('form')
+    expect((slice as { errorMessage?: string }).errorMessage).toBe(FANOUT_PROMPT_REQUIRED_MESSAGE)
+  })
+
+  it('runs when an agent is chosen and the prompt has text', () => {
+    const agentWithPrompt: FanOutSlice = {
+      ...validForm,
+      fields: { count: 3, agent: 'claude', prompt: 'fix the bug' }
+    }
+    const slice = reduceFanOut(agentWithPrompt, { type: 'submit', mutationIds: ['m1'] })
+    expect(slice.view).toBe('running')
+  })
+})
+
+describe('fanOutSubmitBlocker', () => {
+  const validForm: FanOutSlice = {
+    view: 'form',
+    parentId: 'w1',
+    fields: { count: 3, agent: 'none', prompt: '' },
+    repoSelector: 'id:repo-a'
+  }
+
+  it('returns null for a submittable form', () => {
+    expect(fanOutSubmitBlocker(validForm)).toBeNull()
+  })
+
+  it('returns null outside the form view', () => {
+    expect(fanOutSubmitBlocker(emptyFanOutSlice())).toBeNull()
+  })
+
+  it('blocks on a missing repo selector', () => {
+    expect(fanOutSubmitBlocker({ ...validForm, repoSelector: null })).toEqual(expect.any(String))
+  })
+
+  it('blocks on an out-of-range count', () => {
+    expect(
+      fanOutSubmitBlocker({ ...validForm, fields: { ...validForm.fields, count: 99 } })
+    ).toEqual(expect.any(String))
+  })
+
+  it('blocks a blank prompt only when an agent is chosen', () => {
+    expect(
+      fanOutSubmitBlocker({ ...validForm, fields: { count: 3, agent: 'claude', prompt: '' } })
+    ).toBe(FANOUT_PROMPT_REQUIRED_MESSAGE)
+    expect(
+      fanOutSubmitBlocker({ ...validForm, fields: { count: 3, agent: 'none', prompt: '' } })
+    ).toBeNull()
+  })
+})
+
+describe('fanOutObjectiveText', () => {
+  it('is the trimmed prompt — no generated placeholder anymore', () => {
+    expect(fanOutObjectiveText({ count: 3, agent: 'claude', prompt: '  fix the bug  ' })).toBe(
+      'fix the bug'
+    )
+    expect(fanOutObjectiveText({ count: 3, agent: 'claude', prompt: '   ' })).toBe('')
   })
 })
 
@@ -488,7 +557,7 @@ describe('reduceFanOut — submit seeds lease fields to null', () => {
     const validForm: FanOutSlice = {
       view: 'form',
       parentId: 'w1',
-      fields: { count: 2, agent: 'claude', prompt: '' },
+      fields: { count: 2, agent: 'claude', prompt: 'fix the bug' },
       repoSelector: 'id:repo-a'
     }
     const slice = reduceFanOut(validForm, { type: 'submit', mutationIds: ['m1', 'm2'] })

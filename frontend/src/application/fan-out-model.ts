@@ -185,13 +185,31 @@ function openForm(slice: FanOutSlice, parentId: WorktreeId): FanOutSlice {
   }
 }
 
+export const FANOUT_PROMPT_REQUIRED_MESSAGE = 'escribí qué tiene que hacer la camada'
+export const FANOUT_REPO_UNRESOLVED_MESSAGE = 'repositorio aún no resuelto'
+
+/** Why a submit can't proceed (form view only), or null. Shared by the reducer and the
+ *  controller's pre-flight so the batch never starts on a form the reducer would reject. */
+export function fanOutSubmitBlocker(slice: FanOutSlice): string | null {
+  if (slice.view !== 'form') return null
+  if (slice.fields.count < MIN_FANOUT || slice.fields.count > MAX_FANOUT) {
+    return `la camada tiene entre ${MIN_FANOUT} y ${MAX_FANOUT} cubos`
+  }
+  if (slice.repoSelector === null) return FANOUT_REPO_UNRESOLVED_MESSAGE
+  // Why: with an agent, the prompt IS the workers' task spec — a blank one used to ship the
+  // placeholder "Camada de N cubos", and lease workers got dispatched with nothing to do.
+  if (slice.fields.agent !== 'none' && slice.fields.prompt.trim() === '') {
+    return FANOUT_PROMPT_REQUIRED_MESSAGE
+  }
+  return null
+}
+
 function startSubmit(slice: FanOutSlice, mutationIds: readonly string[]): FanOutSlice {
   if (slice.view !== 'form') return slice
-  if (slice.fields.count < MIN_FANOUT || slice.fields.count > MAX_FANOUT) {
-    return { ...slice, errorMessage: `count must be between ${MIN_FANOUT} and ${MAX_FANOUT}` }
-  }
-  if (slice.repoSelector === null) {
-    return { ...slice, errorMessage: 'a repo must be selected' }
+  const blocker = fanOutSubmitBlocker(slice)
+  // The explicit null re-check only narrows repoSelector for TS; the blocker already rejects it.
+  if (blocker !== null || slice.repoSelector === null) {
+    return { ...slice, errorMessage: blocker ?? FANOUT_REPO_UNRESOLVED_MESSAGE }
   }
   const batch: FanOutBatchEntry[] = mutationIds.map((mutationId) => ({
     mutationId,
@@ -217,11 +235,11 @@ export function cubeNameFor(mutationId: string): string {
   return `camada-${mutationId.replace(/-/g, '').slice(0, 10)}`
 }
 
-/** Run objective / task spec text (Change B lease path): the litter prompt if given, else a
- *  generated default — the engine's `requiredString` rejects an empty objective/spec. */
+/** Run objective / task spec text (Change B lease path). No generated fallback on purpose: the
+ *  submit blocker guarantees a prompt whenever an agent runs, and the engine's `requiredString`
+ *  rejects an empty one loudly rather than dispatching workers on a meaningless spec. */
 export function fanOutObjectiveText(fields: FanOutFormFields): string {
-  const prompt = fields.prompt.trim()
-  return prompt !== '' ? prompt : `Camada de ${fields.count} cubos`
+  return fields.prompt.trim()
 }
 
 /** Maps form fields + parent lineage + resolved repo selector to N `worktree.create` params. */

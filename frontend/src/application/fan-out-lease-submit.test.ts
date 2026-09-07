@@ -17,7 +17,7 @@ const formSlice = (
 ): FanOutSlice => ({
   view: 'form',
   parentId: 'w1',
-  fields: { count: 2, agent: 'claude', prompt: '' },
+  fields: { count: 2, agent: 'claude', prompt: 'fix the bug' },
   repoSelector: 'id:repo-a',
   ...overrides
 })
@@ -116,18 +116,16 @@ describe('runCamadaLeaseSubmit — happy path', () => {
     expect(gateway.orchestrationWorkerStart.mock.calls[0]![0]).not.toHaveProperty('agent')
   })
 
-  it('uses the generated default objective/spec when the prompt is blank', async () => {
+  it('trims the prompt into the objective/spec — never a generated placeholder', async () => {
     const { gateway, dispatch } = setup()
     await runCamadaLeaseSubmit(
-      formSlice({ fields: { count: 3, agent: 'claude', prompt: '   ' } }),
+      formSlice({ fields: { count: 3, agent: 'claude', prompt: '  fix the bug  ' } }),
       'id:repo-a',
       ['m1', 'm2', 'm3'],
       { gateway, dispatch }
     )
-    expect(gateway.orchestrationRunCreate).toHaveBeenCalledWith({ objective: 'Camada de 3 cubos' })
-    expect(gateway.orchestrationTaskCreate.mock.calls[0]![0]).toMatchObject({
-      spec: 'Camada de 3 cubos'
-    })
+    expect(gateway.orchestrationRunCreate).toHaveBeenCalledWith({ objective: 'fix the bug' })
+    expect(gateway.orchestrationTaskCreate.mock.calls[0]![0]).toMatchObject({ spec: 'fix the bug' })
   })
 })
 
