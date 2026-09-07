@@ -192,6 +192,13 @@ async function startOrcadRuntime(
   // spawning an unauthenticated agent.
   registerHeadlessPtyRuntime(runtime, undefined, () => store.getSettings(), undefined, store)
 
+  // Why: the desktop binds the hook receiver in first-window startup; headless has no
+  // window, and until it listens every PTY spawns without ORCA_AGENT_HOOK_PORT, so agent
+  // hooks (status, activity feed) silently go nowhere. Namespaced so a desktop sharing this
+  // userData keeps its own endpoint file.
+  const { agentHookServer } = await import('../agent-hooks/server')
+  await agentHookServer.start({ userDataPath: runtimeUserDataPath, endpointNamespace: 'orcad' })
+
   // Why eager: a user who lets an agent work for 30s and only then opens the activity
   // feed must not get an empty page — the ring has to be recording from process start.
   const { ensureAgentActivityRecording } = await import('../agent-hooks/agent-activity-recording')
@@ -270,6 +277,7 @@ async function startOrcadRuntime(
       try {
         await rpc.stop()
       } finally {
+        agentHookServer.stop()
         // Why disconnect and not shut down: the daemon must outlive this process, or an
         // orcad restart goes back to killing every running terminal. See
         // orcad-daemon-supervision.ts.
