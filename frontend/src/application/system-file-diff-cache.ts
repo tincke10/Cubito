@@ -10,6 +10,9 @@ export type SystemFileDiffCacheDeps = {
   store: SceneStore
   gateway: BranchCompareEntriesGateway
   now?: () => number
+  /** Fires once a background refresh lands fresh rows (generation-guarded — never for a
+   *  superseded worktree/key). Lets a publisher re-render without waiting for the next tick. */
+  onEntries?: () => void
 }
 
 export type SystemFileDiffCache = {
@@ -55,6 +58,7 @@ export function createSystemFileDiffCache(deps: SystemFileDiffCacheDeps): System
       lastFetchAt = now()
       lastKey = key
       inFlight = false
+      deps.onEntries?.()
     })
   }
 

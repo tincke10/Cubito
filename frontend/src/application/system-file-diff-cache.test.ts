@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   createSystemFileDiffCache,
   SYSTEM_FILE_DIFF_REFRESH_INTERVAL_MS
@@ -297,6 +297,59 @@ describe('createSystemFileDiffCache', () => {
     await flush()
 
     expect(gateway.calls).toBe(2)
+    expect(cache.entriesFor('repo::child', 'k1')).not.toBeNull()
+    cache.stop()
+  })
+
+  it('calls onEntries once a refresh lands', async () => {
+    const gateway = createFakeGateway()
+    const onEntries = vi.fn()
+    const store: SceneStore = createSceneStore()
+    store.update({ graph: graphWithChild() })
+    const cache = createSystemFileDiffCache({ store, gateway, onEntries })
+
+    cache.entriesFor('repo::child', 'k1')
+    await flush()
+    await flush()
+
+    expect(onEntries).toHaveBeenCalledTimes(1)
+    cache.stop()
+  })
+
+  it('does not call onEntries for a superseded generation (worktree switch mid-flight)', async () => {
+    const gateway = createFakeGateway()
+    const late = deferred<BranchCompare>()
+    gateway.impl = () => late.promise
+    const onEntries = vi.fn()
+    const store: SceneStore = createSceneStore()
+    store.update({ graph: graphWithChild() })
+    const cache = createSystemFileDiffCache({ store, gateway, onEntries })
+
+    cache.entriesFor('repo::child', 'k1') // fetch hangs on `late`
+    gateway.impl = async () => branchCompare()
+    cache.entriesFor('repo::main', 'k-main') // switch — bumps the generation, discarding `late`
+    await flush()
+    await flush()
+    expect(onEntries).toHaveBeenCalledTimes(1) // only repo::main's fetch landed
+
+    late.resolve(branchCompare()) // repo::child's stale fetch resolves after the switch
+    await flush()
+    await flush()
+
+    expect(onEntries).toHaveBeenCalledTimes(1) // still just one — the stale resolution is ignored
+    cache.stop()
+  })
+
+  it('omitting onEntries changes nothing about entriesFor', async () => {
+    const gateway = createFakeGateway()
+    const store: SceneStore = createSceneStore()
+    store.update({ graph: graphWithChild() })
+    const cache = createSystemFileDiffCache({ store, gateway })
+
+    cache.entriesFor('repo::child', 'k1')
+    await flush()
+    await flush()
+
     expect(cache.entriesFor('repo::child', 'k1')).not.toBeNull()
     cache.stop()
   })

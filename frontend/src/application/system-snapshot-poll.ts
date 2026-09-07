@@ -1,7 +1,5 @@
-import { mapSnapshotToSystemGraph } from './system-snapshot-to-graph'
-import { applyFileDiffToSystemGraph, systemGraphFileSetKey } from './system-graph-file-diff'
-import { createSystemFileDiffCache } from './system-file-diff-cache'
-import type { SystemFileDiffCache } from './system-file-diff-cache'
+import { createSystemGraphPublisher } from './system-graph-publish'
+import type { SystemGraphPublisher } from './system-graph-publish'
 import { RpcCallError } from '../infrastructure/rpc/rpc-connection'
 import type { RuntimeGateway } from './ports/runtime-gateway'
 import type { SceneStore } from './scene-store'
@@ -21,8 +19,8 @@ export type SystemSnapshotPollDeps = {
   onUnsupported: () => void
   setTimer?: (fn: () => void, ms: number) => unknown
   clearTimer?: (handle: unknown) => void
-  /** Throttled branch-compare source for the file-level diff join — override in tests. */
-  fileDiff?: SystemFileDiffCache
+  /** Owns the file-diff join and its re-publish-on-fresh-entries behavior — override in tests. */
+  publisher?: SystemGraphPublisher
 }
 
 export type SystemSnapshotPoll = {
@@ -44,7 +42,7 @@ export function createSystemSnapshotPoll(deps: SystemSnapshotPollDeps): SystemSn
     deps.clearTimer ?? ((handle: unknown) => clearTimeout(handle as ReturnType<typeof setTimeout>))
 
   let gateway = deps.gateway
-  const fileDiff = deps.fileDiff ?? createSystemFileDiffCache({ store: deps.store, gateway })
+  const publisher = deps.publisher ?? createSystemGraphPublisher({ store: deps.store, gateway })
   let stopped = true
   let timerHandle: unknown = null
 
@@ -74,10 +72,7 @@ export function createSystemSnapshotPoll(deps: SystemSnapshotPollDeps): SystemSn
       const snapshot = await gateway.systemSnapshot(worktree)
       if (stopped) return
       if (deps.store.get().systemView.view !== 'open') return // left open mid-flight — no dispatch, no schedule
-      const base = mapSnapshotToSystemGraph(snapshot)
-      const rows = fileDiff.entriesFor(worktree, systemGraphFileSetKey(base))
-      const graph = rows === null ? base : applyFileDiffToSystemGraph(base, rows).graph
-      deps.store.dispatchSystemView({ type: 'replace-graph', graph })
+      publisher.publish(worktree, snapshot)
       scheduleNextTick(worktree)
     } catch (error) {
       if (stopped) return
@@ -101,11 +96,11 @@ export function createSystemSnapshotPoll(deps: SystemSnapshotPollDeps): SystemSn
     stop() {
       stopped = true
       clearPendingTimer()
-      fileDiff.stop()
+      publisher.stop()
     },
     rebindGateway(newGateway) {
       gateway = newGateway
-      fileDiff.rebindGateway(newGateway)
+      publisher.rebindGateway(newGateway)
     }
   }
 }
