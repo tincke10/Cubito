@@ -90,4 +90,24 @@ describe('OrchestrationDb.listQuestionsForRun', () => {
     expect(pendingOnly.map((q) => q.message_id)).toEqual([pending.question.message_id])
     expect(answeredOnly.map((q) => q.message_id)).toEqual([answered.question.message_id])
   })
+
+  it('projects the question prompt text from the source message', () => {
+    const d = createDb()
+    const { run, dispatch } = createRunWithQuestion(
+      d,
+      'Run prompt text',
+      'term_prompt',
+      'tab_coord:dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+    )
+    d.createQuestion({
+      runId: run.id,
+      dispatchId: dispatch.id,
+      askerHandle: 'term_prompt',
+      question: 'Deploy to prod?'
+    })
+
+    const [row] = d.listQuestionsForRun(run.id)
+
+    expect(row.question).toBe('Deploy to prod?')
+  })
 })

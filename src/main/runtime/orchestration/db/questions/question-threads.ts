@@ -163,14 +163,26 @@ export function listQuestionsForRun(
   runId: string,
   status?: QuestionStatus
 ): QuestionRow[] {
+  // Why: the prompt text lives on the source message, not question_threads; the reply
+  // UI needs it for context (design doc pin 4). LEFT JOIN keeps a missing message non-fatal.
   const rows = status
     ? this.db
         .prepare(
-          'SELECT * FROM question_threads WHERE run_id = ? AND status = ? ORDER BY created_at'
+          `SELECT question_threads.*, messages.body AS question
+           FROM question_threads
+           LEFT JOIN messages ON messages.id = question_threads.message_id
+           WHERE question_threads.run_id = ? AND question_threads.status = ?
+           ORDER BY question_threads.created_at`
         )
         .all(runId, status)
     : this.db
-        .prepare('SELECT * FROM question_threads WHERE run_id = ? ORDER BY created_at')
+        .prepare(
+          `SELECT question_threads.*, messages.body AS question
+           FROM question_threads
+           LEFT JOIN messages ON messages.id = question_threads.message_id
+           WHERE question_threads.run_id = ?
+           ORDER BY question_threads.created_at`
+        )
         .all(runId)
   return (rows as QuestionRow[]).map(exposeQuestionTimestamps)
 }

@@ -118,6 +118,8 @@ export type QuestionRow = {
   created_at: string
   answered_at: string | null
   closed_at: string | null
+  /** Prompt text of the source message; only populated by listQuestionsForRun (lease inbox read). */
+  question?: string
 }
 
 export type MutationState = 'pending' | 'completed'
