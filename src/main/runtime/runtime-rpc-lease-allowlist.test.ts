@@ -8,7 +8,9 @@ import { MOBILE_RPC_METHOD_ALLOWLIST } from './runtime-rpc'
 describe('MOBILE_RPC_METHOD_ALLOWLIST: GUI run-lease verbs', () => {
   it.each([
     'orchestration.gateList',
+    'orchestration.gateResolve',
     'orchestration.questionList',
+    'orchestration.reply',
     'orchestration.runCreate',
     'orchestration.runShow',
     'orchestration.taskCreate',

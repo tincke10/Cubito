@@ -378,7 +378,9 @@ export const MOBILE_RPC_METHOD_ALLOWLIST = new Set([
   // paired-device lease predicate match (that requires clientKind 'runtime'), so the
   // real gate for these verbs is the lease-ownership branch, not this allowlist.
   'orchestration.gateList',
+  'orchestration.gateResolve',
   'orchestration.questionList',
+  'orchestration.reply',
   'orchestration.runCreate',
   'orchestration.runShow',
   'orchestration.taskCreate',
