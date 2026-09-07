@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { EngineSystemEdge, EngineSystemGraph, EngineSystemNode } from './system-graph-model'
-import { serializeSystemGraph } from './system-graph-wire'
+import { serializeSystemGraph, type SystemGraphWatchFrame } from './system-graph-wire'
 
 describe('serializeSystemGraph', () => {
   it('serializes an empty graph to empty arrays', () => {
@@ -44,5 +44,33 @@ describe('serializeSystemGraph', () => {
     const graph: EngineSystemGraph = { nodes: new Map([[routeNode.id, routeNode]]), edges: [] }
 
     expect(serializeSystemGraph(graph).nodes[0]).toEqual(routeNode)
+  })
+})
+
+describe('SystemGraphWatchFrame', () => {
+  it('carries the serialized graph on a ready frame', () => {
+    const node: EngineSystemNode = { id: 'a', kind: 'router', label: 'A', diff: null }
+    const graph: EngineSystemGraph = { nodes: new Map([['a', node]]), edges: [] }
+
+    const frame: SystemGraphWatchFrame = {
+      type: 'ready',
+      subscriptionId: 'sub-1',
+      graph: serializeSystemGraph(graph)
+    }
+
+    expect(frame).toEqual({
+      type: 'ready',
+      subscriptionId: 'sub-1',
+      graph: { nodes: [node], edges: [] }
+    })
+  })
+
+  it('carries the serialized graph on a graph frame', () => {
+    const edge: EngineSystemEdge = { from: 'a', to: 'b', kind: 'normal' }
+    const graph: EngineSystemGraph = { nodes: new Map(), edges: [edge] }
+
+    const frame: SystemGraphWatchFrame = { type: 'graph', graph: serializeSystemGraph(graph) }
+
+    expect(frame).toEqual({ type: 'graph', graph: { nodes: [], edges: [edge] } })
   })
 })
