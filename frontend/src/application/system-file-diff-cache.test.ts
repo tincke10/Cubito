@@ -261,6 +261,46 @@ describe('createSystemFileDiffCache', () => {
     expect(cache.entriesFor('repo::child', 'k1')).toBeNull()
   })
 
+  it('ignores a late result from a previous worktree (no cross-worktree leak)', async () => {
+    const gateway = createFakeGateway()
+    const late = deferred<BranchCompare>()
+    gateway.impl = () => late.promise // first fetch (old worktree) hangs
+    const { cache } = setup(gateway)
+
+    cache.entriesFor('repo::child', 'k1')
+    gateway.impl = async () =>
+      branchCompare({ entries: [{ path: 'src/main.ts', status: 'added', added: 5, removed: 0 }] })
+    cache.entriesFor('repo::main', 'k-main') // switch worktree while the old fetch is in flight
+    await flush()
+    await flush()
+    late.resolve(branchCompare()) // old worktree's numbers land AFTER the switch
+    await flush()
+    await flush()
+
+    expect(cache.entriesFor('repo::main', 'k-main')).toEqual([
+      { path: 'src/main.ts', status: 'added', added: 5, removed: 0 }
+    ])
+    cache.stop()
+  })
+
+  it('serves fresh entries again after stop() when the view is reopened', async () => {
+    const gateway = createFakeGateway()
+    const { cache } = setup(gateway)
+
+    cache.entriesFor('repo::child', 'k1')
+    await flush()
+    await flush()
+    cache.stop()
+
+    cache.entriesFor('repo::child', 'k1') // reopen: the poll restarts on the same cache
+    await flush()
+    await flush()
+
+    expect(gateway.calls).toBe(2)
+    expect(cache.entriesFor('repo::child', 'k1')).not.toBeNull()
+    cache.stop()
+  })
+
   it('rebindGateway routes the next fetch to the new gateway', async () => {
     const gatewayA = createFakeGateway()
     const gatewayB = createFakeGateway()

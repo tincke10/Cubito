@@ -16,6 +16,7 @@ export type SystemFileDiffCache = {
   /** Synchronous — returns the last known entries (or null), kicking a background refresh
    *  when the worktree/key changed or the cadence interval elapsed. Never awaits the fetch. */
   entriesFor(worktree: WorktreeId, fileSetKey: string): readonly GitStatusRow[] | null
+  /** Discards in-flight work and cached entries; the cache stays usable for the next open. */
   stop(): void
   rebindGateway(gateway: BranchCompareEntriesGateway): void
 }
@@ -32,12 +33,24 @@ export function createSystemFileDiffCache(deps: SystemFileDiffCacheDeps): System
   let lastKey: string | null = null
   let lastFetchAt = 0
   let inFlight = false
-  let stopped = false
+  // Why: a worktree switch or stop() must discard whatever fetch is still in flight — otherwise
+  // the previous worktree's numbers land on the new one. Each refresh owns a generation.
+  let generation = 0
+
+  function invalidate(): void {
+    generation += 1
+    inFlight = false
+    entries = null
+    lastWorktree = null
+    lastKey = null
+    lastFetchAt = 0
+  }
 
   function refresh(worktree: WorktreeId, key: string): void {
+    const owned = ++generation
     inFlight = true
     void fetchBranchCompareEntries(gateway, deps.store.get().graph, worktree).then((result) => {
-      if (stopped) return
+      if (owned !== generation) return
       entries = result.outcome === 'ready' ? result.entries : null
       lastFetchAt = now()
       lastKey = key
@@ -48,10 +61,8 @@ export function createSystemFileDiffCache(deps: SystemFileDiffCacheDeps): System
   return {
     entriesFor(worktree, fileSetKey) {
       if (worktree !== lastWorktree) {
+        invalidate()
         lastWorktree = worktree
-        entries = null
-        lastKey = null
-        lastFetchAt = 0
         refresh(worktree, fileSetKey)
         return entries
       }
@@ -66,8 +77,10 @@ export function createSystemFileDiffCache(deps: SystemFileDiffCacheDeps): System
       }
       return entries
     },
+    // Not terminal: the binder keeps one poll (and this cache) across [x] open/close cycles, so
+    // stop only discards in-flight work and forces a fresh fetch on the next open.
     stop() {
-      stopped = true
+      invalidate()
     },
     rebindGateway(newGateway) {
       gateway = newGateway
