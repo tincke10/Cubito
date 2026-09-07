@@ -421,7 +421,7 @@ if (pairingEntry.kind === 'connect') {
       bindSpawn(connection)
       bindProjects(connection)
       fanOutBinder.bind(connection)
-      systemViewBinder.rebindGateway(connection.gateway)
+      systemViewBinder.rebindGateway(connection.gateway, connection.systemGraphStream)
       diffViewBinder.rebindGateway(connection.gateway)
       compareViewBinder.rebindGateway(connection.gateway, connection.capabilities)
     },

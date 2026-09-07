@@ -118,6 +118,8 @@ function createFakeConnection(overrides?: {
       agentActivity: async () => ({ events: [], latestSeq: 0 })
     },
     terminals: createFakeTerminalsPort(),
+    // Reconnect-hook tests only assert identity, never call this (mirrors createFakeTerminalsPort).
+    systemGraphStream: { watch: () => ({ close: () => {} }) },
     capabilities: [],
     close() {
       connection.closed = true

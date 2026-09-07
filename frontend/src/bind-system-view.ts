@@ -3,12 +3,13 @@ import { createSystemGraph } from './presentation/system/system-graph-element'
 import { createActivityFeed } from './presentation/system/activity-feed-element'
 import { createSystemHud } from './presentation/system/system-hud-element'
 import { createSystemLiveDriver } from './application/system-live-driver'
-import { createSystemSnapshotPoll } from './application/system-snapshot-poll'
+import { createSystemGraphSource } from './application/system-graph-source'
 import type { SystemSnapshotPollGatewayPort } from './application/system-snapshot-poll'
 import { createAgentActivityPoll } from './application/agent-activity-poll'
 import type { AgentActivityPollGatewayPort } from './application/agent-activity-poll'
 import type { SceneStore } from './application/scene-store'
 import type { SystemGraphPort } from './application/ports/system-graph-port'
+import type { SystemGraphStreamPort } from './application/ports/system-graph-stream-port'
 import type { SystemGraphHandle } from './presentation/system/system-graph-element'
 import type { ActivityFeedHandle } from './presentation/system/activity-feed-element'
 import type { SystemHudHandle } from './presentation/system/system-hud-element'
@@ -30,7 +31,7 @@ export type BindSystemViewDeps = {
 
 export type SystemViewBinder = {
   sync(): void
-  rebindGateway(gateway: SystemViewGatewayPort): void
+  rebindGateway(gateway: SystemViewGatewayPort, streamPort?: SystemGraphStreamPort): void
 }
 
 /**
@@ -52,15 +53,15 @@ export function createSystemViewBinder(deps: BindSystemViewDeps): SystemViewBind
   })
   const driver = createSystemLiveDriver({ store: deps.store, port: deps.demoGraphPort })
 
-  // Set once a real connection rebinds the poll's gateway; stays true across later opens/closes
+  // Set once a real connection rebinds the source's gateway; stays true across later opens/closes
   // (mirrors DiffViewBinder — no "unbind" on disconnect), so `pnpm dev` offline stays on the
   // stub path with no gateway ever set.
   let hasRealGateway = false
-  const poll = createSystemSnapshotPoll({
+  const source = createSystemGraphSource({
     store: deps.store,
     gateway: deps.demoGateway,
-    onUnsupported: () => {
-      // old host, no `system.snapshot` — fall back to the scripted demo for this open.
+    onDemoFallback: () => {
+      // old host, no `system.snapshot` either — fall back to the scripted demo for this open.
       const systemView = deps.store.get().systemView
       if (systemView.view === 'open') driver.start(systemView.focusedNodeId)
     }
@@ -89,14 +90,14 @@ export function createSystemViewBinder(deps: BindSystemViewDeps): SystemViewBind
         // per-open attempt (not a one-time probe) — a later open retries the real gateway even
         // if an earlier one fell back, so a since-upgraded host is picked up automatically.
         if (hasRealGateway) {
-          poll.start(systemView.focusedNodeId)
+          source.start(systemView.focusedNodeId)
           activityPoll.start(systemView.focusedNodeId)
         } else {
           driver.start(systemView.focusedNodeId)
         }
       }
       if (transitionToClosed) {
-        poll.stop()
+        source.stop()
         activityPoll.stop()
         driver.stop()
       }
@@ -106,9 +107,9 @@ export function createSystemViewBinder(deps: BindSystemViewDeps): SystemViewBind
         selectedId !== null ? (state.graph.nodes.get(selectedId)?.branch ?? '') : ''
       controller.sync(deps.store.get().systemView, state.connection, branchLabel)
     },
-    rebindGateway(gateway: SystemViewGatewayPort): void {
+    rebindGateway(gateway: SystemViewGatewayPort, streamPort?: SystemGraphStreamPort): void {
       hasRealGateway = true
-      poll.rebindGateway(gateway)
+      source.rebind(gateway, streamPort)
       activityPoll.rebindGateway(gateway)
     }
   }

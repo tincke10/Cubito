@@ -10,6 +10,10 @@ import type { SystemHudHandle } from './presentation/system/system-hud-element'
 import { emptySystemGraph } from './domain/system-graph/types'
 import type { AgentActivityPage, SystemGraphSnapshot } from './application/ports/runtime-gateway'
 import { AGENT_ACTIVITY_POLL_INTERVAL_MS } from './application/agent-activity-poll'
+import type {
+  SystemGraphStreamHandlers,
+  SystemGraphStreamPort
+} from './application/ports/system-graph-stream-port'
 
 /** Flushes pending microtasks/macrotasks so a poll/driver's chained promises settle. */
 const flush = async (): Promise<void> => {
@@ -298,5 +302,26 @@ describe('createSystemViewBinder', () => {
     expect(graphPort.loadSystemGraph).not.toHaveBeenCalled() // scripted driver never starts
     const callsAfterUnsupported = systemSnapshot.mock.calls.length
     expect(callsAfterUnsupported).toBeGreaterThan(0) // snapshot poll keeps running
+  })
+
+  it('opening with a stream port bound never calls systemSnapshot (Wave F3 source)', async () => {
+    const systemSnapshot = vi.fn(async () => ({ nodes: [], edges: [] }))
+    const gitBranchCompare = createNotReadyCompare()
+    const agentActivity = createEmptyAgentActivity()
+    const { store, binder } = setup({
+      gateway: { systemSnapshot, gitBranchCompare, agentActivity }
+    })
+    const watch = vi.fn((_worktree: string, _handlers: SystemGraphStreamHandlers) => ({
+      close: vi.fn()
+    }))
+    const streamPort: SystemGraphStreamPort = { watch }
+    binder.rebindGateway({ systemSnapshot, gitBranchCompare, agentActivity }, streamPort)
+
+    store.dispatchSystemView({ type: 'open', nodeId: '/wt/alpha' })
+    binder.sync()
+    await flush()
+
+    expect(watch).toHaveBeenCalledWith('/wt/alpha', expect.anything())
+    expect(systemSnapshot).not.toHaveBeenCalled()
   })
 })

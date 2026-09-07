@@ -4,6 +4,7 @@ import { syncWorktreeGraph } from './sync-worktree-graph'
 import type { SceneStore } from './scene-store'
 import type { RuntimeGateway } from './ports/runtime-gateway'
 import type { TerminalStreamPort } from './ports/terminal-stream-port'
+import type { SystemGraphStreamPort } from './ports/system-graph-stream-port'
 
 /** Poll loop owns its own timer (D5) — `main.ts` only composes and calls `start()`. */
 export const LIVE_SYNC_POLL_INTERVAL_MS = 2000
@@ -17,6 +18,7 @@ export const LIVE_SYNC_JITTER_RATIO = 0.1
 export type LiveSyncConnection = {
   gateway: RuntimeGateway
   terminals: TerminalStreamPort
+  systemGraphStream: SystemGraphStreamPort
   runtimeId?: string
   /** Host-negotiated capability ids (Change B: e.g. `orchestration.gui-run-lease.v1`), read once via `status.get` at connect time. */
   capabilities: readonly string[]

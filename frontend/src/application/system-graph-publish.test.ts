@@ -224,6 +224,24 @@ describe('createSystemGraphPublisher', () => {
     publisher.stop()
   })
 
+  it('publish() after stop() resumes the re-publish-on-fresh-entries behavior (Wave F3 worktree switch)', async () => {
+    const gateway = createFakeGateway()
+    const { store } = setup()
+    const publisher = createSystemGraphPublisher({ store, gateway })
+
+    publisher.publish('/wt/alpha', realisticSnapshot)
+    publisher.stop()
+    publisher.publish('/wt/alpha', realisticSnapshot) // e.g. a poll re-entering after a switch
+    await flush()
+    await flush()
+
+    expect(graphOf(store).nodes.get('router:src/routes/users.ts')).toMatchObject({
+      state: 'dirty',
+      diff: { added: 34, removed: 8 }
+    })
+    publisher.stop()
+  })
+
   it('rebindGateway forwards to the cache', async () => {
     const gatewayA = createFakeGateway()
     const gatewayB = createFakeGateway()

@@ -53,6 +53,7 @@ export function createSystemGraphPublisher(deps: SystemGraphPublisherDeps): Syst
 
   return {
     publish(worktree, snapshot) {
+      stopped = false // a fresh publish() resumes a previously-stopped publisher (worktree switch)
       lastWorktree = worktree
       lastSnapshot = snapshot
       render(worktree, snapshot)
