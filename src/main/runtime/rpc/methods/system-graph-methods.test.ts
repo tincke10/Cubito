@@ -4,6 +4,7 @@ import { isStreamingMethod } from '../core'
 import type { EngineSystemGraph } from '../../../system-graph/system-graph-model'
 import { SYSTEM_GRAPH_METHODS } from './system-graph-methods'
 import { ALL_RPC_METHODS } from './index'
+import { MOBILE_RPC_METHOD_ALLOWLIST } from '../../runtime-rpc'
 
 const ensureWatched = vi.fn(async (_worktreeId: string) => {})
 const getGraph = vi.fn<(worktreeId: string) => EngineSystemGraph | undefined>()
@@ -14,7 +15,9 @@ vi.mock('../../../system-graph/runtime-system-graph-host', () => ({
   getRuntimeSystemGraphService: vi.fn(() => ({ ensureWatched, getGraph }))
 }))
 
-const runSystemGraphWatchStream = vi.hoisted(() => vi.fn(async () => {}))
+const runSystemGraphWatchStream = vi.hoisted(() =>
+  vi.fn(async (_args: { subscriptionId: string }) => {})
+)
 
 vi.mock('./system-graph-watch-stream-lifecycle', () => ({ runSystemGraphWatchStream }))
 
@@ -91,9 +94,7 @@ describe('system.watch RPC method', () => {
     await watch.handler({ worktree: 'w1' }, { runtime, connectionId: 'conn-a' }, emit)
     await watch.handler({ worktree: 'w1' }, { runtime, connectionId: 'conn-b' }, emit)
 
-    const ids = runSystemGraphWatchStream.mock.calls.map(
-      (call) => (call[0] as { subscriptionId: string }).subscriptionId
-    )
+    const ids = runSystemGraphWatchStream.mock.calls.map((call) => call[0].subscriptionId)
     expect(new Set(ids).size).toBe(3)
   })
 })
@@ -122,5 +123,10 @@ describe('system.watch / system.unwatch registration', () => {
   it('are present in ALL_RPC_METHODS', () => {
     expect(ALL_RPC_METHODS.some((candidate) => candidate.name === 'system.watch')).toBe(true)
     expect(ALL_RPC_METHODS.some((candidate) => candidate.name === 'system.unwatch')).toBe(true)
+  })
+
+  it('are present in MOBILE_RPC_METHOD_ALLOWLIST', () => {
+    expect(MOBILE_RPC_METHOD_ALLOWLIST.has('system.watch')).toBe(true)
+    expect(MOBILE_RPC_METHOD_ALLOWLIST.has('system.unwatch')).toBe(true)
   })
 })

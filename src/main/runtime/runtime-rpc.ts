@@ -437,6 +437,8 @@ export const MOBILE_RPC_METHOD_ALLOWLIST = new Set([
   'stats.summary',
   'status.get',
   'system.snapshot',
+  'system.unwatch',
+  'system.watch',
   'agent.activity',
   'agentTeams.prepareLaunch',
   'agentTeams.tmuxCompat',
