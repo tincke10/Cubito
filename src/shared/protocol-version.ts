@@ -58,6 +58,11 @@ export const ORCHESTRATION_CONTRACT_RUNTIME_CAPABILITY = 'orchestration.contract
 // with no coordinator terminal). Registered unconditionally, like aiVault.v1, so a client
 // can probe for it and safe-fail to the terminal-pane flow against an older host.
 export const GUI_RUN_LEASE_RUNTIME_CAPABILITY = 'orchestration.gui-run-lease.v1' as const
+// Why: signals the host lease-scopes gateList reads and exposes questionList, so a paired
+// GUI can safely poll a Run's decision gates and inbox. Registered unconditionally, like
+// gui-run-lease.v1, so an older host without it is never probed for questionList.
+export const GUI_RUN_LEASE_GATES_RUNTIME_CAPABILITY =
+  'orchestration.gui-run-lease.gates.v1' as const
 export const FOLDER_WORKSPACE_PATH_STATUS_RUNTIME_CAPABILITY =
   'folder-workspace.path-status.v1' as const
 export const LINEAR_ISSUE_ATTRIBUTE_FILTER_RUNTIME_CAPABILITY =
@@ -190,6 +195,7 @@ export const RUNTIME_CAPABILITIES = [
   ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY,
   ORCHESTRATION_CONTRACT_RUNTIME_CAPABILITY,
   GUI_RUN_LEASE_RUNTIME_CAPABILITY,
+  GUI_RUN_LEASE_GATES_RUNTIME_CAPABILITY,
   BROWSER_SCREENCAST_RUNTIME_CAPABILITY,
   BROWSER_TAB_CREATE_KNOWN_ID_RUNTIME_CAPABILITY,
   BROWSER_CLIENT_HOST_RUNTIME_CAPABILITY,

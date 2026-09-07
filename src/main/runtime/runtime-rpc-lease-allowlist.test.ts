@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { MOBILE_RPC_METHOD_ALLOWLIST } from './runtime-rpc'
 
-// Why (Wave 5, C9): the mobile allowlist only gates device.scope === 'mobile' — a
-// 'runtime'-scope GUI lease caller already bypasses it. Adding these 6 verbs is
-// future-mobile + honest inventory; the real gate is the lease-ownership branch in
-// each handler (see orchestration-run-scope.ts assertLeaseOwnership).
+// Why (Wave 5, C9; extended C-EXT for gates/inbox reads): the mobile allowlist only gates
+// device.scope === 'mobile' — a 'runtime'-scope GUI lease caller already bypasses it. Adding
+// these verbs is future-mobile + honest inventory; the real gate is the lease-ownership
+// branch in each handler (see orchestration-run-scope.ts assertLeaseOwnership).
 describe('MOBILE_RPC_METHOD_ALLOWLIST: GUI run-lease verbs', () => {
   it.each([
+    'orchestration.gateList',
+    'orchestration.questionList',
     'orchestration.runCreate',
     'orchestration.runShow',
     'orchestration.taskCreate',

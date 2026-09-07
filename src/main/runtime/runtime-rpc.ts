@@ -376,6 +376,8 @@ export const MOBILE_RPC_METHOD_ALLOWLIST = new Set([
   // Why: future-mobile + honest inventory only — a mobile-scope caller still has no
   // paired-device lease predicate match (that requires clientKind 'runtime'), so the
   // real gate for these verbs is the lease-ownership branch, not this allowlist.
+  'orchestration.gateList',
+  'orchestration.questionList',
   'orchestration.runCreate',
   'orchestration.runShow',
   'orchestration.taskCreate',

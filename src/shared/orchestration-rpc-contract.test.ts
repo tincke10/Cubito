@@ -43,6 +43,7 @@ describe('orchestration RPC contract', () => {
     ['orchestration.taskList', {}],
     ['orchestration.dispatchShow', {}],
     ['orchestration.gateList', {}],
+    ['orchestration.questionList', {}],
     ['orchestration.workerShow', {}],
     ['orchestration.workerRead', {}],
     ['orchestration.federationPull', {}],
