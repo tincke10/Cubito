@@ -26,7 +26,9 @@ export type FanOutGatewayPort = Pick<
   | 'orchestrationWorkerList'
   | 'orchestrationWorkerShow'
   | 'orchestrationGateList'
+  | 'orchestrationGateResolve'
   | 'orchestrationQuestionList'
+  | 'orchestrationQuestionAnswer'
 >
 
 export type FanOutControllerDeps = {
@@ -79,6 +81,22 @@ export function createFanOutController(deps: FanOutControllerDeps): FanOutContro
     element = null
   }
 
+  // Both are called from the gate-list row's own submit — it awaits the returned promise and
+  // shows a rejection inline on that row (non-destructive: no dispatch, panel stays mounted).
+  // A resolved/answered id simply stops coming back from the poll's decisionVisibility next
+  // tick, so no local reducer action is needed here (design pin 8/Open Q1: poll-refresh only).
+  const handleResolveGate = async (gateId: string, resolution: string): Promise<void> => {
+    if (currentSlice.view !== 'running' || currentSlice.runId === null) return
+    await gateway.orchestrationGateResolve({ run: currentSlice.runId, gateId, resolution })
+    await deps.refetch()
+  }
+
+  const handleAnswerQuestion = async (messageId: string, body: string): Promise<void> => {
+    if (currentSlice.view !== 'running' || currentSlice.runId === null) return
+    await gateway.orchestrationQuestionAnswer({ run: currentSlice.runId, messageId, body })
+    await deps.refetch()
+  }
+
   const mount = (): FanOutFormHandle => {
     if (!element) {
       const created = deps.createElement()
@@ -87,6 +105,8 @@ export function createFanOutController(deps: FanOutControllerDeps): FanOutContro
       created.onPromptChange((prompt) => deps.dispatch({ type: 'update-prompt', prompt }))
       created.onSubmit(() => void handleSubmit())
       created.onCancel(() => deps.dispatch({ type: 'cancel' }))
+      created.onResolveGate((gateId, resolution) => handleResolveGate(gateId, resolution))
+      created.onAnswerQuestion((messageId, body) => handleAnswerQuestion(messageId, body))
       deps.hud.appendChild(created.element)
       element = created
     }

@@ -12,6 +12,10 @@ import type {
   CreateWorktreeResult,
   LeaseGateListInput,
   LeaseGateListResult,
+  LeaseGateResolveInput,
+  LeaseGateResolveResult,
+  LeaseQuestionAnswerInput,
+  LeaseQuestionAnswerResult,
   LeaseQuestionListInput,
   LeaseQuestionListResult,
   LeaseRunCreateInput,
@@ -143,9 +147,19 @@ const createFakeGateway = () => ({
   orchestrationGateList: vi.fn<(input: LeaseGateListInput) => Promise<LeaseGateListResult>>(
     async () => ({ gates: [] })
   ),
+  orchestrationGateResolve: vi.fn<
+    (input: LeaseGateResolveInput) => Promise<LeaseGateResolveResult>
+  >(async () => {
+    throw new Error('orchestrationGateResolve not implemented in this fake')
+  }),
   orchestrationQuestionList: vi.fn<
     (input: LeaseQuestionListInput) => Promise<LeaseQuestionListResult>
-  >(async () => ({ questions: [] }))
+  >(async () => ({ questions: [] })),
+  orchestrationQuestionAnswer: vi.fn<
+    (input: LeaseQuestionAnswerInput) => Promise<LeaseQuestionAnswerResult>
+  >(async () => {
+    throw new Error('orchestrationQuestionAnswer not implemented in this fake')
+  })
 })
 
 const createFakePoll = () => ({
@@ -519,5 +533,108 @@ describe('createFanOutController — lease path (Change B)', () => {
     expect(leasePlanner).toHaveBeenCalledOnce()
     expect(gateway.createWorktree).toHaveBeenCalledOnce()
     expect(focusLitter).toHaveBeenCalledWith(['w1', 'wt-v1-fallback'])
+  })
+})
+
+const runningLeaseSlice = (
+  overrides: Partial<Extract<FanOutSlice, { view: 'running' }>> = {}
+): FanOutSlice => ({
+  view: 'running',
+  parentId: 'w1',
+  fields: { count: 1, agent: 'claude', prompt: '' },
+  repoSelector: 'id:repo-1',
+  batch: [
+    {
+      mutationId: 'mutation-1',
+      worktreeId: 'wt-1',
+      failed: false,
+      dispatchId: 'dispatch-1',
+      taskId: 'task-1'
+    }
+  ],
+  memberStatus: {},
+  runId: 'run-1',
+  ...overrides
+})
+
+describe('createFanOutController — gate resolve / question answer (Change F)', () => {
+  it('resolve: routes to orchestrationGateResolve scoped to the running runId, then refetches', async () => {
+    const { controller, gateway, forms, refetch } = setup()
+    controller.sync(runningLeaseSlice(), emptyWorktreeGraph())
+    gateway.orchestrationGateResolve.mockResolvedValueOnce({
+      gate: {
+        id: 'gate-1',
+        runId: 'run-1',
+        taskId: 'task-1',
+        question: 'q',
+        options: '[]',
+        status: 'resolved',
+        resolution: 'a',
+        createdAt: '',
+        resolvedAt: ''
+      }
+    })
+    await forms[0]!.emitResolveGate('gate-1', 'a')
+    expect(gateway.orchestrationGateResolve).toHaveBeenCalledWith({
+      run: 'run-1',
+      gateId: 'gate-1',
+      resolution: 'a'
+    })
+    expect(refetch).toHaveBeenCalledOnce()
+  })
+
+  it('answer: routes to orchestrationQuestionAnswer scoped to the running runId, then refetches', async () => {
+    const { controller, gateway, forms, refetch } = setup()
+    controller.sync(runningLeaseSlice(), emptyWorktreeGraph())
+    gateway.orchestrationQuestionAnswer.mockResolvedValueOnce({
+      messageId: 'msg-2',
+      duplicate: false
+    })
+    await forms[0]!.emitAnswerQuestion('msg-1', 'go with a')
+    expect(gateway.orchestrationQuestionAnswer).toHaveBeenCalledWith({
+      run: 'run-1',
+      messageId: 'msg-1',
+      body: 'go with a'
+    })
+    expect(refetch).toHaveBeenCalledOnce()
+  })
+
+  it('a gateway throw on resolve propagates to the caller (the row shows it inline) without dispatching or crashing', async () => {
+    const { controller, gateway, forms, dispatch } = setup()
+    controller.sync(runningLeaseSlice(), emptyWorktreeGraph())
+    gateway.orchestrationGateResolve.mockRejectedValueOnce(new Error('gate_not_pending'))
+    await expect(forms[0]!.emitResolveGate('gate-1', 'a')).rejects.toThrow('gate_not_pending')
+    expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'cancel' }))
+    expect(forms[0]!.disposed).toBe(false)
+  })
+
+  it('a gateway throw on answer propagates to the caller without dispatching or crashing', async () => {
+    const { controller, gateway, forms } = setup()
+    controller.sync(runningLeaseSlice(), emptyWorktreeGraph())
+    gateway.orchestrationQuestionAnswer.mockRejectedValueOnce(new Error('answer_conflict'))
+    await expect(forms[0]!.emitAnswerQuestion('msg-1', 'go with a')).rejects.toThrow(
+      'answer_conflict'
+    )
+    expect(forms[0]!.disposed).toBe(false)
+  })
+
+  it('is a defensive no-op (no gateway call) when the running batch has no lease runId (v1 path)', async () => {
+    const { controller, gateway, forms } = setup()
+    controller.sync(runningLeaseSlice({ runId: null }), emptyWorktreeGraph())
+    await forms[0]!.emitResolveGate('gate-1', 'a')
+    await forms[0]!.emitAnswerQuestion('msg-1', 'body')
+    expect(gateway.orchestrationGateResolve).not.toHaveBeenCalled()
+    expect(gateway.orchestrationQuestionAnswer).not.toHaveBeenCalled()
+  })
+
+  it('not capable: the running model carries no gates/questions when decisionVisibility never populated — rows never render', () => {
+    const { controller, forms } = setup()
+    controller.sync(runningLeaseSlice(), emptyWorktreeGraph())
+    const applied = forms[0]!.apply as unknown as {
+      mock: { calls: [{ view: string; gates?: unknown[]; questions?: unknown[] }][] }
+    }
+    const lastModel = applied.mock.calls.at(-1)![0]
+    expect(lastModel.gates).toEqual([])
+    expect(lastModel.questions).toEqual([])
   })
 })
