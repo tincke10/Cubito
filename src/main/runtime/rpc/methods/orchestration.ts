@@ -1377,7 +1377,13 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
     params: ReplyParams,
     handler: async (
       params,
-      { orchestrationCompatibilityEvidence, runtime, legacyCoordinatorRunId }
+      {
+        orchestrationCompatibilityEvidence,
+        runtime,
+        legacyCoordinatorRunId,
+        pairedDeviceId,
+        clientKind
+      }
     ) => {
       const db = runtime.getOrchestrationDb()
       const original = db.getMessageById(params.id)
@@ -1409,12 +1415,16 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
 
       const question = db.getQuestion(params.id)
       if (question) {
+        // Why: mirrors gateResolve/taskCreate — a paired GUI device with no `from` is a lease caller.
+        const isLeaseCaller =
+          !params.from && pairedDeviceId !== undefined && clientKind === 'runtime'
         const run = resolveRunScope(runtime, {
           runId: params.run ?? question.run_id,
           callerTerminalHandle: params.from,
           requireCurrentConsumer: true,
           legacyCoordinatorRunId,
-          callerEvidence: orchestrationCompatibilityEvidence
+          callerEvidence: orchestrationCompatibilityEvidence,
+          leaseDeviceId: isLeaseCaller ? pairedDeviceId : undefined
         })
         const answered = db.answerQuestion({
           messageId: question.message_id,
