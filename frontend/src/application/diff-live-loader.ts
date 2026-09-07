@@ -115,8 +115,9 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-/** Human copy for a non-'ready' BranchCompare status (git.branchCompare doesn't throw for these). */
-function railErrorMessageFor(status: string): string {
+/** Human copy for a non-'ready' BranchCompare status (git.branchCompare doesn't throw for these).
+ *  Exported for compare-live-loader.ts (Change D) — reused verbatim, one wording for both modes. */
+export function railErrorMessageFor(status: string): string {
   switch (status) {
     case 'invalid-base':
       return 'base inválida'
