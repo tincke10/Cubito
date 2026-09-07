@@ -101,7 +101,8 @@ export function reduceDiffView(slice: DiffViewSlice, action: DiffViewAction): Di
   }
 }
 
-function toPanelState(content: DiffFileContent): DiffPanelState {
+/** Exported for compare-child-load.ts (Change D) — identical per-file panel projection, reused verbatim. */
+export function toPanelState(content: DiffFileContent): DiffPanelState {
   return content.kind === 'text'
     ? {
         kind: 'text',
@@ -118,10 +119,10 @@ export type DiffHudCounts = { files: number; added: number; removed: number }
 
 const emptyDiffHudCounts = (): DiffHudCounts => ({ files: 0, added: 0, removed: 0 })
 
-/** HUD copy: file/added/removed totals across the rail's files list. */
-export function diffHudCounts(slice: DiffViewSlice): DiffHudCounts {
-  if (slice.view !== 'open') return emptyDiffHudCounts()
-  return slice.files.reduce(
+/** File/added/removed totals over any DiffFileRow list — reused by compare-rail-model.ts (Change D)
+ *  for the per-child stat, since a compare child's files list isn't wrapped in a DiffViewSlice. */
+export function hudCountsOfFiles(files: readonly DiffFileRow[]): DiffHudCounts {
+  return files.reduce(
     (acc, file) => ({
       files: acc.files + 1,
       added: acc.added + file.added,
@@ -129,4 +130,10 @@ export function diffHudCounts(slice: DiffViewSlice): DiffHudCounts {
     }),
     emptyDiffHudCounts()
   )
+}
+
+/** HUD copy: file/added/removed totals across the rail's files list. */
+export function diffHudCounts(slice: DiffViewSlice): DiffHudCounts {
+  if (slice.view !== 'open') return emptyDiffHudCounts()
+  return hudCountsOfFiles(slice.files)
 }

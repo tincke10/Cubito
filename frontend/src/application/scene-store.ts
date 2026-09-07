@@ -16,6 +16,8 @@ import { emptySystemViewSlice, reduceSystemView } from './system-view-model'
 import type { SystemViewAction, SystemViewSlice } from './system-view-model'
 import { emptyDiffViewSlice, reduceDiffView } from './diff-view-model'
 import type { DiffViewAction, DiffViewSlice } from './diff-view-model'
+import { emptyCompareViewSlice, reduceCompareView } from './compare-view-model'
+import type { CompareViewAction, CompareViewSlice } from './compare-view-model'
 
 export type SyncStatus =
   | { state: 'idle' }
@@ -42,6 +44,7 @@ export type SceneState = {
   fanOut: FanOutSlice
   systemView: SystemViewSlice
   diffView: DiffViewSlice
+  compareView: CompareViewSlice
 }
 
 export type SceneStore = {
@@ -64,6 +67,8 @@ export type SceneStore = {
   dispatchSystemView(action: SystemViewAction): void
   /** Drives the diffView slice through diff-view-model's reducer, one notify. Doesn't touch `graph`. */
   dispatchDiffView(action: DiffViewAction): void
+  /** Drives the compareView slice through compare-view-model's reducer, one notify. Doesn't touch `graph`. */
+  dispatchCompareView(action: CompareViewAction): void
   subscribe(listener: (state: SceneState) => void): () => void
 }
 
@@ -79,7 +84,8 @@ const initialSceneState = (): SceneState => ({
   commandPalette: emptyCommandPaletteSlice(),
   fanOut: emptyFanOutSlice(),
   systemView: emptySystemViewSlice(),
-  diffView: emptyDiffViewSlice()
+  diffView: emptyDiffViewSlice(),
+  compareView: emptyCompareViewSlice()
 })
 
 /** Minimal observable store; swap for a richer signal system when the UI grows. */
@@ -127,21 +133,60 @@ export function createSceneStore(): SceneStore {
       notify()
     },
     dispatchSystemView(action) {
-      // [x] sistema and [d] diff are mutually exclusive scene modes — opening one closes the
-      // other at this chokepoint so no caller (keyboard, palette, ...) can leave both open.
+      // [x] sistema, [d] diff and [c] compare are mutually exclusive scene modes — opening one
+      // closes the OTHER TWO at this chokepoint so no caller (keyboard, palette, ...) can leave
+      // more than one open.
+      const opening = action.type === 'open'
       const diffView =
-        action.type === 'open' && state.diffView.view === 'open'
+        opening && state.diffView.view === 'open'
           ? reduceDiffView(state.diffView, { type: 'close' })
           : state.diffView
-      state = { ...state, systemView: reduceSystemView(state.systemView, action), diffView }
+      const compareView =
+        opening && state.compareView.view === 'open'
+          ? reduceCompareView(state.compareView, { type: 'close' })
+          : state.compareView
+      state = {
+        ...state,
+        systemView: reduceSystemView(state.systemView, action),
+        diffView,
+        compareView
+      }
       notify()
     },
     dispatchDiffView(action) {
+      const opening = action.type === 'open'
       const systemView =
-        action.type === 'open' && state.systemView.view === 'open'
+        opening && state.systemView.view === 'open'
           ? reduceSystemView(state.systemView, { type: 'close' })
           : state.systemView
-      state = { ...state, diffView: reduceDiffView(state.diffView, action), systemView }
+      const compareView =
+        opening && state.compareView.view === 'open'
+          ? reduceCompareView(state.compareView, { type: 'close' })
+          : state.compareView
+      state = {
+        ...state,
+        diffView: reduceDiffView(state.diffView, action),
+        systemView,
+        compareView
+      }
+      notify()
+    },
+    dispatchCompareView(action) {
+      const opening = action.type === 'open'
+      const systemView =
+        opening && state.systemView.view === 'open'
+          ? reduceSystemView(state.systemView, { type: 'close' })
+          : state.systemView
+      const diffView =
+        opening && state.diffView.view === 'open'
+          ? reduceDiffView(state.diffView, { type: 'close' })
+          : state.diffView
+      state = {
+        ...state,
+        compareView: reduceCompareView(state.compareView, action),
+        systemView,
+        diffView
+      }
       notify()
     },
     subscribe(listener) {

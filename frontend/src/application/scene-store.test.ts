@@ -9,6 +9,7 @@ import { emptyCommandPaletteSlice } from './command-palette-model'
 import { emptyFanOutSlice, FANOUT_PLACEHOLDER_PREFIX } from './fan-out-model'
 import { emptySystemViewSlice } from './system-view-model'
 import { emptyDiffViewSlice } from './diff-view-model'
+import { emptyCompareViewSlice } from './compare-view-model'
 import { inertActivity } from '../domain/worktree-graph/node-activity'
 import type { WorktreeGraph, WorktreeNode } from '../domain/worktree-graph/types'
 
@@ -413,5 +414,98 @@ describe('createSceneStore', () => {
     const diffBefore = store.get().diffView
     store.dispatchSystemView({ type: 'close' })
     expect(store.get().diffView).toBe(diffBefore)
+  })
+
+  it('starts with a closed compareView slice', () => {
+    const store = createSceneStore()
+    expect(store.get().compareView).toEqual(emptyCompareViewSlice())
+  })
+
+  it('dispatchCompareView() drives the compareView slice through the reducer', () => {
+    const store = createSceneStore()
+    store.dispatchCompareView({ type: 'open', members: ['w1', 'w2'] })
+    expect(store.get().compareView).toMatchObject({ view: 'open', members: ['w1', 'w2'] })
+  })
+
+  it('dispatchCompareView() notifies subscribers once and leaves the rest of SceneState untouched', () => {
+    const store = createSceneStore()
+    const listener = vi.fn()
+    store.subscribe(listener)
+    const before = store.get()
+    store.dispatchCompareView({ type: 'open', members: ['w1'] })
+    expect(listener).toHaveBeenCalledTimes(1)
+    const after = store.get()
+    expect(after.graph).toBe(before.graph)
+    expect(after.systemView).toBe(before.systemView)
+    expect(after.diffView).toBe(before.diffView)
+    expect(after.compareView).not.toBe(before.compareView)
+  })
+
+  it('dispatchCompareView() does not recompose the worktree graph', () => {
+    const store = createSceneStore()
+    store.update({ graph: graphOf([node()]) })
+    const before = store.get().graph
+    store.dispatchCompareView({ type: 'open', members: ['w1'] })
+    expect(store.get().graph).toBe(before)
+  })
+
+  describe('three-way scene-mode mutual exclusion (system / diff / compare)', () => {
+    it('open compare closes an already-open systemView AND diffView, never leaving either open', () => {
+      const store = createSceneStore()
+      store.dispatchSystemView({ type: 'open', nodeId: 'w1' })
+      store.dispatchDiffView({ type: 'open', nodeId: 'w1', baseRef: 'main' })
+      const listener = vi.fn()
+      store.subscribe(listener)
+
+      store.dispatchCompareView({ type: 'open', members: ['w1'] })
+
+      expect(listener).toHaveBeenCalledTimes(1)
+      expect(store.get().systemView.view).toBe('closed')
+      expect(store.get().diffView.view).toBe('closed')
+      expect(store.get().compareView.view).toBe('open')
+    })
+
+    it('open system closes an already-open compareView, never leaving both open', () => {
+      const store = createSceneStore()
+      store.dispatchCompareView({ type: 'open', members: ['w1'] })
+      const listener = vi.fn()
+      store.subscribe(listener)
+
+      store.dispatchSystemView({ type: 'open', nodeId: 'w1' })
+
+      expect(listener).toHaveBeenCalledTimes(1)
+      expect(store.get().compareView.view).toBe('closed')
+      expect(store.get().systemView.view).toBe('open')
+    })
+
+    it('open diff closes an already-open compareView, never leaving both open', () => {
+      const store = createSceneStore()
+      store.dispatchCompareView({ type: 'open', members: ['w1'] })
+      const listener = vi.fn()
+      store.subscribe(listener)
+
+      store.dispatchDiffView({ type: 'open', nodeId: 'w1', baseRef: 'main' })
+
+      expect(listener).toHaveBeenCalledTimes(1)
+      expect(store.get().compareView.view).toBe('closed')
+      expect(store.get().diffView.view).toBe('open')
+    })
+
+    it('dispatchCompareView open is a no-op on system/diff when both are already closed', () => {
+      const store = createSceneStore()
+      const systemBefore = store.get().systemView
+      const diffBefore = store.get().diffView
+      store.dispatchCompareView({ type: 'open', members: ['w1'] })
+      expect(store.get().systemView).toBe(systemBefore)
+      expect(store.get().diffView).toBe(diffBefore)
+    })
+
+    it('non-open compareView actions never touch system or diff', () => {
+      const store = createSceneStore()
+      store.dispatchSystemView({ type: 'open', nodeId: 'w1' })
+      const systemBefore = store.get().systemView
+      store.dispatchCompareView({ type: 'close' })
+      expect(store.get().systemView).toBe(systemBefore)
+    })
   })
 })

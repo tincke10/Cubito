@@ -11,6 +11,7 @@ import { emptyCommandPaletteSlice } from './command-palette-model'
 import { emptyFanOutSlice } from './fan-out-model'
 import { emptySystemViewSlice } from './system-view-model'
 import { emptyDiffViewSlice } from './diff-view-model'
+import { emptyCompareViewSlice } from './compare-view-model'
 
 const state = (overrides: Partial<SceneState> = {}): SceneState => ({
   graph: emptyWorktreeGraph(),
@@ -25,6 +26,7 @@ const state = (overrides: Partial<SceneState> = {}): SceneState => ({
   fanOut: emptyFanOutSlice(),
   systemView: emptySystemViewSlice(),
   diffView: emptyDiffViewSlice(),
+  compareView: emptyCompareViewSlice(),
   ...overrides
 })
 
