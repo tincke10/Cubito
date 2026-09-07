@@ -1,0 +1,210 @@
+import { describe, expect, it } from 'vitest'
+import { createCompareMergeAction } from './compare-merge-action-element'
+import type { CompareMergeActionModel } from './compare-merge-action-element'
+import type { CompareMergeState } from '../../application/compare-view-model'
+
+type Handler = (event: { key?: string }) => void
+
+type FakeElement = {
+  tagName: string
+  type: string
+  hidden: boolean
+  disabled: boolean
+  readonly children: FakeElement[]
+  className: string
+  textContent: string
+  appendChild(child: FakeElement): FakeElement
+  replaceChildren(): void
+  remove(): void
+  addEventListener(type: string, handler: Handler): void
+  dispatch(type: string, event?: { key?: string }): void
+}
+
+const createFakeElement = (tag: string): FakeElement => {
+  const handlers: Record<string, Handler> = {}
+  const el: FakeElement = {
+    tagName: tag.toUpperCase(),
+    type: '',
+    hidden: false,
+    disabled: false,
+    children: [],
+    className: '',
+    textContent: '',
+    appendChild(child) {
+      el.children.push(child)
+      return child
+    },
+    replaceChildren() {
+      el.children.length = 0
+    },
+    remove() {},
+    addEventListener(type, handler) {
+      handlers[type] = handler
+    },
+    dispatch(type, event = {}) {
+      handlers[type]?.(event)
+    }
+  }
+  return el
+}
+
+const createFakeDocument = (): Document =>
+  ({ createElement: (tag: string) => createFakeElement(tag) }) as unknown as Document
+
+const rootOf = (handle: ReturnType<typeof createCompareMergeAction>) =>
+  handle.root as unknown as FakeElement
+const buttonOf = (root: FakeElement) => root.children[0]!
+const resultOf = (root: FakeElement) => root.children[1]!
+
+const idle: CompareMergeState = { phase: 'idle' }
+const running: CompareMergeState = { phase: 'running' }
+
+const model = (overrides: Partial<CompareMergeActionModel> = {}): CompareMergeActionModel => ({
+  visible: true,
+  capable: true,
+  merge: idle,
+  ...overrides
+})
+
+describe('createCompareMergeAction', () => {
+  it('is hidden when not visible (no winner picked)', () => {
+    const action = createCompareMergeAction(createFakeDocument())
+    action.apply(model({ visible: false }))
+    expect(rootOf(action).hidden).toBe(true)
+  })
+
+  it('is visible once a winner is picked', () => {
+    const action = createCompareMergeAction(createFakeDocument())
+    action.apply(model({ visible: true }))
+    expect(rootOf(action).hidden).toBe(false)
+  })
+
+  it('disables the button and shows "no soportado" when the host lacks the capability', () => {
+    const action = createCompareMergeAction(createFakeDocument())
+    action.apply(model({ capable: false }))
+    const button = buttonOf(rootOf(action))
+    expect(button.disabled).toBe(true)
+    expect(button.textContent).toBe('no soportado')
+  })
+
+  it('shows the idle label when capable and idle', () => {
+    const action = createCompareMergeAction(createFakeDocument())
+    action.apply(model())
+    expect(buttonOf(rootOf(action)).textContent).toBe('mergear ganador')
+  })
+
+  it('first click arms a confirm, without firing onMergeWinner', () => {
+    const action = createCompareMergeAction(createFakeDocument())
+    action.apply(model())
+    const fired: number[] = []
+    action.onMergeWinner(() => fired.push(1))
+    buttonOf(rootOf(action)).dispatch('click')
+    expect(buttonOf(rootOf(action)).textContent).toBe('confirmar merge')
+    expect(fired).toHaveLength(0)
+  })
+
+  it('second click fires onMergeWinner and disarms back to the idle label', () => {
+    const action = createCompareMergeAction(createFakeDocument())
+    action.apply(model())
+    const fired: number[] = []
+    action.onMergeWinner(() => fired.push(1))
+    const button = buttonOf(rootOf(action))
+    button.dispatch('click')
+    button.dispatch('click')
+    expect(fired).toEqual([1])
+    expect(button.textContent).toBe('mergear ganador')
+  })
+
+  it('blur disarms an armed confirm', () => {
+    const action = createCompareMergeAction(createFakeDocument())
+    action.apply(model())
+    const fired: number[] = []
+    action.onMergeWinner(() => fired.push(1))
+    const button = buttonOf(rootOf(action))
+    button.dispatch('click')
+    button.dispatch('blur')
+    button.dispatch('click')
+    expect(button.textContent).toBe('confirmar merge')
+    expect(fired).toHaveLength(0)
+  })
+
+  it('Escape disarms an armed confirm', () => {
+    const action = createCompareMergeAction(createFakeDocument())
+    action.apply(model())
+    const button = buttonOf(rootOf(action))
+    button.dispatch('click')
+    button.dispatch('keydown', { key: 'Escape' })
+    expect(button.textContent).toBe('mergear ganador')
+  })
+
+  it('a click while disabled (not capable) neither arms nor fires', () => {
+    const action = createCompareMergeAction(createFakeDocument())
+    action.apply(model({ capable: false }))
+    const fired: number[] = []
+    action.onMergeWinner(() => fired.push(1))
+    const button = buttonOf(rootOf(action))
+    button.dispatch('click')
+    button.dispatch('click')
+    expect(fired).toHaveLength(0)
+    expect(button.textContent).toBe('no soportado')
+  })
+
+  it('shows the running label and disables the button while merging', () => {
+    const action = createCompareMergeAction(createFakeDocument())
+    action.apply(model({ merge: running }))
+    const button = buttonOf(rootOf(action))
+    expect(button.disabled).toBe(true)
+    expect(button.textContent).toBe('mergeando…')
+  })
+
+  it('renders the R1-aware success copy on clean, including a short commit oid', () => {
+    const action = createCompareMergeAction(createFakeDocument())
+    action.apply(model({ merge: { phase: 'clean', commitOid: 'abcdef1234567' } }))
+    const result = resultOf(rootOf(action))
+    expect(result.children[0]!.textContent).toContain('Mergeado al padre')
+    expect(result.children[0]!.textContent).toContain('abcdef1')
+    expect(result.children[0]!.textContent).toContain('Sincronizá')
+  })
+
+  it('renders a read-only conflict file-name list', () => {
+    const action = createCompareMergeAction(createFakeDocument())
+    action.apply(model({ merge: { phase: 'conflict', files: ['src/a.ts', 'src/b.ts'] } }))
+    const result = resultOf(rootOf(action))
+    const list = result.children[1]!
+    expect(list.tagName).toBe('UL')
+    expect(list.children.map((li) => li.textContent)).toEqual(['src/a.ts', 'src/b.ts'])
+  })
+
+  it('renders the error message on error', () => {
+    const action = createCompareMergeAction(createFakeDocument())
+    action.apply(model({ merge: { phase: 'error', message: 'host unavailable' } }))
+    const result = resultOf(rootOf(action))
+    expect(result.children[0]!.textContent).toBe('host unavailable')
+  })
+
+  it('clears the result region back to idle/running', () => {
+    const action = createCompareMergeAction(createFakeDocument())
+    action.apply(model({ merge: { phase: 'error', message: 'x' } }))
+    action.apply(model({ merge: idle }))
+    expect(resultOf(rootOf(action)).children).toHaveLength(0)
+  })
+
+  it('going hidden disarms a pending confirm', () => {
+    const action = createCompareMergeAction(createFakeDocument())
+    action.apply(model())
+    const button = buttonOf(rootOf(action))
+    button.dispatch('click')
+    action.apply(model({ visible: false }))
+    action.apply(model({ visible: true }))
+    expect(button.textContent).toBe('mergear ganador')
+  })
+
+  it('dispose removes the root element', () => {
+    const action = createCompareMergeAction(createFakeDocument())
+    const root = rootOf(action)
+    let removed = false
+    root.remove = () => (removed = true)
+    action.dispose()
+    expect(removed).toBe(true)
+  })
+})

@@ -850,6 +850,54 @@
         left: 440px;
         width: calc(100% - 440px);
       }
+      /* Winner-merge action (Change E) — sits over the file panel, bottom-right. */
+      .cubito-compare-merge-action {
+        position: absolute;
+        right: 16px;
+        bottom: 16px;
+        width: 320px;
+        max-height: 40%;
+        overflow-y: auto;
+        pointer-events: auto;
+        background: var(--cubito-panel-surface);
+        border: 1px solid var(--cubito-panel-border);
+        font-size: 11.5px;
+      }
+      .compare-merge-action__button {
+        display: block;
+        width: 100%;
+        background: none;
+        border: none;
+        border-bottom: 1px solid var(--cubito-panel-border);
+        color: var(--cubito-text-primary);
+        font: inherit;
+        text-align: left;
+        padding: 10px 14px;
+        cursor: pointer;
+      }
+      .compare-merge-action__button:disabled {
+        color: var(--cubito-text-faint);
+        cursor: default;
+      }
+      .compare-merge-action__result {
+        padding: 0 14px;
+      }
+      .compare-merge-action__result-line {
+        padding: 10px 0;
+        color: var(--cubito-text-dim);
+      }
+      .compare-merge-action__result-line--clean {
+        color: var(--cubito-accent);
+      }
+      .compare-merge-action__result-line--conflict,
+      .compare-merge-action__result-line--error {
+        color: var(--cubito-amber-ink);
+      }
+      .compare-merge-action__conflict-list {
+        margin: 0 0 10px;
+        padding: 0 0 0 16px;
+        color: var(--cubito-text-dim);
+      }
     </style>
   </head>
   <body>
