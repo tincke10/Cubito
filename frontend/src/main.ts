@@ -35,6 +35,7 @@ import { createKeyboardController } from './presentation/input/keyboard-controll
 import { createCameraRig } from './presentation/scene/camera-rig'
 import { createScene } from './presentation/scene/create-scene'
 import { createGraphView } from './presentation/scene/graph-view'
+import { didSceneModeClose } from './presentation/scene/scene-mode-close-edge'
 import { applyCssTheme } from './presentation/theme/css-theme'
 import { FOCUS_DURATION_MS } from './presentation/theme/scene-metrics'
 import { paletteFor } from './presentation/theme/scene-palette'
@@ -313,6 +314,9 @@ cubitoScene.onResize((width, height) => {
 
 // The first non-empty graph gets an initial fit; afterwards the camera is the user's.
 let framed = false
+// Re-measures the renderer when a scene mode (sistema/diff/compare) closes (Change W13): while
+// open, #app is `hidden` (0×0 clientWidth/Height), so a resize during that window is missed.
+let previousSceneModeOpen = false
 
 store.subscribe((state) => {
   graphView.update({
@@ -336,6 +340,8 @@ store.subscribe((state) => {
     state.diffView.view === 'open' ||
     state.compareView.view === 'open'
   for (const el of worktreeChrome) el.hidden = sceneModeOpen
+  if (didSceneModeClose(previousSceneModeOpen, sceneModeOpen)) cubitoScene.remeasure()
+  previousSceneModeOpen = sceneModeOpen
   commandPaletteController.sync(state.commandPalette, state)
   if (!framed && state.graph.nodes.size > 0) {
     framed = true

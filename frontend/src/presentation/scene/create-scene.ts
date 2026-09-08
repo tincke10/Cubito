@@ -28,6 +28,9 @@ export type CubitoScene = {
   /** Subscribe to resize. Fires once immediately with the current size, so subscribers
    *  that depend on it (LineMaterial.resolution, camera aspect) are never left unset. */
   onResize(callback: ResizeCallback): () => void
+  /** Re-reads the container's current size and applies it (Change W13) — for a caller that just
+   *  made the container visible again after a resize was missed while it measured 0×0. */
+  remeasure(): void
   dispose(): void
 }
 
@@ -101,14 +104,14 @@ export function createScene(container: HTMLElement, palette: ScenePalette): Cubi
   }
   document.addEventListener('visibilitychange', onVisibilityChange)
 
-  const onWindowResize = (): void => {
+  const applyMeasurement = (): void => {
     const nextWidth = container.clientWidth
     const nextHeight = container.clientHeight
     renderer.setSize(nextWidth, nextHeight)
     labelRenderer.setSize(nextWidth, nextHeight)
     for (const callback of [...resizeCallbacks]) callback(nextWidth, nextHeight)
   }
-  window.addEventListener('resize', onWindowResize)
+  window.addEventListener('resize', applyMeasurement)
 
   renderer.setAnimationLoop(() => {
     if (document.hidden) return
@@ -136,9 +139,12 @@ export function createScene(container: HTMLElement, palette: ScenePalette): Cubi
       callback(container.clientWidth, container.clientHeight)
       return () => void resizeCallbacks.delete(callback)
     },
+    remeasure(): void {
+      applyMeasurement()
+    },
     dispose(): void {
       renderer.setAnimationLoop(null)
-      window.removeEventListener('resize', onWindowResize)
+      window.removeEventListener('resize', applyMeasurement)
       document.removeEventListener('visibilitychange', onVisibilityChange)
       frameCallbacks.clear()
       resizeCallbacks.clear()
