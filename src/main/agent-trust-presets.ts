@@ -1,12 +1,13 @@
 import { existsSync, mkdirSync, readFileSync, realpathSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
+import { ClaudeRuntimePathResolver } from './claude-accounts/runtime-paths'
 import { writeFileAtomically } from './codex-accounts/fs-utils'
 import { getOrcaManagedCodexHomePath } from './codex/codex-home-paths'
 import { upsertProjectTrustLevel } from './codex/config-toml-trust'
 import { runExclusivelyForCodexTrustConfig } from './codex/codex-trust-config-mutation-queue'
 
-export type AgentTrustPreset = 'cursor' | 'copilot' | 'codex'
+export type AgentTrustPreset = 'cursor' | 'copilot' | 'codex' | 'claude'
 
 /**
  * Pre-mark a workspace as trusted for cursor-agent, GitHub Copilot CLI, or
@@ -95,6 +96,54 @@ export function markCopilotFolderTrusted(workspacePath: string): void {
   }
   const next = [...existing.filter((e) => typeof e === 'string'), absPath]
   config.trustedFolders = next
+  if (!existsSync(configDir)) {
+    mkdirSync(configDir, { recursive: true })
+  }
+  writeFileAtomically(configPath, `${JSON.stringify(config, null, 2)}\n`)
+}
+
+/**
+ * Claude Code CLI keeps per-project trust in `.claude.json` (resolved via
+ * `ClaudeRuntimePathResolver`, honoring `CLAUDE_CONFIG_DIR`) under:
+ *   projects["<realpath>"].hasTrustDialogAccepted = true
+ * Mirrors markCopilotFolderTrusted's read-merge-write shape so sibling
+ * project entries and unrelated top-level keys survive untouched.
+ */
+export function markClaudeWorkspaceTrusted(
+  workspacePath: string,
+  configPathOverride?: string
+): void {
+  const absPath = canonicalize(workspacePath)
+  const configPath =
+    configPathOverride ?? new ClaudeRuntimePathResolver().getRuntimePaths().configPath
+  const configDir = dirname(configPath)
+  let config: Record<string, unknown> = {}
+  try {
+    if (existsSync(configPath)) {
+      const raw = readFileSync(configPath, 'utf-8')
+      const parsed = JSON.parse(raw)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        config = parsed as Record<string, unknown>
+      }
+    }
+  } catch {
+    // Why: a corrupted .claude.json is the user's to fix — refuse to overwrite
+    // it from this side-effect path.
+    return
+  }
+  const projects =
+    config.projects && typeof config.projects === 'object' && !Array.isArray(config.projects)
+      ? (config.projects as Record<string, unknown>)
+      : {}
+  const existingProject =
+    projects[absPath] && typeof projects[absPath] === 'object' && !Array.isArray(projects[absPath])
+      ? (projects[absPath] as Record<string, unknown>)
+      : {}
+  if (existingProject.hasTrustDialogAccepted === true) {
+    return
+  }
+  projects[absPath] = { ...existingProject, hasTrustDialogAccepted: true }
+  config.projects = projects
   if (!existsSync(configDir)) {
     mkdirSync(configDir, { recursive: true })
   }

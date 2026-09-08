@@ -37,7 +37,7 @@ export type TuiAgentConfig = {
   /** Startup env var that seeds the input without submitting, for agents with no `--prefill`-style flag (e.g. pi); avoids the paste-after-ready race. */
   draftPromptEnvVar?: string
   /** Pre-write a trust artifact so the agent's first-launch "trust this folder?" menu doesn't consume the bracketed paste (see agent-trust-presets.ts). */
-  preflightTrust?: 'cursor' | 'copilot' | 'codex'
+  preflightTrust?: 'cursor' | 'copilot' | 'codex' | 'claude'
   /** Agent-specific signal that the composer is ready for paste, stronger than the default quiet-render window. */
   draftPasteReadySignal?: DraftPasteReadySignal
   /** Hard deadline for the agent's composer readiness signal. */
@@ -58,8 +58,9 @@ export const TUI_AGENT_CONFIG: Record<TuiAgent, TuiAgentConfig> = {
     launchCmd: 'claude',
     expectedProcess: 'claude',
     promptInjectionMode: 'argv',
-    // Why: `claude --prefill <text>` seeds the input without submitting, avoiding the paste-after-ready race (PR https://github.com/stablyai/orca/pull/926).
-    draftPromptFlag: '--prefill'
+    // Why: `claude --prefill <text>` seeds the input without submitting, avoiding the paste-after-ready race (PR https://github.com/stablyai/orca/pull/926); preflightTrust pre-writes trust so the first-launch dialog doesn't swallow it (agent-trust-presets.ts).
+    draftPromptFlag: '--prefill',
+    preflightTrust: 'claude'
   },
   'claude-agent-teams': {
     // Why: an Orca-provided launch mode, not a separate binary; detection follows the Orca CLI.
@@ -355,8 +356,7 @@ export function getTuiAgentLaunchCommand(
   opts?: { isRemote?: boolean }
 ): string {
   // Why: local-only orca-ide rename (avoids GNOME Orca clash) must not leak to Linux remotes, whose relay shim is always `orca`.
-  if (opts?.isRemote && platform === 'linux') {
-    return config.launchCmd
-  }
-  return config.launchCmdByPlatform?.[platform] ?? config.launchCmd
+  return opts?.isRemote && platform === 'linux'
+    ? config.launchCmd
+    : (config.launchCmdByPlatform?.[platform] ?? config.launchCmd)
 }

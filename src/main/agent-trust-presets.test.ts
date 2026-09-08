@@ -6,6 +6,7 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync
 } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -38,8 +39,27 @@ vi.mock('node:os', async () => {
   }
 })
 
-const { markCodexProjectTrusted, markCopilotFolderTrusted, markCursorWorkspaceTrusted } =
-  await import('./agent-trust-presets')
+const writeFileAtomicallySpy = vi.hoisted(() => vi.fn())
+vi.mock('./codex-accounts/fs-utils', async () => {
+  // eslint-disable-next-line @typescript-eslint/consistent-type-imports -- vi.importActual requires inline import()
+  const actual = await vi.importActual<typeof import('./codex-accounts/fs-utils')>(
+    './codex-accounts/fs-utils'
+  )
+  return {
+    ...actual,
+    writeFileAtomically: (...args: Parameters<typeof actual.writeFileAtomically>) => {
+      writeFileAtomicallySpy(...args)
+      return actual.writeFileAtomically(...args)
+    }
+  }
+})
+
+const {
+  markClaudeWorkspaceTrusted,
+  markCodexProjectTrusted,
+  markCopilotFolderTrusted,
+  markCursorWorkspaceTrusted
+} = await import('./agent-trust-presets')
 const { runExclusivelyForCodexTrustConfig } =
   await import('./codex/codex-trust-config-mutation-queue')
 
@@ -48,6 +68,7 @@ beforeEach(() => {
   testState.userDataDir = mkdtempSync(join(tmpdir(), 'orca-trust-presets-user-data-'))
   testState.previousUserDataPath = process.env.ORCA_USER_DATA_PATH
   process.env.ORCA_USER_DATA_PATH = testState.userDataDir
+  writeFileAtomicallySpy.mockClear()
 })
 
 afterEach(() => {
@@ -134,6 +155,95 @@ describe('markCopilotFolderTrusted', () => {
       expect(parsed.trustedFolders).toHaveLength(1)
     } finally {
       rmSync(workspace, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('markClaudeWorkspaceTrusted', () => {
+  it('writes projects[realpath].hasTrustDialogAccepted = true to the config path', () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'orca-claude-ws-'))
+    const configPath = join(testState.fakeHomeDir, '.claude.json')
+    try {
+      const realpath = realpathSync.native(workspace)
+      markClaudeWorkspaceTrusted(workspace, configPath)
+      expect(existsSync(configPath)).toBe(true)
+      const parsed = JSON.parse(readFileSync(configPath, 'utf-8'))
+      expect(parsed.projects[realpath].hasTrustDialogAccepted).toBe(true)
+    } finally {
+      rmSync(workspace, { recursive: true, force: true })
+    }
+  })
+
+  it('preserves sibling project entries and other fields on the same project', () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'orca-claude-ws-'))
+    const configPath = join(testState.fakeHomeDir, '.claude.json')
+    try {
+      const realpath = realpathSync.native(workspace)
+      writeFileSync(
+        configPath,
+        JSON.stringify({
+          oauthAccount: { email: 'dev@example.com' },
+          projects: {
+            '/other/project': { hasTrustDialogAccepted: true },
+            [realpath]: { mcpServers: { keep: 'me' } }
+          }
+        })
+      )
+      markClaudeWorkspaceTrusted(workspace, configPath)
+      const parsed = JSON.parse(readFileSync(configPath, 'utf-8'))
+      expect(parsed.oauthAccount).toEqual({ email: 'dev@example.com' })
+      expect(parsed.projects['/other/project']).toEqual({ hasTrustDialogAccepted: true })
+      expect(parsed.projects[realpath]).toEqual({
+        mcpServers: { keep: 'me' },
+        hasTrustDialogAccepted: true
+      })
+    } finally {
+      rmSync(workspace, { recursive: true, force: true })
+    }
+  })
+
+  it('is idempotent — does not rewrite the file when already trusted', () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'orca-claude-ws-'))
+    const configPath = join(testState.fakeHomeDir, '.claude.json')
+    try {
+      markClaudeWorkspaceTrusted(workspace, configPath)
+      expect(writeFileAtomicallySpy).toHaveBeenCalledTimes(1)
+      markClaudeWorkspaceTrusted(workspace, configPath)
+      expect(writeFileAtomicallySpy).toHaveBeenCalledTimes(1)
+    } finally {
+      rmSync(workspace, { recursive: true, force: true })
+    }
+  })
+
+  it('respects configPathOverride instead of the default ClaudeRuntimePathResolver path', () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'orca-claude-ws-'))
+    const overridePath = join(testState.fakeHomeDir, 'custom', '.claude.json')
+    const defaultPath = join(testState.fakeHomeDir, '.claude.json')
+    try {
+      mkdirSync(join(testState.fakeHomeDir, 'custom'), { recursive: true })
+      markClaudeWorkspaceTrusted(workspace, overridePath)
+      expect(existsSync(overridePath)).toBe(true)
+      expect(existsSync(defaultPath)).toBe(false)
+    } finally {
+      rmSync(workspace, { recursive: true, force: true })
+    }
+  })
+
+  it('canonicalizes a symlinked workspace path to its realpath before writing', () => {
+    const realDir = mkdtempSync(join(tmpdir(), 'orca-claude-real-'))
+    const symlinkParent = mkdtempSync(join(tmpdir(), 'orca-claude-link-'))
+    const symlinkPath = join(symlinkParent, 'linked-workspace')
+    const configPath = join(testState.fakeHomeDir, '.claude.json')
+    try {
+      symlinkSync(realDir, symlinkPath, 'dir')
+      const realpath = realpathSync.native(realDir)
+      markClaudeWorkspaceTrusted(symlinkPath, configPath)
+      const parsed = JSON.parse(readFileSync(configPath, 'utf-8'))
+      expect(parsed.projects[realpath].hasTrustDialogAccepted).toBe(true)
+      expect(parsed.projects[symlinkPath]).toBeUndefined()
+    } finally {
+      rmSync(realDir, { recursive: true, force: true })
+      rmSync(symlinkParent, { recursive: true, force: true })
     }
   })
 })
