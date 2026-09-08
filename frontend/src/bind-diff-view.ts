@@ -5,12 +5,19 @@ import { createDiffHud } from './presentation/diff/diff-hud-element'
 import { createDiffLiveLoader } from './application/diff-live-loader'
 import type { DiffLiveLoaderGatewayPort } from './application/diff-live-loader'
 import type { SceneStore } from './application/scene-store'
+import type { DiffRailHandle } from './presentation/diff/diff-rail-element'
+import type { DiffPanelHandle } from './presentation/diff/diff-panel-element'
+import type { DiffHudHandle } from './presentation/diff/diff-hud-element'
 
 export type BindDiffViewDeps = {
   store: SceneStore
   diffSlot: { appendChild(element: unknown): void }
   keyboardBarSlot: { appendChild(element: unknown): void }
   demoGateway: DiffLiveLoaderGatewayPort
+  /** DOM element factory overrides — tests substitute fakes, production uses the defaults. */
+  createRail?: () => DiffRailHandle
+  createPanel?: () => DiffPanelHandle
+  createHud?: () => DiffHudHandle
 }
 
 export type DiffViewBinder = {
@@ -30,9 +37,9 @@ export function createDiffViewBinder(deps: BindDiffViewDeps): DiffViewBinder {
   const loader = createDiffLiveLoader({ store: deps.store, gateway: deps.demoGateway })
 
   const controller = createDiffViewController({
-    createRail: createDiffRail,
-    createPanel: createDiffPanel,
-    createHud: createDiffHud,
+    createRail: deps.createRail ?? createDiffRail,
+    createPanel: deps.createPanel ?? createDiffPanel,
+    createHud: deps.createHud ?? createDiffHud,
     hud: deps.diffSlot,
     keyboardBarSlot: deps.keyboardBarSlot,
     onSelect: (path) => loader.select(path)
