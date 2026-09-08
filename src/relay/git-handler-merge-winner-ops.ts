@@ -5,8 +5,13 @@ import {
 } from '../shared/git-merge-tree-capability'
 import type { GitExec } from './git-handler-ops'
 
+export type RelayParentWorkingTreeSyncResult =
+  | { status: 'synced' }
+  | { status: 'skipped'; reason: 'dirty' }
+  | { status: 'failed'; message: string }
+
 export type RelayMergeWinnerResult =
-  | { outcome: 'clean'; commitOid: string }
+  | { outcome: 'clean'; commitOid: string; workingTree?: RelayParentWorkingTreeSyncResult }
   | { outcome: 'conflict'; files: string[] }
 
 /**
@@ -19,7 +24,8 @@ export async function mergeWinnerIntoParentRelayOp(
   capabilities: GitCapabilityCache,
   parentPath: string,
   winnerPath: string,
-  message: string
+  message: string,
+  syncWorkingTree = false
 ): Promise<RelayMergeWinnerResult> {
   const parentBranch = await resolveCurrentBranch(git, parentPath)
   const parentTip = await resolveHeadOid(git, parentPath)
@@ -46,7 +52,35 @@ export async function mergeWinnerIntoParentRelayOp(
   const commitOid = commitOidOut.trim()
   // Why: old-value guard makes the ref move fail loudly if parentTip moved underneath us.
   await git(['update-ref', `refs/heads/${parentBranch}`, commitOid, parentTip], parentPath)
-  return { outcome: 'clean', commitOid }
+  if (!syncWorkingTree) {
+    return { outcome: 'clean', commitOid }
+  }
+  const workingTree = await syncParentWorkingTreeRelayOp(git, parentPath, parentTip, treeOid)
+  return { outcome: 'clean', commitOid, workingTree }
+}
+
+/**
+ * Mirrors src/main/git/merge-winner-sync.ts's syncParentWorkingTree — never throws, a failure
+ * here must not roll back the already-moved parent ref.
+ */
+async function syncParentWorkingTreeRelayOp(
+  git: GitExec,
+  parentPath: string,
+  parentTip: string,
+  newTreeOid: string
+): Promise<RelayParentWorkingTreeSyncResult> {
+  // Why: pinned to parentTip explicitly (not implicit HEAD) — the parent branch ref has
+  // already moved past parentTip by the time this runs.
+  const { stdout: trackedDiff } = await git(['diff', '--name-only', parentTip, '--'], parentPath)
+  if (trackedDiff.trim()) {
+    return { status: 'skipped', reason: 'dirty' }
+  }
+  try {
+    await git(['read-tree', '-u', '-m', parentTip, newTreeOid], parentPath)
+    return { status: 'synced' }
+  } catch (error) {
+    return { status: 'failed', message: error instanceof Error ? error.message : String(error) }
+  }
 }
 
 async function resolveCurrentBranch(git: GitExec, worktreePath: string): Promise<string> {
