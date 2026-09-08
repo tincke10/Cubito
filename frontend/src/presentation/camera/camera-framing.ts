@@ -100,14 +100,28 @@ export const frameLitter = (
   return frameAll(centers)
 }
 
-/** Growth-only camera decision for a fan-out litter (Change item 2): reframes (same
- *  `frameLitter`/`frameAll` math, over already-resolved centers) only when a new child just
- *  landed — never on a shrink, so a failed/removed member never yanks the camera in. */
-export const frameLitterOnGrowth = (
-  previousCount: number,
-  nextCount: number,
-  centers: readonly Vec3[]
+/** A litter's member count plus its resolved centers, as framed last time. */
+export type LitterLayout = { count: number; centers: readonly Vec3[] }
+
+/** Camera decision for a fan-out litter (Change item 2, corrected W11): reframes (same
+ *  `frameLitter`/`frameAll` math) when a new child landed (count grew), when the graph's own
+ *  layout moved the existing members (e.g. the post-batch `refetch()` swaps in the host's real
+ *  worktree.list positions — a discrete store event, not a tween, so a missed one leaves a
+ *  member off-screen), or on the very first framing (`previous === null`). Never on a shrink —
+ *  a failed/removed member must not yank the camera in. */
+export const frameLitterOnLayout = (
+  previous: LitterLayout | null,
+  next: LitterLayout
 ): CameraFraming | null => {
-  if (nextCount <= previousCount || nextCount <= 0) return null
-  return frameAll(centers)
+  if (next.count <= 0) return null
+  if (previous === null) return frameAll(next.centers)
+  if (next.count > previous.count) return frameAll(next.centers)
+  if (next.count < previous.count) return null
+  const moved =
+    next.centers.length !== previous.centers.length ||
+    next.centers.some((c, i) => {
+      const p = previous.centers[i]!
+      return c.x !== p.x || c.y !== p.y || c.z !== p.z
+    })
+  return moved ? frameAll(next.centers) : null
 }

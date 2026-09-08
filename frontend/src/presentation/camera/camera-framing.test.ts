@@ -5,11 +5,12 @@ import {
   frameAll,
   frameIsland,
   frameLitter,
-  frameLitterOnGrowth,
+  frameLitterOnLayout,
   frameNode,
   interpolateFraming,
   islandCenters,
   isWithinFraming,
+  type LitterLayout,
   type Vec3
 } from './camera-framing'
 import { inertActivity } from '../../domain/worktree-graph/node-activity'
@@ -196,26 +197,42 @@ describe('frameLitter', () => {
   })
 })
 
-describe('frameLitterOnGrowth', () => {
+describe('frameLitterOnLayout', () => {
   const centers: readonly Vec3[] = [v(-5, 0, 0), v(5, 0, 0), v(0, 0, 20)]
+  const movedCenters: readonly Vec3[] = [v(-5, 0, 0), v(5, 0, 0), v(0, 0, 21)] // one z moved
 
-  it('frames the given centers, matching frameAll, when the litter grew', () => {
-    expect(frameLitterOnGrowth(2, 3, centers)).toEqual(frameAll(centers))
+  it('frames when previous is null (first framing for this litter)', () => {
+    const next: LitterLayout = { count: 3, centers }
+    expect(frameLitterOnLayout(null, next)).toEqual(frameAll(centers))
   })
 
-  it('frames from zero (the first child landing) too', () => {
-    expect(frameLitterOnGrowth(0, 1, centers)).toEqual(frameAll(centers))
+  it('frames when the count grew', () => {
+    const previous: LitterLayout = { count: 2, centers: centers.slice(0, 2) }
+    const next: LitterLayout = { count: 3, centers }
+    expect(frameLitterOnLayout(previous, next)).toEqual(frameAll(centers))
   })
 
-  it('returns null when the count did not change', () => {
-    expect(frameLitterOnGrowth(3, 3, centers)).toBeNull()
+  it('frames when the count is unchanged but a center moved (exact compare, no epsilon)', () => {
+    const previous: LitterLayout = { count: 3, centers }
+    const next: LitterLayout = { count: 3, centers: movedCenters }
+    expect(frameLitterOnLayout(previous, next)).toEqual(frameAll(movedCenters))
   })
 
-  it('returns null when the count shrank', () => {
-    expect(frameLitterOnGrowth(3, 2, centers)).toBeNull()
+  it('returns null when the count is unchanged and nothing moved', () => {
+    const previous: LitterLayout = { count: 3, centers }
+    const next: LitterLayout = { count: 3, centers: [...centers] } // same values, new array
+    expect(frameLitterOnLayout(previous, next)).toBeNull()
   })
 
-  it('returns null when the next count is zero, even nominally "greater" than a negative previous', () => {
-    expect(frameLitterOnGrowth(-1, 0, centers)).toBeNull()
+  it('returns null when the count shrank, even if the remaining centers moved', () => {
+    const previous: LitterLayout = { count: 3, centers }
+    const next: LitterLayout = { count: 2, centers: movedCenters.slice(0, 2) }
+    expect(frameLitterOnLayout(previous, next)).toBeNull()
+  })
+
+  it('returns null when the next count is zero', () => {
+    const previous: LitterLayout = { count: 3, centers }
+    const next: LitterLayout = { count: 0, centers: [] }
+    expect(frameLitterOnLayout(previous, next)).toBeNull()
   })
 })

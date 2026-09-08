@@ -5,8 +5,8 @@ import type { LiveSyncConnection } from './application/live-worktree-sync'
 import type { SceneStore } from './application/scene-store'
 import type { RuntimeGateway } from './application/ports/runtime-gateway'
 import type { WorktreeId } from './domain/worktree-graph/types'
-import { frameLitter, frameLitterOnGrowth } from './presentation/camera/camera-framing'
-import type { CameraFraming, Vec3 } from './presentation/camera/camera-framing'
+import { frameLitter, frameLitterOnLayout } from './presentation/camera/camera-framing'
+import type { CameraFraming, LitterLayout, Vec3 } from './presentation/camera/camera-framing'
 import { createFanOutForm } from './presentation/hud/fan-out-element'
 import { createFanOutController } from './presentation/hud/fan-out-controller'
 import type { FanOutController } from './presentation/hud/fan-out-controller'
@@ -39,9 +39,10 @@ export function createFanOutBinder(deps: BindFanOutDeps): FanOutBinder {
   let fanOutController: FanOutController | null = null
   let fanOutGateway: RuntimeGateway = deps.demoGateway
   let capabilities: readonly string[] = []
-  // Item 2: reframes as each child lands during a running batch — reset outside 'running' so
-  // reopening the form (or a later camada) never reads as growth from a stale count.
-  let lastLitterCount = 0
+  // Item 2 (corrected W11): reframes as each child lands AND when the layout itself moves (e.g.
+  // the post-batch refetch swaps in the host's real positions) — null outside 'running' so
+  // reopening the form (or a later camada) never reads a stale layout as growth/movement.
+  let lastLitter: LitterLayout | null = null
 
   return {
     bind(connection: LiveSyncConnection): void {
@@ -77,7 +78,7 @@ export function createFanOutBinder(deps: BindFanOutDeps): FanOutBinder {
       fanOutController?.sync(state.fanOut, state.graph)
 
       if (state.fanOut.view !== 'running') {
-        lastLitterCount = 0
+        lastLitter = null
         return
       }
       const memberIds = fanOutMemberIds(state.fanOut)
@@ -86,8 +87,9 @@ export function createFanOutBinder(deps: BindFanOutDeps): FanOutBinder {
         const center = deps.nodeCenter(id)
         if (center) centers.push(center)
       }
-      const framing = frameLitterOnGrowth(lastLitterCount, memberIds.length, centers)
-      lastLitterCount = memberIds.length
+      const next: LitterLayout = { count: memberIds.length, centers }
+      const framing = frameLitterOnLayout(lastLitter, next)
+      lastLitter = next
       if (framing) deps.animateTo(framing, deps.focusDurationMs)
     }
   }
