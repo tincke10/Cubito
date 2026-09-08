@@ -6,14 +6,16 @@ import {
 import type { GitRuntimeOptions } from './git-runtime-options'
 import { gitOptionsForWorktree } from './git-runtime-options'
 import { mergeTreeWriteTree } from './merge-tree-write-tree'
+import type { ParentWorkingTreeSyncResult } from './merge-winner-sync'
+import { syncParentWorkingTree } from './merge-winner-sync'
 import { gitExecFileAsync } from './runner'
 import { runWithGitReadCacheInvalidation } from './status'
 import { runWithGitWorktreeOperationLock } from '../../shared/git-worktree-operation-lock'
 
-export type MergeWinnerOptions = GitRuntimeOptions
+export type MergeWinnerOptions = GitRuntimeOptions & { syncWorkingTree?: boolean }
 
 export type MergeWinnerResult =
-  | { outcome: 'clean'; commitOid: string }
+  | { outcome: 'clean'; commitOid: string; workingTree?: ParentWorkingTreeSyncResult }
   | { outcome: 'conflict'; files: string[] }
 
 /**
@@ -78,5 +80,9 @@ async function commitAndMoveParentBranch(
     ['update-ref', `refs/heads/${parentBranch}`, commitOid, parentTip],
     gitOptionsForWorktree(parentPath, options)
   )
-  return { outcome: 'clean', commitOid }
+  if (!options.syncWorkingTree) {
+    return { outcome: 'clean', commitOid }
+  }
+  const workingTree = await syncParentWorkingTree(parentPath, parentTip, treeOid, options)
+  return { outcome: 'clean', commitOid, workingTree }
 }
