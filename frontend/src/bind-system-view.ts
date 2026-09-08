@@ -20,6 +20,8 @@ export type SystemViewGatewayPort = SystemSnapshotPollGatewayPort & AgentActivit
 export type BindSystemViewDeps = {
   store: SceneStore
   systemSlot: { appendChild(element: unknown): void }
+  /** The `#system-graph-viewport` scrollable slot (Change item 4) the graph mounts into. */
+  graphSlot: { appendChild(element: unknown): void }
   keyboardBarSlot: { appendChild(element: unknown): void }
   demoGraphPort: SystemGraphPort
   demoGateway: SystemViewGatewayPort
@@ -49,6 +51,7 @@ export function createSystemViewBinder(deps: BindSystemViewDeps): SystemViewBind
     createFeed: deps.createFeed ?? createActivityFeed,
     createHud: deps.createHud ?? createSystemHud,
     hud: deps.systemSlot,
+    graphSlot: deps.graphSlot,
     keyboardBarSlot: deps.keyboardBarSlot
   })
   const driver = createSystemLiveDriver({ store: deps.store, port: deps.demoGraphPort })

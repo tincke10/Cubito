@@ -565,15 +565,27 @@
       .cubito-system-hud__label {
         color: var(--cubito-info);
       }
-      /* System graph SVG: nodes are <g>s carrying system-node--<kind>/--<state> from
-         system-graph-model.ts; edges are <line>s carrying system-edge--<kind>. */
-      .cubito-system-graph {
+      /* Scrollable slot the graph SVG mounts into (Change item 4) — narrower than 832px scrolls
+         instead of shrinking node labels past legibility. */
+      .cubito-system-graph-viewport {
         position: absolute;
         left: 0;
         top: 84px; /* the 3-line HUD ends ~70px; reserved here so it survives the viewBox scale */
         width: calc(100% - 400px);
-        max-width: 1040px; /* the model's design canvas: never upscale, only shrink to fit */
+        max-width: 1040px;
         height: calc(100% - 84px);
+        overflow-x: auto;
+        overflow-y: hidden;
+        pointer-events: auto; /* #system itself is pointer-events:none */
+      }
+      /* System graph SVG: nodes are <g>s carrying system-node--<kind>/--<state> from
+         system-graph-model.ts; edges are <line>s carrying system-edge--<kind>. */
+      .cubito-system-graph {
+        display: block;
+        width: 100%;
+        min-width: 832px; /* 0.8 × 1040 — scale floor before the viewport scrolls instead of shrinking further */
+        max-width: 1040px; /* the model's design canvas: never upscale, only shrink to fit */
+        height: 100%;
       }
       .system-node__shape {
         fill: var(--cubito-panel-surface);
@@ -980,7 +992,9 @@
     <div id="app"></div>
     <div id="vignette"></div>
     <div id="hud"></div>
-    <div id="system"></div>
+    <div id="system">
+      <div id="system-graph-viewport" class="cubito-system-graph-viewport"></div>
+    </div>
     <div id="diff"></div>
     <div id="compare"></div>
     <div id="keyboard-bar"></div>

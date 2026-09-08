@@ -153,10 +153,21 @@ const container = document.getElementById('app')
 const hud = document.getElementById('hud')
 const keyboardBarSlot = document.getElementById('keyboard-bar')
 const systemSlot = document.getElementById('system')
+const systemGraphSlot = document.getElementById('system-graph-viewport')
 const diffSlot = document.getElementById('diff')
 const compareSlot = document.getElementById('compare')
-if (!container || !hud || !keyboardBarSlot || !systemSlot || !diffSlot || !compareSlot) {
-  throw new Error('index.html must provide #app, #hud, #system, #diff, #compare and #keyboard-bar')
+if (
+  !container ||
+  !hud ||
+  !keyboardBarSlot ||
+  !systemSlot ||
+  !systemGraphSlot ||
+  !diffSlot ||
+  !compareSlot
+) {
+  throw new Error(
+    'index.html must provide #app, #hud, #system, #system-graph-viewport, #diff, #compare and #keyboard-bar'
+  )
 }
 const hudElement: HTMLElement = hud
 
@@ -216,6 +227,7 @@ const fanOutBinder = createFanOutBinder({
 const systemViewBinder = createSystemViewBinder({
   store,
   systemSlot,
+  graphSlot: systemGraphSlot,
   keyboardBarSlot,
   demoGraphPort: demoSystemGraph,
   demoGateway

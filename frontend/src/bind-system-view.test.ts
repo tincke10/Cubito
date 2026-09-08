@@ -59,6 +59,7 @@ function setup(overrides: { gateway: SystemViewGatewayPort; graphPort?: SystemGr
   const deps: BindSystemViewDeps = {
     store,
     systemSlot: { appendChild: vi.fn() },
+    graphSlot: { appendChild: vi.fn() },
     keyboardBarSlot: { appendChild: vi.fn() },
     demoGraphPort: graphPort,
     demoGateway: overrides.gateway,
