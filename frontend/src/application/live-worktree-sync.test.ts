@@ -33,6 +33,7 @@ function deferred<T>(): Deferred<T> {
 function createFakeTerminalsPort(): LiveSyncConnection['terminals'] {
   return {
     createTerminal: async () => ({ terminal: 'fake' }),
+    listTerminals: async () => [],
     subscribe: () => {},
     sendInput: () => {},
     sendResize: () => {},

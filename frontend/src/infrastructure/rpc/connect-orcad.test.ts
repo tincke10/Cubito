@@ -164,6 +164,53 @@ describe('connectOrcad', () => {
     }
   })
 
+  it('lists a worktree host terminals, projecting the wire shape into the local port shape (P.t-attach)', async () => {
+    const server = await startFakeOrcadServer({
+      handleRequest: (method) => {
+        if (method === 'terminal.list') {
+          return {
+            ok: true,
+            result: {
+              terminals: [
+                {
+                  handle: 'pty-1',
+                  agentIdentity: 'claude',
+                  title: 'startup agent',
+                  connected: true,
+                  worktreeId: 'w1',
+                  worktreePath: '/repo/w1',
+                  branch: 'main',
+                  tabId: 't1',
+                  leafId: 'l1',
+                  writable: true,
+                  lastOutputAt: null,
+                  preview: ''
+                },
+                { handle: 'pty-2', title: null, connected: false, extra: 'ignored-field' },
+                { handle: 42, title: null, connected: true },
+                { notAHandle: true }
+              ],
+              totalCount: 4,
+              truncated: false
+            }
+          }
+        }
+        return { ok: true, result: { worktrees: [] } }
+      }
+    })
+    servers.push(server)
+
+    const connection = await connectOrcad(offerFor(server))
+    try {
+      await expect(connection.terminals.listTerminals('w1')).resolves.toEqual([
+        { handle: 'pty-1', agentIdentity: 'claude', title: 'startup agent', connected: true },
+        { handle: 'pty-2', title: null, connected: false }
+      ])
+    } finally {
+      connection.close()
+    }
+  })
+
   it('exposes a systemGraphStream port that opens system.watch with the worktree', async () => {
     const server = await startFakeOrcadServer()
     servers.push(server)

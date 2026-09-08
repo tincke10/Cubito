@@ -15,7 +15,10 @@ import { TerminalMultiplexClient } from './terminal-multiplex-client'
 import { createSystemGraphStreamPort } from './orcad-system-watch-gateway'
 import type { PairingOffer } from './pairing-offer'
 import type { RuntimeGateway } from '../../application/ports/runtime-gateway'
-import type { TerminalStreamPort } from '../../application/ports/terminal-stream-port'
+import type {
+  HostTerminalSummary,
+  TerminalStreamPort
+} from '../../application/ports/terminal-stream-port'
 import type { SystemGraphStreamPort } from '../../application/ports/system-graph-stream-port'
 
 const DEFAULT_TIMEOUT_MS = 30_000
@@ -89,6 +92,13 @@ async function openTerminalsPort(rpcConnection: RpcConnection): Promise<Terminal
       )
       return { terminal: response.result.terminal.handle }
     },
+    async listTerminals(worktree) {
+      const response = await rpcConnection.call<{ terminals?: unknown }>('terminal.list', {
+        worktree
+      })
+      const rows = Array.isArray(response.result.terminals) ? response.result.terminals : []
+      return rows.flatMap(projectHostTerminalRow)
+    },
     subscribe: (streamId, terminal, viewport, sink) =>
       client.subscribe(streamId, terminal, viewport, sink),
     sendInput: (streamId, text) => client.sendInput(streamId, text),
@@ -98,6 +108,25 @@ async function openTerminalsPort(rpcConnection: RpcConnection): Promise<Terminal
       await rpcConnection.call('terminal.close', { terminal })
     }
   }
+}
+
+/** Defensively projects one `terminal.list` wire row into the port's local shape, dropping any
+ *  row that doesn't carry the minimum required fields (keeps a stale/mixed-version host from
+ *  crashing the attach path — see terminal-stream-port.ts). */
+function projectHostTerminalRow(row: unknown): HostTerminalSummary[] {
+  if (!row || typeof row !== 'object') return []
+  const r = row as Record<string, unknown>
+  if (typeof r.handle !== 'string') return []
+  if (typeof r.connected !== 'boolean') return []
+  if (r.title !== null && typeof r.title !== 'string') return []
+  return [
+    {
+      handle: r.handle,
+      title: r.title as string | null,
+      connected: r.connected,
+      ...(typeof r.agentIdentity === 'string' ? { agentIdentity: r.agentIdentity } : {})
+    }
+  ]
 }
 
 /** Reads the host's negotiated capability list once per connect; an unreachable/old host

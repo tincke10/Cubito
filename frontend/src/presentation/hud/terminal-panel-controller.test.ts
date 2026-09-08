@@ -91,6 +91,7 @@ const createFakePort = (): TerminalStreamPort & { sinks: Map<number, TerminalStr
   return {
     sinks,
     createTerminal: vi.fn(async (worktree: string) => ({ terminal: `handle-${worktree}` })),
+    listTerminals: vi.fn(async () => []),
     subscribe: vi.fn((streamId: number, _terminal: string, _viewport, sink: TerminalStreamSink) => {
       sinks.set(streamId, sink)
     }),
