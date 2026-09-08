@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createSystemGraphPublisher } from './system-graph-publish'
 import { createSceneStore } from './scene-store'
 import type { SceneStore } from './scene-store'
-import type { SystemFileDiffGateway } from './system-file-diff-cache'
+import type { SystemFileDiffCache, SystemFileDiffGateway } from './system-file-diff-cache'
 import type { BranchCompare, SystemGraphSnapshot } from './ports/runtime-gateway'
 import { emptyWorktreeGraph } from '../domain/worktree-graph/types'
 import type { WorktreeNode } from '../domain/worktree-graph/types'
@@ -257,5 +257,61 @@ describe('createSystemGraphPublisher', () => {
     expect(gatewayA.calls).toBe(0)
     expect(gatewayB.calls).toBe(1)
     publisher.stop()
+  })
+
+  describe('origin (Change item 3: stream-triggered immediate refresh)', () => {
+    function fakeFileDiff(): SystemFileDiffCache {
+      return {
+        entriesFor: vi.fn(() => null),
+        refreshNow: vi.fn(),
+        stop: vi.fn(),
+        rebindGateway: vi.fn()
+      }
+    }
+
+    it("publish(..., 'stream') calls refreshNow before reading entriesFor", () => {
+      const gateway = createFakeGateway()
+      const { store } = setup()
+      const fileDiff = fakeFileDiff()
+      const publisher = createSystemGraphPublisher({ store, gateway, fileDiff })
+      const calls: string[] = []
+      ;(fileDiff.refreshNow as ReturnType<typeof vi.fn>).mockImplementation(() =>
+        calls.push('refreshNow')
+      )
+      ;(fileDiff.entriesFor as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        calls.push('entriesFor')
+        return null
+      })
+
+      publisher.publish('/wt/alpha', realisticSnapshot, 'stream')
+
+      expect(fileDiff.refreshNow).toHaveBeenCalledWith('/wt/alpha', expect.any(String))
+      expect(calls).toEqual(['refreshNow', 'entriesFor'])
+      publisher.stop()
+    })
+
+    it("publish(..., 'poll') never calls refreshNow", () => {
+      const gateway = createFakeGateway()
+      const { store } = setup()
+      const fileDiff = fakeFileDiff()
+      const publisher = createSystemGraphPublisher({ store, gateway, fileDiff })
+
+      publisher.publish('/wt/alpha', realisticSnapshot, 'poll')
+
+      expect(fileDiff.refreshNow).not.toHaveBeenCalled()
+      publisher.stop()
+    })
+
+    it("publish() with no origin defaults to 'poll' — never calls refreshNow", () => {
+      const gateway = createFakeGateway()
+      const { store } = setup()
+      const fileDiff = fakeFileDiff()
+      const publisher = createSystemGraphPublisher({ store, gateway, fileDiff })
+
+      publisher.publish('/wt/alpha', realisticSnapshot)
+
+      expect(fileDiff.refreshNow).not.toHaveBeenCalled()
+      publisher.stop()
+    })
   })
 })

@@ -12,8 +12,16 @@ export type SystemGraphPublisherDeps = {
   fileDiff?: SystemFileDiffCache
 }
 
+/** 'stream' forces an immediate (throttled) file-diff refresh before rendering — the poll's own
+ *  10s cadence already keeps numbers fresh, so it stays on the passive 'poll' path (default). */
+export type SystemGraphPublishOrigin = 'poll' | 'stream'
+
 export type SystemGraphPublisher = {
-  publish(worktree: WorktreeId, snapshot: SystemGraphSnapshot): void
+  publish(
+    worktree: WorktreeId,
+    snapshot: SystemGraphSnapshot,
+    origin?: SystemGraphPublishOrigin
+  ): void
   stop(): void
   rebindGateway(gateway: SystemFileDiffGateway): void
 }
@@ -30,9 +38,15 @@ export function createSystemGraphPublisher(deps: SystemGraphPublisherDeps): Syst
   let lastWorktree: WorktreeId | null = null
   let lastSnapshot: SystemGraphSnapshot | null = null
 
-  function render(worktree: WorktreeId, snapshot: SystemGraphSnapshot): void {
+  function render(
+    worktree: WorktreeId,
+    snapshot: SystemGraphSnapshot,
+    origin: SystemGraphPublishOrigin
+  ): void {
     const base = mapSnapshotToSystemGraph(snapshot)
-    const rows = fileDiff.entriesFor(worktree, systemGraphFileSetKey(base))
+    const key = systemGraphFileSetKey(base)
+    if (origin === 'stream') fileDiff.refreshNow(worktree, key)
+    const rows = fileDiff.entriesFor(worktree, key)
     const graph = rows === null ? base : applyFileDiffToSystemGraph(base, rows).graph
     deps.store.dispatchSystemView({ type: 'replace-graph', graph })
   }
@@ -46,16 +60,16 @@ export function createSystemGraphPublisher(deps: SystemGraphPublisherDeps): Syst
         if (stopped) return
         if (lastWorktree === null || lastSnapshot === null) return
         if (deps.store.get().systemView.view !== 'open') return
-        render(lastWorktree, lastSnapshot)
+        render(lastWorktree, lastSnapshot, 'poll') // just re-reads the now-fresh cache, no forced refetch
       }
     })
 
   return {
-    publish(worktree, snapshot) {
+    publish(worktree, snapshot, origin = 'poll') {
       stopped = false // a fresh publish() resumes a previously-stopped publisher (worktree switch)
       lastWorktree = worktree
       lastSnapshot = snapshot
-      render(worktree, snapshot)
+      render(worktree, snapshot, origin)
     },
     stop() {
       stopped = true
