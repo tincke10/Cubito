@@ -5,6 +5,7 @@ import {
   frameAll,
   frameIsland,
   frameLitter,
+  frameLitterOnGrowth,
   frameNode,
   interpolateFraming,
   islandCenters,
@@ -192,5 +193,29 @@ describe('frameLitter', () => {
   it('falls back to FIT_MIN_RADIUS when every member is unresolvable', () => {
     const framing = frameLitter(['unknown-1', 'unknown-2'], () => null)
     expect(framing.radius).toBe(FIT_MIN_RADIUS)
+  })
+})
+
+describe('frameLitterOnGrowth', () => {
+  const centers: readonly Vec3[] = [v(-5, 0, 0), v(5, 0, 0), v(0, 0, 20)]
+
+  it('frames the given centers, matching frameAll, when the litter grew', () => {
+    expect(frameLitterOnGrowth(2, 3, centers)).toEqual(frameAll(centers))
+  })
+
+  it('frames from zero (the first child landing) too', () => {
+    expect(frameLitterOnGrowth(0, 1, centers)).toEqual(frameAll(centers))
+  })
+
+  it('returns null when the count did not change', () => {
+    expect(frameLitterOnGrowth(3, 3, centers)).toBeNull()
+  })
+
+  it('returns null when the count shrank', () => {
+    expect(frameLitterOnGrowth(3, 2, centers)).toBeNull()
+  })
+
+  it('returns null when the next count is zero, even nominally "greater" than a negative previous', () => {
+    expect(frameLitterOnGrowth(-1, 0, centers)).toBeNull()
   })
 })

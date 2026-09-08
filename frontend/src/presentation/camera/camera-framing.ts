@@ -99,3 +99,15 @@ export const frameLitter = (
   }
   return frameAll(centers)
 }
+
+/** Growth-only camera decision for a fan-out litter (Change item 2): reframes (same
+ *  `frameLitter`/`frameAll` math, over already-resolved centers) only when a new child just
+ *  landed — never on a shrink, so a failed/removed member never yanks the camera in. */
+export const frameLitterOnGrowth = (
+  previousCount: number,
+  nextCount: number,
+  centers: readonly Vec3[]
+): CameraFraming | null => {
+  if (nextCount <= previousCount || nextCount <= 0) return null
+  return frameAll(centers)
+}
