@@ -65,10 +65,19 @@ const node = (
 const model = (overrides: Partial<SystemGraphViewModel> = {}): SystemGraphViewModel => ({
   nodes: [],
   edges: [],
+  canvas: { width: 1040, height: 216 },
   ...overrides
 })
 
 describe('createSystemGraph', () => {
+  it('sets the viewBox from the model canvas so a narrow canvas scales the graph to fit', () => {
+    const graph = createSystemGraph(createFakeDocument())
+    graph.apply(model({ canvas: { width: 1040, height: 500 } }))
+    const root = rootOf(graph)
+    expect(root.getAttribute('viewBox')).toBe('0 0 1040 500')
+    expect(root.getAttribute('preserveAspectRatio')).toBe('xMinYMin meet')
+  })
+
   it('renders an empty model with no node or edge elements', () => {
     const graph = createSystemGraph(createFakeDocument())
     graph.apply(model())
@@ -266,10 +275,12 @@ describe('createSystemGraph', () => {
 
   it('re-applying replaces previous nodes/edges rather than accumulating them', () => {
     const graph = createSystemGraph(createFakeDocument())
-    graph.apply({
-      nodes: [node({ id: 'a', kind: 'router' })],
-      edges: [{ from: 'a', to: 'a', kind: 'normal', cssClass: 'system-edge--normal' }]
-    })
+    graph.apply(
+      model({
+        nodes: [node({ id: 'a', kind: 'router' })],
+        edges: [{ from: 'a', to: 'a', kind: 'normal', cssClass: 'system-edge--normal' }]
+      })
+    )
     graph.apply(model())
     const root = rootOf(graph)
     expect(nodesLayerOf(root).children).toHaveLength(0)

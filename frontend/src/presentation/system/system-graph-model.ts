@@ -33,6 +33,8 @@ export type SystemGraphEdgeView = {
 export type SystemGraphViewModel = {
   nodes: readonly SystemGraphNodeView[]
   edges: readonly SystemGraphEdgeView[]
+  /** Design-space canvas (mockup 1440 − 400 feed); the SVG viewBox scales it to fit. */
+  canvas: { width: number; height: number }
 }
 
 /** Column order (design: router feeds endpoints feeds services feeds database). */
@@ -53,10 +55,20 @@ export const NODE_BOX_SIZE: Record<SystemNodeKind, { width: number; height: numb
 
 const TIER_X_ORIGIN = 40
 const TIER_X_SPACING = 280
-/** 3-line .cubito-system-hud (index.html) ends ~70px; keep row 0 clear of it. */
-export const SYSTEM_HUD_RESERVED_TOP = 96
-const ROW_Y_ORIGIN = SYSTEM_HUD_RESERVED_TOP
+/** Design-space top margin only — the HUD band is screen-space, reserved by the SVG's CSS top
+ *  (index.html .cubito-system-graph), so it never shrinks with the viewBox scale. */
+export const SYSTEM_GRAPH_TOP_MARGIN = 24
+const ROW_Y_ORIGIN = SYSTEM_GRAPH_TOP_MARGIN
 const ROW_Y_SPACING = 120
+export const SYSTEM_CANVAS_WIDTH = 1040
+/** Room under the lowest box for its diff/note lines (element draws them up to y+76). */
+const CANVAS_BOTTOM_MARGIN = 96
+
+const canvasHeight = (nodes: readonly SystemGraphNodeView[]): number =>
+  Math.max(
+    ROW_Y_ORIGIN + ROW_Y_SPACING,
+    ...nodes.map((node) => node.y + node.height + CANVAS_BOTTOM_MARGIN)
+  )
 
 const nodeCssClass = (kind: SystemNodeKind, state: SystemNodeState): string =>
   `system-node--${kind} system-node--${state}`
@@ -101,5 +113,5 @@ export function systemGraphViewModel(
     cssClass: edgeCssClass(edge.kind)
   }))
 
-  return { nodes, edges }
+  return { nodes, edges, canvas: { width: SYSTEM_CANVAS_WIDTH, height: canvasHeight(nodes) } }
 }

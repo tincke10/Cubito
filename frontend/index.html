@@ -561,9 +561,10 @@
       .cubito-system-graph {
         position: absolute;
         left: 0;
-        top: 0;
+        top: 84px; /* the 3-line HUD ends ~70px; reserved here so it survives the viewBox scale */
         width: calc(100% - 400px);
-        height: 100%;
+        max-width: 1040px; /* the model's design canvas: never upscale, only shrink to fit */
+        height: calc(100% - 84px);
       }
       .system-node__shape {
         fill: var(--cubito-panel-surface);

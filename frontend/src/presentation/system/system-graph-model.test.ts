@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { NODE_BOX_SIZE, SYSTEM_HUD_RESERVED_TOP, systemGraphViewModel } from './system-graph-model'
+import {
+  NODE_BOX_SIZE,
+  SYSTEM_CANVAS_WIDTH,
+  SYSTEM_GRAPH_TOP_MARGIN,
+  systemGraphViewModel
+} from './system-graph-model'
 import { buildSystemGraph } from '../../domain/system-graph/build-system-graph'
 import { emptySystemGraph } from '../../domain/system-graph/types'
 import type { SystemNode } from '../../domain/system-graph/types'
@@ -14,7 +19,21 @@ const node = (overrides: Partial<SystemNode> & Pick<SystemNode, 'id' | 'kind'>):
 describe('systemGraphViewModel', () => {
   it('returns an empty model for an empty graph', () => {
     const model = systemGraphViewModel(emptySystemGraph())
-    expect(model).toEqual({ nodes: [], edges: [] })
+    expect(model).toEqual({ nodes: [], edges: [], canvas: { width: 1040, height: 144 } })
+  })
+
+  it('sizes the design canvas 1040 wide and tall enough for the lowest node plus its annotations', () => {
+    const graph = buildSystemGraph({
+      nodes: [
+        node({ id: 'e1', kind: 'endpoint' }),
+        node({ id: 'e2', kind: 'endpoint' }),
+        node({ id: 'd', kind: 'database' })
+      ],
+      edges: []
+    })
+    const model = systemGraphViewModel(graph)
+    expect(model.canvas).toEqual({ width: SYSTEM_CANVAS_WIDTH, height: 24 + 120 + 44 + 96 })
+    expect(SYSTEM_CANVAS_WIDTH).toBe(1040)
   })
 
   it('assigns tiers by kind: router 0, endpoint 1, service 2, database 3', () => {
@@ -51,7 +70,7 @@ describe('systemGraphViewModel', () => {
     expect(model.nodes[1]!.y).toBeLessThan(model.nodes[2]!.y)
   })
 
-  it('keeps every node clear of the HUD band, with row 0 starting exactly at the reserved top', () => {
+  it('starts row 0 at the design top margin (the HUD band is reserved in screen space by CSS)', () => {
     const graph = buildSystemGraph({
       nodes: [
         node({ id: 'e1', kind: 'endpoint' }),
@@ -61,8 +80,9 @@ describe('systemGraphViewModel', () => {
       edges: []
     })
     const model = systemGraphViewModel(graph)
-    for (const n of model.nodes) expect(n.y).toBeGreaterThanOrEqual(SYSTEM_HUD_RESERVED_TOP)
-    expect(model.nodes.find((n) => n.id === 'e1')!.y).toBe(SYSTEM_HUD_RESERVED_TOP)
+    for (const n of model.nodes) expect(n.y).toBeGreaterThanOrEqual(SYSTEM_GRAPH_TOP_MARGIN)
+    expect(model.nodes.find((n) => n.id === 'e1')!.y).toBe(SYSTEM_GRAPH_TOP_MARGIN)
+    expect(SYSTEM_GRAPH_TOP_MARGIN).toBe(24)
   })
 
   it('produces the same layout across calls given the same graph (stable/deterministic)', () => {

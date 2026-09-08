@@ -179,6 +179,10 @@ export function createSystemGraph(doc: Document = document): SystemGraphHandle {
   return {
     element: root,
     apply(model: SystemGraphViewModel) {
+      // Why: tiers are fixed design px; a narrow canvas scales the whole graph down instead of
+      // clipping the database tier (index.html caps the width so wide screens stay 1:1).
+      root.setAttribute('viewBox', `0 0 ${model.canvas.width} ${model.canvas.height}`)
+      root.setAttribute('preserveAspectRatio', 'xMinYMin meet')
       const pointById = new Map(
         model.nodes.map((node) => [
           node.id,
