@@ -74,4 +74,90 @@ describe('createGitMergeMethods — gitMergeWinnerIntoParent', () => {
       /git\.mergeWinnerIntoParent/
     )
   })
+
+  it('omits syncWorkingTree from the RPC params when not passed', async () => {
+    const call: RpcCaller = vi.fn(async () => frame({ outcome: 'clean', commitOid: 'c0ffee' }))
+    const methods = createGitMergeMethods({ call })
+    await methods.gitMergeWinnerIntoParent('repo::/parent', 'repo::/child')
+    expect(call).toHaveBeenCalledWith('git.mergeWinnerIntoParent', {
+      parent: 'repo::/parent',
+      winner: 'repo::/child'
+    })
+  })
+
+  it('includes syncWorkingTree:true in the RPC params when requested', async () => {
+    const call: RpcCaller = vi.fn(async () => frame({ outcome: 'clean', commitOid: 'c0ffee' }))
+    const methods = createGitMergeMethods({ call })
+    await methods.gitMergeWinnerIntoParent('repo::/parent', 'repo::/child', undefined, true)
+    expect(call).toHaveBeenCalledWith('git.mergeWinnerIntoParent', {
+      parent: 'repo::/parent',
+      winner: 'repo::/child',
+      syncWorkingTree: true
+    })
+  })
+
+  it('omits syncWorkingTree from the RPC params when explicitly false', async () => {
+    const call: RpcCaller = vi.fn(async () => frame({ outcome: 'clean', commitOid: 'c0ffee' }))
+    const methods = createGitMergeMethods({ call })
+    await methods.gitMergeWinnerIntoParent('repo::/parent', 'repo::/child', undefined, false)
+    expect(call).toHaveBeenCalledWith('git.mergeWinnerIntoParent', {
+      parent: 'repo::/parent',
+      winner: 'repo::/child'
+    })
+  })
+
+  it('projects a synced workingTree sub-shape', async () => {
+    const call: RpcCaller = vi.fn(async () =>
+      frame({ outcome: 'clean', commitOid: 'abc123', workingTree: { status: 'synced' } })
+    )
+    const methods = createGitMergeMethods({ call })
+    await expect(methods.gitMergeWinnerIntoParent('p', 'w')).resolves.toEqual({
+      outcome: 'clean',
+      commitOid: 'abc123',
+      workingTree: { status: 'synced' }
+    })
+  })
+
+  it('projects a skipped/dirty workingTree sub-shape', async () => {
+    const call: RpcCaller = vi.fn(async () =>
+      frame({
+        outcome: 'clean',
+        commitOid: 'abc123',
+        workingTree: { status: 'skipped', reason: 'dirty' }
+      })
+    )
+    const methods = createGitMergeMethods({ call })
+    await expect(methods.gitMergeWinnerIntoParent('p', 'w')).resolves.toEqual({
+      outcome: 'clean',
+      commitOid: 'abc123',
+      workingTree: { status: 'skipped', reason: 'dirty' }
+    })
+  })
+
+  it('projects a failed workingTree sub-shape with its message', async () => {
+    const call: RpcCaller = vi.fn(async () =>
+      frame({
+        outcome: 'clean',
+        commitOid: 'abc123',
+        workingTree: { status: 'failed', message: 'refusing to clobber' }
+      })
+    )
+    const methods = createGitMergeMethods({ call })
+    await expect(methods.gitMergeWinnerIntoParent('p', 'w')).resolves.toEqual({
+      outcome: 'clean',
+      commitOid: 'abc123',
+      workingTree: { status: 'failed', message: 'refusing to clobber' }
+    })
+  })
+
+  it('drops a malformed workingTree instead of throwing on an otherwise-valid clean result', async () => {
+    const call: RpcCaller = vi.fn(async () =>
+      frame({ outcome: 'clean', commitOid: 'abc123', workingTree: { status: 'bogus' } })
+    )
+    const methods = createGitMergeMethods({ call })
+    await expect(methods.gitMergeWinnerIntoParent('p', 'w')).resolves.toEqual({
+      outcome: 'clean',
+      commitOid: 'abc123'
+    })
+  })
 })

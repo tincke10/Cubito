@@ -7,3 +7,7 @@ export const GUI_RUN_LEASE_GATES_CAPABILITY = 'orchestration.gui-run-lease.gates
 
 /** Host capability gating the winner-merge git.* RPC (Change E). LOCAL mirror, not src/shared. */
 export const GIT_MERGE_WINNER_CAPABILITY = 'git.merge-winner.v1'
+
+/** Host capability gating opt-in parent working-tree sync after a winner merge (v3-2). LOCAL
+ *  mirror, not src/shared. */
+export const GIT_MERGE_WINNER_SYNC_CAPABILITY = 'git.merge-winner.sync.v1'

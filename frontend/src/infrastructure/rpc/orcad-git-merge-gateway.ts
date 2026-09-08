@@ -1,16 +1,45 @@
-import type { MergeWinnerResult, RuntimeGateway } from '../../application/ports/runtime-gateway'
+import type {
+  MergeWinnerResult,
+  ParentWorkingTreeSyncResult,
+  RuntimeGateway
+} from '../../application/ports/runtime-gateway'
 import type { RpcCaller } from './orcad-gateway'
 
 export type GitMergeMethods = Pick<RuntimeGateway, 'gitMergeWinnerIntoParent'>
+
+/** Projects a raw `workingTree` sub-shape; malformed/missing -> undefined (best-effort field,
+ *  should not fail the whole merge result). */
+function toWorkingTreeResult(workingTree: unknown): ParentWorkingTreeSyncResult | undefined {
+  if (typeof workingTree !== 'object' || workingTree === null) {
+    return undefined
+  }
+  const w = workingTree as { status?: unknown; reason?: unknown; message?: unknown }
+  if (w.status === 'synced') {
+    return { status: 'synced' }
+  }
+  if (w.status === 'skipped' && w.reason === 'dirty') {
+    return { status: 'skipped', reason: 'dirty' }
+  }
+  if (w.status === 'failed' && typeof w.message === 'string') {
+    return { status: 'failed', message: w.message }
+  }
+  return undefined
+}
 
 /** Projects a raw `git.mergeWinnerIntoParent` result onto the local `MergeWinnerResult` shape. */
 function toMergeWinnerResult(result: {
   outcome?: unknown
   commitOid?: unknown
   files?: unknown
+  workingTree?: unknown
 }): MergeWinnerResult {
   if (result.outcome === 'clean' && typeof result.commitOid === 'string') {
-    return { outcome: 'clean', commitOid: result.commitOid }
+    const workingTree = toWorkingTreeResult(result.workingTree)
+    return {
+      outcome: 'clean',
+      commitOid: result.commitOid,
+      ...(workingTree ? { workingTree } : {})
+    }
   }
   if (result.outcome === 'conflict' && Array.isArray(result.files)) {
     const files = result.files as unknown[]
@@ -27,11 +56,12 @@ function toMergeWinnerResult(result: {
  */
 export function createGitMergeMethods(connection: { call: RpcCaller }): GitMergeMethods {
   return {
-    async gitMergeWinnerIntoParent(parent, winner, message) {
+    async gitMergeWinnerIntoParent(parent, winner, message, syncWorkingTree) {
       const response = await connection.call('git.mergeWinnerIntoParent', {
         parent,
         winner,
-        ...(message !== undefined ? { message } : {})
+        ...(message !== undefined ? { message } : {}),
+        ...(syncWorkingTree === true ? { syncWorkingTree: true } : {})
       })
       return toMergeWinnerResult(response.result as Parameters<typeof toMergeWinnerResult>[0])
     }

@@ -222,10 +222,17 @@ export type AgentActivityPage = {
 
 export type AgentActivityInput = { worktree: string; sinceSeq?: number; limit?: number }
 
+/** `workingTree` sub-shape on a clean `MergeWinnerResult` (v3-2): opt-in parent working-tree
+ *  sync outcome. Absent = not requested (old host, or the caller didn't ask). */
+export type ParentWorkingTreeSyncResult =
+  | { status: 'synced' }
+  | { status: 'skipped'; reason: 'dirty' }
+  | { status: 'failed'; message: string }
+
 /** `git.mergeWinnerIntoParent` result (Change E): LOCAL mirror of the engine's headless-merge
  *  outcome — clean moves the parent branch ref, conflict mutates nothing (file-name list only). */
 export type MergeWinnerResult =
-  | { outcome: 'clean'; commitOid: string }
+  | { outcome: 'clean'; commitOid: string; workingTree?: ParentWorkingTreeSyncResult }
   | { outcome: 'conflict'; files: readonly string[] }
 
 /**
@@ -261,7 +268,8 @@ export type RuntimeGateway = {
   gitMergeWinnerIntoParent(
     parent: string,
     winner: string,
-    message?: string
+    message?: string,
+    syncWorkingTree?: boolean
   ): Promise<MergeWinnerResult>
   agentActivity(input: AgentActivityInput): Promise<AgentActivityPage>
 }
