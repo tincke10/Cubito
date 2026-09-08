@@ -29,8 +29,9 @@ export type CompareViewControllerDeps = {
   onSetWinner: (childId: WorktreeId | null) => void
   /** Forwards a file-rail row click to the live loader (`loader.select(childId, path)`). */
   onSelectFile: (path: string) => void
-  /** Forwards the merge action's 2nd-click fire (never the 1st, arm-only) to the merge runner. */
-  onMergeWinner: () => void
+  /** Forwards the merge action's 2nd-click fire (never the 1st, arm-only) to the merge runner,
+   *  with the sync checkbox's value (v3-2). */
+  onMergeWinner: (syncWorkingTree: boolean) => void
   /** Fires once on the closed->open transition, after mounting — the seam for hiding the
    *  worktree HUD/keyboard-bar/3D scene, keeping this controller DOM-scoped to #compare. */
   onEnter?: () => void
@@ -44,7 +45,9 @@ export type CompareViewController = {
     connection: ConnectionState,
     branchLabelFor: (childId: WorktreeId) => string,
     /** Whether the host advertises `git.merge-winner.v1` — gates the merge action's button. */
-    mergeCapable: boolean
+    mergeCapable: boolean,
+    /** Whether the host advertises `git.merge-winner.sync.v1` (v3-2) — gates the sync checkbox. */
+    mergeSyncCapable?: boolean
   ): void
   dispose(): void
 }
@@ -77,7 +80,7 @@ export function createCompareViewController(
     childRail.onFocusChild((childId) => deps.onFocusChild(childId))
     childRail.onSetWinner((childId) => deps.onSetWinner(childId))
     fileRail.onSelect((path) => deps.onSelectFile(path))
-    mergeAction.onMergeWinner(() => deps.onMergeWinner())
+    mergeAction.onMergeWinner((syncWorkingTree) => deps.onMergeWinner(syncWorkingTree))
     deps.hud.appendChild(hud.root)
     deps.hud.appendChild(childRail.root)
     deps.hud.appendChild(fileRail.root)
@@ -100,7 +103,7 @@ export function createCompareViewController(
   }
 
   return {
-    sync(compareView, connection, branchLabelFor, mergeCapable) {
+    sync(compareView, connection, branchLabelFor, mergeCapable, mergeSyncCapable = false) {
       if (compareView.view !== 'open') {
         if (mounted) {
           unmount()
@@ -140,6 +143,7 @@ export function createCompareViewController(
       entry.mergeAction.apply({
         visible: compareView.winnerId !== null,
         capable: mergeCapable,
+        syncCapable: mergeSyncCapable,
         merge: compareView.merge
       })
     },

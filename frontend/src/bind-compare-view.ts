@@ -8,7 +8,10 @@ import { createCompareLiveLoader } from './application/compare-live-loader'
 import type { CompareLiveLoaderGatewayPort } from './application/compare-live-loader'
 import { runCompareMerge } from './application/compare-merge-run'
 import type { CompareMergeGatewayPort } from './application/compare-merge-run'
-import { GIT_MERGE_WINNER_CAPABILITY } from './application/runtime-capability-keys'
+import {
+  GIT_MERGE_WINNER_CAPABILITY,
+  GIT_MERGE_WINNER_SYNC_CAPABILITY
+} from './application/runtime-capability-keys'
 import type { SceneStore } from './application/scene-store'
 import type { WorktreeId } from './domain/worktree-graph/types'
 
@@ -55,12 +58,17 @@ export function createCompareViewBinder(deps: BindCompareViewDeps): CompareViewB
       if (compareView.view !== 'open' || compareView.focusedChildId === null) return
       loader.select(compareView.focusedChildId, path)
     },
-    onMergeWinner: () => {
+    onMergeWinner: (syncWorkingTree) => {
       const state = deps.store.get()
-      void runCompareMerge(state.compareView, state.fanOut, {
-        gateway: mergeGateway,
-        dispatch: (action) => deps.store.dispatchCompareView(action)
-      })
+      void runCompareMerge(
+        state.compareView,
+        state.fanOut,
+        {
+          gateway: mergeGateway,
+          dispatch: (action) => deps.store.dispatchCompareView(action)
+        },
+        syncWorkingTree
+      )
     }
   })
 
@@ -84,7 +92,8 @@ export function createCompareViewBinder(deps: BindCompareViewDeps): CompareViewB
         compareView,
         state.connection,
         branchLabelFor,
-        capabilities.includes(GIT_MERGE_WINNER_CAPABILITY)
+        capabilities.includes(GIT_MERGE_WINNER_CAPABILITY),
+        capabilities.includes(GIT_MERGE_WINNER_SYNC_CAPABILITY)
       )
     },
     rebindGateway(gateway: CompareGatewayPort, nextCapabilities: readonly string[]): void {

@@ -87,18 +87,18 @@ const branchLabelFor = (childId: string): string => `cubito-${childId}`
 const createFakeMergeAction = (): CompareMergeActionHandle & {
   applyCalls: unknown[]
   disposed: boolean
-  emitMergeWinner(): void
+  emitMergeWinner(syncWorkingTree: boolean): void
 } => {
-  let mergeCb: (() => void) | null = null
+  let mergeCb: ((syncWorkingTree: boolean) => void) | null = null
   const handle = {
     root: {} as HTMLElement,
     applyCalls: [] as unknown[],
     disposed: false,
     apply: vi.fn((model) => handle.applyCalls.push(model)),
-    onMergeWinner: vi.fn((cb: () => void) => (mergeCb = cb)),
+    onMergeWinner: vi.fn((cb: (syncWorkingTree: boolean) => void) => (mergeCb = cb)),
     dispose: vi.fn(() => (handle.disposed = true)),
-    emitMergeWinner() {
-      mergeCb?.()
+    emitMergeWinner(syncWorkingTree: boolean) {
+      mergeCb?.(syncWorkingTree)
     }
   }
   return handle
@@ -340,6 +340,15 @@ describe('createCompareViewController — winner-merge action (Change E)', () =>
     expect(mergeActions[0]!.applyCalls[1]).toMatchObject({ capable: true })
   })
 
+  it('forwards the sync mergeSyncCapable flag straight through as syncCapable', () => {
+    const { controller, mergeActions } = setup()
+    controller.sync(openSlice(), CONNECTED, branchLabelFor, true, false)
+    expect(mergeActions[0]!.applyCalls[0]).toMatchObject({ syncCapable: false })
+
+    controller.sync(openSlice(), CONNECTED, branchLabelFor, true, true)
+    expect(mergeActions[0]!.applyCalls[1]).toMatchObject({ syncCapable: true })
+  })
+
   it('applies the merge slice state verbatim', () => {
     const { controller, mergeActions } = setup()
     const running = reduceCompareView(openSlice(), { type: 'merge-start' })
@@ -347,10 +356,10 @@ describe('createCompareViewController — winner-merge action (Change E)', () =>
     expect(mergeActions[0]!.applyCalls[0]).toMatchObject({ merge: { phase: 'running' } })
   })
 
-  it('routes the merge action fire callback to onMergeWinner', () => {
+  it('routes the merge action fire callback to onMergeWinner, forwarding the boolean arg', () => {
     const { controller, mergeActions, onMergeWinner } = setup()
     controller.sync(openSlice(), CONNECTED, branchLabelFor, true)
-    mergeActions[0]!.emitMergeWinner()
-    expect(onMergeWinner).toHaveBeenCalledOnce()
+    mergeActions[0]!.emitMergeWinner(true)
+    expect(onMergeWinner).toHaveBeenCalledExactlyOnceWith(true)
   })
 })
