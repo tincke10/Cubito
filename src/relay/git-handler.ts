@@ -600,6 +600,7 @@ export class GitHandler {
     const parentPath = params.parentPath as string
     const winnerPath = params.winnerPath as string
     const message = params.message as string
+    const syncWorkingTree = params.syncWorkingTree as boolean | undefined
     return runWithGitWorktreeOperationLock(parentPath, context?.signal, async () => {
       this.clearGitMutationReadCaches()
       try {
@@ -608,7 +609,8 @@ export class GitHandler {
           this.gitCapabilities,
           parentPath,
           winnerPath,
-          message
+          message,
+          syncWorkingTree === true
         )
       } finally {
         this.clearGitMutationReadCaches()

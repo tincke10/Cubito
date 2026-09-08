@@ -160,6 +160,39 @@ describe('GitHandler', () => {
     })
   })
 
+  describe('mergeWinnerIntoParent', () => {
+    it('syncs the parent working tree end-to-end when syncWorkingTree is requested', async () => {
+      gitInit(tmpDir)
+      writeFileSync(path.join(tmpDir, 'base.txt'), 'base\n')
+      gitCommit(tmpDir, 'initial')
+      const parentDir = path.join(tmpDir, 'parent')
+      const winnerDir = path.join(tmpDir, 'winner')
+      execFileSync('git', ['worktree', 'add', '-q', '-b', 'parent-branch', parentDir], {
+        cwd: tmpDir,
+        stdio: 'pipe'
+      })
+      execFileSync('git', ['worktree', 'add', '-q', '-b', 'winner-branch', winnerDir], {
+        cwd: tmpDir,
+        stdio: 'pipe'
+      })
+      writeFileSync(path.join(winnerDir, 'winner-only.txt'), 'winner\n')
+      gitCommit(winnerDir, 'winner change')
+
+      const result = (await dispatcher.callRequest('git.mergeWinnerIntoParent', {
+        parentPath: parentDir,
+        winnerPath: winnerDir,
+        message: 'Merge winner into parent',
+        syncWorkingTree: true
+      })) as { outcome: string; workingTree?: { status: string } }
+
+      expect(result.outcome).toBe('clean')
+      expect(result.workingTree).toEqual({ status: 'synced' })
+      await expect(
+        fs.readFile(path.join(parentDir, 'winner-only.txt'), 'utf-8').then(normalizeGitFileText)
+      ).resolves.toBe('winner\n')
+    })
+  })
+
   describe('checkout / localBranches', () => {
     it('switches to an existing local branch and lists branches current-first', async () => {
       gitInit(tmpDir)

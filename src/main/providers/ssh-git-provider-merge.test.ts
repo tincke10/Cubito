@@ -59,4 +59,52 @@ describe('SshGitProvider merge operations', () => {
     })
     expect(result).toEqual({ outcome: 'clean', commitOid: 'c'.repeat(40) })
   })
+
+  it('mergeWinnerIntoParent forwards syncWorkingTree when requested', async () => {
+    const mux = {
+      request: vi.fn().mockResolvedValue({ outcome: 'clean', commitOid: 'c'.repeat(40) }),
+      notify: vi.fn(),
+      onNotification: vi.fn(),
+      dispose: vi.fn(),
+      isDisposed: vi.fn().mockReturnValue(false)
+    }
+    const provider = new SshGitProvider('conn-1', mux as never)
+
+    await provider.mergeWinnerIntoParent(
+      '/home/user/parent',
+      '/home/user/winner',
+      'Merge winner into parent',
+      { syncWorkingTree: true }
+    )
+
+    expect(mux.request).toHaveBeenCalledWith('git.mergeWinnerIntoParent', {
+      parentPath: '/home/user/parent',
+      winnerPath: '/home/user/winner',
+      message: 'Merge winner into parent',
+      syncWorkingTree: true
+    })
+  })
+
+  it('mergeWinnerIntoParent omits syncWorkingTree when not requested', async () => {
+    const mux = {
+      request: vi.fn().mockResolvedValue({ outcome: 'clean', commitOid: 'c'.repeat(40) }),
+      notify: vi.fn(),
+      onNotification: vi.fn(),
+      dispose: vi.fn(),
+      isDisposed: vi.fn().mockReturnValue(false)
+    }
+    const provider = new SshGitProvider('conn-1', mux as never)
+
+    await provider.mergeWinnerIntoParent(
+      '/home/user/parent',
+      '/home/user/winner',
+      'Merge winner into parent'
+    )
+
+    expect(mux.request).toHaveBeenCalledWith('git.mergeWinnerIntoParent', {
+      parentPath: '/home/user/parent',
+      winnerPath: '/home/user/winner',
+      message: 'Merge winner into parent'
+    })
+  })
 })

@@ -32,7 +32,8 @@ export type IGitProvider = {
   mergeWinnerIntoParent(
     parentPath: string,
     winnerPath: string,
-    message: string
+    message: string,
+    options?: { syncWorkingTree?: boolean }
   ): Promise<MergeWinnerResult>
   getStagedCommitContext(worktreePath: string): Promise<CommitMessageDraftContext | null>
   getDiff(

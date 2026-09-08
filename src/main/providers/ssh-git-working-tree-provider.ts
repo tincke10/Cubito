@@ -41,14 +41,16 @@ export class SshGitWorkingTreeProvider extends SshGitNoninteractiveProvider {
   async mergeWinnerIntoParent(
     parentPath: string,
     winnerPath: string,
-    message: string
+    message: string,
+    options: { syncWorkingTree?: boolean } = {}
   ): Promise<MergeWinnerResult> {
     return this.runWithGitReadInvalidation(
       async () =>
         (await this.mux.request('git.mergeWinnerIntoParent', {
           parentPath,
           winnerPath,
-          message
+          message,
+          ...(options.syncWorkingTree === true ? { syncWorkingTree: true } : {})
         })) as MergeWinnerResult
     )
   }
