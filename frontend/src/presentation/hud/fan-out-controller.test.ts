@@ -400,7 +400,11 @@ describe('createFanOutController', () => {
     forms[0]!.emitSubmit()
     await flush()
     expect(gateway.createWorktree).toHaveBeenCalledTimes(2)
-    expect(dispatch).toHaveBeenCalledWith({ type: 'child-failed', mutationId: 'mutation-1' })
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'child-failed',
+      mutationId: 'mutation-1',
+      message: 'boom'
+    })
     expect(dispatch).toHaveBeenCalledWith({
       type: 'child-created',
       mutationId: 'mutation-2',

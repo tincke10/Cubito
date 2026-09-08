@@ -140,10 +140,14 @@ describe('runCamadaLeaseSubmit — error branches', () => {
     })
 
     expect(gateway.orchestrationTaskCreate).toHaveBeenCalledTimes(1) // only for m2
-    expect(dispatch).toHaveBeenCalledWith({ type: 'child-failed', mutationId: 'm1' })
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'child-failed',
+      mutationId: 'm1',
+      message: 'boom'
+    })
     expect(result.localSlice).toMatchObject({
       batch: [
-        { mutationId: 'm1', worktreeId: null, failed: true },
+        { mutationId: 'm1', worktreeId: null, failed: true, errorMessage: 'boom' },
         { mutationId: 'm2', worktreeId: 'wt-m2' }
       ]
     })
@@ -158,10 +162,21 @@ describe('runCamadaLeaseSubmit — error branches', () => {
       dispatch
     })
 
-    expect(dispatch).toHaveBeenCalledWith({ type: 'child-failed', mutationId: 'm1' })
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'child-failed',
+      mutationId: 'm1',
+      message: 'boom'
+    })
     expect(result.localSlice).toMatchObject({
       batch: [
-        { mutationId: 'm1', worktreeId: 'wt-m1', failed: true, dispatchId: null, taskId: null }
+        {
+          mutationId: 'm1',
+          worktreeId: 'wt-m1',
+          failed: true,
+          dispatchId: null,
+          taskId: null,
+          errorMessage: 'boom'
+        }
       ]
     })
   })

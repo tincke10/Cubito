@@ -158,9 +158,10 @@ export function createFanOutController(deps: FanOutControllerDeps): FanOutContro
           worktreeId: result.worktreeId
         })
         deps.dispatch({ type: 'child-created', mutationId, worktreeId: result.worktreeId })
-      } catch {
-        localSlice = reduceFanOut(localSlice, { type: 'child-failed', mutationId })
-        deps.dispatch({ type: 'child-failed', mutationId })
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        localSlice = reduceFanOut(localSlice, { type: 'child-failed', mutationId, message })
+        deps.dispatch({ type: 'child-failed', mutationId, message })
       }
     }
     return localSlice

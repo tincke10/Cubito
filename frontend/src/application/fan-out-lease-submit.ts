@@ -61,8 +61,9 @@ export async function runCamadaLeaseSubmit(
         nameWasGenerated: true
       })
       worktreeId = worktree.worktreeId
-    } catch {
-      localSlice = apply(localSlice, deps, { type: 'child-failed', mutationId })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      localSlice = apply(localSlice, deps, { type: 'child-failed', mutationId, message })
       continue
     }
     localSlice = apply(localSlice, deps, { type: 'child-created', mutationId, worktreeId })
@@ -86,8 +87,9 @@ export async function runCamadaLeaseSubmit(
         dispatchId: worker.dispatchId,
         taskId: task.taskId
       })
-    } catch {
-      localSlice = apply(localSlice, deps, { type: 'child-failed', mutationId })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      localSlice = apply(localSlice, deps, { type: 'child-failed', mutationId, message })
     }
   }
 
