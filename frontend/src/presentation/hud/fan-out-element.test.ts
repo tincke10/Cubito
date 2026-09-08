@@ -74,6 +74,7 @@ const runningModel = (overrides: Partial<FanOutRunningViewModel> = {}): FanOutRu
   counters: '2 trabajando · 1 esperando · 1 naciendo · 1 listo',
   gates: [],
   questions: [],
+  failures: [],
   ...overrides
 })
 
@@ -207,6 +208,40 @@ describe('createFanOutForm — running view', () => {
     const counters = root.children.find((c) => c.className.includes('counters'))!
     expect(callout.textContent).toBe('fan-out · 5 × claude')
     expect(counters.textContent).toBe('2 trabajando · 1 esperando · 1 naciendo · 1 listo')
+  })
+})
+
+describe('createFanOutForm — running view — per-child failures', () => {
+  it('renders one row per failure, with the child label and message', () => {
+    const form = createFanOutForm(createFakeDocument())
+    form.apply(
+      runningModel({
+        failures: [
+          { mutationId: 'm1', label: 'camada-m1', message: 'network unreachable' },
+          { mutationId: 'm3', label: 'camada-m3', message: 'timeout' }
+        ]
+      })
+    )
+    const root = form.element as unknown as FakeElement
+    const failuresContainer = root.children.find((c) => c.className.includes('failures'))!
+    expect(failuresContainer.children).toHaveLength(2)
+    expect(failuresContainer.children[0]!.textContent).toContain('camada-m1')
+    expect(failuresContainer.children[0]!.textContent).toContain('network unreachable')
+    expect(failuresContainer.children[1]!.textContent).toContain('camada-m3')
+    expect(failuresContainer.children[1]!.textContent).toContain('timeout')
+  })
+
+  it('rebuilds the failure rows from scratch on every apply()', () => {
+    const form = createFanOutForm(createFakeDocument())
+    form.apply(
+      runningModel({
+        failures: [{ mutationId: 'm1', label: 'camada-m1', message: 'boom' }]
+      })
+    )
+    form.apply(runningModel({ failures: [] }))
+    const root = form.element as unknown as FakeElement
+    const failuresContainer = root.children.find((c) => c.className.includes('failures'))!
+    expect(failuresContainer.children).toHaveLength(0)
   })
 })
 

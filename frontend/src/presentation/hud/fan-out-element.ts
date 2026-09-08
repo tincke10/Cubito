@@ -62,6 +62,9 @@ export function createFanOutForm(doc: Document = document): FanOutFormHandle {
   const counters = doc.createElement('div')
   counters.className = 'cubito-fanout-form__counters'
 
+  const failuresList = doc.createElement('div')
+  failuresList.className = 'cubito-fanout-form__failures'
+
   const gateList = createFanOutGateList(doc)
 
   for (const child of [
@@ -72,7 +75,8 @@ export function createFanOutForm(doc: Document = document): FanOutFormHandle {
     submitButton,
     cancelButton,
     callout,
-    counters
+    counters,
+    failuresList
   ]) {
     root.appendChild(child)
   }
@@ -111,7 +115,20 @@ export function createFanOutForm(doc: Document = document): FanOutFormHandle {
     const display = visible ? '' : 'none'
     callout.style.display = display
     counters.style.display = display
+    failuresList.style.display = display
     gateList.element.style.display = display
+  }
+
+  // Terminal entries, rebuilt on every apply() (mirrors gate-list's simpler siblings) — no
+  // reconciliation needed since a failed child never un-fails.
+  const renderFailures = (failures: FanOutRunningViewModel['failures']): void => {
+    failuresList.replaceChildren()
+    for (const failure of failures) {
+      const row = doc.createElement('div')
+      row.className = 'cubito-fanout-form__failure'
+      row.textContent = `${failure.label}: ${failure.message}`
+      failuresList.appendChild(row)
+    }
   }
 
   return {
@@ -137,6 +154,7 @@ export function createFanOutForm(doc: Document = document): FanOutFormHandle {
       showRunning(true)
       callout.textContent = model.callout
       counters.textContent = model.counters
+      renderFailures(model.failures)
       gateList.apply({ gates: model.gates, questions: model.questions })
     },
     onCountChange(callback) {

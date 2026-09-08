@@ -164,6 +164,37 @@ describe('fanOutViewModel — running — decision visibility (Change C-EXTENDED
   })
 })
 
+describe('fanOutViewModel — running — per-child failures', () => {
+  it('projects one failure row per failed entry, with a label and message', () => {
+    const model = fanOutViewModel(
+      runningSlice({
+        batch: [
+          {
+            mutationId: 'm1',
+            worktreeId: null,
+            failed: true,
+            dispatchId: null,
+            taskId: null,
+            errorMessage: 'network unreachable'
+          },
+          { mutationId: 'm2', worktreeId: 'w3', failed: false, dispatchId: null, taskId: null }
+        ],
+        memberStatus: {}
+      })
+    )
+    if (model?.view !== 'running') throw new Error('expected running')
+    expect(model.failures).toEqual([
+      { mutationId: 'm1', label: 'camada-m1', message: 'network unreachable' }
+    ])
+  })
+
+  it('defaults failures to an empty array when no entry failed', () => {
+    const model = fanOutViewModel(runningSlice())
+    if (model?.view !== 'running') throw new Error('expected running')
+    expect(model.failures).toEqual([])
+  })
+})
+
 describe('fanOutViewModel — running — gate/question rows (Change F)', () => {
   it('projects pending gates and questions from decisionVisibility onto the running model', () => {
     const model = fanOutViewModel(
