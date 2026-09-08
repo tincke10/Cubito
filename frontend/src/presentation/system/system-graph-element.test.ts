@@ -159,6 +159,21 @@ describe('createSystemGraph', () => {
     expect(byClass('system-node__method')!.textContent).toBe('POST')
     expect(byClass('system-node__diff')!.textContent).toBe('+18 −6')
     expect(byClass('system-node__note')!.textContent).toBe('editando ahora')
+    expect(byClass('system-node__note')!.getAttribute('y')).not.toBe(
+      byClass('system-node__diff')!.getAttribute('y')
+    )
+  })
+
+  it('keeps the note at the annotation row when there is no diff', () => {
+    const graph = createSystemGraph(createFakeDocument())
+    graph.apply(
+      model({
+        nodes: [node({ id: 'e', kind: 'endpoint', diff: null, note: 'editando ahora' })]
+      })
+    )
+    const g = nodesLayerOf(rootOf(graph)).children[0]!
+    const byClass = (cls: string) => g.children.find((c) => c.getAttribute('class') === cls)
+    expect(byClass('system-node__note')!.getAttribute('y')).toBe('34')
   })
 
   it('omits method/diff/note elements when absent', () => {

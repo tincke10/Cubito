@@ -10,6 +10,7 @@ const SVG_NS = 'http://www.w3.org/2000/svg'
  *  group. Sourced from VistaSistema.dc.html's rect-relative text offsets. */
 const LABEL_Y = 16
 const ANNOTATION_Y = 34
+const NOTE_Y_BELOW_DIFF = 52
 const METHOD_X = 8
 const LABEL_X_WITH_METHOD = 48
 const LABEL_X = 8
@@ -98,7 +99,8 @@ const buildNodeGroup = (doc: Document, node: SystemGraphNodeView): SVGElement =>
     )
   }
   if (node.note !== undefined) {
-    group.appendChild(textEl(doc, 'system-node__note', LABEL_X, ANNOTATION_Y, node.note))
+    const noteY = node.diff !== null ? NOTE_Y_BELOW_DIFF : ANNOTATION_Y
+    group.appendChild(textEl(doc, 'system-node__note', LABEL_X, noteY, node.note))
   }
 
   return group
