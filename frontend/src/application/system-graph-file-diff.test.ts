@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   applyFileDiffToSystemGraph,
+  mergeFileDiffEntries,
   normalizeSystemFilePath,
   systemGraphFileSetKey,
   systemNodeFilePath
@@ -238,6 +239,72 @@ describe('applyFileDiffToSystemGraph', () => {
     const { graph } = applyFileDiffToSystemGraph(headlineGraph(), headlineEntries)
     const counts = systemHudCounts({ view: 'open', focusedNodeId: 'w', graph, feed: [] })
     expect(counts).toEqual({ tocados: 2, nuevo: 1 })
+  })
+})
+
+describe('applyFileDiffToSystemGraph untracked status', () => {
+  function headlineGraph(): SystemGraph {
+    return buildSystemGraph({
+      nodes: [routerNode({ id: 'router:src/routes/users.ts', label: 'src/routes/users.ts' })],
+      edges: []
+    })
+  }
+
+  it('maps untracked to naciendo', () => {
+    const entries = [entry({ status: 'untracked' })]
+
+    const { graph } = applyFileDiffToSystemGraph(headlineGraph(), entries)
+
+    expect(graph.nodes.get('router:src/routes/users.ts')?.state).toBe('naciendo')
+  })
+})
+
+describe('mergeFileDiffEntries', () => {
+  it('returns null when both sides are null', () => {
+    expect(mergeFileDiffEntries(null, null)).toBeNull()
+  })
+
+  it('returns the other side as-is when one side is null', () => {
+    const working: readonly GitStatusRow[] = [entry({ path: 'src/a.ts' })]
+    expect(mergeFileDiffEntries(null, working)).toEqual(working)
+    const committed: readonly GitStatusRow[] = [entry({ path: 'src/b.ts' })]
+    expect(mergeFileDiffEntries(committed, null)).toEqual(committed)
+  })
+
+  it('sums added/removed for a path present on both sides', () => {
+    const committed = [entry({ path: 'src/a.ts', status: 'modified', added: 3, removed: 1 })]
+    const working = [entry({ path: 'src/a.ts', status: 'modified', added: 2, removed: 4 })]
+
+    const merged = mergeFileDiffEntries(committed, working)
+
+    expect(merged).toEqual([{ path: 'src/a.ts', status: 'modified', added: 5, removed: 5 }])
+  })
+
+  it('prefers the committed status when both sides disagree', () => {
+    const committed = [entry({ path: 'src/a.ts', status: 'added', added: 3, removed: 0 })]
+    const working = [entry({ path: 'src/a.ts', status: 'modified', added: 1, removed: 0 })]
+
+    const merged = mergeFileDiffEntries(committed, working)
+
+    expect(merged).toEqual([{ path: 'src/a.ts', status: 'added', added: 4, removed: 0 }])
+  })
+
+  it('includes a working-only path untouched', () => {
+    const committed = [entry({ path: 'src/a.ts' })]
+    const working = [entry({ path: 'src/b.ts', status: 'untracked', added: 5, removed: 0 })]
+
+    const merged = mergeFileDiffEntries(committed, working)
+
+    expect(merged).toContainEqual({ path: 'src/b.ts', status: 'untracked', added: 5, removed: 0 })
+  })
+
+  it('keys by normalizeSystemFilePath so a Windows-separator path matches its posix counterpart', () => {
+    const committed = [entry({ path: 'src/a.ts', status: 'modified', added: 3, removed: 1 })]
+    const working = [entry({ path: 'src\\a.ts', status: 'modified', added: 2, removed: 0 })]
+
+    const merged = mergeFileDiffEntries(committed, working)
+
+    expect(merged).toEqual([{ path: 'src/a.ts', status: 'modified', added: 5, removed: 1 }])
   })
 })
 

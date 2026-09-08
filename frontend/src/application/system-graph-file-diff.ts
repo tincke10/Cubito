@@ -46,12 +46,13 @@ export function systemGraphFileSetKey(graph: SystemGraph): string {
 
 export type SystemFileDiffJoin = { graph: SystemGraph; matchedFileCount: number }
 
-/** modified/renamed -> dirty, added/copied -> naciendo; deleted or unknown -> ignored (idle stays). */
+/** modified/renamed -> dirty, added/copied/untracked -> naciendo; deleted/unknown -> ignored (idle stays). */
 const STATE_FOR_STATUS: Partial<Record<string, SystemNodeState>> = {
   modified: 'dirty',
   renamed: 'dirty',
   added: 'naciendo',
-  copied: 'naciendo'
+  copied: 'naciendo',
+  untracked: 'naciendo'
 }
 
 /**
@@ -91,4 +92,34 @@ export function applyFileDiffToSystemGraph(
     graph: buildSystemGraph({ nodes, edges: graph.edges }),
     matchedFileCount: matchedPaths.size
   }
+}
+
+/** Union of committed (branch-compare) and working-tree (git.status) rows, keyed by file path. */
+export function mergeFileDiffEntries(
+  committed: readonly GitStatusRow[] | null,
+  working: readonly GitStatusRow[] | null
+): readonly GitStatusRow[] | null {
+  if (committed === null) return working
+  if (working === null) return committed
+
+  const byKey = new Map<string, GitStatusRow>()
+  for (const entry of committed) {
+    byKey.set(normalizeSystemFilePath(entry.path), entry)
+  }
+  for (const entry of working) {
+    const key = normalizeSystemFilePath(entry.path)
+    const existing = byKey.get(key)
+    byKey.set(
+      key,
+      existing === undefined
+        ? entry
+        : {
+            path: existing.path,
+            status: existing.status,
+            added: existing.added + entry.added,
+            removed: existing.removed + entry.removed
+          }
+    )
+  }
+  return [...byKey.values()]
 }
