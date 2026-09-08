@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { systemGraphViewModel } from './system-graph-model'
+import { SYSTEM_HUD_RESERVED_TOP, systemGraphViewModel } from './system-graph-model'
 import { buildSystemGraph } from '../../domain/system-graph/build-system-graph'
 import { emptySystemGraph } from '../../domain/system-graph/types'
 import type { SystemNode } from '../../domain/system-graph/types'
@@ -49,6 +49,20 @@ describe('systemGraphViewModel', () => {
     expect(model.nodes[0]!.x).toBe(model.nodes[1]!.x)
     expect(model.nodes[0]!.y).toBeLessThan(model.nodes[1]!.y)
     expect(model.nodes[1]!.y).toBeLessThan(model.nodes[2]!.y)
+  })
+
+  it('keeps every node clear of the HUD band, with row 0 starting exactly at the reserved top', () => {
+    const graph = buildSystemGraph({
+      nodes: [
+        node({ id: 'e1', kind: 'endpoint' }),
+        node({ id: 'e2', kind: 'endpoint' }),
+        node({ id: 'd', kind: 'database' })
+      ],
+      edges: []
+    })
+    const model = systemGraphViewModel(graph)
+    for (const n of model.nodes) expect(n.y).toBeGreaterThanOrEqual(SYSTEM_HUD_RESERVED_TOP)
+    expect(model.nodes.find((n) => n.id === 'e1')!.y).toBe(SYSTEM_HUD_RESERVED_TOP)
   })
 
   it('produces the same layout across calls given the same graph (stable/deterministic)', () => {

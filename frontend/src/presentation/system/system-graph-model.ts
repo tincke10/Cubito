@@ -43,7 +43,9 @@ const TIER_BY_KIND: Record<SystemNodeKind, number> = {
 
 const TIER_X_ORIGIN = 40
 const TIER_X_SPACING = 280
-const ROW_Y_ORIGIN = 40
+/** 3-line .cubito-system-hud (index.html) ends ~70px; keep row 0 clear of it. */
+export const SYSTEM_HUD_RESERVED_TOP = 96
+const ROW_Y_ORIGIN = SYSTEM_HUD_RESERVED_TOP
 const ROW_Y_SPACING = 120
 
 const nodeCssClass = (kind: SystemNodeKind, state: SystemNodeState): string =>
