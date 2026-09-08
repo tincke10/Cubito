@@ -317,6 +317,29 @@ describe('createKeyboardController', () => {
       expect(store.get().terminals.activePanel?.focused).toBe(true)
     })
 
+    it('shift+t always opens a brand-new terminal tab, even on an already-open node (v3-3)', () => {
+      const { store, terminal, controller } = setup('a')
+      controller.handleKeyDown(baseEvent({ key: 't' }))
+      const handled = controller.handleKeyDown(baseEvent({ key: 'T', shiftKey: true }))
+      expect(handled).toBe(true)
+      expect(store.get().terminals.byNode.get('a')).toHaveLength(2)
+      expect(terminal.focusActivePanel).toHaveBeenCalledTimes(2)
+    })
+
+    it('shift+t marks the new session forceNew:true so mount bypasses attach-to-existing', () => {
+      const { store, controller } = setup('a')
+      controller.handleKeyDown(baseEvent({ key: 'T', shiftKey: true }))
+      const streamId = store.get().terminals.byNode.get('a')?.[0]
+      expect(store.get().terminals.sessions.get(streamId!)?.forceNew).toBe(true)
+    })
+
+    it('bare t still just carries forceNew:false through the dispatch', () => {
+      const { store, controller } = setup('a')
+      controller.handleKeyDown(baseEvent({ key: 't' }))
+      const streamId = store.get().terminals.byNode.get('a')?.[0]
+      expect(store.get().terminals.sessions.get(streamId!)?.forceNew).toBe(false)
+    })
+
     it('p toggles placement scene -> hud -> scene', () => {
       const { store, controller } = setup('a')
       controller.handleKeyDown(baseEvent({ key: 't' }))

@@ -20,6 +20,8 @@ export type TerminalSession = {
   error?: string
   /** Output-buffer bookkeeping (metadata only) — bytes go frame->xterm directly, never here. */
   hasOutput: boolean
+  /** shift+t (design v3-3): skip attach-to-existing-host-terminal and always spawn a fresh pty. */
+  forceNew: boolean
 }
 
 export type ActivePanel = {
@@ -47,8 +49,16 @@ export const emptyTerminalsState = (): TerminalsState => ({
 })
 
 export type TerminalAction =
-  | { type: 'open-terminal-for-node'; nodeId: WorktreeId }
-  | { type: 'subscribed'; streamId: number; terminal: string; cols: number; rows: number }
+  | { type: 'open-terminal-for-node'; nodeId: WorktreeId; forceNew?: boolean }
+  | {
+      type: 'subscribed'
+      streamId: number
+      terminal: string
+      cols: number
+      rows: number
+      /** Set when attach picked an existing host pty — see terminal-panel-controller.ts. */
+      title?: string
+    }
   | { type: 'output-arrived'; streamId: number }
   | { type: 'set-placement'; placement: TerminalPlacement }
   | { type: 'set-focused'; focused: boolean }
@@ -60,14 +70,15 @@ export type TerminalAction =
 export function reduceTerminals(state: TerminalsState, action: TerminalAction): TerminalsState {
   switch (action.type) {
     case 'open-terminal-for-node':
-      return openTerminalForNode(state, action.nodeId)
+      return openTerminalForNode(state, action.nodeId, action.forceNew ?? false)
     case 'subscribed':
       return withSession(state, action.streamId, (session) => ({
         ...session,
         handle: action.terminal,
         cols: action.cols,
         rows: action.rows,
-        status: 'snapshotting'
+        status: 'snapshotting',
+        ...(action.title !== undefined ? { title: action.title } : {})
       }))
     case 'output-arrived':
       return withSession(state, action.streamId, (session) => ({
@@ -92,14 +103,19 @@ export function reduceTerminals(state: TerminalsState, action: TerminalAction): 
   }
 }
 
-function openTerminalForNode(state: TerminalsState, nodeId: WorktreeId): TerminalsState {
+function openTerminalForNode(
+  state: TerminalsState,
+  nodeId: WorktreeId,
+  forceNew: boolean
+): TerminalsState {
   const streamId = state.nextStreamId
   const session: TerminalSession = {
     streamId,
     nodeId,
     handle: null,
     status: 'creating',
-    hasOutput: false
+    hasOutput: false,
+    forceNew
   }
 
   const sessions = new Map(state.sessions)

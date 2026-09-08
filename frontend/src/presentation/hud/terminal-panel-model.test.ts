@@ -9,6 +9,7 @@ const session = (overrides: Partial<TerminalSession> = {}): TerminalSession => (
   handle: 'h1',
   status: 'live',
   hasOutput: true,
+  forceNew: false,
   ...overrides
 })
 

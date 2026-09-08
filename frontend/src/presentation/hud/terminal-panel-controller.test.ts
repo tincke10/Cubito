@@ -102,10 +102,11 @@ const createFakePort = (): TerminalStreamPort & { sinks: Map<number, TerminalStr
   }
 }
 
-const openedState = (nodeId = 'repo::/wt/a'): TerminalsState =>
+const openedState = (nodeId = 'repo::/wt/a', forceNew = false): TerminalsState =>
   reduceTerminals(emptyTerminalsState(), {
     type: 'open-terminal-for-node',
-    nodeId
+    nodeId,
+    forceNew
   })
 
 const setup = () => {
@@ -300,6 +301,109 @@ describe('createTerminalPanelController', () => {
       expect(port.subscribe).toHaveBeenCalledWith(
         1,
         'pty-1',
+        { cols: 80, rows: 24 },
+        expect.anything()
+      )
+    })
+  })
+
+  describe('attach [t] to an existing host terminal before spawning a new one (v3-3)', () => {
+    it('attaches to the agent-tagged terminal when the host lists more than one', async () => {
+      const { controller, port, panels } = setup()
+      port.listTerminals = vi.fn(async () => [
+        { handle: 'pty-shell', title: null, connected: true },
+        { handle: 'pty-agent', agentIdentity: 'claude', title: null, connected: true }
+      ])
+      controller.sync(openedState())
+      await flush()
+      expect(port.listTerminals).toHaveBeenCalledWith('repo::/wt/a')
+      expect(port.createTerminal).not.toHaveBeenCalled()
+      expect(port.subscribe).toHaveBeenCalledWith(
+        1,
+        'pty-agent',
+        { cols: 80, rows: 24 },
+        expect.anything()
+      )
+      expect(panels).toHaveLength(1)
+    })
+
+    it('attaches to the first listed terminal when none carries an agentIdentity', async () => {
+      const { controller, port } = setup()
+      port.listTerminals = vi.fn(async () => [
+        { handle: 'pty-first', title: null, connected: true },
+        { handle: 'pty-second', title: null, connected: true }
+      ])
+      controller.sync(openedState())
+      await flush()
+      expect(port.createTerminal).not.toHaveBeenCalled()
+      expect(port.subscribe).toHaveBeenCalledWith(
+        1,
+        'pty-first',
+        { cols: 80, rows: 24 },
+        expect.anything()
+      )
+    })
+
+    it('sets the session title to "agente" once attached to an agent-tagged pty', async () => {
+      const { controller, port, dispatch } = setup()
+      port.listTerminals = vi.fn(async () => [
+        { handle: 'pty-agent', agentIdentity: 'claude', title: null, connected: true }
+      ])
+      controller.sync(openedState())
+      await flush()
+      port.sinks.get(1)!.onSubscribed({ streamId: 1, terminal: 'pty-agent', cols: 80, rows: 24 })
+      expect(dispatch).toHaveBeenCalledWith({
+        type: 'subscribed',
+        streamId: 1,
+        terminal: 'pty-agent',
+        cols: 80,
+        rows: 24,
+        title: 'agente'
+      })
+    })
+
+    it('falls back to createTerminal when the host lists no terminals', async () => {
+      const { controller, port } = setup()
+      port.listTerminals = vi.fn(async () => [])
+      controller.sync(openedState())
+      await flush()
+      expect(port.createTerminal).toHaveBeenCalledWith('repo::/wt/a')
+      expect(port.subscribe).toHaveBeenCalledWith(
+        1,
+        'handle-repo::/wt/a',
+        { cols: 80, rows: 24 },
+        expect.anything()
+      )
+    })
+
+    it('falls back to createTerminal when listTerminals rejects — a list failure never blocks opening the panel', async () => {
+      const { controller, port } = setup()
+      port.listTerminals = vi.fn(async () => {
+        throw new Error('boom')
+      })
+      controller.sync(openedState())
+      await flush()
+      expect(port.createTerminal).toHaveBeenCalledWith('repo::/wt/a')
+      expect(port.subscribe).toHaveBeenCalledWith(
+        1,
+        'handle-repo::/wt/a',
+        { cols: 80, rows: 24 },
+        expect.anything()
+      )
+    })
+
+    it('forceNew:true bypasses listTerminals entirely and always spawns a fresh pty', async () => {
+      const { controller, port } = setup()
+      port.listTerminals = vi.fn(async () => [
+        { handle: 'pty-agent', agentIdentity: 'claude', title: null, connected: true }
+      ])
+      controller.sync(openedState('repo::/wt/a', true))
+      await flush()
+      expect(port.listTerminals).not.toHaveBeenCalled()
+      expect(port.createTerminal).toHaveBeenCalledWith('repo::/wt/a')
+      expect(port.subscribe).toHaveBeenCalledWith(
+        1,
+        'handle-repo::/wt/a',
         { cols: 80, rows: 24 },
         expect.anything()
       )

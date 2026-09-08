@@ -6,6 +6,7 @@ import type {
   TerminalsState
 } from '../../application/terminal-session-model'
 import type {
+  HostTerminalSummary,
   TerminalStreamPort,
   TerminalStreamSink
 } from '../../application/ports/terminal-stream-port'
@@ -58,6 +59,16 @@ type Mounted = {
   /** Known once `terminal.create`/`onSubscribed` resolve — lets a later re-mount (tab switch,
    *  revisiting a node) skip `createTerminal` and just resubscribe the existing PTY handle. */
   handle: string | null
+  /** Set when attach picked an existing agent-tagged host pty — carried onto the `subscribed`
+   *  dispatch so terminalPanelModel's title copy reflects what's actually attached. */
+  attachedTitle?: string
+}
+
+/** design v3-3: prefer the entry a tracked TUI agent is running in, else the first one listed. */
+function pickHostTerminal(
+  terminals: readonly HostTerminalSummary[]
+): HostTerminalSummary | undefined {
+  return terminals.find((terminal) => terminal.agentIdentity) ?? terminals[0]
 }
 
 /**
@@ -100,7 +111,8 @@ export function createTerminalPanelController(
         streamId: meta.streamId,
         terminal: meta.terminal,
         cols: meta.cols,
-        rows: meta.rows
+        rows: meta.rows,
+        ...(entry.attachedTitle ? { title: entry.attachedTitle } : {})
       })
       // Fit now that the stream is live: xterm resizes from its default to the real panel size,
       // and the resulting sendResize (SIGWINCH) is what makes the shell draw its first prompt.
@@ -125,11 +137,43 @@ export function createTerminalPanelController(
     deps.dispatch({ type: 'set-focused', focused: false })
   }
 
+  /** No cached handle and no forceNew: ask the host for terminals already running on this
+   *  worktree (design v3-3) and attach to one instead of always spawning a fresh pty — an empty
+   *  or rejected list falls back to spawnNewTerminal, same as today, so a list failure never
+   *  blocks opening the panel. */
+  const attachOrSpawn = (entry: Mounted, nodeId: WorktreeId, streamId: number): void => {
+    void port.listTerminals(nodeId).then(
+      (terminals) => {
+        if (mounted !== entry) return
+        const picked = pickHostTerminal(terminals)
+        if (!picked) {
+          spawnNewTerminal(entry, nodeId, streamId)
+          return
+        }
+        if (picked.agentIdentity) entry.attachedTitle = 'agente'
+        entry.handle = picked.handle
+        port.subscribe(streamId, picked.handle, entry.panel.dimensions(), sinkFor(entry))
+      },
+      () => {
+        if (mounted === entry) spawnNewTerminal(entry, nodeId, streamId)
+      }
+    )
+  }
+
+  const spawnNewTerminal = (entry: Mounted, nodeId: WorktreeId, streamId: number): void => {
+    void port.createTerminal(nodeId).then(({ terminal }) => {
+      if (mounted !== entry) return // superseded while the create RPC was in flight
+      entry.handle = terminal
+      port.subscribe(streamId, terminal, entry.panel.dimensions(), sinkFor(entry))
+    })
+  }
+
   const mount = (
     nodeId: WorktreeId,
     streamId: number,
     placement: TerminalPlacement,
-    cachedHandle: string | null
+    cachedHandle: string | null,
+    forceNew: boolean
   ): void => {
     const panel = deps.createPanel(() => exitFocus())
     const unsubscribeData = panel.onData((data) => port.sendInput(streamId, data))
@@ -152,11 +196,11 @@ export function createTerminalPanelController(
       port.subscribe(streamId, cachedHandle, entry.panel.dimensions(), sinkFor(entry))
       return
     }
-    void port.createTerminal(nodeId).then(({ terminal }) => {
-      if (mounted !== entry) return // superseded while the create RPC was in flight
-      entry.handle = terminal
-      port.subscribe(streamId, terminal, entry.panel.dimensions(), sinkFor(entry))
-    })
+    if (forceNew) {
+      spawnNewTerminal(entry, nodeId, streamId)
+      return
+    }
+    attachOrSpawn(entry, nodeId, streamId)
   }
 
   return {
@@ -175,7 +219,14 @@ export function createTerminalPanelController(
 
       if (!mounted || mounted.streamId !== streamId) {
         unmount()
-        mount(model.nodeId, streamId, model.placement, state.sessions.get(streamId)?.handle ?? null)
+        const session = state.sessions.get(streamId)
+        mount(
+          model.nodeId,
+          streamId,
+          model.placement,
+          session?.handle ?? null,
+          session?.forceNew ?? false
+        )
       } else if (mounted.placement !== model.placement) {
         detach(mounted.panel, mounted.placement)
         attach(mounted.panel, model.placement)

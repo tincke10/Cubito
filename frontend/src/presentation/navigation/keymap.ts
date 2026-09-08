@@ -4,7 +4,8 @@ export type NavCommand =
   | { kind: 'move'; direction: NavDirection }
   | { kind: 'focus' }
   | { kind: 'fit-all' }
-  | { kind: 'open-terminal' }
+  /** forceNew (shift+t, v3-3): skip attach-to-existing-host-pty, always spawn a fresh shell. */
+  | { kind: 'open-terminal'; forceNew?: boolean }
   | { kind: 'pin-terminal' }
   | { kind: 'next-terminal' }
   | { kind: 'open-spawn' }
@@ -68,6 +69,15 @@ const isFanOutChord = (key: string, modifiers: Modifiers): boolean =>
   !modifiers.ctrl &&
   !modifiers.meta
 
+/** Shift+T (v3-3) — platform-uniform, same shape as the fan-out chord above; bare `t` still
+ *  falls through to plain `open-terminal`. */
+const isForceNewTerminalChord = (key: string, modifiers: Modifiers): boolean =>
+  key.toLowerCase() === 't' &&
+  modifiers.shift &&
+  !modifiers.alt &&
+  !modifiers.ctrl &&
+  !modifiers.meta
+
 /** `h/l/k/j` move the selection, `f` focuses, `v` fits all; any modifier or unmapped key yields `null`. */
 export function resolveNavCommand(
   key: string,
@@ -82,6 +92,9 @@ export function resolveNavCommand(
   }
   if (isFanOutChord(key, modifiers)) {
     return { kind: 'open-fan-out' }
+  }
+  if (isForceNewTerminalChord(key, modifiers)) {
+    return { kind: 'open-terminal', forceNew: true }
   }
   if (hasModifier(modifiers)) {
     return null

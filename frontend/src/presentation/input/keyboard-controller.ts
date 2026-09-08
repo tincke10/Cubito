@@ -157,11 +157,12 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
     if (command.kind === 'open-terminal') {
       const selectedId = store.get().selection.selectedId
       if (selectedId === null) return false
+      const forceNew = command.forceNew === true
       const activePanel = store.get().terminals.activePanel
-      if (activePanel?.nodeId === selectedId) {
+      if (!forceNew && activePanel?.nodeId === selectedId) {
         store.dispatchTerminal({ type: 'set-focused', focused: true })
       } else {
-        store.dispatchTerminal({ type: 'open-terminal-for-node', nodeId: selectedId })
+        store.dispatchTerminal({ type: 'open-terminal-for-node', nodeId: selectedId, forceNew })
       }
       terminal.focusActivePanel()
       return true

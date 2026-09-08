@@ -38,6 +38,23 @@ describe('reduceTerminals — open-terminal-for-node', () => {
     })
   })
 
+  it('defaults forceNew to false when omitted', () => {
+    const state = reduceTerminals(emptyTerminalsState(), {
+      type: 'open-terminal-for-node',
+      nodeId: 'w1'
+    })
+    expect(state.sessions.get(1)?.forceNew).toBe(false)
+  })
+
+  it('carries an explicit forceNew:true onto the new session', () => {
+    const state = reduceTerminals(emptyTerminalsState(), {
+      type: 'open-terminal-for-node',
+      nodeId: 'w1',
+      forceNew: true
+    })
+    expect(state.sessions.get(1)?.forceNew).toBe(true)
+  })
+
   it('appends the streamId to byNode tab list for that node', () => {
     let state = emptyTerminalsState()
     state = reduceTerminals(state, { type: 'open-terminal-for-node', nodeId: 'w1' })
@@ -131,6 +148,37 @@ describe('reduceTerminals — subscribed', () => {
       rows: 1
     })
     expect(after).toBe(before)
+  })
+
+  it('sets the session title when the action carries one (attach-to-existing-agent copy)', () => {
+    let state = reduceTerminals(emptyTerminalsState(), {
+      type: 'open-terminal-for-node',
+      nodeId: 'w1'
+    })
+    state = reduceTerminals(state, {
+      type: 'subscribed',
+      streamId: 1,
+      terminal: 'term-abc',
+      cols: 80,
+      rows: 24,
+      title: 'agente'
+    })
+    expect(state.sessions.get(1)?.title).toBe('agente')
+  })
+
+  it('leaves title untouched when the action carries none', () => {
+    let state = reduceTerminals(emptyTerminalsState(), {
+      type: 'open-terminal-for-node',
+      nodeId: 'w1'
+    })
+    state = reduceTerminals(state, {
+      type: 'subscribed',
+      streamId: 1,
+      terminal: 'term-abc',
+      cols: 80,
+      rows: 24
+    })
+    expect(state.sessions.get(1)?.title).toBeUndefined()
   })
 })
 

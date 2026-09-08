@@ -203,6 +203,37 @@ describe('shift+f fan-out chord — platform-uniform, targeted exception to the 
   })
 })
 
+describe('shift+t force-new-terminal chord — v3-3, targeted exception to the modifier gate', () => {
+  it('shift+t resolves to open-terminal with forceNew:true on either platform', () => {
+    expect(resolveNavCommand('t', { ...noModifiers, shift: true }, MAC)).toEqual({
+      kind: 'open-terminal',
+      forceNew: true
+    })
+    expect(resolveNavCommand('t', { ...noModifiers, shift: true }, LINUX)).toEqual({
+      kind: 'open-terminal',
+      forceNew: true
+    })
+  })
+
+  it('resolves the REAL browser key: Shift+T yields event.key "T" (uppercase), not "t"', () => {
+    expect(resolveNavCommand('T', { ...noModifiers, shift: true }, LINUX)).toEqual({
+      kind: 'open-terminal',
+      forceNew: true
+    })
+  })
+
+  it('bare t (no modifier) still resolves to plain open-terminal on either platform', () => {
+    expect(resolveNavCommand('t', noModifiers, MAC)).toEqual({ kind: 'open-terminal' })
+    expect(resolveNavCommand('t', noModifiers, LINUX)).toEqual({ kind: 'open-terminal' })
+  })
+
+  it('shift+t with ctrl, alt or meta also held stays gated to null', () => {
+    expect(resolveNavCommand('t', { ...noModifiers, shift: true, ctrl: true }, LINUX)).toBeNull()
+    expect(resolveNavCommand('t', { ...noModifiers, shift: true, alt: true }, LINUX)).toBeNull()
+    expect(resolveNavCommand('t', { ...noModifiers, shift: true, meta: true }, LINUX)).toBeNull()
+  })
+})
+
 describe('isTextEntryTarget', () => {
   it('is true for an input tag', () => {
     expect(isTextEntryTarget('INPUT', false)).toBe(true)
