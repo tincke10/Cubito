@@ -139,6 +139,43 @@ describe('createSystemGraph', () => {
     expect(g.children[0]!.tagName).toBe('RECT')
   })
 
+  it('draws a router box sized from the node view, at the group-local origin', () => {
+    const graph = createSystemGraph(createFakeDocument())
+    graph.apply(model({ nodes: [node({ id: 'r', kind: 'router' })] }))
+    const rect = nodesLayerOf(rootOf(graph)).children[0]!.children[0]!
+    expect(rect.getAttribute('x')).toBe('0')
+    expect(rect.getAttribute('y')).toBe('0')
+    expect(rect.getAttribute('width')).toBe('200')
+    expect(rect.getAttribute('height')).toBe('44')
+    expect(rect.getAttribute('rx')).toBe('4')
+  })
+
+  it('centers the router label over the box width', () => {
+    const graph = createSystemGraph(createFakeDocument())
+    graph.apply(model({ nodes: [node({ id: 'r', kind: 'router', label: 'api/routes' })] }))
+    const g = nodesLayerOf(rootOf(graph)).children[0]!
+    const label = g.children.find((c) => c.getAttribute('class') === 'system-node__label')!
+    expect(label.getAttribute('x')).toBe('100')
+    expect(label.getAttribute('y')).toBe('27')
+    expect(label.getAttribute('text-anchor')).toBe('middle')
+  })
+
+  it('positions the endpoint method and label side by side without centering', () => {
+    const graph = createSystemGraph(createFakeDocument())
+    graph.apply(
+      model({
+        nodes: [node({ id: 'e', kind: 'endpoint', label: '/auth/retry', method: 'POST' })]
+      })
+    )
+    const g = nodesLayerOf(rootOf(graph)).children[0]!
+    const byClass = (cls: string) => g.children.find((c) => c.getAttribute('class') === cls)
+    expect(byClass('system-node__method')!.getAttribute('x')).toBe('20')
+    expect(byClass('system-node__method')!.getAttribute('y')).toBe('27')
+    expect(byClass('system-node__label')!.getAttribute('x')).toBe('65')
+    expect(byClass('system-node__label')!.getAttribute('y')).toBe('27')
+    expect(byClass('system-node__label')!.getAttribute('text-anchor')).toBeNull()
+  })
+
   it('renders label, method, diff and note text when present', () => {
     const graph = createSystemGraph(createFakeDocument())
     graph.apply(
@@ -161,9 +198,8 @@ describe('createSystemGraph', () => {
     expect(byClass('system-node__method')!.textContent).toBe('POST')
     expect(byClass('system-node__diff')!.textContent).toBe('+18 −6')
     expect(byClass('system-node__note')!.textContent).toBe('editando ahora')
-    expect(byClass('system-node__note')!.getAttribute('y')).not.toBe(
-      byClass('system-node__diff')!.getAttribute('y')
-    )
+    expect(byClass('system-node__diff')!.getAttribute('y')).toBe('60')
+    expect(byClass('system-node__note')!.getAttribute('y')).toBe('76')
   })
 
   it('keeps the note at the annotation row when there is no diff', () => {
@@ -175,7 +211,7 @@ describe('createSystemGraph', () => {
     )
     const g = nodesLayerOf(rootOf(graph)).children[0]!
     const byClass = (cls: string) => g.children.find((c) => c.getAttribute('class') === cls)
-    expect(byClass('system-node__note')!.getAttribute('y')).toBe('34')
+    expect(byClass('system-node__note')!.getAttribute('y')).toBe('60')
   })
 
   it('omits method/diff/note elements when absent', () => {
@@ -188,7 +224,7 @@ describe('createSystemGraph', () => {
     expect(classes).not.toContain('system-node__note')
   })
 
-  it('renders one <line> per edge, with the edge cssClass, positioned at the endpoints', () => {
+  it('renders one <line> per edge, anchored on the source right-middle and target left-middle', () => {
     const graph = createSystemGraph(createFakeDocument())
     graph.apply(
       model({
@@ -204,10 +240,28 @@ describe('createSystemGraph', () => {
     const line = edgesLayer.children[0]!
     expect(line.tagName).toBe('LINE')
     expect(line.getAttribute('class')).toBe('system-edge--flow')
-    expect(line.getAttribute('x1')).toBe('40')
-    expect(line.getAttribute('y1')).toBe('40')
+    expect(line.getAttribute('x1')).toBe('240')
+    expect(line.getAttribute('y1')).toBe('62')
     expect(line.getAttribute('x2')).toBe('320')
-    expect(line.getAttribute('y2')).toBe('40')
+    expect(line.getAttribute('y2')).toBe('62')
+  })
+
+  it('anchors an edge into a database on the left edge of its cylinder body', () => {
+    const graph = createSystemGraph(createFakeDocument())
+    graph.apply(
+      model({
+        nodes: [
+          node({ id: 's', kind: 'service', x: 775, y: 288 }),
+          node({ id: 'd', kind: 'database', x: 935, y: 310 })
+        ],
+        edges: [{ from: 's', to: 'd', kind: 'normal', cssClass: 'system-edge--normal' }]
+      })
+    )
+    const line = edgesLayerOf(rootOf(graph)).children[0]!
+    expect(line.getAttribute('x1')).toBe('925')
+    expect(line.getAttribute('y1')).toBe('310')
+    expect(line.getAttribute('x2')).toBe('947')
+    expect(line.getAttribute('y2')).toBe('360')
   })
 
   it('re-applying replaces previous nodes/edges rather than accumulating them', () => {

@@ -6,14 +6,16 @@ import type {
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
 
-/** Local layout constants (not model data): where sub-texts sit inside a node's translated
- *  group. Sourced from VistaSistema.dc.html's rect-relative text offsets. */
-const LABEL_Y = 16
-const ANNOTATION_Y = 34
-const NOTE_Y_BELOW_DIFF = 52
-const METHOD_X = 8
-const LABEL_X_WITH_METHOD = 48
-const LABEL_X = 8
+/** Local layout constants (not model data): where sub-texts/box sit inside a node's translated
+ *  group, and how edges anchor on box edges. Sourced from VistaSistema.dc.html's rect-relative
+ *  text offsets and box dimensions. */
+const LABEL_Y = 27
+const ANNOTATION_Y = 60
+const NOTE_Y_BELOW_DIFF = 76
+const METHOD_X = 20
+const LABEL_X_WITH_METHOD = 65
+const LABEL_X = 0
+const BOX_RX = 4
 
 /** db cylinder path/ellipse, verbatim from VistaSistema.dc.html's local 100x130 db svg. */
 const DB_BODY_D = 'M12 20 v60 a38 12 0 0 0 76 0 v-60'
@@ -57,9 +59,14 @@ const buildDatabaseShape = (doc: Document): SVGElement[] => {
   return [body, cap]
 }
 
-const buildBoxShape = (doc: Document): SVGElement => {
+const buildBoxShape = (doc: Document, width: number, height: number): SVGElement => {
   const rect = svgEl(doc, 'rect')
   rect.setAttribute('class', 'system-node__shape')
+  rect.setAttribute('x', '0')
+  rect.setAttribute('y', '0')
+  rect.setAttribute('width', String(width))
+  rect.setAttribute('height', String(height))
+  rect.setAttribute('rx', String(BOX_RX))
   return rect
 }
 
@@ -73,12 +80,15 @@ const buildNodeGroup = (doc: Document, node: SystemGraphNodeView): SVGElement =>
   group.setAttribute('data-y', String(node.y))
   group.setAttribute('transform', `translate(${node.x}, ${node.y})`)
 
-  for (const shape of node.kind === 'database' ? buildDatabaseShape(doc) : [buildBoxShape(doc)]) {
-    group.appendChild(shape)
-  }
+  const shapes =
+    node.kind === 'database'
+      ? buildDatabaseShape(doc)
+      : [buildBoxShape(doc, node.width, node.height)]
+  for (const shape of shapes) group.appendChild(shape)
 
   const centered = isCenteredLabelKind(node.kind)
-  const labelX = node.method !== undefined ? LABEL_X_WITH_METHOD : LABEL_X
+  const labelX =
+    node.method !== undefined ? LABEL_X_WITH_METHOD : centered ? node.width / 2 : LABEL_X
   const labelPos = node.kind === 'database' ? DB_LABEL : { x: labelX, y: LABEL_Y }
   const label = textEl(doc, 'system-node__label', labelPos.x, labelPos.y, node.label)
   if (centered) label.setAttribute('text-anchor', 'middle')
@@ -106,14 +116,33 @@ const buildNodeGroup = (doc: Document, node: SystemGraphNodeView): SVGElement =>
   return group
 }
 
+type EdgeAnchorNode = Pick<SystemGraphNodeView, 'x' | 'y' | 'width' | 'height' | 'kind'>
+
+const BOX_MID_Y_OFFSET = 22
+/** Left edge of the db cylinder body (DB_BODY_D), at mid-height. */
+const DB_ANCHOR_X_OFFSET = 12
+const DB_ANCHOR_Y_OFFSET = 50
+
+const sourceAnchor = (node: EdgeAnchorNode): { x: number; y: number } => ({
+  x: node.x + node.width,
+  y: node.y + BOX_MID_Y_OFFSET
+})
+
+const targetAnchor = (node: EdgeAnchorNode): { x: number; y: number } =>
+  node.kind === 'database'
+    ? { x: node.x + DB_ANCHOR_X_OFFSET, y: node.y + DB_ANCHOR_Y_OFFSET }
+    : { x: node.x, y: node.y + BOX_MID_Y_OFFSET }
+
 const buildEdgeLine = (
   doc: Document,
   edge: SystemGraphEdgeView,
-  pointById: ReadonlyMap<string, { x: number; y: number }>
+  pointById: ReadonlyMap<string, EdgeAnchorNode>
 ): SVGElement | null => {
-  const from = pointById.get(edge.from)
-  const to = pointById.get(edge.to)
-  if (!from || !to) return null
+  const fromNode = pointById.get(edge.from)
+  const toNode = pointById.get(edge.to)
+  if (!fromNode || !toNode) return null
+  const from = sourceAnchor(fromNode)
+  const to = targetAnchor(toNode)
   const line = svgEl(doc, 'line')
   line.setAttribute('class', edge.cssClass)
   line.setAttribute('x1', String(from.x))
@@ -150,7 +179,12 @@ export function createSystemGraph(doc: Document = document): SystemGraphHandle {
   return {
     element: root,
     apply(model: SystemGraphViewModel) {
-      const pointById = new Map(model.nodes.map((node) => [node.id, { x: node.x, y: node.y }]))
+      const pointById = new Map(
+        model.nodes.map((node) => [
+          node.id,
+          { x: node.x, y: node.y, width: node.width, height: node.height, kind: node.kind }
+        ])
+      )
 
       edgesLayer.replaceChildren()
       for (const edge of model.edges) {
