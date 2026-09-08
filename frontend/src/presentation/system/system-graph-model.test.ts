@@ -113,6 +113,21 @@ describe('systemGraphViewModel', () => {
     expect(model.nodes[0]!.note).toBe('editando ahora')
   })
 
+  it('strips a leading method from the label so the badge does not repeat it', () => {
+    const graph = buildSystemGraph({
+      nodes: [
+        node({ id: 'e', kind: 'endpoint', method: 'POST', label: 'POST /auth/retry' }),
+        node({ id: 'p', kind: 'endpoint', method: 'GET', label: '/plain' }),
+        node({ id: 'r', kind: 'router', label: 'GET routes.ts' })
+      ],
+      edges: []
+    })
+    const byId = new Map(systemGraphViewModel(graph).nodes.map((n) => [n.id, n.label]))
+    expect(byId.get('e')).toBe('/auth/retry')
+    expect(byId.get('p')).toBe('/plain')
+    expect(byId.get('r')).toBe('GET routes.ts')
+  })
+
   it('omits method and note when absent, rather than setting them to undefined', () => {
     const graph = buildSystemGraph({ nodes: [node({ id: 'e', kind: 'endpoint' })], edges: [] })
     const model = systemGraphViewModel(graph)

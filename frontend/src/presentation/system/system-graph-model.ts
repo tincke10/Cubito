@@ -63,6 +63,10 @@ const nodeCssClass = (kind: SystemNodeKind, state: SystemNodeState): string =>
 
 const edgeCssClass = (kind: SystemEdgeKind): string => `system-edge--${kind}`
 
+/** Engine/demo labels arrive as "POST /path"; the badge already shows the method. */
+const labelWithoutMethod = (label: string, method: string | undefined): string =>
+  method !== undefined && label.startsWith(`${method} `) ? label.slice(method.length + 1) : label
+
 /** Pure layout: tier by kind (x), row by insertion order within a tier (y). No DOM/Three. */
 export function systemGraphViewModel(
   graph: SystemGraph,
@@ -77,7 +81,7 @@ export function systemGraphViewModel(
     nodes.push({
       id: node.id,
       kind: node.kind,
-      label: node.label,
+      label: labelWithoutMethod(node.label, node.method),
       ...(node.method !== undefined ? { method: node.method } : {}),
       x: TIER_X_ORIGIN + tier * TIER_X_SPACING,
       y: ROW_Y_ORIGIN + row * ROW_Y_SPACING,
