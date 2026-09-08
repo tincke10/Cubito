@@ -42,7 +42,28 @@ describe('runCompareMerge — happy path', () => {
       gateway,
       dispatch
     })
-    expect(gateway.gitMergeWinnerIntoParent).toHaveBeenCalledWith('w-parent', 'w-child-2')
+    expect(gateway.gitMergeWinnerIntoParent).toHaveBeenCalledWith(
+      'w-parent',
+      'w-child-2',
+      undefined,
+      false
+    )
+  })
+
+  it('forwards syncWorkingTree true to the gateway when requested', async () => {
+    const { gateway, dispatch } = setup()
+    await runCompareMerge(
+      openWithWinner('w-child-2'),
+      runningFanOut('w-parent'),
+      { gateway, dispatch },
+      true
+    )
+    expect(gateway.gitMergeWinnerIntoParent).toHaveBeenCalledWith(
+      'w-parent',
+      'w-child-2',
+      undefined,
+      true
+    )
   })
 
   it('dispatches merge-start, then merge-clean on a clean outcome', async () => {
@@ -52,6 +73,21 @@ describe('runCompareMerge — happy path', () => {
       { type: 'merge-start' },
       { type: 'merge-clean', commitOid: 'abc123' }
     ])
+  })
+
+  it('threads result.workingTree into the dispatched merge-clean action', async () => {
+    const gateway = createFakeGateway(async () => ({
+      outcome: 'clean',
+      commitOid: 'abc123',
+      workingTree: { status: 'synced' }
+    }))
+    const { dispatch } = setup(gateway)
+    await runCompareMerge(openWithWinner(), runningFanOut(), { gateway, dispatch }, true)
+    expect(dispatch).toHaveBeenLastCalledWith({
+      type: 'merge-clean',
+      commitOid: 'abc123',
+      workingTree: { status: 'synced' }
+    })
   })
 
   it('dispatches merge-conflict with the file list on a conflict outcome', async () => {

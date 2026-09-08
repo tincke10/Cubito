@@ -101,6 +101,22 @@ describe('reduceCompareView — merge (Change E)', () => {
     expect(slice).toMatchObject({ merge: { phase: 'clean', commitOid: 'abc123' } })
   })
 
+  it('merge-clean carries an optional workingTree sync result through', () => {
+    const running = reduceCompareView(openSlice(), { type: 'merge-start' })
+    const slice = reduceCompareView(running, {
+      type: 'merge-clean',
+      commitOid: 'abc123',
+      workingTree: { status: 'skipped', reason: 'dirty' }
+    })
+    expect(slice).toMatchObject({
+      merge: {
+        phase: 'clean',
+        commitOid: 'abc123',
+        workingTree: { status: 'skipped', reason: 'dirty' }
+      }
+    })
+  })
+
   it('merge-conflict sets phase to conflict with the file list', () => {
     const running = reduceCompareView(openSlice(), { type: 'merge-start' })
     const slice = reduceCompareView(running, {

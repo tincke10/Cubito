@@ -1,5 +1,5 @@
 import type { WorktreeId } from '../domain/worktree-graph/types'
-import type { DiffFileContent } from './ports/runtime-gateway'
+import type { DiffFileContent, ParentWorkingTreeSyncResult } from './ports/runtime-gateway'
 import type { DiffFileRow } from './diff-view-model'
 import { emptyCompareChildLoad, reduceCompareChildLoad } from './compare-child-load'
 import type { CompareChildLoad, CompareChildLoadAction } from './compare-child-load'
@@ -7,11 +7,11 @@ import type { CompareChildLoad, CompareChildLoadAction } from './compare-child-l
 export type { CompareChildLoad }
 
 /** Winner-merge state (Change E) — idle until fired; headless, so `clean` never touches the
- *  parent worktree's working tree (the caller must warn the user to sync it). */
+ *  parent worktree's working tree unless `workingTree` (v3-2, opt-in) reports otherwise. */
 export type CompareMergeState =
   | { phase: 'idle' }
   | { phase: 'running' }
-  | { phase: 'clean'; commitOid: string }
+  | { phase: 'clean'; commitOid: string; workingTree?: ParentWorkingTreeSyncResult }
   | { phase: 'conflict'; files: readonly string[] }
   | { phase: 'error'; message: string }
 
@@ -46,7 +46,7 @@ export type CompareViewAction =
   | { type: 'child-panel-error'; childId: WorktreeId; path: string; message?: string }
   | { type: 'set-winner'; winnerId: WorktreeId | null }
   | { type: 'merge-start' }
-  | { type: 'merge-clean'; commitOid: string }
+  | { type: 'merge-clean'; commitOid: string; workingTree?: ParentWorkingTreeSyncResult }
   | { type: 'merge-conflict'; files: readonly string[] }
   | { type: 'merge-error'; message: string }
   | { type: 'merge-reset' }
@@ -85,7 +85,14 @@ export function reduceCompareView(
       return slice.view === 'open' ? { ...slice, merge: { phase: 'running' } } : slice
     case 'merge-clean':
       return slice.view === 'open'
-        ? { ...slice, merge: { phase: 'clean', commitOid: action.commitOid } }
+        ? {
+            ...slice,
+            merge: {
+              phase: 'clean',
+              commitOid: action.commitOid,
+              ...(action.workingTree ? { workingTree: action.workingTree } : {})
+            }
+          }
         : slice
     case 'merge-conflict':
       return slice.view === 'open'

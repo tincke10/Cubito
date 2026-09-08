@@ -20,7 +20,8 @@ export type CompareMergeRunDeps = {
 export async function runCompareMerge(
   compareView: CompareViewSlice,
   fanOut: FanOutSlice,
-  deps: CompareMergeRunDeps
+  deps: CompareMergeRunDeps,
+  syncWorkingTree = false
 ): Promise<void> {
   if (compareView.view !== 'open') return
   if (compareView.winnerId === null) return
@@ -31,10 +32,19 @@ export async function runCompareMerge(
 
   deps.dispatch({ type: 'merge-start' })
   try {
-    const result = await deps.gateway.gitMergeWinnerIntoParent(parent, winner)
+    const result = await deps.gateway.gitMergeWinnerIntoParent(
+      parent,
+      winner,
+      undefined,
+      syncWorkingTree
+    )
     deps.dispatch(
       result.outcome === 'clean'
-        ? { type: 'merge-clean', commitOid: result.commitOid }
+        ? {
+            type: 'merge-clean',
+            commitOid: result.commitOid,
+            ...(result.workingTree ? { workingTree: result.workingTree } : {})
+          }
         : { type: 'merge-conflict', files: result.files }
     )
   } catch (error) {
