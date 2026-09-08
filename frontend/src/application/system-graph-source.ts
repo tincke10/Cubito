@@ -1,4 +1,5 @@
 import { createSystemGraphPublisher } from './system-graph-publish'
+import type { SystemGraphPublisher } from './system-graph-publish'
 import { createSystemSnapshotPoll } from './system-snapshot-poll'
 import type { SystemSnapshotPollGatewayPort } from './system-snapshot-poll'
 import type { SystemGraphStreamPort } from './ports/system-graph-stream-port'
@@ -12,6 +13,9 @@ export type SystemGraphSourceDeps = {
   /** Fires once when the poll itself reports `method_not_found` — the binder starts the
    *  scripted stub driver for this open (mirrors the pre-Wave-F3 fallback). */
   onDemoFallback: () => void
+  /** Injectable for deterministic tests; defaults to the real shared publisher (mirrors
+   *  system-snapshot-poll.ts's own `publisher?` dep). */
+  publisher?: SystemGraphPublisher
 }
 
 export type SystemGraphSourceKind = 'stream' | 'poll' | 'demo'
@@ -39,7 +43,8 @@ export function createSystemGraphSource(deps: SystemGraphSourceDeps): SystemGrap
   let worktree: WorktreeId | null = null
   let subscription: { close(): void } | null = null
 
-  const publisher = createSystemGraphPublisher({ store: deps.store, gateway: deps.gateway })
+  const publisher =
+    deps.publisher ?? createSystemGraphPublisher({ store: deps.store, gateway: deps.gateway })
   const poll = createSystemSnapshotPoll({
     store: deps.store,
     gateway: deps.gateway,
@@ -71,7 +76,7 @@ export function createSystemGraphSource(deps: SystemGraphSourceDeps): SystemGrap
       onFrame(frame) {
         if (worktree !== w) return // superseded by a later stop()/start()/rebind()
         if (frame.type === 'ready') state = 'streaming'
-        publisher.publish(w, frame.snapshot)
+        publisher.publish(w, frame.snapshot, 'stream')
       },
       onUnsupported() {
         if (worktree !== w) return

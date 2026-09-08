@@ -4,6 +4,7 @@ import { createSceneStore } from './scene-store'
 import type { SceneStore } from './scene-store'
 import { SYSTEM_SNAPSHOT_POLL_INTERVAL_MS } from './system-snapshot-poll'
 import type { SystemSnapshotPollGatewayPort } from './system-snapshot-poll'
+import type { SystemGraphPublisher } from './system-graph-publish'
 import { RpcCallError } from '../infrastructure/rpc/rpc-connection'
 import type { SystemGraphSnapshot } from './ports/runtime-gateway'
 import type {
@@ -302,5 +303,55 @@ describe('createSystemGraphSource', () => {
     await vi.advanceTimersByTimeAsync(0)
 
     expect(graphOf(store).nodes.get('router')?.label).toBe('router') // unchanged
+  })
+
+  describe('publisher origin (Change item 3: stream-triggered immediate refresh)', () => {
+    function fakePublisher(): SystemGraphPublisher {
+      return {
+        publish: vi.fn(),
+        stop: vi.fn(),
+        rebindGateway: vi.fn()
+      }
+    }
+
+    it("a stream frame publishes with origin 'stream'", async () => {
+      const gateway = createFakeGateway()
+      const { port, subscriptions } = createFakeStreamPort()
+      const publisher = fakePublisher()
+      const source = createSystemGraphSource({
+        store,
+        gateway,
+        streamPort: port,
+        onDemoFallback,
+        publisher
+      })
+
+      source.start('/wt/alpha')
+      subscriptions[0]!.handlers.onFrame(readyFrame())
+      await vi.advanceTimersByTimeAsync(0)
+
+      expect(publisher.publish).toHaveBeenCalledWith('/wt/alpha', snapshotA, 'stream')
+      source.stop()
+    })
+
+    it('the same injected publisher instance backs the poll fallback, with the default poll origin', async () => {
+      const gateway = createFakeGateway()
+      const { port, subscriptions } = createFakeStreamPort()
+      const publisher = fakePublisher()
+      const source = createSystemGraphSource({
+        store,
+        gateway,
+        streamPort: port,
+        onDemoFallback,
+        publisher
+      })
+
+      source.start('/wt/alpha')
+      subscriptions[0]!.handlers.onUnsupported() // falls back to the poll
+      await vi.advanceTimersByTimeAsync(0)
+
+      expect(publisher.publish).toHaveBeenCalledWith('/wt/alpha', snapshotA)
+      source.stop()
+    })
   })
 })
