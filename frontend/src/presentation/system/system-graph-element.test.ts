@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createSystemGraph } from './system-graph-element'
+import { NODE_BOX_SIZE } from './system-graph-model'
 import type { SystemGraphNodeView, SystemGraphViewModel } from './system-graph-model'
 
 type FakeElement = {
@@ -53,6 +54,7 @@ const node = (
   label: overrides.id,
   x: 0,
   y: 0,
+  ...NODE_BOX_SIZE[overrides.kind],
   state: 'idle',
   diff: null,
   cssClass: `system-node--${overrides.kind} system-node--idle`,

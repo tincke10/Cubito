@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SYSTEM_HUD_RESERVED_TOP, systemGraphViewModel } from './system-graph-model'
+import { NODE_BOX_SIZE, SYSTEM_HUD_RESERVED_TOP, systemGraphViewModel } from './system-graph-model'
 import { buildSystemGraph } from '../../domain/system-graph/build-system-graph'
 import { emptySystemGraph } from '../../domain/system-graph/types'
 import type { SystemNode } from '../../domain/system-graph/types'
@@ -149,5 +149,26 @@ describe('systemGraphViewModel', () => {
     })
     const model = systemGraphViewModel(graph)
     expect(model.edges[0]!.cssClass).toBe(`system-edge--${kind}`)
+  })
+
+  it.each([
+    ['router', 200, 44],
+    ['endpoint', 250, 44],
+    ['service', 150, 44],
+    ['database', 100, 130]
+  ] as const)('sizes a %s node box as %dx%d', (kind, width, height) => {
+    const graph = buildSystemGraph({ nodes: [node({ id: 'n', kind })], edges: [] })
+    const model = systemGraphViewModel(graph)
+    expect(model.nodes[0]!.width).toBe(width)
+    expect(model.nodes[0]!.height).toBe(height)
+  })
+
+  it('exposes NODE_BOX_SIZE per kind matching the mockup', () => {
+    expect(NODE_BOX_SIZE).toEqual({
+      router: { width: 200, height: 44 },
+      endpoint: { width: 250, height: 44 },
+      service: { width: 150, height: 44 },
+      database: { width: 100, height: 130 }
+    })
   })
 })

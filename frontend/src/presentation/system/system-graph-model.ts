@@ -14,6 +14,8 @@ export type SystemGraphNodeView = {
   method?: string
   x: number
   y: number
+  width: number
+  height: number
   state: SystemNodeState
   diff: SystemDiff | null
   note?: string
@@ -39,6 +41,14 @@ const TIER_BY_KIND: Record<SystemNodeKind, number> = {
   endpoint: 1,
   service: 2,
   database: 3
+}
+
+/** Box sizes per kind, verbatim from VistaSistema.dc.html's rect/db-svg dimensions. */
+export const NODE_BOX_SIZE: Record<SystemNodeKind, { width: number; height: number }> = {
+  router: { width: 200, height: 44 },
+  endpoint: { width: 250, height: 44 },
+  service: { width: 150, height: 44 },
+  database: { width: 100, height: 130 }
 }
 
 const TIER_X_ORIGIN = 40
@@ -71,6 +81,7 @@ export function systemGraphViewModel(
       ...(node.method !== undefined ? { method: node.method } : {}),
       x: TIER_X_ORIGIN + tier * TIER_X_SPACING,
       y: ROW_Y_ORIGIN + row * ROW_Y_SPACING,
+      ...NODE_BOX_SIZE[node.kind],
       state: node.state,
       diff: node.diff,
       ...(node.note !== undefined ? { note: node.note } : {}),
