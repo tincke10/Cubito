@@ -747,7 +747,38 @@ describe('git RPC methods', () => {
     expect(runtime.mergeRuntimeGitWinnerIntoParent).toHaveBeenCalledWith(
       'id:parent',
       'id:winner',
-      'Merge winner'
+      'Merge winner',
+      undefined
+    )
+    expect(response).toMatchObject({
+      ok: true,
+      result: { outcome: 'clean', commitOid: 'c'.repeat(40) }
+    })
+  })
+
+  it('forwards syncWorkingTree on merge-winner requests', async () => {
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      mergeRuntimeGitWinnerIntoParent: vi
+        .fn()
+        .mockResolvedValue({ outcome: 'clean', commitOid: 'c'.repeat(40) })
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: GIT_METHODS })
+
+    const response = await dispatcher.dispatch(
+      makeRequest('git.mergeWinnerIntoParent', {
+        parent: 'id:parent',
+        winner: 'id:winner',
+        message: 'Merge winner',
+        syncWorkingTree: true
+      })
+    )
+
+    expect(runtime.mergeRuntimeGitWinnerIntoParent).toHaveBeenCalledWith(
+      'id:parent',
+      'id:winner',
+      'Merge winner',
+      true
     )
     expect(response).toMatchObject({
       ok: true,

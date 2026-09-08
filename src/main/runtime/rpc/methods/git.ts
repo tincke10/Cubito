@@ -177,7 +177,12 @@ export const GIT_METHODS: RpcMethod[] = [
     name: 'git.mergeWinnerIntoParent',
     params: GitMergeWinnerIntoParent,
     handler: async (params, { runtime }) =>
-      runtime.mergeRuntimeGitWinnerIntoParent(params.parent, params.winner, params.message)
+      runtime.mergeRuntimeGitWinnerIntoParent(
+        params.parent,
+        params.winner,
+        params.message,
+        params.syncWorkingTree
+      )
   }),
   ...GIT_COMMIT_MESSAGE_GENERATION_METHODS,
   defineMethod({

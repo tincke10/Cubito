@@ -100,7 +100,8 @@ export const GitMergeWinnerIntoParent = z.object({
     .unknown()
     .transform((v) => (typeof v === 'string' ? v : ''))
     .pipe(z.string().min(1, 'Missing winner worktree selector')),
-  message: z.string().optional()
+  message: z.string().optional(),
+  syncWorkingTree: z.boolean().optional()
 })
 
 export const GitCommit = WorktreeSelector.extend({

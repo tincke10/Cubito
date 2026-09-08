@@ -138,6 +138,51 @@ describe('RuntimeGitCommands.mergeRuntimeGitWinnerIntoParent', () => {
     expect(mocks.mergeWinnerIntoParent).not.toHaveBeenCalled()
   })
 
+  it('forwards syncWorkingTree to the local merge when requested', async () => {
+    mocks.mergeWinnerIntoParent.mockResolvedValue({ outcome: 'clean', commitOid: 'c'.repeat(40) })
+    const commands = makeCommands({
+      'id:parent': { worktree: makeWorktree('/repo/parent', 'parent-branch') },
+      'id:winner': { worktree: makeWorktree('/repo/winner', 'winner-branch') }
+    })
+
+    await commands.mergeRuntimeGitWinnerIntoParent('id:parent', 'id:winner', 'custom message', true)
+
+    expect(mocks.mergeWinnerIntoParent).toHaveBeenCalledWith(
+      '/repo/parent',
+      '/repo/winner',
+      'custom message',
+      { syncWorkingTree: true }
+    )
+  })
+
+  it('forwards syncWorkingTree to the SSH provider when requested', async () => {
+    const provider = {
+      mergeWinnerIntoParent: vi
+        .fn()
+        .mockResolvedValue({ outcome: 'clean', commitOid: 'c'.repeat(40) })
+    }
+    mocks.getSshGitProvider.mockReturnValue(provider)
+    const commands = makeCommands({
+      'id:parent': {
+        worktree: makeWorktree('/remote/parent', 'parent-branch'),
+        connectionId: 'conn-1'
+      },
+      'id:winner': {
+        worktree: makeWorktree('/remote/winner', 'winner-branch'),
+        connectionId: 'conn-1'
+      }
+    })
+
+    await commands.mergeRuntimeGitWinnerIntoParent('id:parent', 'id:winner', 'msg', true)
+
+    expect(provider.mergeWinnerIntoParent).toHaveBeenCalledWith(
+      '/remote/parent',
+      '/remote/winner',
+      'msg',
+      { syncWorkingTree: true }
+    )
+  })
+
   it('throws when the parent and winner resolve to different execution hosts', async () => {
     const commands = makeCommands({
       'id:parent': {

@@ -187,7 +187,8 @@ export class RuntimeGitSyncCommands {
   async mergeRuntimeGitWinnerIntoParent(
     parentSelector: string,
     winnerSelector: string,
-    message?: string
+    message?: string,
+    syncWorkingTree?: boolean
   ): Promise<MergeWinnerResult> {
     const parentTarget = await this.host.resolveRuntimeGitTarget(parentSelector)
     const winnerTarget = await this.host.resolveRuntimeGitTarget(winnerSelector)
@@ -203,17 +204,28 @@ export class RuntimeGitSyncCommands {
       if (!provider) {
         throw new Error(SSH_GIT_PROVIDER_UNAVAILABLE_MESSAGE)
       }
-      return provider.mergeWinnerIntoParent(
-        parentTarget.worktree.path,
-        winnerTarget.worktree.path,
-        resolvedMessage
-      )
+      // Why: options bag omitted when not requested, matching the provider's own optional 4th param.
+      return syncWorkingTree
+        ? provider.mergeWinnerIntoParent(
+            parentTarget.worktree.path,
+            winnerTarget.worktree.path,
+            resolvedMessage,
+            { syncWorkingTree: true }
+          )
+        : provider.mergeWinnerIntoParent(
+            parentTarget.worktree.path,
+            winnerTarget.worktree.path,
+            resolvedMessage
+          )
     }
     return mergeWinnerIntoParent(
       parentTarget.worktree.path,
       winnerTarget.worktree.path,
       resolvedMessage,
-      localGitOptionsForTarget(parentTarget)
+      {
+        ...localGitOptionsForTarget(parentTarget),
+        syncWorkingTree
+      }
     )
   }
 }
