@@ -144,6 +144,60 @@ describe('markRemoteAgentWorkspaceTrusted', () => {
     })
   })
 
+  it('writes Claude trust to the remote ~/.claude.json without clobbering config keys', async () => {
+    const writeFile = vi.fn(async (_filePath: string, _content: string) => undefined)
+    const fsProvider = makeFsProvider({
+      readFile: vi.fn(async () => ({
+        content: JSON.stringify({
+          oauthAccount: { email: 'dev@example.com' },
+          projects: { '/other/project': { hasTrustDialogAccepted: true } }
+        }),
+        isBinary: false
+      })),
+      writeFile
+    })
+    mocks.getSshFilesystemProvider.mockReturnValue(fsProvider)
+
+    await markRemoteAgentWorkspaceTrusted({
+      preset: 'claude',
+      connectionId: 'ssh-1',
+      workspacePath: '/repo/worktree'
+    })
+
+    expect(fsProvider.writeFile).toHaveBeenCalledWith('/home/u/.claude.json', expect.any(String))
+    const written = writeFile.mock.calls[0]?.[1]
+    expect(typeof written).toBe('string')
+    expect(JSON.parse(written as string)).toEqual({
+      oauthAccount: { email: 'dev@example.com' },
+      projects: {
+        '/other/project': { hasTrustDialogAccepted: true },
+        '/real/repo/worktree': { hasTrustDialogAccepted: true }
+      }
+    })
+  })
+
+  it('does not rewrite remote Claude trust when the project is already trusted', async () => {
+    const writeFile = vi.fn(async (_filePath: string, _content: string) => undefined)
+    const fsProvider = makeFsProvider({
+      readFile: vi.fn(async () => ({
+        content: JSON.stringify({
+          projects: { '/real/repo/worktree': { hasTrustDialogAccepted: true } }
+        }),
+        isBinary: false
+      })),
+      writeFile
+    })
+    mocks.getSshFilesystemProvider.mockReturnValue(fsProvider)
+
+    await markRemoteAgentWorkspaceTrusted({
+      preset: 'claude',
+      connectionId: 'ssh-1',
+      workspacePath: '/repo/worktree'
+    })
+
+    expect(writeFile).not.toHaveBeenCalled()
+  })
+
   it('does nothing when the SSH home cannot be resolved safely', async () => {
     const fsProvider = makeFsProvider()
     mocks.getActiveMultiplexer.mockReturnValue({
