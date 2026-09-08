@@ -14,6 +14,9 @@ export type SystemViewControllerDeps = {
   createHud: () => SystemHudHandle
   /** The `#system` slot — this controller mounts/unmounts into it and nothing else DOM-wise. */
   hud: { appendChild(element: unknown): void }
+  /** The `#system-graph-viewport` scrollable slot (Change item 4) — the graph mounts here
+   *  instead of `hud`, so a narrow window scrolls the graph instead of shrinking its text. */
+  graphSlot: { appendChild(element: unknown): void }
   /** Shared `#keyboard-bar` slot the worktree HUD's own bar already occupies. */
   keyboardBarSlot: { appendChild(element: unknown): void }
   /** Fires once on the closed->open transition, after mounting — the seam for hiding the
@@ -48,7 +51,7 @@ export function createSystemViewController(deps: SystemViewControllerDeps): Syst
     const feed = deps.createFeed()
     const hud = deps.createHud()
     deps.hud.appendChild(hud.root)
-    deps.hud.appendChild(graph.element)
+    deps.graphSlot.appendChild(graph.element)
     deps.hud.appendChild(feed.element)
     deps.keyboardBarSlot.appendChild(hud.keyboardBar.root)
     const entry: Mounted = { graph, feed, hud }

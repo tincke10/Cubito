@@ -51,6 +51,7 @@ const setup = () => {
   const feeds: ReturnType<typeof createFakeFeed>[] = []
   const huds: ReturnType<typeof createFakeHud>[] = []
   const hud = { appendChild: vi.fn() }
+  const graphSlot = { appendChild: vi.fn() }
   const keyboardBarSlot = { appendChild: vi.fn() }
   const onEnter = vi.fn()
   const onExit = vi.fn()
@@ -71,12 +72,13 @@ const setup = () => {
       return h
     },
     hud,
+    graphSlot,
     keyboardBarSlot,
     onEnter,
     onExit
   }
   const controller = createSystemViewController(deps)
-  return { controller, graphs, feeds, huds, hud, keyboardBarSlot, onEnter, onExit }
+  return { controller, graphs, feeds, huds, hud, graphSlot, keyboardBarSlot, onEnter, onExit }
 }
 
 const openSlice = (nodeId = 'router'): SystemViewSlice =>
@@ -89,15 +91,16 @@ describe('createSystemViewController', () => {
     expect(graphs).toHaveLength(0)
   })
 
-  it('mounts graph/feed/hud into the #system slot and the keyboard bar into its own slot on open', () => {
-    const { controller, graphs, feeds, huds, hud, keyboardBarSlot } = setup()
+  it('mounts hud/feed into the #system slot, the graph into its own scrollable slot, and the keyboard bar into its own slot on open', () => {
+    const { controller, graphs, feeds, huds, hud, graphSlot, keyboardBarSlot } = setup()
     controller.sync(openSlice(), CONNECTED, 'main', 'poll')
     expect(graphs).toHaveLength(1)
     expect(feeds).toHaveLength(1)
     expect(huds).toHaveLength(1)
     expect(hud.appendChild).toHaveBeenCalledWith(huds[0]!.root)
-    expect(hud.appendChild).toHaveBeenCalledWith(graphs[0]!.element)
     expect(hud.appendChild).toHaveBeenCalledWith(feeds[0]!.element)
+    expect(hud.appendChild).toHaveBeenCalledTimes(2) // NOT the graph — that goes to graphSlot
+    expect(graphSlot.appendChild).toHaveBeenCalledExactlyOnceWith(graphs[0]!.element)
     expect(keyboardBarSlot.appendChild).toHaveBeenCalledWith(huds[0]!.keyboardBar.root)
   })
 
