@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   createSystemFileDiffCache,
-  SYSTEM_FILE_DIFF_REFRESH_INTERVAL_MS
+  SYSTEM_FILE_DIFF_REFRESH_INTERVAL_MS,
+  SYSTEM_FILE_DIFF_STREAM_MIN_INTERVAL_MS
 } from './system-file-diff-cache'
 import type { SystemFileDiffGateway } from './system-file-diff-cache'
 import { createSceneStore } from './scene-store'
@@ -121,6 +122,35 @@ function setup(gateway: SystemFileDiffGateway, now?: () => number) {
   store.update({ graph: graphWithChild() })
   const cache = createSystemFileDiffCache({ store, gateway, ...(now ? { now } : {}) })
   return { store, cache }
+}
+
+/** Manually-driven fake timer for refreshNow's trailing-edge scheduling — records the one
+ *  pending callback instead of running on the real clock, so a test fires it deterministically. */
+function setupWithFakeTimer(gateway: SystemFileDiffGateway, clock: { value: number }) {
+  const store: SceneStore = createSceneStore()
+  store.update({ graph: graphWithChild() })
+  let pending: (() => void) | null = null
+  const cache = createSystemFileDiffCache({
+    store,
+    gateway,
+    now: () => clock.value,
+    setTimer: (fn) => {
+      pending = fn
+      return {}
+    },
+    clearTimer: () => {
+      pending = null
+    }
+  })
+  return {
+    cache,
+    fireTimer: (): void => {
+      const fn = pending
+      pending = null
+      fn?.()
+    },
+    hasPendingTimer: (): boolean => pending !== null
+  }
 }
 
 describe('createSystemFileDiffCache', () => {
@@ -505,5 +535,127 @@ describe('createSystemFileDiffCache', () => {
       { path: 'src/main.ts', status: 'added', added: 1, removed: 0 }
     ])
     cache.stop()
+  })
+
+  describe('refreshNow — stream-triggered throttled refresh', () => {
+    it('leading edge: the first call for an established worktree fetches immediately', async () => {
+      const gateway = createFakeGateway()
+      const clock = { value: 0 }
+      const { cache } = setupWithFakeTimer(gateway, clock)
+      cache.entriesFor('repo::child', 'k1')
+      await flush()
+      await flush()
+      expect(gateway.calls).toBe(1)
+
+      cache.refreshNow('repo::child', 'k1')
+
+      expect(gateway.calls).toBe(2)
+      cache.stop()
+    })
+
+    it('coalesces a burst inside the window into exactly one trailing refresh', async () => {
+      const gateway = createFakeGateway()
+      const clock = { value: 0 }
+      const { cache, fireTimer } = setupWithFakeTimer(gateway, clock)
+      cache.entriesFor('repo::child', 'k1')
+      await flush()
+      await flush()
+      cache.refreshNow('repo::child', 'k1') // leading
+      expect(gateway.calls).toBe(2)
+
+      cache.refreshNow('repo::child', 'k1')
+      cache.refreshNow('repo::child', 'k1')
+      cache.refreshNow('repo::child', 'k1')
+      expect(gateway.calls).toBe(2) // still throttled — coalesced into one pending trailing refresh
+
+      fireTimer()
+
+      expect(gateway.calls).toBe(3) // exactly one trailing refresh for the whole burst
+      cache.stop()
+    })
+
+    it('fires a new leading refresh once the window has fully elapsed', async () => {
+      const gateway = createFakeGateway()
+      const clock = { value: 0 }
+      const { cache } = setupWithFakeTimer(gateway, clock)
+      cache.entriesFor('repo::child', 'k1')
+      await flush()
+      await flush()
+      cache.refreshNow('repo::child', 'k1') // leading
+      expect(gateway.calls).toBe(2)
+
+      clock.value += SYSTEM_FILE_DIFF_STREAM_MIN_INTERVAL_MS
+      cache.refreshNow('repo::child', 'k1')
+
+      expect(gateway.calls).toBe(3)
+      cache.stop()
+    })
+
+    it('stop() cancels a pending trailing refresh', async () => {
+      const gateway = createFakeGateway()
+      const clock = { value: 0 }
+      const { cache, fireTimer, hasPendingTimer } = setupWithFakeTimer(gateway, clock)
+      cache.entriesFor('repo::child', 'k1')
+      await flush()
+      await flush()
+      cache.refreshNow('repo::child', 'k1') // leading
+      cache.refreshNow('repo::child', 'k1') // queues a trailing refresh
+      expect(hasPendingTimer()).toBe(true)
+      expect(gateway.calls).toBe(2)
+
+      cache.stop()
+
+      expect(hasPendingTimer()).toBe(false)
+      fireTimer() // no-op: nothing pending
+      expect(gateway.calls).toBe(2)
+    })
+
+    it('a worktree switch cancels a pending trailing refresh queued for the old worktree', async () => {
+      const gateway = createFakeGateway()
+      const clock = { value: 0 }
+      const { cache, fireTimer, hasPendingTimer } = setupWithFakeTimer(gateway, clock)
+      cache.entriesFor('repo::child', 'k1')
+      await flush()
+      await flush()
+      cache.refreshNow('repo::child', 'k1') // leading
+      cache.refreshNow('repo::child', 'k1') // queues a trailing refresh
+      expect(hasPendingTimer()).toBe(true)
+      expect(gateway.calls).toBe(2)
+
+      cache.entriesFor('repo::main', 'k-main') // switch — cancels the stale trailing, refetches
+
+      expect(hasPendingTimer()).toBe(false)
+      expect(gateway.calls).toBe(3)
+
+      fireTimer() // no-op: the old trailing was cancelled, not merely superseded
+      expect(gateway.calls).toBe(3)
+      cache.stop()
+    })
+
+    it('generation guard: a stale leading-refresh result is discarded after a worktree switch', async () => {
+      const gateway = createFakeGateway()
+      const stale = deferred<BranchCompare>()
+      gateway.impl = () => stale.promise
+      const clock = { value: 0 }
+      const { cache } = setupWithFakeTimer(gateway, clock)
+
+      cache.entriesFor('repo::child', 'k1') // hangs on `stale`
+      cache.refreshNow('repo::child', 'k1') // leading — a second hanging fetch, same generation family
+
+      gateway.impl = async () =>
+        branchCompare({ entries: [{ path: 'src/main.ts', status: 'added', added: 5, removed: 0 }] })
+      cache.entriesFor('repo::main', 'k-main') // switch — bumps generation, discards both stale fetches
+      await flush()
+      await flush()
+
+      stale.resolve(branchCompare()) // the stale leading-refresh result lands after the switch
+      await flush()
+      await flush()
+
+      expect(cache.entriesFor('repo::main', 'k-main')).toEqual([
+        { path: 'src/main.ts', status: 'added', added: 5, removed: 0 }
+      ])
+      cache.stop()
+    })
   })
 })
