@@ -4,7 +4,13 @@ import type { DiffFileContent } from './ports/runtime-gateway'
 export type DiffRailStatus = 'loading' | 'ready' | 'empty' | 'error'
 
 /** One row in the diff rail — from a BranchCompare entry. */
-export type DiffFileRow = { path: string; status: string; added: number; removed: number }
+export type DiffFileRow = {
+  path: string
+  status: string
+  added: number
+  removed: number
+  oldPath?: string
+}
 
 export type DiffPanelState =
   | { kind: 'idle' }

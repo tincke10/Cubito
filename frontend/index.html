@@ -762,11 +762,18 @@
       }
       .diff-rail__row--modified .diff-rail__path,
       .diff-rail__row--added .diff-rail__path,
-      .diff-rail__row--deleted .diff-rail__path {
+      .diff-rail__row--deleted .diff-rail__path,
+      .diff-rail__row--renamed .diff-rail__path {
         color: var(--cubito-text-primary);
       }
       .diff-rail__path {
         flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .diff-rail__old-path {
+        color: var(--cubito-text-faint);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;

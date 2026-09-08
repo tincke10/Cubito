@@ -297,6 +297,31 @@ describe('createDiffLiveLoader', () => {
     loader.stop()
   })
 
+  it('select(path) on a renamed row passes its oldPath as the 4th gitBranchDiff arg', async () => {
+    setupGraph()
+    const gateway = createFakeGateway()
+    gateway.gitBranchCompareImpl = async () =>
+      branchCompare({
+        entries: [{ path: 'b.ts', status: 'renamed', oldPath: 'a.ts', added: 1, removed: 0 }]
+      })
+    const loader = createDiffLiveLoader({ store, gateway })
+
+    loader.start('repo::child')
+    await vi.waitFor(() => {
+      const slice = store.get().diffView
+      expect(slice.view === 'open' && slice.status).toBe('ready')
+    })
+    loader.select('b.ts')
+    await vi.waitFor(() => expect(gateway.diffCalls.length).toBe(1))
+    expect(gateway.diffCalls[0]).toEqual({
+      worktree: 'repo::child',
+      compare: { mergeBase: 'merge-base', headOid: 'head-oid' },
+      filePath: 'b.ts',
+      oldPath: 'a.ts'
+    })
+    loader.stop()
+  })
+
   it('select(path) dispatches panel-error when gitBranchDiff rejects', async () => {
     setupGraph()
     const gateway = createFakeGateway()

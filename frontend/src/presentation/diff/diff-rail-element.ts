@@ -25,6 +25,12 @@ const buildRow = (
   rowElement.appendChild(path)
   rowElement.appendChild(added)
   rowElement.appendChild(removed)
+  if (row.oldPathText !== undefined) {
+    const oldPath = doc.createElement('span')
+    oldPath.className = 'diff-rail__old-path'
+    oldPath.textContent = row.oldPathText
+    rowElement.appendChild(oldPath)
+  }
   rowElement.addEventListener('click', () => onClick(row.path))
   return rowElement
 }

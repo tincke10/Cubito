@@ -47,12 +47,14 @@ function toGitStatusRow(row: {
   status?: unknown
   added?: unknown
   removed?: unknown
+  oldPath?: unknown
 }): GitStatusRow {
   return {
     path: typeof row.path === 'string' ? row.path : '',
     status: typeof row.status === 'string' ? row.status : 'modified',
     added: typeof row.added === 'number' ? row.added : 0,
-    removed: typeof row.removed === 'number' ? row.removed : 0
+    removed: typeof row.removed === 'number' ? row.removed : 0,
+    ...(typeof row.oldPath === 'string' ? { oldPath: row.oldPath } : {})
   }
 }
 

@@ -160,6 +160,31 @@ describe('createOrcadGateway', () => {
     })
   })
 
+  it('gitBranchCompare carries oldPath through a renamed entry, and omits it when absent', async () => {
+    const call: RpcCaller = vi.fn(async () => ({
+      id: 'x',
+      ok: true as const,
+      result: {
+        summary: {},
+        entries: [
+          { path: 'b.ts', status: 'renamed', oldPath: 'a.ts', added: 1, removed: 0 },
+          { path: 'c.ts', status: 'modified', added: 2, removed: 0 }
+        ]
+      },
+      _meta: { runtimeId: 'rt' }
+    }))
+    const gateway = createOrcadGateway({ call })
+    const { entries } = await gateway.gitBranchCompare('/wt/beta', 'main')
+    expect(entries[0]).toEqual({
+      path: 'b.ts',
+      status: 'renamed',
+      oldPath: 'a.ts',
+      added: 1,
+      removed: 0
+    })
+    expect(entries[1]).not.toHaveProperty('oldPath')
+  })
+
   it('gitBranchCompare surfaces headOid/mergeBase/baseRef/status from the summary', async () => {
     const call: RpcCaller = vi.fn(async () => ({
       id: 'x',

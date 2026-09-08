@@ -112,6 +112,18 @@ describe('createDiffRail', () => {
     expect(selected).toEqual(['b.ts'])
   })
 
+  it('renders the old-path hint for a renamed row, and nothing extra otherwise', () => {
+    const rail = createDiffRail(createFakeDocument())
+    rail.apply([
+      row({ path: 'b.ts', status: 'renamed', oldPathText: 'a.ts →' }),
+      row({ path: 'c.ts' })
+    ])
+    const [renamedRow, plainRow] = rootOf(rail).children
+    expect(renamedRow!.children).toHaveLength(4)
+    expect(renamedRow!.children[3]!.textContent).toBe('a.ts →')
+    expect(plainRow!.children).toHaveLength(3)
+  })
+
   it('renders an empty-state element for an empty rows list', () => {
     const rail = createDiffRail(createFakeDocument())
     rail.apply([])

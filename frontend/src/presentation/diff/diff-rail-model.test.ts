@@ -54,4 +54,17 @@ describe('diffRailViewModel', () => {
       expect(rows[0]!.cssClass).toContain(`diff-rail__row--${status}`)
     }
   )
+
+  it('shows the old path hint for a renamed row', () => {
+    const rows = diffRailViewModel(
+      [file({ path: 'b.ts', status: 'renamed', oldPath: 'a.ts' })],
+      null
+    )
+    expect(rows[0]!.oldPathText).toBe('a.ts →')
+  })
+
+  it('omits the old path hint when the row has no oldPath', () => {
+    const rows = diffRailViewModel([file({ path: 'a.ts' })], null)
+    expect(rows[0]).not.toHaveProperty('oldPathText')
+  })
 })

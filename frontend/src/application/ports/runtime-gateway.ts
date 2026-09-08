@@ -40,6 +40,8 @@ export type GitStatusRow = {
   status: string
   added: number
   removed: number
+  /** Prior path for a `renamed` entry — omitted otherwise. */
+  oldPath?: string
 }
 
 /** Minimal projection of `git.status` — not the full result; only what diff-mode/live-sync/fan-out need. */

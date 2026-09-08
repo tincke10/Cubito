@@ -47,7 +47,8 @@ export function createDiffLiveLoader(deps: DiffLiveLoaderDeps): DiffLiveLoader {
             path: entry.path,
             status: entry.status,
             added: entry.added,
-            removed: entry.removed
+            removed: entry.removed,
+            ...(entry.oldPath === undefined ? {} : { oldPath: entry.oldPath })
           }))
         })
         return
@@ -65,10 +66,11 @@ export function createDiffLiveLoader(deps: DiffLiveLoaderDeps): DiffLiveLoader {
   async function loadPanel(
     nodeId: WorktreeId,
     path: string,
-    compare: DiffCompareRef
+    compare: DiffCompareRef,
+    oldPath: string | undefined
   ): Promise<void> {
     try {
-      const content = await gateway.gitBranchDiff(nodeId, compare, path)
+      const content = await gateway.gitBranchDiff(nodeId, compare, path, oldPath)
       if (stopped) return
       const slice = deps.store.get().diffView
       if (slice.view !== 'open' || slice.focusedNodeId !== nodeId || slice.selectedPath !== path)
@@ -99,8 +101,9 @@ export function createDiffLiveLoader(deps: DiffLiveLoaderDeps): DiffLiveLoader {
       if (slice.view !== 'open' || slice.compare === null) return // rail not loaded — no-op
       const nodeId = slice.focusedNodeId
       const compare = slice.compare
+      const oldPath = slice.files.find((file) => file.path === path)?.oldPath
       dispatch({ type: 'select', path })
-      void loadPanel(nodeId, path, compare)
+      void loadPanel(nodeId, path, compare, oldPath)
     },
     stop() {
       stopped = true

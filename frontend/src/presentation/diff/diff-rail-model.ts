@@ -7,6 +7,8 @@ export type DiffRailRow = {
   removedText: string
   cssClass: string
   selected: boolean
+  /** Rename hint, e.g. "a.ts →" — set only when the file has an oldPath. */
+  oldPathText?: string
 }
 
 const MINUS_GLYPH = '−'
@@ -27,7 +29,8 @@ export function diffRailViewModel(
       addedText: `+${file.added}`,
       removedText: `${MINUS_GLYPH}${file.removed}`,
       cssClass: railCssClass(file.status, selected),
-      selected
+      selected,
+      ...(file.oldPath === undefined ? {} : { oldPathText: `${file.oldPath} →` })
     }
   })
 }
