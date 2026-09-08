@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { reduceFanOut } from './fan-out-model'
 import type { FanOutBatchEntry, FanOutSlice } from './fan-out-model'
-import { fanOutBatchFailures } from './fan-out-batch-failures'
+import { fanOutBatchFailures, summarizeChildFailure } from './fan-out-batch-failures'
 
 const runningSliceWithBatch = (batch: readonly FanOutBatchEntry[]): FanOutSlice => ({
   view: 'running',
@@ -101,5 +101,77 @@ describe('fanOutBatchFailures', () => {
     expect(fanOutBatchFailures(slice)).toEqual([
       { mutationId: 'm1', label: 'camada-m1', message: 'no se pudo crear el cubo' }
     ])
+  })
+
+  it('summarizes a raw multi-line stderr message down to its fatal line', () => {
+    const raw =
+      'Command failed: git worktree add --no-track -b camada-abc123 /Users/dev/repo/camada-abc123 refs/heads/master\n' +
+      "Preparing worktree (new branch 'camada-abc123')\n" +
+      "fatal: could not create leading directories of '/Users/dev/repo/camada-abc123/.git': Permission denied\n"
+    const slice = runningSliceWithBatch([
+      {
+        mutationId: 'm1',
+        worktreeId: null,
+        failed: true,
+        dispatchId: null,
+        taskId: null,
+        errorMessage: raw
+      }
+    ])
+    expect(fanOutBatchFailures(slice)).toEqual([
+      {
+        mutationId: 'm1',
+        label: 'camada-m1',
+        message:
+          "fatal: could not create leading directories of '/Users/dev/repo/camada-abc123/.git': Permission denied"
+      }
+    ])
+  })
+})
+
+describe('summarizeChildFailure', () => {
+  it('picks the last fatal:/error: line, keeping its prefix, from raw git stderr', () => {
+    const raw =
+      'Command failed: git worktree add --no-track -b camada-abc123 /Users/dev/repo/camada-abc123 refs/heads/master\n' +
+      "Preparing worktree (new branch 'camada-abc123')\n" +
+      "fatal: could not create leading directories of '/Users/dev/repo/camada-abc123/.git': Permission denied\n"
+    expect(summarizeChildFailure(raw)).toBe(
+      "fatal: could not create leading directories of '/Users/dev/repo/camada-abc123/.git': Permission denied"
+    )
+  })
+
+  it('falls back to the first non-empty line when no fatal:/error: line is present', () => {
+    const raw = '\n  some warning line  \nanother line\n'
+    expect(summarizeChildFailure(raw)).toBe('some warning line')
+  })
+
+  it('prefers the LAST matching fatal:/error: line when there are several', () => {
+    const raw = 'error: first problem\nsome context\nfatal: the real cause\n'
+    expect(summarizeChildFailure(raw)).toBe('fatal: the real cause')
+  })
+
+  it('matches fatal:/error: case-insensitively, keeping the original casing', () => {
+    const raw = 'context\nFatal: Something broke\n'
+    expect(summarizeChildFailure(raw)).toBe('Fatal: Something broke')
+  })
+
+  it('caps at 160 chars with a trailing ellipsis', () => {
+    const longLine = `fatal: ${'x'.repeat(200)}`
+    const result = summarizeChildFailure(longLine)
+    expect(result.length).toBe(161)
+    expect(result.endsWith('…')).toBe(true)
+    expect(result.startsWith('fatal: ')).toBe(true)
+  })
+
+  it('does not cap a line already within the limit', () => {
+    expect(summarizeChildFailure('boom')).toBe('boom')
+  })
+
+  it('falls back to the generic message for empty input', () => {
+    expect(summarizeChildFailure('')).toBe('no se pudo crear el cubo')
+  })
+
+  it('falls back to the generic message for whitespace-only input', () => {
+    expect(summarizeChildFailure('   \n  \n')).toBe('no se pudo crear el cubo')
   })
 })
