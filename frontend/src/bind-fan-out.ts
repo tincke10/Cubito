@@ -1,10 +1,11 @@
 import { syncWorktreeGraph } from './application/sync-worktree-graph'
 import { createCamadaMemberPoll } from './application/camada-member-poll'
+import { fanOutMemberIds } from './application/fan-out-model'
 import type { LiveSyncConnection } from './application/live-worktree-sync'
 import type { SceneStore } from './application/scene-store'
 import type { RuntimeGateway } from './application/ports/runtime-gateway'
 import type { WorktreeId } from './domain/worktree-graph/types'
-import { frameLitter } from './presentation/camera/camera-framing'
+import { frameLitter, frameLitterOnGrowth } from './presentation/camera/camera-framing'
 import type { CameraFraming, Vec3 } from './presentation/camera/camera-framing'
 import { createFanOutForm } from './presentation/hud/fan-out-element'
 import { createFanOutController } from './presentation/hud/fan-out-controller'
@@ -38,6 +39,9 @@ export function createFanOutBinder(deps: BindFanOutDeps): FanOutBinder {
   let fanOutController: FanOutController | null = null
   let fanOutGateway: RuntimeGateway = deps.demoGateway
   let capabilities: readonly string[] = []
+  // Item 2: reframes as each child lands during a running batch — reset outside 'running' so
+  // reopening the form (or a later camada) never reads as growth from a stale count.
+  let lastLitterCount = 0
 
   return {
     bind(connection: LiveSyncConnection): void {
@@ -71,6 +75,20 @@ export function createFanOutBinder(deps: BindFanOutDeps): FanOutBinder {
     sync(): void {
       const state = deps.store.get()
       fanOutController?.sync(state.fanOut, state.graph)
+
+      if (state.fanOut.view !== 'running') {
+        lastLitterCount = 0
+        return
+      }
+      const memberIds = fanOutMemberIds(state.fanOut)
+      const centers: Vec3[] = []
+      for (const id of memberIds) {
+        const center = deps.nodeCenter(id)
+        if (center) centers.push(center)
+      }
+      const framing = frameLitterOnGrowth(lastLitterCount, memberIds.length, centers)
+      lastLitterCount = memberIds.length
+      if (framing) deps.animateTo(framing, deps.focusDurationMs)
     }
   }
 }
