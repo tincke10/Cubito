@@ -664,6 +664,7 @@ import {
   detectRemoteAgents
 } from '../preflight/agent-detection'
 import {
+  markClaudeWorkspaceTrusted,
   markCodexProjectTrusted,
   markCopilotFolderTrusted,
   markCursorWorkspaceTrusted
@@ -26145,6 +26146,8 @@ export class OrcaRuntimeService {
         // Why: the Codex write queues behind any in-flight hook grant, so the
         // agent must not launch until it has actually landed.
         await markCodexProjectTrusted(workspacePath)
+      } else if (preset === 'claude') {
+        markClaudeWorkspaceTrusted(workspacePath)
       }
     } catch {
       // Best-effort: the user can still accept the agent trust prompt manually.
