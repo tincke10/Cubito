@@ -1,14 +1,18 @@
 import { fetchBranchCompareEntries } from './branch-compare-entries-fetch'
-import type { BranchCompareEntriesGateway } from './branch-compare-entries-fetch'
+import { fetchWorkingTreeEntries } from './working-tree-entries-fetch'
+import { mergeFileDiffEntries } from './system-graph-file-diff'
 import type { WorktreeId } from '../domain/worktree-graph/types'
-import type { GitStatusRow } from './ports/runtime-gateway'
+import type { GitStatusRow, RuntimeGateway } from './ports/runtime-gateway'
 import type { SceneStore } from './scene-store'
 
 export const SYSTEM_FILE_DIFF_REFRESH_INTERVAL_MS = 10_000
 
+/** Only the methods a file-diff refresh needs — branch-compare plus working-tree status. */
+export type SystemFileDiffGateway = Pick<RuntimeGateway, 'gitBranchCompare' | 'gitStatus'>
+
 export type SystemFileDiffCacheDeps = {
   store: SceneStore
-  gateway: BranchCompareEntriesGateway
+  gateway: SystemFileDiffGateway
   now?: () => number
   /** Fires once a background refresh lands fresh rows (generation-guarded — never for a
    *  superseded worktree/key). Lets a publisher re-render without waiting for the next tick. */
@@ -21,7 +25,7 @@ export type SystemFileDiffCache = {
   entriesFor(worktree: WorktreeId, fileSetKey: string): readonly GitStatusRow[] | null
   /** Discards in-flight work and cached entries; the cache stays usable for the next open. */
   stop(): void
-  rebindGateway(gateway: BranchCompareEntriesGateway): void
+  rebindGateway(gateway: SystemFileDiffGateway): void
 }
 
 /**
@@ -52,9 +56,14 @@ export function createSystemFileDiffCache(deps: SystemFileDiffCacheDeps): System
   function refresh(worktree: WorktreeId, key: string): void {
     const owned = ++generation
     inFlight = true
-    void fetchBranchCompareEntries(gateway, deps.store.get().graph, worktree).then((result) => {
+    void Promise.all([
+      fetchBranchCompareEntries(gateway, deps.store.get().graph, worktree),
+      fetchWorkingTreeEntries(gateway, worktree)
+    ]).then(([committedResult, workingResult]) => {
       if (owned !== generation) return
-      entries = result.outcome === 'ready' ? result.entries : null
+      const committed = committedResult.outcome === 'ready' ? committedResult.entries : null
+      const working = workingResult.outcome === 'ready' ? workingResult.entries : null
+      entries = mergeFileDiffEntries(committed, working)
       lastFetchAt = now()
       lastKey = key
       inFlight = false

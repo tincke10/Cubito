@@ -39,7 +39,8 @@ function createFakeGateway(): FakeGateway {
       mergeBase: '',
       status: '',
       entries: []
-    })
+    }),
+    gitStatus: async () => ({ entries: [], branch: '', branchLineTotal: 0 })
   }
   return gw
 }

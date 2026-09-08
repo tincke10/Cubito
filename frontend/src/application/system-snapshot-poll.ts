@@ -9,7 +9,7 @@ export const SYSTEM_SNAPSHOT_POLL_INTERVAL_MS = 1500
 /** Only the methods the snapshot poll needs — narrow like the other controller ports. */
 export type SystemSnapshotPollGatewayPort = Pick<
   RuntimeGateway,
-  'systemSnapshot' | 'gitBranchCompare'
+  'systemSnapshot' | 'gitBranchCompare' | 'gitStatus'
 >
 
 export type SystemSnapshotPollDeps = {

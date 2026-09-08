@@ -1,22 +1,21 @@
 import { mapSnapshotToSystemGraph } from './system-snapshot-to-graph'
 import { applyFileDiffToSystemGraph, systemGraphFileSetKey } from './system-graph-file-diff'
 import { createSystemFileDiffCache } from './system-file-diff-cache'
-import type { SystemFileDiffCache } from './system-file-diff-cache'
-import type { BranchCompareEntriesGateway } from './branch-compare-entries-fetch'
+import type { SystemFileDiffCache, SystemFileDiffGateway } from './system-file-diff-cache'
 import type { SystemGraphSnapshot } from './ports/runtime-gateway'
 import type { WorktreeId } from '../domain/worktree-graph/types'
 import type { SceneStore } from './scene-store'
 
 export type SystemGraphPublisherDeps = {
   store: SceneStore
-  gateway: BranchCompareEntriesGateway
+  gateway: SystemFileDiffGateway
   fileDiff?: SystemFileDiffCache
 }
 
 export type SystemGraphPublisher = {
   publish(worktree: WorktreeId, snapshot: SystemGraphSnapshot): void
   stop(): void
-  rebindGateway(gateway: BranchCompareEntriesGateway): void
+  rebindGateway(gateway: SystemFileDiffGateway): void
 }
 
 /**

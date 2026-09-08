@@ -3,10 +3,10 @@ import {
   createSystemFileDiffCache,
   SYSTEM_FILE_DIFF_REFRESH_INTERVAL_MS
 } from './system-file-diff-cache'
-import type { BranchCompareEntriesGateway } from './branch-compare-entries-fetch'
+import type { SystemFileDiffGateway } from './system-file-diff-cache'
 import { createSceneStore } from './scene-store'
 import type { SceneStore } from './scene-store'
-import type { BranchCompare } from './ports/runtime-gateway'
+import type { BranchCompare, GitStatus } from './ports/runtime-gateway'
 import type { WorktreeGraph, WorktreeNode } from '../domain/worktree-graph/types'
 import { emptyWorktreeGraph } from '../domain/worktree-graph/types'
 import { inertActivity } from '../domain/worktree-graph/node-activity'
@@ -61,6 +61,19 @@ function graphWithChild(): WorktreeGraph {
   }
 }
 
+/** A worktree with no resolvable base ref (no baseRef, no parent, no main sibling in its repo). */
+function graphWithLonelyNode(): WorktreeGraph {
+  const graph = emptyWorktreeGraph()
+  const lonely = node({
+    id: 'orphan::lonely',
+    repoId: 'orphan-repo',
+    isMain: false,
+    branch: 'refs/heads/lonely',
+    parentId: null
+  })
+  return { ...graph, nodes: new Map([[lonely.id, lonely]]) }
+}
+
 const branchCompare = (overrides: Partial<BranchCompare> = {}): BranchCompare => ({
   changedFiles: 1,
   commitsAhead: 1,
@@ -73,9 +86,18 @@ const branchCompare = (overrides: Partial<BranchCompare> = {}): BranchCompare =>
   ...overrides
 })
 
-type FakeGateway = BranchCompareEntriesGateway & {
+const gitStatus = (overrides: Partial<GitStatus> = {}): GitStatus => ({
+  entries: [],
+  branch: 'refs/heads/child',
+  branchLineTotal: 0,
+  ...overrides
+})
+
+type FakeGateway = SystemFileDiffGateway & {
   calls: number
   impl?: () => Promise<BranchCompare>
+  /** Absent by default (rejects) — most tests only care about the committed side. */
+  statusImpl?: () => Promise<GitStatus>
 }
 
 function createFakeGateway(): FakeGateway {
@@ -85,12 +107,16 @@ function createFakeGateway(): FakeGateway {
       gw.calls += 1
       if (gw.impl) return gw.impl()
       return branchCompare()
+    },
+    gitStatus: async () => {
+      if (gw.statusImpl) return gw.statusImpl()
+      throw new Error('gitStatus not configured')
     }
   }
   return gw
 }
 
-function setup(gateway: BranchCompareEntriesGateway, now?: () => number) {
+function setup(gateway: SystemFileDiffGateway, now?: () => number) {
   const store: SceneStore = createSceneStore()
   store.update({ graph: graphWithChild() })
   const cache = createSystemFileDiffCache({ store, gateway, ...(now ? { now } : {}) })
@@ -374,6 +400,109 @@ describe('createSystemFileDiffCache', () => {
     expect(gatewayB.calls).toBe(1)
     expect(cache.entriesFor('repo::child', 'k2')).toEqual([
       { path: 'src/b.ts', status: 'added', added: 1, removed: 0 }
+    ])
+    cache.stop()
+  })
+
+  it('refresh calls BOTH gitBranchCompare and gitStatus, merging shared and working-only rows', async () => {
+    const gateway = createFakeGateway()
+    gateway.impl = async () =>
+      branchCompare({ entries: [{ path: 'src/a.ts', status: 'modified', added: 3, removed: 1 }] })
+    gateway.statusImpl = async () =>
+      gitStatus({
+        entries: [
+          { path: 'src/a.ts', status: 'modified', added: 2, removed: 0 },
+          { path: 'src/b.ts', status: 'untracked', added: 5, removed: 0 }
+        ]
+      })
+    const { cache } = setup(gateway)
+
+    cache.entriesFor('repo::child', 'k1')
+    await flush()
+    await flush()
+
+    expect(gateway.calls).toBe(1)
+    expect(cache.entriesFor('repo::child', 'k1')).toEqual([
+      { path: 'src/a.ts', status: 'modified', added: 5, removed: 1 },
+      { path: 'src/b.ts', status: 'untracked', added: 5, removed: 0 }
+    ])
+    cache.stop()
+  })
+
+  it('no-base-ref plus a ready gitStatus still yields working-only rows, not null', async () => {
+    const gateway = createFakeGateway()
+    gateway.statusImpl = async () =>
+      gitStatus({ entries: [{ path: 'src/local.ts', status: 'untracked', added: 4, removed: 0 }] })
+    const store: SceneStore = createSceneStore()
+    store.update({ graph: graphWithLonelyNode() })
+    const cache = createSystemFileDiffCache({ store, gateway })
+
+    cache.entriesFor('orphan::lonely', 'k1')
+    await flush()
+    await flush()
+
+    expect(gateway.calls).toBe(0) // no base ref -> gitBranchCompare never called
+    expect(cache.entriesFor('orphan::lonely', 'k1')).toEqual([
+      { path: 'src/local.ts', status: 'untracked', added: 4, removed: 0 }
+    ])
+    cache.stop()
+  })
+
+  it('gitStatus throwing falls back to committed-only rows', async () => {
+    const gateway = createFakeGateway() // statusImpl unset -> gitStatus rejects
+    const { cache } = setup(gateway)
+
+    cache.entriesFor('repo::child', 'k1')
+    await flush()
+    await flush()
+
+    expect(cache.entriesFor('repo::child', 'k1')).toEqual([
+      { path: 'src/a.ts', status: 'modified', added: 3, removed: 1 }
+    ])
+    cache.stop()
+  })
+
+  it('both sides unavailable yields null', async () => {
+    const gateway = createFakeGateway() // statusImpl unset -> rejects
+    gateway.impl = async () => branchCompare({ status: 'no-merge-base', entries: [] })
+    const { cache } = setup(gateway)
+
+    cache.entriesFor('repo::child', 'k1')
+    await flush()
+    await flush()
+
+    expect(cache.entriesFor('repo::child', 'k1')).toBeNull()
+    cache.stop()
+  })
+
+  it('generation guard holds when the two fetches resolve out of order across a worktree switch', async () => {
+    const gateway = createFakeGateway()
+    const lateCompare = deferred<BranchCompare>()
+    const lateStatus = deferred<GitStatus>()
+    gateway.impl = () => lateCompare.promise
+    gateway.statusImpl = () => lateStatus.promise
+    const { cache } = setup(gateway)
+
+    cache.entriesFor('repo::child', 'k1') // both fetches hang
+
+    gateway.impl = async () => branchCompare({ entries: [] })
+    gateway.statusImpl = async () =>
+      gitStatus({ entries: [{ path: 'src/main.ts', status: 'added', added: 1, removed: 0 }] })
+    cache.entriesFor('repo::main', 'k-main') // switch — bumps the generation
+    await flush()
+    await flush()
+
+    // stale resolutions land out of order, after the switch
+    lateStatus.resolve(
+      gitStatus({ entries: [{ path: 'src/stale.ts', status: 'added', added: 9, removed: 0 }] })
+    )
+    await flush()
+    lateCompare.resolve(branchCompare())
+    await flush()
+    await flush()
+
+    expect(cache.entriesFor('repo::main', 'k-main')).toEqual([
+      { path: 'src/main.ts', status: 'added', added: 1, removed: 0 }
     ])
     cache.stop()
   })

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createSystemGraphPublisher } from './system-graph-publish'
 import { createSceneStore } from './scene-store'
 import type { SceneStore } from './scene-store'
-import type { BranchCompareEntriesGateway } from './branch-compare-entries-fetch'
+import type { SystemFileDiffGateway } from './system-file-diff-cache'
 import type { BranchCompare, SystemGraphSnapshot } from './ports/runtime-gateway'
 import { emptyWorktreeGraph } from '../domain/worktree-graph/types'
 import type { WorktreeNode } from '../domain/worktree-graph/types'
@@ -69,7 +69,7 @@ const worktreeNode = (overrides: Partial<WorktreeNode> = {}): WorktreeNode => ({
   ...overrides
 })
 
-type FakeGateway = BranchCompareEntriesGateway & {
+type FakeGateway = SystemFileDiffGateway & {
   calls: number
   impl?: (worktree: string, baseRef: string) => Promise<BranchCompare>
 }
@@ -81,7 +81,8 @@ function createFakeGateway(): FakeGateway {
       gw.calls += 1
       if (gw.impl) return gw.impl(worktree, baseRef)
       return readyCompare()
-    }
+    },
+    gitStatus: async () => ({ entries: [], branch: '', branchLineTotal: 0 })
   }
   return gw
 }

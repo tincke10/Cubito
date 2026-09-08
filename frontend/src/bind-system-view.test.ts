@@ -45,6 +45,11 @@ const createFakeHud = (): SystemHudHandle => ({
 const createEmptyAgentActivity = () =>
   vi.fn(async (): Promise<AgentActivityPage> => ({ events: [], latestSeq: 0 }))
 
+/** Harmless gitStatus default — no test here asserts on working-tree entries. */
+const createEmptyGitStatus = () =>
+  vi.fn(async () => ({ entries: [], branch: '', branchLineTotal: 0 }))
+const gitStatus = createEmptyGitStatus()
+
 function setup(overrides: { gateway: SystemViewGatewayPort; graphPort?: SystemGraphPort }) {
   const store = createSceneStore()
   const graphPort: SystemGraphPort = overrides.graphPort ?? {
@@ -100,9 +105,9 @@ describe('createSystemViewBinder', () => {
     const gitBranchCompare = createNotReadyCompare()
     const agentActivity = createEmptyAgentActivity()
     const { store, binder } = setup({
-      gateway: { systemSnapshot, gitBranchCompare, agentActivity }
+      gateway: { systemSnapshot, gitBranchCompare, agentActivity, gitStatus }
     })
-    binder.rebindGateway({ systemSnapshot, gitBranchCompare, agentActivity })
+    binder.rebindGateway({ systemSnapshot, gitBranchCompare, agentActivity, gitStatus })
 
     store.dispatchSystemView({ type: 'open', nodeId: '/wt/alpha' })
     binder.sync()
@@ -122,10 +127,10 @@ describe('createSystemViewBinder', () => {
     const agentActivity = createEmptyAgentActivity()
     const graphPort: SystemGraphPort = { loadSystemGraph: vi.fn(async () => emptySystemGraph()) }
     const { store, binder } = setup({
-      gateway: { systemSnapshot, gitBranchCompare, agentActivity },
+      gateway: { systemSnapshot, gitBranchCompare, agentActivity, gitStatus },
       graphPort
     })
-    binder.rebindGateway({ systemSnapshot, gitBranchCompare, agentActivity })
+    binder.rebindGateway({ systemSnapshot, gitBranchCompare, agentActivity, gitStatus })
 
     store.dispatchSystemView({ type: 'open', nodeId: '/wt/alpha' })
     binder.sync()
@@ -141,7 +146,7 @@ describe('createSystemViewBinder', () => {
     const gitBranchCompare = createNotReadyCompare()
     const agentActivity = createEmptyAgentActivity()
     const { store, binder } = setup({
-      gateway: { systemSnapshot, gitBranchCompare, agentActivity },
+      gateway: { systemSnapshot, gitBranchCompare, agentActivity, gitStatus },
       graphPort
     })
     // no binder.rebindGateway(...) — offline / `pnpm dev` path
@@ -160,7 +165,7 @@ describe('createSystemViewBinder', () => {
     const gitBranchCompare = createNotReadyCompare()
     const agentActivity = createEmptyAgentActivity()
     const { store, binder } = setup({
-      gateway: { systemSnapshot, gitBranchCompare, agentActivity },
+      gateway: { systemSnapshot, gitBranchCompare, agentActivity, gitStatus },
       graphPort
     })
 
@@ -177,8 +182,10 @@ describe('createSystemViewBinder', () => {
     const systemSnapshot = vi.fn(async () => ({ nodes: [], edges: [] }))
     const gitBranchCompare = createNotReadyCompare()
     const agentActivity = createEmptyAgentActivity()
-    const { binder } = setup({ gateway: { systemSnapshot, gitBranchCompare, agentActivity } })
-    binder.rebindGateway({ systemSnapshot, gitBranchCompare, agentActivity })
+    const { binder } = setup({
+      gateway: { systemSnapshot, gitBranchCompare, agentActivity, gitStatus }
+    })
+    binder.rebindGateway({ systemSnapshot, gitBranchCompare, agentActivity, gitStatus })
 
     binder.sync() // systemView stays closed — no open dispatched
     await flush()
@@ -193,9 +200,9 @@ describe('createSystemViewBinder', () => {
     const gitBranchCompare = createNotReadyCompare()
     const agentActivity = createEmptyAgentActivity()
     const { store, binder } = setup({
-      gateway: { systemSnapshot, gitBranchCompare, agentActivity }
+      gateway: { systemSnapshot, gitBranchCompare, agentActivity, gitStatus }
     })
-    binder.rebindGateway({ systemSnapshot, gitBranchCompare, agentActivity })
+    binder.rebindGateway({ systemSnapshot, gitBranchCompare, agentActivity, gitStatus })
 
     store.dispatchSystemView({ type: 'open', nodeId: '/wt/alpha' })
     binder.sync()
@@ -215,9 +222,9 @@ describe('createSystemViewBinder', () => {
     const gitBranchCompare = createNotReadyCompare()
     const agentActivity = createEmptyAgentActivity()
     const { store, binder } = setup({
-      gateway: { systemSnapshot, gitBranchCompare, agentActivity }
+      gateway: { systemSnapshot, gitBranchCompare, agentActivity, gitStatus }
     })
-    binder.rebindGateway({ systemSnapshot, gitBranchCompare, agentActivity })
+    binder.rebindGateway({ systemSnapshot, gitBranchCompare, agentActivity, gitStatus })
 
     store.dispatchSystemView({ type: 'open', nodeId: '/wt/alpha' })
     binder.sync()
@@ -236,9 +243,9 @@ describe('createSystemViewBinder', () => {
     const gitBranchCompare = createNotReadyCompare()
     const agentActivity = createEmptyAgentActivity()
     const { store, binder } = setup({
-      gateway: { systemSnapshot, gitBranchCompare, agentActivity }
+      gateway: { systemSnapshot, gitBranchCompare, agentActivity, gitStatus }
     })
-    binder.rebindGateway({ systemSnapshot, gitBranchCompare, agentActivity })
+    binder.rebindGateway({ systemSnapshot, gitBranchCompare, agentActivity, gitStatus })
 
     store.dispatchSystemView({ type: 'open', nodeId: '/wt/alpha' })
     binder.sync()
@@ -266,13 +273,15 @@ describe('createSystemViewBinder', () => {
         gateway: {
           systemSnapshot: systemSnapshotA,
           gitBranchCompare: gitBranchCompareA,
-          agentActivity: agentActivityA
+          agentActivity: agentActivityA,
+          gitStatus
         }
       })
       binder.rebindGateway({
         systemSnapshot: systemSnapshotA,
         gitBranchCompare: gitBranchCompareA,
-        agentActivity: agentActivityA
+        agentActivity: agentActivityA,
+        gitStatus
       })
 
       store.dispatchSystemView({ type: 'open', nodeId: '/wt/alpha' })
@@ -283,7 +292,8 @@ describe('createSystemViewBinder', () => {
       binder.rebindGateway({
         systemSnapshot: systemSnapshotB,
         gitBranchCompare: gitBranchCompareB,
-        agentActivity: agentActivityB
+        agentActivity: agentActivityB,
+        gitStatus
       })
       await vi.advanceTimersByTimeAsync(AGENT_ACTIVITY_POLL_INTERVAL_MS)
 
@@ -301,10 +311,10 @@ describe('createSystemViewBinder', () => {
     })
     const graphPort: SystemGraphPort = { loadSystemGraph: vi.fn(async () => emptySystemGraph()) }
     const { store, binder } = setup({
-      gateway: { systemSnapshot, gitBranchCompare, agentActivity },
+      gateway: { systemSnapshot, gitBranchCompare, agentActivity, gitStatus },
       graphPort
     })
-    binder.rebindGateway({ systemSnapshot, gitBranchCompare, agentActivity })
+    binder.rebindGateway({ systemSnapshot, gitBranchCompare, agentActivity, gitStatus })
 
     store.dispatchSystemView({ type: 'open', nodeId: '/wt/alpha' })
     binder.sync()
@@ -321,13 +331,13 @@ describe('createSystemViewBinder', () => {
     const gitBranchCompare = createNotReadyCompare()
     const agentActivity = createEmptyAgentActivity()
     const { store, binder } = setup({
-      gateway: { systemSnapshot, gitBranchCompare, agentActivity }
+      gateway: { systemSnapshot, gitBranchCompare, agentActivity, gitStatus }
     })
     const watch = vi.fn((_worktree: string, _handlers: SystemGraphStreamHandlers) => ({
       close: vi.fn()
     }))
     const streamPort: SystemGraphStreamPort = { watch }
-    binder.rebindGateway({ systemSnapshot, gitBranchCompare, agentActivity }, streamPort)
+    binder.rebindGateway({ systemSnapshot, gitBranchCompare, agentActivity, gitStatus }, streamPort)
 
     store.dispatchSystemView({ type: 'open', nodeId: '/wt/alpha' })
     binder.sync()
@@ -346,7 +356,8 @@ describe('createSystemViewBinder', () => {
       gateway: {
         systemSnapshot: vi.fn(async () => ({ nodes: [], edges: [] })),
         gitBranchCompare: createNotReadyCompare(),
-        agentActivity: createEmptyAgentActivity()
+        agentActivity: createEmptyAgentActivity(),
+        gitStatus: createEmptyGitStatus()
       },
       graphPort: offlineGraphPort
     })
@@ -364,8 +375,11 @@ describe('createSystemViewBinder', () => {
     const systemSnapshot = vi.fn(async () => ({ nodes: [], edges: [] }))
     const gitBranchCompare = createNotReadyCompare()
     const agentActivity = createEmptyAgentActivity()
-    const live = setup({ gateway: { systemSnapshot, gitBranchCompare, agentActivity } })
-    live.binder.rebindGateway({ systemSnapshot, gitBranchCompare, agentActivity }, { watch })
+    const live = setup({ gateway: { systemSnapshot, gitBranchCompare, agentActivity, gitStatus } })
+    live.binder.rebindGateway(
+      { systemSnapshot, gitBranchCompare, agentActivity, gitStatus },
+      { watch }
+    )
 
     live.store.dispatchSystemView({ type: 'open', nodeId: '/wt/alpha' })
     live.binder.sync()

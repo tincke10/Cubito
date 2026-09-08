@@ -51,7 +51,8 @@ function createFakeGateway(snapshot: SystemGraphSnapshot = snapshotA): FakeGatew
       if (gw.systemSnapshotImpl) return gw.systemSnapshotImpl()
       return snapshot
     },
-    gitBranchCompare: async () => notReadyCompare
+    gitBranchCompare: async () => notReadyCompare,
+    gitStatus: async () => ({ entries: [], branch: '', branchLineTotal: 0 })
   }
   return gw
 }
