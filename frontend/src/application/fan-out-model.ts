@@ -36,6 +36,8 @@ export type FanOutBatchEntry = {
   failed: boolean
   dispatchId: string | null
   taskId: string | null
+  /** Present only when the failing call reported a real message (`child-failed`'s `message`). */
+  errorMessage?: string
 }
 
 /** closed → form (anchored to a node) → running (batch in flight) → closed. */
@@ -73,7 +75,7 @@ export type FanOutAction =
   | { type: 'submit'; mutationIds: readonly string[] }
   | { type: 'form-error'; message: string }
   | { type: 'child-created'; mutationId: string; worktreeId: WorktreeId }
-  | { type: 'child-failed'; mutationId: string }
+  | { type: 'child-failed'; mutationId: string; message?: string }
   | { type: 'member-status'; worktreeId: WorktreeId; status: AgentStatus }
   | { type: 'run-created'; runId: string }
   | { type: 'child-dispatched'; mutationId: string; dispatchId: string; taskId: string }
@@ -121,7 +123,11 @@ export function reduceFanOut(slice: FanOutSlice, action: FanOutAction): FanOutSl
       return slice.view === 'running'
         ? {
             ...slice,
-            batch: withEntry(slice.batch, action.mutationId, (e) => ({ ...e, failed: true }))
+            batch: withEntry(slice.batch, action.mutationId, (e) => ({
+              ...e,
+              failed: true,
+              ...(action.message ? { errorMessage: action.message } : {})
+            }))
           }
         : slice
     case 'member-status':
