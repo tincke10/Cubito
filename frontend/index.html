@@ -621,12 +621,13 @@
         filter: drop-shadow(0 0 6px var(--cubito-active-faces-right));
         animation: pulse 1.6s ease-in-out infinite;
       }
-      /* naciendo: dashed outline, no fill — the node the agent just created. */
+      /* naciendo: dashed outline — the node the agent just created. Opaque fill so edges
+         ending on it stay hidden behind the box like every other state. */
       .system-node--naciendo .system-node__shape {
-        fill: none;
+        fill: var(--cubito-panel-surface);
         stroke: var(--cubito-active-faces-right);
         stroke-dasharray: 5 4;
-        opacity: 0.8;
+        stroke-opacity: 0.8;
       }
       /* dirty service: faintly lit, downstream of the endpoint being edited. */
       .system-node--service.system-node--dirty .system-node__shape {
