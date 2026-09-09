@@ -9,6 +9,7 @@ import {
   createOauthRefreshMock,
   createSettings,
   createStore,
+  expectedRuntimeConfigDir,
   readManagedCredentialsForTest,
   readRuntimeOauthAccountForTest,
   resetRuntimeAuthTestState,
@@ -503,5 +504,38 @@ describe('ClaudeRuntimeAuthService', () => {
     expect(readManagedCredentialsForTest('account-1', managedAuthPath1)).toBe(noOrgCredentials)
     expect(readManagedCredentialsForTest('account-2', managedAuthPath2)).toBe(orgCredentials)
     expect(readFileSync(runtimeCredentialsPath, 'utf-8')).toBe(noOrgCredentials)
+  })
+})
+
+// Why: spawn-preflight spreads claudeAuth.envPatch last, so the trust-marking write
+// must target the same effective CLAUDE_CONFIG_DIR the launched CLI actually reads —
+// only a managed account (host or WSL) redirects it away from the system default.
+describe('getManagedRuntimeConfigDirOverride', () => {
+  it('returns null for the system (unmanaged) target', async () => {
+    const settings = createSettings({ activeClaudeManagedAccountId: null })
+    const store = createStore(settings)
+
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    const service = new ClaudeRuntimeAuthService(store as never)
+
+    expect(service.getManagedRuntimeConfigDirOverride()).toBeNull()
+  })
+
+  it('returns the runtime configDir for a host-managed account', async () => {
+    const managedAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'account-1',
+      createClaudeCredentialsJson('user@example.com', 'token')
+    )
+    const settings = createSettings({
+      claudeManagedAccounts: [createClaudeAccount('account-1', managedAuthPath)],
+      activeClaudeManagedAccountId: 'account-1'
+    })
+    const store = createStore(settings)
+
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    const service = new ClaudeRuntimeAuthService(store as never)
+
+    expect(service.getManagedRuntimeConfigDirOverride()).toBe(expectedRuntimeConfigDir())
   })
 })

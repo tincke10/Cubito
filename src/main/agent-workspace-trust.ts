@@ -45,7 +45,9 @@ export async function markAgentWorkspaceTrusted(args: {
       case 'codex':
         // Why: the Codex write queues behind any in-flight hook grant, so the agent must not
         // launch until it has actually landed.
-        await markCodexProjectTrusted(args.workspacePath, args.codexHome)
+        await (args.codexHome
+          ? markCodexProjectTrusted(args.workspacePath, args.codexHome)
+          : markCodexProjectTrusted(args.workspacePath))
         return
       case 'claude':
         if (args.claudeConfigDir) {

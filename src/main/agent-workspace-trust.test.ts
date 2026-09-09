@@ -82,7 +82,7 @@ describe('markAgentWorkspaceTrusted', () => {
       host: { kind: 'local' }
     })
 
-    expect(mocks.markCodexProjectTrusted).toHaveBeenCalledWith('/w', undefined)
+    expect(mocks.markCodexProjectTrusted).toHaveBeenCalledWith('/w')
   })
 
   it('routes codex preset with codexHome to markCodexProjectTrusted locally', async () => {

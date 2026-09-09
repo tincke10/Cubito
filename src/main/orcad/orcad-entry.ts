@@ -181,6 +181,7 @@ async function startOrcadRuntime(
     // what powers serve→desktop promotion. A Node host can never do that, and the
     // constructor's default would advertise it.
     getDesktopWindowStatus: () => 'blocked'
+    // getManagedClaudeConfigDirOverride intentionally omitted: no managed Claude accounts headless.
   })
 
   // Why the headless entry point rather than registerPtyHandlers directly: this is the

@@ -3872,6 +3872,7 @@ export class OrcaRuntimeService {
         launchEnv: NodeJS.ProcessEnv
       }) => string | null | Promise<string | null>)
     | null
+  private readonly getManagedClaudeConfigDirOverrideFn: (() => string | null) | null
   private readonly agentSessionClaimSigner: AgentSessionClaimSigner
   private readonly agentSessionCreateOperations = new Map<string, AgentSessionCreateOperation>()
   private readonly orchestrationCompatibilitySshAttachments = new Map<
@@ -3965,6 +3966,9 @@ export class OrcaRuntimeService {
         launchEnv: NodeJS.ProcessEnv
       }) => string | null | Promise<string | null>
       buildAgentHookPtyEnv?: () => Record<string, string>
+      // Why: spawn-preflight spreads claudeAuth.envPatch last, so trust must target
+      // a managed account's effective CLAUDE_CONFIG_DIR over agentDefaultEnv's when set.
+      getManagedClaudeConfigDirOverride?: () => string | null
       getDesktopWindowStatus?: () => RuntimeDesktopWindowStatus
       agentSessionClaimSigner?: AgentSessionClaimSigner
       orchestrationEnvironmentTransport?: OrchestrationEnvironmentTransport
@@ -4025,6 +4029,7 @@ export class OrcaRuntimeService {
     this.getDesktopWindowStatusFn = deps?.getDesktopWindowStatus ?? (() => 'openable')
     this.prepareAiVaultSessionResumeFn = deps?.prepareAiVaultSessionResume ?? null
     this.prepareCodexStructuredLaunchFn = deps?.prepareCodexStructuredLaunch ?? null
+    this.getManagedClaudeConfigDirOverrideFn = deps?.getManagedClaudeConfigDirOverride ?? null
     this.agentSessionClaimSigner =
       deps?.agentSessionClaimSigner ?? createEphemeralAgentSessionClaimSigner(this.runtimeId)
     this.onTerminalSideEffects = deps?.onTerminalSideEffects ?? null
@@ -26162,8 +26167,13 @@ export class OrcaRuntimeService {
       agent,
       this.requireStore().getSettings().agentDefaultEnv
     )
+    // Why: spawn-preflight spreads claudeAuth.envPatch last, so a managed account's
+    // effective CLAUDE_CONFIG_DIR wins at launch over agentDefaultEnv.claude.CLAUDE_CONFIG_DIR.
+    const managedClaudeConfigDir =
+      agent === 'claude' ? (this.getManagedClaudeConfigDirOverrideFn?.() ?? null) : null
+    const claudeConfigDir = managedClaudeConfigDir ?? launchEnv.CLAUDE_CONFIG_DIR
     return {
-      ...(launchEnv.CLAUDE_CONFIG_DIR ? { claudeConfigDir: launchEnv.CLAUDE_CONFIG_DIR } : {}),
+      ...(claudeConfigDir ? { claudeConfigDir } : {}),
       ...(launchEnv.CODEX_HOME ? { codexHome: launchEnv.CODEX_HOME } : {})
     }
   }

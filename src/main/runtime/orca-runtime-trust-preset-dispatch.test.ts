@@ -8,7 +8,10 @@ vi.mock('../agent-workspace-trust', () => mocks)
 
 const { OrcaRuntimeService } = await import('./orca-runtime')
 
-function createRuntime(agentDefaultEnv: Record<string, Record<string, string>> = {}) {
+function createRuntime(
+  agentDefaultEnv: Record<string, Record<string, string>> = {},
+  deps: { getManagedClaudeConfigDirOverride?: () => string | null } = {}
+) {
   const runtime = new OrcaRuntimeService(
     {
       getSettings: () => ({
@@ -19,7 +22,7 @@ function createRuntime(agentDefaultEnv: Record<string, Record<string, string>> =
       })
     } as never,
     undefined,
-    undefined
+    deps
   )
   return runtime as unknown as {
     markLocalWorkspaceTrustedForAgent: (agent: string, workspacePath: string) => Promise<void>
@@ -67,6 +70,53 @@ describe('markLocalWorkspaceTrustedForAgent — dispatch to the shared trust mod
       workspacePath: '/tmp/worktree-1',
       host: { kind: 'local' },
       codexHome: '/managed-codex-home'
+    })
+  })
+
+  // Why: spawn-preflight spreads claudeAuth.envPatch last, so a managed account's
+  // effective CLAUDE_CONFIG_DIR wins at launch over agentDefaultEnv.claude.CLAUDE_CONFIG_DIR.
+  it('prefers the managed CLAUDE_CONFIG_DIR override over the agentDefaultEnv one', async () => {
+    const internal = createRuntime(
+      { claude: { CLAUDE_CONFIG_DIR: '/acct-2' } },
+      { getManagedClaudeConfigDirOverride: () => '/managed/claude-config' }
+    )
+
+    await internal.markLocalWorkspaceTrustedForAgent('claude', '/tmp/worktree-1')
+
+    expect(mocks.markAgentWorkspaceTrusted).toHaveBeenCalledWith({
+      preset: 'claude',
+      workspacePath: '/tmp/worktree-1',
+      host: { kind: 'local' },
+      claudeConfigDir: '/managed/claude-config'
+    })
+  })
+
+  it('falls back to the agentDefaultEnv override when the managed dep returns null', async () => {
+    const internal = createRuntime(
+      { claude: { CLAUDE_CONFIG_DIR: '/acct-2' } },
+      { getManagedClaudeConfigDirOverride: () => null }
+    )
+
+    await internal.markLocalWorkspaceTrustedForAgent('claude', '/tmp/worktree-1')
+
+    expect(mocks.markAgentWorkspaceTrusted).toHaveBeenCalledWith({
+      preset: 'claude',
+      workspacePath: '/tmp/worktree-1',
+      host: { kind: 'local' },
+      claudeConfigDir: '/acct-2'
+    })
+  })
+
+  it('falls back to the agentDefaultEnv override when the managed dep is not provided', async () => {
+    const internal = createRuntime({ claude: { CLAUDE_CONFIG_DIR: '/acct-2' } })
+
+    await internal.markLocalWorkspaceTrustedForAgent('claude', '/tmp/worktree-1')
+
+    expect(mocks.markAgentWorkspaceTrusted).toHaveBeenCalledWith({
+      preset: 'claude',
+      workspacePath: '/tmp/worktree-1',
+      host: { kind: 'local' },
+      claudeConfigDir: '/acct-2'
     })
   })
 })

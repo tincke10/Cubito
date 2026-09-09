@@ -156,6 +156,14 @@ export class ClaudeRuntimeAuthService {
     return this.getPreparation(target).configDir
   }
 
+  // Why: only a managed account (host or WSL) redirects CLAUDE_CONFIG_DIR away from the
+  // system default — used to target trust writes at the same config file the launched CLI
+  // actually reads (see resolveAgentConfigDirOverrides in orca-runtime.ts).
+  getManagedRuntimeConfigDirOverride(target?: ClaudeAccountSelectionTarget): string | null {
+    const preparation = this.getPreparation(target)
+    return preparation.provenance.startsWith('managed:') ? preparation.configDir : null
+  }
+
   private initializeLastSyncedState(): void {
     const settings = this.store.getSettings()
     this.lastSyncedAccountId = getSelectedClaudeAccountIdForTarget(settings, { runtime: 'host' })

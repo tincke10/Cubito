@@ -272,4 +272,62 @@ describe('ClaudeRuntimeAuthService', () => {
       }
     }
   })
+
+  it('returns null for a wsl-system (unmanaged) target', async () => {
+    setPlatform('win32')
+    vi.doMock('../wsl', () => ({
+      getDefaultWslDistro: () => 'Ubuntu',
+      getWslHome: () => null,
+      toWindowsWslPath: (value: string) => value
+    }))
+    const settings = createSettings({
+      claudeManagedAccounts: [],
+      activeClaudeManagedAccountId: null,
+      activeClaudeManagedAccountIdsByRuntime: { host: null, wsl: {} }
+    })
+    const store = createStore(settings)
+
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    const service = new ClaudeRuntimeAuthService(store as never)
+
+    expect(
+      service.getManagedRuntimeConfigDirOverride({ runtime: 'wsl', wslDistro: 'Ubuntu' })
+    ).toBeNull()
+  })
+
+  it('returns managedAuthPath, not envPatch.CLAUDE_CONFIG_DIR, for a WSL-managed account', async () => {
+    setPlatform('win32')
+    vi.doMock('../wsl', () => ({
+      getDefaultWslDistro: () => 'Ubuntu',
+      getWslHome: () => null,
+      toWindowsWslPath: (value: string) => value
+    }))
+    const ubuntuAuthPath = createManagedClaudeAuth(
+      testState.userDataDir,
+      'ubuntu-account',
+      createClaudeCredentialsJson('ubuntu@example.com', 'ubuntu-token')
+    )
+    const settings = createSettings({
+      claudeManagedAccounts: [
+        createClaudeAccount('ubuntu-account', ubuntuAuthPath, {
+          managedAuthRuntime: 'wsl',
+          wslDistro: 'Ubuntu',
+          wslLinuxAuthPath: '/home/alice/.local/share/orca/claude-accounts/ubuntu/auth'
+        })
+      ],
+      activeClaudeManagedAccountId: null,
+      activeClaudeManagedAccountIdsByRuntime: {
+        host: null,
+        wsl: { Ubuntu: 'ubuntu-account' }
+      }
+    })
+    const store = createStore(settings)
+
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    const service = new ClaudeRuntimeAuthService(store as never)
+
+    expect(
+      service.getManagedRuntimeConfigDirOverride({ runtime: 'wsl', wslDistro: 'Ubuntu' })
+    ).toBe(ubuntuAuthPath)
+  })
 })
