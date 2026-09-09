@@ -1,16 +1,11 @@
 import ts from 'typescript-compiler-api'
 import type { ParsedEndpoint } from './framework-route-model'
-import { HTTP_ROUTE_METHODS, calleeParts, resolvePathArg } from './route-call-ast'
-
-function stringLiteralValues(node: ts.Expression): string[] {
-  if (ts.isStringLiteralLike(node)) {
-    return [node.text]
-  }
-  if (ts.isArrayLiteralExpression(node)) {
-    return node.elements.filter(ts.isStringLiteralLike).map((el) => el.text)
-  }
-  return []
-}
+import {
+  HTTP_ROUTE_METHODS,
+  calleeParts,
+  resolvePathArg,
+  stringLiteralValues
+} from './route-call-ast'
 
 /** Extracts one endpoint per method from a `.route({ method, url })` object-literal argument. */
 function routeCallEndpoints(

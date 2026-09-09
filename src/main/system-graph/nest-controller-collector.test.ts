@@ -47,4 +47,125 @@ describe('collectNestEndpoints', () => {
     const sourceFile = parse(['class PlainService {', '  @Get()', '  find() {}', '}'].join('\n'))
     expect(collectNestEndpoints(sourceFile)).toEqual([])
   })
+
+  const methodCases: [string, string][] = [
+    ['Post', 'POST'],
+    ['Put', 'PUT'],
+    ['Patch', 'PATCH'],
+    ['Delete', 'DELETE'],
+    ['Options', 'OPTIONS'],
+    ['Head', 'HEAD'],
+    ['All', 'ALL']
+  ]
+
+  it.each(methodCases)('maps @%s to the %s method, uppercased', (decoratorName, httpMethod) => {
+    const sourceFile = parse(
+      [
+        '@Controller("users")',
+        'class UsersController {',
+        `  @${decoratorName}()`,
+        '  handle() {}',
+        '}'
+      ].join('\n')
+    )
+    expect(collectNestEndpoints(sourceFile)).toEqual([
+      { method: httpMethod, path: '/users', routerLocalName: 'UsersController' }
+    ])
+  })
+
+  it('reads the prefix from an object-literal @Controller({ path, host }) arg, ignoring host', () => {
+    const sourceFile = parse(
+      [
+        '@Controller({ path: "users", host: "admin.example.com" })',
+        'class UsersController {',
+        '  @Get()',
+        '  list() {}',
+        '}'
+      ].join('\n')
+    )
+    expect(collectNestEndpoints(sourceFile)).toEqual([
+      { method: 'GET', path: '/users', routerLocalName: 'UsersController' }
+    ])
+  })
+
+  it('produces one endpoint per controller-prefix array entry', () => {
+    const sourceFile = parse(
+      ['@Controller(["v1", "v2"])', 'class UsersController {', '  @Get()', '  list() {}', '}'].join(
+        '\n'
+      )
+    )
+    expect(collectNestEndpoints(sourceFile)).toEqual([
+      { method: 'GET', path: '/v1', routerLocalName: 'UsersController' },
+      { method: 'GET', path: '/v2', routerLocalName: 'UsersController' }
+    ])
+  })
+
+  it('produces one endpoint per method-path array entry', () => {
+    const sourceFile = parse(
+      [
+        '@Controller("users")',
+        'class UsersController {',
+        '  @Get(["a", "b"])',
+        '  list() {}',
+        '}'
+      ].join('\n')
+    )
+    expect(collectNestEndpoints(sourceFile)).toEqual([
+      { method: 'GET', path: '/users/a', routerLocalName: 'UsersController' },
+      { method: 'GET', path: '/users/b', routerLocalName: 'UsersController' }
+    ])
+  })
+
+  it('concatenates endpoints from multiple controllers in one file, in source order', () => {
+    const sourceFile = parse(
+      [
+        '@Controller("users")',
+        'class UsersController {',
+        '  @Get()',
+        '  list() {}',
+        '}',
+        '@Controller("auth")',
+        'class AuthController {',
+        '  @Post("login")',
+        '  login() {}',
+        '}'
+      ].join('\n')
+    )
+    expect(collectNestEndpoints(sourceFile)).toEqual([
+      { method: 'GET', path: '/users', routerLocalName: 'UsersController' },
+      { method: 'POST', path: '/auth/login', routerLocalName: 'AuthController' }
+    ])
+  })
+
+  it('degrades a non-literal controller prefix to the dynamic-path marker', () => {
+    const sourceFile = parse(
+      [
+        'const prefix = computePrefix()',
+        '@Controller(prefix)',
+        'class UsersController {',
+        '  @Get(":id")',
+        '  find() {}',
+        '}'
+      ].join('\n')
+    )
+    expect(collectNestEndpoints(sourceFile)).toEqual([
+      { method: 'GET', path: '<dynamic>/:id', routerLocalName: 'UsersController' }
+    ])
+  })
+
+  it('degrades a non-literal method path to the dynamic-path marker', () => {
+    const sourceFile = parse(
+      [
+        'const suffix = computeSuffix()',
+        '@Controller("users")',
+        'class UsersController {',
+        '  @Get(suffix)',
+        '  find() {}',
+        '}'
+      ].join('\n')
+    )
+    expect(collectNestEndpoints(sourceFile)).toEqual([
+      { method: 'GET', path: '/users<dynamic>', routerLocalName: 'UsersController' }
+    ])
+  })
 })

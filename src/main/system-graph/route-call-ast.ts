@@ -23,6 +23,19 @@ export function resolvePathArg(arg: ts.Expression | undefined): string {
   return DYNAMIC_PATH
 }
 
+/** A string literal's text, or every string-literal element of an array literal; anything
+ * else (identifier, non-literal expression) yields no values. Framework-neutral: shared by
+ * Fastify's `.route({ method, url })` and Nest's decorator path/prefix arguments. */
+export function stringLiteralValues(node: ts.Expression): string[] {
+  if (ts.isStringLiteralLike(node)) {
+    return [node.text]
+  }
+  if (ts.isArrayLiteralExpression(node)) {
+    return node.elements.filter(ts.isStringLiteralLike).map((el) => el.text)
+  }
+  return []
+}
+
 /** const x = someIdentifier() — the shared, name-agnostic instance-creation shape used by
  * both Express (app/router locals) and Fastify (server instance / plugin-function locals). */
 export function isBareIdentifierCall(node: ts.Expression): boolean {
