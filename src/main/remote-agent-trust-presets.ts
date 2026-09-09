@@ -12,6 +12,7 @@ export async function markRemoteAgentWorkspaceTrusted(args: {
   preset: AgentTrustPreset
   connectionId: string
   workspacePath: string
+  claudeConfigDir?: string
 }): Promise<void> {
   const home = await resolveRemoteHome(args.connectionId)
   const fsProvider = getSshFilesystemProvider(args.connectionId)
@@ -27,7 +28,7 @@ export async function markRemoteAgentWorkspaceTrusted(args: {
   } else if (args.preset === 'copilot') {
     await markRemoteCopilotFolderTrusted(fsProvider, home, workspacePath)
   } else if (args.preset === 'claude') {
-    await markRemoteClaudeWorkspaceTrusted(fsProvider, home, workspacePath)
+    await markRemoteClaudeWorkspaceTrusted(fsProvider, home, workspacePath, args.claudeConfigDir)
   }
 }
 
@@ -124,9 +125,10 @@ async function markRemoteCursorWorkspaceTrusted(
 async function markRemoteClaudeWorkspaceTrusted(
   fsProvider: IFilesystemProvider,
   remoteHome: string,
-  workspacePath: string
+  workspacePath: string,
+  claudeConfigDir?: string
 ): Promise<void> {
-  const configPath = `${remoteHome}/.claude.json`
+  const configPath = `${(claudeConfigDir ?? remoteHome).replace(/\/$/, '')}/.claude.json`
   const raw = await readRemoteTextFile(fsProvider, configPath)
   let config: Record<string, unknown> = {}
   if (raw.trim()) {

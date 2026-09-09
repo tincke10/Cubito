@@ -198,6 +198,46 @@ describe('markRemoteAgentWorkspaceTrusted', () => {
     expect(writeFile).not.toHaveBeenCalled()
   })
 
+  it('writes remote Claude trust to a claudeConfigDir override instead of the remote home', async () => {
+    const writeFile = vi.fn(async (_filePath: string, _content: string) => undefined)
+    const fsProvider = makeFsProvider({
+      readFile: vi.fn(async () => ({ content: '', isBinary: false })),
+      writeFile
+    })
+    mocks.getSshFilesystemProvider.mockReturnValue(fsProvider)
+
+    await markRemoteAgentWorkspaceTrusted({
+      preset: 'claude',
+      connectionId: 'ssh-1',
+      workspacePath: '/repo/worktree',
+      claudeConfigDir: '/custom'
+    })
+
+    expect(fsProvider.writeFile).toHaveBeenCalledWith('/custom/.claude.json', expect.any(String))
+    expect(fsProvider.writeFile).not.toHaveBeenCalledWith(
+      '/home/u/.claude.json',
+      expect.any(String)
+    )
+  })
+
+  it('strips a trailing slash from a claudeConfigDir override', async () => {
+    const writeFile = vi.fn(async (_filePath: string, _content: string) => undefined)
+    const fsProvider = makeFsProvider({
+      readFile: vi.fn(async () => ({ content: '', isBinary: false })),
+      writeFile
+    })
+    mocks.getSshFilesystemProvider.mockReturnValue(fsProvider)
+
+    await markRemoteAgentWorkspaceTrusted({
+      preset: 'claude',
+      connectionId: 'ssh-1',
+      workspacePath: '/repo/worktree',
+      claudeConfigDir: '/custom/'
+    })
+
+    expect(fsProvider.writeFile).toHaveBeenCalledWith('/custom/.claude.json', expect.any(String))
+  })
+
   it('does nothing when the SSH home cannot be resolved safely', async () => {
     const fsProvider = makeFsProvider()
     mocks.getActiveMultiplexer.mockReturnValue({

@@ -11,8 +11,9 @@ export type ClaudeRuntimePaths = {
 }
 
 export class ClaudeRuntimePathResolver {
-  getRuntimePaths(): ClaudeRuntimePaths {
-    const inheritedConfigDir = process.env.CLAUDE_CONFIG_DIR?.trim() || null
+  getRuntimePaths(configDirOverride?: string): ClaudeRuntimePaths {
+    const inheritedConfigDir =
+      configDirOverride?.trim() || process.env.CLAUDE_CONFIG_DIR?.trim() || null
     const configDir = inheritedConfigDir || join(homedir(), '.claude')
     mkdirSync(configDir, { recursive: true })
 
