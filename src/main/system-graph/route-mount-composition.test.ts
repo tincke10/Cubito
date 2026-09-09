@@ -193,4 +193,31 @@ describe('composeMountPrefixes: edge cases', () => {
     const only = routeFile({ filePath: 'src/index.ts' })
     expect(composeMountPrefixes([only]).size).toBe(0)
   })
+
+  // Regression lock: a 1-arg `app.use(router)` never lands in file.mounts at all (the parser's
+  // "no prefix argument" case) — even though the router is still imported. No edge should exist
+  // for it, matching today's "bare, uncomposed endpoint" behavior.
+  it('creates no edge for an imported router that is never recorded as a mount (unprefixed cross-file mount)', () => {
+    const index = routeFile({
+      filePath: 'src/index.ts',
+      imports: [
+        {
+          moduleSpecifier: './routes/users',
+          isRelative: true,
+          bindings: [{ localName: 'usersRouter', importedName: 'default' }]
+        }
+      ],
+      mounts: []
+    })
+    const users = routeFile({
+      filePath: 'src/routes/users.ts',
+      endpoints: [{ method: 'GET', path: '/', routerLocalName: 'router' }],
+      exports: [{ localName: 'router', exportedName: 'default' }]
+    })
+
+    const composed = composeMountPrefixes([index, users])
+
+    expect(composed.size).toBe(0)
+    expect(composed.get('src/routes/users.ts')).toBeUndefined()
+  })
 })

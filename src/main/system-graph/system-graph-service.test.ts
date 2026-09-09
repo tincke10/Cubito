@@ -663,6 +663,45 @@ describe('SystemGraphService: namespace-import property mount golden', () => {
   })
 })
 
+// Mirrors FASTIFY_WORKTREE's auth.ts unprefixed-mount coverage on the Express side: index.ts
+// mounts users.ts with no prefix at all (1-arg app.use), which never lands in file.mounts —
+// the endpoint must stay bare and the router file must still be excluded from service nodes.
+const EXPRESS_UNPREFIXED_MOUNT_WORKTREE: FakeWorktree = {
+  rootPath: '/repo/express-unprefixed-app',
+  connectionId: 'ssh-express-unprefixed',
+  files: {
+    'package.json': JSON.stringify({ dependencies: { express: '^4.19.0' } }),
+    'tsconfig.json': '{}',
+    'src/index.ts': [
+      "import express from 'express'",
+      "import usersRouter from './routes/users'",
+      'const app = express()',
+      'app.use(usersRouter)'
+    ].join('\n'),
+    'src/routes/users.ts': [
+      "import express from 'express'",
+      'const router = express.Router()',
+      "router.get('/', (req, res) => res.send('ok'))",
+      'export default router'
+    ].join('\n')
+  }
+}
+
+describe('SystemGraphService: express worktree golden (unprefixed cross-file mount)', () => {
+  it('keeps an unprefixed mounted router bare and excluded from service nodes', async () => {
+    const service = new SystemGraphService(fakeHost({ w1: EXPRESS_UNPREFIXED_MOUNT_WORKTREE }))
+
+    await service.buildGraph('w1')
+    const graph = service.getGraph('w1')!
+    const nodes = [...graph.nodes.values()]
+
+    expect(graph.nodes.has('router:src/index.ts')).toBe(false)
+    expect(graph.nodes.has('router:src/routes/users.ts')).toBe(true)
+    expect(nodes.filter((n) => n.kind === 'endpoint').map((n) => n.label)).toContain('GET /')
+    expect(nodes.filter((n) => n.kind === 'service').map((n) => n.label)).toEqual([])
+  })
+})
+
 describe('SystemGraphService: fastify worktree golden (cross-file plugin registration)', () => {
   it('crawls, detects fastify, and composes endpoint paths across app.ts and its two plugin files', async () => {
     const service = new SystemGraphService(fakeHost({ w1: FASTIFY_WORKTREE }))

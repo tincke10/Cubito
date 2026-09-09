@@ -92,6 +92,32 @@ describe('deriveServiceAndDatabaseNodes: service grouping from relative imports'
     expect(result.serviceNodes).toEqual([])
   })
 
+  // Unit-level lock for the "endpoints>0" branch of isRouteModuleImport, in isolation from any
+  // parser: an unprefixed cross-file mount never lands in file.mounts (only a prefixed one does),
+  // so exclusion must come from the imported file having endpoints of its own, not from `mounts`.
+  it('excludes a relative import from serviceNodes when its target file has endpoints, even with an empty mounts array', () => {
+    const importer = routeFile({
+      filePath: 'src/index.ts',
+      mounts: [],
+      imports: [
+        {
+          moduleSpecifier: './routes/users',
+          isRelative: true,
+          bindings: [{ localName: 'usersRouter', importedName: 'default' }]
+        }
+      ]
+    })
+    const usersRouteModule = routeFile({
+      filePath: 'src/routes/users.ts',
+      endpoints: [{ method: 'GET', path: '/', routerLocalName: 'router' }]
+    })
+    const result = deriveServiceAndDatabaseNodes({
+      routeFiles: [importer, usersRouteModule],
+      packageDependencies: []
+    })
+    expect(result.serviceNodes).toEqual([])
+  })
+
   it('collapses a trailing index segment to the parent directory name', () => {
     const files = [
       routeFile({
