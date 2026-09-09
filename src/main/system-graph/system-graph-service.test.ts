@@ -14,7 +14,7 @@ import {
 type FakeWorktree = {
   rootPath: string
   connectionId: string
-  files: Record<string, string> // relative posix path (root-level) -> text content
+  files: Record<string, string> // relative posix path (may be nested) -> text content
 }
 
 function fakeFilesystemProvider(worktree: FakeWorktree): IFilesystemProvider {
@@ -31,13 +31,30 @@ function fakeFilesystemProvider(worktree: FakeWorktree): IFilesystemProvider {
       }
       return { size: Buffer.byteLength(content), type: 'file', mtime: 0 }
     },
+    // Derives directory listings from the flat `files` map's keys, so a fixture can use
+    // nested paths like 'src/routes/users.ts' without a real filesystem.
     readDir: async (absPath) => {
-      if (relOf(absPath) !== '.') {
-        return []
+      const rel = relOf(absPath)
+      const prefix = rel === '.' ? '' : `${rel}/`
+      const children = new Map<string, boolean>()
+      for (const filePath of Object.keys(worktree.files)) {
+        if (!filePath.startsWith(prefix)) {
+          continue
+        }
+        const remainder = filePath.slice(prefix.length)
+        if (remainder.length === 0) {
+          continue
+        }
+        const slashIndex = remainder.indexOf('/')
+        if (slashIndex === -1) {
+          children.set(remainder, false)
+        } else if (!children.has(remainder.slice(0, slashIndex))) {
+          children.set(remainder.slice(0, slashIndex), true)
+        }
       }
-      return Object.keys(worktree.files).map((name) => ({
+      return [...children.entries()].map(([name, isDirectory]) => ({
         name,
-        isDirectory: false,
+        isDirectory,
         isSymlink: false
       }))
     },
@@ -139,6 +156,44 @@ const NON_EXPRESS_WORKTREE: FakeWorktree = {
   rootPath: '/repo/plain-app',
   connectionId: 'ssh-plain',
   files: { 'package.json': JSON.stringify({ dependencies: { fastify: '^4.0.0' } }) }
+}
+
+// Mirrors EXPRESS_WORKTREE, but nested (per README of readDir above) and exercising the
+// Fastify cross-file plugin-registration path: app.ts never declares an endpoint itself —
+// it only registers two plugins, one prefixed, one not.
+const FASTIFY_WORKTREE: FakeWorktree = {
+  rootPath: '/repo/fastify-app',
+  connectionId: 'ssh-fastify',
+  files: {
+    'package.json': JSON.stringify({ dependencies: { fastify: '^4.19.0', pg: '^8.11.0' } }),
+    'tsconfig.json': '{}',
+    'src/app.ts': [
+      "import Fastify from 'fastify'",
+      "import usersPlugin from './routes/users'",
+      "import authPlugin from './routes/auth'",
+      'const app = Fastify()',
+      "app.register(usersPlugin, { prefix: '/api' })",
+      'app.register(authPlugin)'
+    ].join('\n'),
+    'src/routes/users.ts': [
+      "import userService from '../services/user.service'",
+      'async function usersPlugin(fastify, opts) {',
+      "  fastify.get('/', async () => userService.list())",
+      "  fastify.get('/:id', async () => userService.get())",
+      "  fastify.route({ method: ['POST', 'PUT'], url: '/' })",
+      '}',
+      'export default usersPlugin'
+    ].join('\n'),
+    'src/routes/auth.ts': [
+      'async function authPlugin(fastify, opts) {',
+      "  fastify.post('/login', async () => 'ok')",
+      '}',
+      'export default authPlugin'
+    ].join('\n'),
+    'src/services/user.service.ts': ['export default {', '  list() {},', '  get() {}', '}'].join(
+      '\n'
+    )
+  }
 }
 
 describe('SystemGraphService', () => {
@@ -490,5 +545,31 @@ describe('getSystemGraphService', () => {
 
   it('returns different service instances for different runtime objects', () => {
     expect(getSystemGraphService(fakeHost({}))).not.toBe(getSystemGraphService(fakeHost({})))
+  })
+})
+
+describe('SystemGraphService: fastify worktree golden (cross-file plugin registration)', () => {
+  it('crawls, detects fastify, and composes endpoint paths across app.ts and its two plugin files', async () => {
+    const service = new SystemGraphService(fakeHost({ w1: FASTIFY_WORKTREE }))
+
+    await service.buildGraph('w1')
+    const graph = service.getGraph('w1')!
+    const nodes = [...graph.nodes.values()]
+
+    // app.ts declares zero endpoints of its own (only .register() calls) -> no router node.
+    expect(graph.nodes.has('router:src/app.ts')).toBe(false)
+    expect(graph.nodes.has('router:src/routes/users.ts')).toBe(true)
+    expect(graph.nodes.has('router:src/routes/auth.ts')).toBe(true)
+
+    const endpointLabels = nodes.filter((n) => n.kind === 'endpoint').map((n) => n.label)
+    expect(endpointLabels).toContain('GET /api/')
+    expect(endpointLabels).toContain('GET /api/:id')
+    expect(endpointLabels).toContain('POST /api/')
+    expect(endpointLabels).toContain('PUT /api/')
+    // auth.ts was registered with no prefix -> its endpoint stays uncomposed.
+    expect(endpointLabels).toContain('POST /login')
+
+    expect(nodes.some((n) => n.kind === 'database' && n.label === 'PostgreSQL')).toBe(true)
+    expect(nodes.some((n) => n.kind === 'service' && n.label === 'user.service')).toBe(true)
   })
 })
