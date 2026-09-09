@@ -1,11 +1,6 @@
 import { ipcMain } from 'electron'
-import {
-  type AgentTrustPreset,
-  markCodexProjectTrusted,
-  markCopilotFolderTrusted,
-  markCursorWorkspaceTrusted
-} from '../agent-trust-presets'
-import { markRemoteAgentWorkspaceTrusted } from '../remote-agent-trust-presets'
+import type { AgentTrustPreset } from '../agent-trust-presets'
+import { markAgentWorkspaceTrusted } from '../agent-workspace-trust'
 
 /**
  * Why: cursor-agent, GitHub Copilot CLI, and Codex gate first-launch in an
@@ -13,8 +8,8 @@ import { markRemoteAgentWorkspaceTrusted } from '../remote-agent-trust-presets'
  * keystrokes (numbered options / single-letter shortcuts). Orca's draft-URL
  * paste flow needs the input box, not the menu, so before Orca spawns the
  * agent it asks main to write the same trust artifacts the agents write
- * after the user accepts. Best-effort: any IO error is swallowed so a failed
- * trust write never blocks the workspace from opening.
+ * after the user accepts. Routes through the shared dispatcher, which
+ * swallows write errors so a failed trust write never blocks the workspace.
  */
 export function registerAgentTrustHandlers(): void {
   ipcMain.removeHandler('agentTrust:markTrusted')
@@ -27,27 +22,12 @@ export function registerAgentTrustHandlers(): void {
       if (!args || typeof args.workspacePath !== 'string' || !args.workspacePath) {
         return
       }
-      try {
-        const connectionId = typeof args.connectionId === 'string' ? args.connectionId.trim() : ''
-        if (connectionId) {
-          // Why: SSH-launched agents read trust artifacts from the remote
-          // user's home, not from this desktop process.
-          await markRemoteAgentWorkspaceTrusted({
-            preset: args.preset,
-            connectionId,
-            workspacePath: args.workspacePath
-          })
-        } else if (args.preset === 'cursor') {
-          markCursorWorkspaceTrusted(args.workspacePath)
-        } else if (args.preset === 'copilot') {
-          markCopilotFolderTrusted(args.workspacePath)
-        } else if (args.preset === 'codex') {
-          markCodexProjectTrusted(args.workspacePath)
-        }
-      } catch {
-        // Best-effort: see Why above. The user can still accept the trust
-        // prompt manually if writing the artifact fails.
-      }
+      const connectionId = typeof args.connectionId === 'string' ? args.connectionId.trim() : ''
+      await markAgentWorkspaceTrusted({
+        preset: args.preset,
+        workspacePath: args.workspacePath,
+        host: connectionId ? { kind: 'remote', connectionId } : { kind: 'local' }
+      })
     }
   )
 }
