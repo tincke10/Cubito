@@ -548,6 +548,49 @@ describe('getSystemGraphService', () => {
   })
 })
 
+// Mirrors FASTIFY_WORKTREE but registers its plugin as a dynamic import() call directly
+// (no static import statement at all), exercising the mount-target-resolution synthetic import.
+const FASTIFY_DYNAMIC_IMPORT_WORKTREE: FakeWorktree = {
+  rootPath: '/repo/fastify-dynamic-app',
+  connectionId: 'ssh-fastify-dynamic',
+  files: {
+    'package.json': JSON.stringify({ dependencies: { fastify: '^4.19.0' } }),
+    'tsconfig.json': '{}',
+    'src/app.ts': [
+      "import Fastify from 'fastify'",
+      'const app = Fastify()',
+      "app.register(import('./routes/orders'), { prefix: '/orders' })"
+    ].join('\n'),
+    'src/routes/orders.ts': [
+      'async function ordersPlugin(fastify, opts) {',
+      "  fastify.get('/', async () => 'ok')",
+      "  fastify.get('/:id', async () => 'ok')",
+      '}',
+      'export default ordersPlugin'
+    ].join('\n')
+  }
+}
+
+describe('SystemGraphService: fastify dynamic import() plugin target golden', () => {
+  it('composes endpoint paths for a register(import(...), {prefix}) target with no service node', async () => {
+    const service = new SystemGraphService(fakeHost({ w1: FASTIFY_DYNAMIC_IMPORT_WORKTREE }))
+
+    await service.buildGraph('w1')
+    const graph = service.getGraph('w1')!
+    const nodes = [...graph.nodes.values()]
+
+    expect(graph.nodes.has('router:src/app.ts')).toBe(false)
+    expect(graph.nodes.has('router:src/routes/orders.ts')).toBe(true)
+
+    const endpointLabels = nodes.filter((n) => n.kind === 'endpoint').map((n) => n.label)
+    expect(endpointLabels).toContain('GET /orders/')
+    expect(endpointLabels).toContain('GET /orders/:id')
+
+    const serviceLabels = nodes.filter((n) => n.kind === 'service').map((n) => n.label)
+    expect(serviceLabels).toEqual([])
+  })
+})
+
 describe('SystemGraphService: fastify worktree golden (cross-file plugin registration)', () => {
   it('crawls, detects fastify, and composes endpoint paths across app.ts and its two plugin files', async () => {
     const service = new SystemGraphService(fakeHost({ w1: FASTIFY_WORKTREE }))

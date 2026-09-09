@@ -1,7 +1,13 @@
 import ts from 'typescript-compiler-api'
 import { collectFastifyEndpoints } from './fastify-endpoint-collector'
-import type { ParsedEndpoint, ParsedRouterMount } from './framework-route-model'
-import { calleeParts, collectExports, collectRelativeImportLocalNames } from './route-call-ast'
+import type { ParsedEndpoint, ParsedImport, ParsedRouterMount } from './framework-route-model'
+import { resolveMountTargetArg } from './mount-target-resolution'
+import {
+  calleeParts,
+  collectExports,
+  collectNamespaceImportLocalNames,
+  collectRelativeImportLocalNames
+} from './route-call-ast'
 
 type PluginDefinition = { name: string; firstParamName: string; body: ts.Node }
 
@@ -46,23 +52,6 @@ function collectPluginDefinitions(sourceFile: ts.SourceFile): Map<string, Plugin
   return plugins
 }
 
-/** Unwraps `.register(pluginLocal, ...)` and `.register(fp(pluginLocal), ...)` to the
- * referenced plugin identifier. Any single-argument call wrapping an identifier is
- * unwrapped — the wrapper's own name (conventionally fastify-plugin's `fp`) is never
- * checked, consistent with this parser's no-name-check looseness elsewhere. */
-function pluginIdentifierName(arg: ts.Expression | undefined): string | null {
-  if (!arg) {
-    return null
-  }
-  if (ts.isIdentifier(arg)) {
-    return arg.text
-  }
-  if (ts.isCallExpression(arg) && arg.arguments.length === 1 && ts.isIdentifier(arg.arguments[0])) {
-    return (arg.arguments[0] as ts.Identifier).text
-  }
-  return null
-}
-
 function extractPrefix(optionsArg: ts.Expression | undefined): string | null {
   if (!optionsArg || !ts.isObjectLiteralExpression(optionsArg)) {
     return null
@@ -91,11 +80,19 @@ function extractPrefix(optionsArg: ts.Expression | undefined): string | null {
 export function collectPluginRegistrations(
   sourceFile: ts.SourceFile,
   instanceLocals: ReadonlySet<string>
-): { mounts: ParsedRouterMount[]; pluginEndpoints: ParsedEndpoint[] } {
+): {
+  mounts: ParsedRouterMount[]
+  pluginEndpoints: ParsedEndpoint[]
+  syntheticImports: ParsedImport[]
+} {
   const plugins = collectPluginDefinitions(sourceFile)
   const relativeImportLocalNames = collectRelativeImportLocalNames(sourceFile)
+  const namespaceImportLocalNames = collectNamespaceImportLocalNames(sourceFile)
   const mounts: ParsedRouterMount[] = []
+  const syntheticImports: ParsedImport[] = []
   const activePluginNames = new Set<string>()
+  let syntheticCounter = 0
+  const nextSyntheticLocalName = (): string => `__dynamicPluginTarget${syntheticCounter++}`
 
   for (const exported of collectExports(sourceFile)) {
     if (plugins.has(exported.localName)) {
@@ -108,16 +105,41 @@ export function collectPluginRegistrations(
       const parts = calleeParts(node.expression)
       if (parts && instanceLocals.has(parts.objectName) && parts.methodName === 'register') {
         const [pluginArg, optionsArg] = node.arguments
-        const pluginName = pluginIdentifierName(pluginArg)
-        const isLocalPlugin = !!pluginName && plugins.has(pluginName)
-        const isImportedPlugin = !!pluginName && relativeImportLocalNames.has(pluginName)
-        if (pluginName && (isLocalPlugin || isImportedPlugin)) {
+        const target = resolveMountTargetArg(
+          pluginArg,
+          namespaceImportLocalNames,
+          nextSyntheticLocalName
+        )
+        if (target?.kind === 'identifier') {
+          const pluginName = target.name
+          const isLocalPlugin = plugins.has(pluginName)
+          const isImportedPlugin = relativeImportLocalNames.has(pluginName)
+          if (isLocalPlugin || isImportedPlugin) {
+            const prefix = extractPrefix(optionsArg)
+            if (prefix !== null) {
+              mounts.push({
+                prefix,
+                routerLocalName: pluginName,
+                parentLocalName: parts.objectName
+              })
+            }
+            if (isLocalPlugin) {
+              activePluginNames.add(pluginName)
+            }
+          }
+        } else if (target?.kind === 'moduleBinding') {
+          syntheticImports.push({
+            moduleSpecifier: target.moduleSpecifier,
+            isRelative: target.moduleSpecifier.startsWith('.'),
+            bindings: [{ localName: target.localName, importedName: target.importedName }]
+          })
           const prefix = extractPrefix(optionsArg)
           if (prefix !== null) {
-            mounts.push({ prefix, routerLocalName: pluginName, parentLocalName: parts.objectName })
-          }
-          if (isLocalPlugin) {
-            activePluginNames.add(pluginName)
+            mounts.push({
+              prefix,
+              routerLocalName: target.localName,
+              parentLocalName: parts.objectName
+            })
           }
         }
       }
@@ -134,5 +156,5 @@ export function collectPluginRegistrations(
     )
   }
 
-  return { mounts, pluginEndpoints }
+  return { mounts, pluginEndpoints, syntheticImports }
 }

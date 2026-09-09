@@ -41,8 +41,11 @@ export function parseFastifyRoutes(source: string, filePath: string): ParsedRout
     )
     const instanceLocals = collectInstanceLocals(sourceFile)
     const topLevelEndpoints = collectFastifyEndpoints(sourceFile, instanceLocals, (name) => name)
-    const { mounts, pluginEndpoints } = collectPluginRegistrations(sourceFile, instanceLocals)
-    const imports = collectImports(sourceFile)
+    const { mounts, pluginEndpoints, syntheticImports } = collectPluginRegistrations(
+      sourceFile,
+      instanceLocals
+    )
+    const imports = [...collectImports(sourceFile), ...syntheticImports]
     const exports = collectExports(sourceFile)
     return {
       filePath,

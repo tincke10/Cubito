@@ -6,6 +6,7 @@ import {
   calleeParts,
   collectExports,
   collectImports,
+  collectNamespaceImportLocalNames,
   isBareIdentifierCall,
   resolvePathArg
 } from './route-call-ast'
@@ -128,6 +129,25 @@ describe('collectImports', () => {
         bindings: [{ localName: 'routes', importedName: '*' }]
       }
     ])
+  })
+})
+
+describe('collectNamespaceImportLocalNames', () => {
+  it('maps a namespace-import local name to its relative module specifier', () => {
+    const source = "import * as auth from './routes/auth'"
+    expect(collectNamespaceImportLocalNames(parse(source))).toEqual(
+      new Map([['auth', './routes/auth']])
+    )
+  })
+
+  it('ignores a non-relative namespace import', () => {
+    const source = "import * as path from 'node:path'"
+    expect(collectNamespaceImportLocalNames(parse(source))).toEqual(new Map())
+  })
+
+  it('ignores a default or named import (no namespace binding)', () => {
+    const source = "import Users, { auth } from './routes'"
+    expect(collectNamespaceImportLocalNames(parse(source))).toEqual(new Map())
   })
 })
 

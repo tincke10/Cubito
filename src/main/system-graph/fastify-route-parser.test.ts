@@ -129,3 +129,52 @@ describe('parseFastifyRoutes: same-file plugin registration', () => {
     ])
   })
 })
+
+describe('parseFastifyRoutes: dynamic import()/require() plugin targets', () => {
+  it("mounts a register(import('./x'), {prefix}) target via a synthetic import binding", () => {
+    const source = `
+      const app = Fastify()
+      app.register(import('./routes/orders'), { prefix: '/orders' })
+    `
+    const result = parseFastifyRoutes(source, FILE)
+    expect(result.mounts).toEqual([
+      { prefix: '/orders', routerLocalName: '__dynamicPluginTarget0', parentLocalName: 'app' }
+    ])
+    expect(result.imports).toEqual([
+      {
+        moduleSpecifier: './routes/orders',
+        isRelative: true,
+        bindings: [{ localName: '__dynamicPluginTarget0', importedName: 'default' }]
+      }
+    ])
+  })
+
+  it('mounts an await import(...) target the same way', () => {
+    const source = `
+      const app = Fastify()
+      app.register(await import('./routes/orders'), { prefix: '/orders' })
+    `
+    const result = parseFastifyRoutes(source, FILE)
+    expect(result.mounts).toEqual([
+      { prefix: '/orders', routerLocalName: '__dynamicPluginTarget0', parentLocalName: 'app' }
+    ])
+  })
+
+  it('mounts a require(...) target the same way', () => {
+    const source = `
+      const app = Fastify()
+      app.register(require('./routes/orders'), { prefix: '/orders' })
+    `
+    const result = parseFastifyRoutes(source, FILE)
+    expect(result.mounts).toEqual([
+      { prefix: '/orders', routerLocalName: '__dynamicPluginTarget0', parentLocalName: 'app' }
+    ])
+    expect(result.imports).toEqual([
+      {
+        moduleSpecifier: './routes/orders',
+        isRelative: true,
+        bindings: [{ localName: '__dynamicPluginTarget0', importedName: 'default' }]
+      }
+    ])
+  })
+})

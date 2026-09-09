@@ -97,6 +97,23 @@ export function collectRelativeImportLocalNames(sourceFile: ts.SourceFile): Set<
   return names
 }
 
+/** Local name -> module specifier for every relative namespace import (`import * as ns from
+ * './x'`) — lets a mount-target resolver treat `ns.prop` as a property access into a known file. */
+export function collectNamespaceImportLocalNames(sourceFile: ts.SourceFile): Map<string, string> {
+  const names = new Map<string, string>()
+  for (const imp of collectImports(sourceFile)) {
+    if (!imp.isRelative) {
+      continue
+    }
+    for (const binding of imp.bindings ?? []) {
+      if (binding.importedName === '*') {
+        names.set(binding.localName, imp.moduleSpecifier)
+      }
+    }
+  }
+  return names
+}
+
 function hasModifier(node: ts.Node, kind: ts.SyntaxKind): boolean {
   return ts.canHaveModifiers(node) && (ts.getModifiers(node) ?? []).some((m) => m.kind === kind)
 }
