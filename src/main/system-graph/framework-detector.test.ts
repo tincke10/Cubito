@@ -93,4 +93,51 @@ describe('detectFramework', () => {
     })
     await expect(detectFramework(reader)).resolves.toBe('express')
   })
+
+  it('detects nest via @nestjs/core plus @nestjs/platform-express, ahead of express', async () => {
+    const reader = fakeReader({
+      readPackageJson: async () => ({
+        dependencies: {
+          '@nestjs/core': '^10.0.0',
+          '@nestjs/common': '^10.0.0',
+          '@nestjs/platform-express': '^10.0.0'
+        },
+        devDependencies: { '@types/express': '^4.17.0', typescript: '^5.5.0' }
+      })
+    })
+    await expect(detectFramework(reader)).resolves.toBe('nest')
+  })
+
+  it('detects nest via @nestjs/core plus @nestjs/platform-fastify, ahead of fastify', async () => {
+    const reader = fakeReader({
+      readPackageJson: async () => ({
+        dependencies: {
+          '@nestjs/core': '^10.0.0',
+          '@nestjs/common': '^10.0.0',
+          '@nestjs/platform-fastify': '^10.0.0'
+        },
+        devDependencies: { typescript: '^5.5.0' }
+      })
+    })
+    await expect(detectFramework(reader)).resolves.toBe('nest')
+  })
+
+  it('detects nest when only @types/express is present as a devDependency', async () => {
+    const reader = fakeReader({
+      readPackageJson: async () => ({
+        dependencies: { '@nestjs/core': '^10.0.0', '@nestjs/common': '^10.0.0' },
+        devDependencies: { '@types/express': '^4.17.0', typescript: '^5.5.0' }
+      })
+    })
+    await expect(detectFramework(reader)).resolves.toBe('nest')
+  })
+
+  it('returns null when nest is present but no TS signal exists', async () => {
+    const reader = fakeReader({
+      readPackageJson: async () => ({
+        dependencies: { '@nestjs/core': '^10.0.0', '@nestjs/common': '^10.0.0' }
+      })
+    })
+    await expect(detectFramework(reader)).resolves.toBeNull()
+  })
 })

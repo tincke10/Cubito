@@ -1,7 +1,8 @@
 import type { WorktreeSourceReader } from './worktree-source-reader'
 
-export type EngineFramework = 'express' | 'fastify'
+export type EngineFramework = 'express' | 'fastify' | 'nest'
 
+const NEST_DEP_NAMES = ['@nestjs/core', '@nestjs/common']
 const EXPRESS_DEP_NAMES = ['express', '@types/express']
 const FASTIFY_DEP_NAMES = ['fastify']
 const FASTIFY_SCOPE_PREFIX = '@fastify/'
@@ -57,12 +58,19 @@ async function hasTsSignal(
   )
 }
 
-// Why: Express is checked first (D7-precedent) so existing Express repos keep resolving
-// through the same branch/laziness even now that Fastify is also recognized.
+// Why: Nest is checked before Express/Fastify — a Nest app commonly carries @types/express
+// (typed @Req()/@Res() with platform-express) or fastify/@fastify/* (platform-fastify), which
+// would otherwise misdetect as the underlying HTTP adapter instead of Nest itself.
+// Express is then checked before Fastify (D7-precedent) so existing Express repos keep
+// resolving through the same branch/laziness even now that Fastify is also recognized.
 export async function detectFramework(
   reader: WorktreeSourceReader
 ): Promise<EngineFramework | null> {
   const packageJson = asPackageJsonShape(await reader.readPackageJson())
+
+  if (hasDependencyEither(packageJson, NEST_DEP_NAMES)) {
+    return (await hasTsSignal(reader, packageJson)) ? 'nest' : null
+  }
 
   if (hasDependencyEither(packageJson, EXPRESS_DEP_NAMES)) {
     return (await hasTsSignal(reader, packageJson)) ? 'express' : null
