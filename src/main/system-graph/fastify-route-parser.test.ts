@@ -40,3 +40,92 @@ describe('parseFastifyRoutes: verb endpoints on a Fastify() instance', () => {
     expect(Array.isArray(result.imports)).toBe(true)
   })
 })
+
+describe('parseFastifyRoutes: .route({...}) calls', () => {
+  it('extracts a single endpoint for a string method', () => {
+    const source = `
+      const app = Fastify()
+      app.route({ method: 'GET', url: '/items' })
+    `
+    const result = parseFastifyRoutes(source, FILE)
+    expect(result.endpoints).toEqual([{ method: 'GET', path: '/items', routerLocalName: 'app' }])
+  })
+
+  it('extracts one endpoint per method for an array of methods', () => {
+    const source = `
+      const app = Fastify()
+      app.route({ method: ['POST', 'PUT'], url: '/items' })
+    `
+    const result = parseFastifyRoutes(source, FILE)
+    expect(result.endpoints).toEqual([
+      { method: 'POST', path: '/items', routerLocalName: 'app' },
+      { method: 'PUT', path: '/items', routerLocalName: 'app' }
+    ])
+  })
+})
+
+describe('parseFastifyRoutes: same-file plugin registration', () => {
+  it('captures endpoints declared inside a registered plugin function under the plugin name', () => {
+    const source = `
+      const app = Fastify()
+      async function usersPlugin(fastify, opts) {
+        fastify.get('/', h)
+        fastify.get('/:id', h)
+      }
+      app.register(usersPlugin, { prefix: '/users' })
+    `
+    const result = parseFastifyRoutes(source, FILE)
+    expect(result.endpoints).toEqual([
+      { method: 'GET', path: '/', routerLocalName: 'usersPlugin' },
+      { method: 'GET', path: '/:id', routerLocalName: 'usersPlugin' }
+    ])
+    expect(result.mounts).toEqual([
+      { prefix: '/users', routerLocalName: 'usersPlugin', parentLocalName: 'app' }
+    ])
+  })
+
+  it('unwraps a single fp(plugin)-style wrapper call around the plugin identifier', () => {
+    const source = `
+      const app = Fastify()
+      function authPlugin(fastify, opts) {
+        fastify.post('/login', h)
+      }
+      app.register(fp(authPlugin), { prefix: '/auth' })
+    `
+    const result = parseFastifyRoutes(source, FILE)
+    expect(result.mounts).toEqual([
+      { prefix: '/auth', routerLocalName: 'authPlugin', parentLocalName: 'app' }
+    ])
+    expect(result.endpoints).toEqual([
+      { method: 'POST', path: '/login', routerLocalName: 'authPlugin' }
+    ])
+  })
+
+  it('does not cross-contaminate endpoints between two plugins sharing the same parameter name', () => {
+    const source = `
+      const app = Fastify()
+      function usersPlugin(fastify, opts) { fastify.get('/users', h) }
+      function ordersPlugin(fastify, opts) { fastify.get('/orders', h) }
+      app.register(usersPlugin, { prefix: '/a' })
+      app.register(ordersPlugin, { prefix: '/b' })
+    `
+    const result = parseFastifyRoutes(source, FILE)
+    expect(result.endpoints).toEqual([
+      { method: 'GET', path: '/users', routerLocalName: 'usersPlugin' },
+      { method: 'GET', path: '/orders', routerLocalName: 'ordersPlugin' }
+    ])
+  })
+
+  it('registers without a mount when no literal prefix is given', () => {
+    const source = `
+      const app = Fastify()
+      function usersPlugin(fastify, opts) { fastify.get('/users', h) }
+      app.register(usersPlugin)
+    `
+    const result = parseFastifyRoutes(source, FILE)
+    expect(result.mounts).toEqual([])
+    expect(result.endpoints).toEqual([
+      { method: 'GET', path: '/users', routerLocalName: 'usersPlugin' }
+    ])
+  })
+})

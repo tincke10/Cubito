@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ParsedRouteFile } from './express-route-parser'
+import { parseFastifyRoutes } from './fastify-route-parser'
 import { assembleSystemGraph, deriveServiceAndDatabaseNodes } from './service-db-heuristic'
 
 function routeFile(overrides: Partial<ParsedRouteFile> & { filePath: string }): ParsedRouteFile {
@@ -361,5 +362,23 @@ describe('assembleSystemGraph: full 4-tier composition', () => {
     const graph = assembleSystemGraph({ routeFiles: files, packageDependencies: ['pg'] })
     const ids = [...graph.nodes.keys()]
     expect(new Set(ids).size).toBe(ids.length)
+  })
+})
+
+describe('assembleSystemGraph: golden through a real Fastify parse (same-file plugin mount)', () => {
+  it('composes the plugin prefix into each endpoint path with zero framework-specific logic here', () => {
+    const source = `
+      const app = Fastify()
+      async function usersPlugin(fastify, opts) {
+        fastify.get('/', h)
+        fastify.get('/:id', h)
+      }
+      app.register(usersPlugin, { prefix: '/users' })
+    `
+    const parsed = parseFastifyRoutes(source, 'src/app.ts')
+    const graph = assembleSystemGraph({ routeFiles: [parsed], packageDependencies: [] })
+
+    expect(graph.nodes.get('endpoint:src/app.ts#0')).toMatchObject({ path: '/users/' })
+    expect(graph.nodes.get('endpoint:src/app.ts#1')).toMatchObject({ path: '/users/:id' })
   })
 })

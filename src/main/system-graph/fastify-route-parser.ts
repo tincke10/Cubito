@@ -1,12 +1,8 @@
 import ts from 'typescript-compiler-api'
-import type { FrameworkRouteParser, ParsedEndpoint, ParsedRouteFile } from './framework-route-model'
-import {
-  HTTP_ROUTE_METHODS,
-  calleeParts,
-  collectImports,
-  isBareIdentifierCall,
-  resolvePathArg
-} from './route-call-ast'
+import { collectFastifyEndpoints } from './fastify-endpoint-collector'
+import { collectPluginRegistrations } from './fastify-plugin-registration'
+import type { FrameworkRouteParser, ParsedRouteFile } from './framework-route-model'
+import { collectImports, isBareIdentifierCall } from './route-call-ast'
 
 function emptyResult(filePath: string): ParsedRouteFile {
   return { filePath, endpoints: [], mounts: [], imports: [] }
@@ -31,34 +27,9 @@ function collectInstanceLocals(sourceFile: ts.SourceFile): Set<string> {
   return locals
 }
 
-function collectVerbEndpoints(
-  sourceFile: ts.SourceFile,
-  instanceLocals: ReadonlySet<string>
-): ParsedEndpoint[] {
-  const endpoints: ParsedEndpoint[] = []
-  const visit = (node: ts.Node): void => {
-    if (ts.isCallExpression(node)) {
-      const parts = calleeParts(node.expression)
-      if (
-        parts &&
-        instanceLocals.has(parts.objectName) &&
-        HTTP_ROUTE_METHODS.has(parts.methodName)
-      ) {
-        endpoints.push({
-          method: parts.methodName.toUpperCase(),
-          path: resolvePathArg(node.arguments[0]),
-          routerLocalName: parts.objectName
-        })
-      }
-    }
-    ts.forEachChild(node, visit)
-  }
-  visit(sourceFile)
-  return endpoints
-}
-
 /** Pure Fastify/TS route extraction over an AST; never throws — invalid input yields a partial result.
- * v1 (minimal): verb calls only — .route()/.register() land in later waves. */
+ * v1: verb calls, .route({method,url}), and same-file .register(plugin,{prefix}) composition —
+ * cross-file plugin registration lands in a later wave. */
 export function parseFastifyRoutes(source: string, filePath: string): ParsedRouteFile {
   try {
     const sourceFile = ts.createSourceFile(
@@ -69,9 +40,15 @@ export function parseFastifyRoutes(source: string, filePath: string): ParsedRout
       ts.ScriptKind.TS
     )
     const instanceLocals = collectInstanceLocals(sourceFile)
-    const endpoints = collectVerbEndpoints(sourceFile, instanceLocals)
+    const topLevelEndpoints = collectFastifyEndpoints(sourceFile, instanceLocals, (name) => name)
+    const { mounts, pluginEndpoints } = collectPluginRegistrations(sourceFile, instanceLocals)
     const imports = collectImports(sourceFile)
-    return { filePath, endpoints, mounts: [], imports }
+    return {
+      filePath,
+      endpoints: [...topLevelEndpoints, ...pluginEndpoints],
+      mounts,
+      imports
+    }
   } catch {
     return emptyResult(filePath)
   }
