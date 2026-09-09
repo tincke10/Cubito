@@ -65,6 +65,42 @@ describe('parseExpressRoutes: app.use mount capture', () => {
   })
 })
 
+describe('parseExpressRoutes: app.use mount via namespace-import property access', () => {
+  it('captures a mount whose target is ns.default from a namespace import', () => {
+    const source = `
+      import * as users from './routes/users'
+      const app = express()
+      app.use('/users', users.default)
+    `
+    const result = parseExpressRoutes(source, FILE)
+    expect(result.mounts).toEqual([
+      { prefix: '/users', routerLocalName: '__dynamicMountTarget0', parentLocalName: 'app' }
+    ])
+    expect(result.imports).toContainEqual({
+      moduleSpecifier: './routes/users',
+      isRelative: true,
+      bindings: [{ localName: '__dynamicMountTarget0', importedName: 'default' }]
+    })
+  })
+
+  it('captures a mount whose target is a named property on the namespace import', () => {
+    const source = `
+      import * as users from './routes/users'
+      const app = express()
+      app.use('/users', users.router)
+    `
+    const result = parseExpressRoutes(source, FILE)
+    expect(result.mounts).toEqual([
+      { prefix: '/users', routerLocalName: '__dynamicMountTarget0', parentLocalName: 'app' }
+    ])
+    expect(result.imports).toContainEqual({
+      moduleSpecifier: './routes/users',
+      isRelative: true,
+      bindings: [{ localName: '__dynamicMountTarget0', importedName: 'router' }]
+    })
+  })
+})
+
 describe('parseExpressRoutes: app.route() chains', () => {
   it('extracts each chained method as its own endpoint on the same path', () => {
     const source = `

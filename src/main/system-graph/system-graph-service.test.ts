@@ -591,6 +591,78 @@ describe('SystemGraphService: fastify dynamic import() plugin target golden', ()
   })
 })
 
+// Live-validation fixture shape: a namespace import mounted via its .default property, no prefix.
+const FASTIFY_NAMESPACE_IMPORT_WORKTREE: FakeWorktree = {
+  rootPath: '/repo/fastify-namespace-app',
+  connectionId: 'ssh-fastify-namespace',
+  files: {
+    'package.json': JSON.stringify({ dependencies: { fastify: '^4.19.0' } }),
+    'tsconfig.json': '{}',
+    'src/app.ts': [
+      "import Fastify from 'fastify'",
+      "import * as auth from './routes/auth'",
+      'const app = Fastify()',
+      'app.register(auth.default)'
+    ].join('\n'),
+    'src/routes/auth.ts': [
+      'async function authPlugin(fastify, opts) {',
+      "  fastify.post('/login', async () => 'ok')",
+      '}',
+      'export default authPlugin'
+    ].join('\n')
+  }
+}
+
+// Nested under src/ — crawlSourceFiles only walks a top-level "preferred" dir (routes/ included)
+// when one exists at the worktree root, which would otherwise skip a root-level entry file.
+const EXPRESS_NAMESPACE_IMPORT_WORKTREE: FakeWorktree = {
+  rootPath: '/repo/express-namespace-app',
+  connectionId: 'ssh-express-namespace',
+  files: {
+    'package.json': JSON.stringify({ dependencies: { express: '^4.19.0' } }),
+    'tsconfig.json': '{}',
+    'src/server.ts': [
+      "import express from 'express'",
+      "import * as users from './routes/users'",
+      'const app = express()',
+      "app.use('/users', users.default)"
+    ].join('\n'),
+    'src/routes/users.ts': [
+      "import express from 'express'",
+      'const router = express.Router()',
+      "router.get('/', (req, res) => res.send('ok'))",
+      'export default router'
+    ].join('\n')
+  }
+}
+
+describe('SystemGraphService: namespace-import property mount golden', () => {
+  it('composes a fastify plugin registered via auth.default with no service node', async () => {
+    const service = new SystemGraphService(fakeHost({ w1: FASTIFY_NAMESPACE_IMPORT_WORKTREE }))
+
+    await service.buildGraph('w1')
+    const graph = service.getGraph('w1')!
+    const nodes = [...graph.nodes.values()]
+
+    expect(graph.nodes.has('router:src/app.ts')).toBe(false)
+    expect(graph.nodes.has('router:src/routes/auth.ts')).toBe(true)
+    expect(nodes.filter((n) => n.kind === 'endpoint').map((n) => n.label)).toContain('POST /login')
+    expect(nodes.filter((n) => n.kind === 'service').map((n) => n.label)).toEqual([])
+  })
+
+  it('composes an express router mounted via users.default with no service node', async () => {
+    const service = new SystemGraphService(fakeHost({ w1: EXPRESS_NAMESPACE_IMPORT_WORKTREE }))
+
+    await service.buildGraph('w1')
+    const graph = service.getGraph('w1')!
+    const nodes = [...graph.nodes.values()]
+
+    expect(graph.nodes.has('router:src/routes/users.ts')).toBe(true)
+    expect(nodes.filter((n) => n.kind === 'endpoint').map((n) => n.label)).toContain('GET /users/')
+    expect(nodes.filter((n) => n.kind === 'service').map((n) => n.label)).toEqual([])
+  })
+})
+
 describe('SystemGraphService: fastify worktree golden (cross-file plugin registration)', () => {
   it('crawls, detects fastify, and composes endpoint paths across app.ts and its two plugin files', async () => {
     const service = new SystemGraphService(fakeHost({ w1: FASTIFY_WORKTREE }))

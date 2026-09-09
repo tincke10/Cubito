@@ -2,14 +2,17 @@ import ts from 'typescript-compiler-api'
 import type {
   FrameworkRouteParser,
   ParsedEndpoint,
+  ParsedImport,
   ParsedRouteFile,
   ParsedRouterMount
 } from './framework-route-model'
+import { resolveMountTargetArg } from './mount-target-resolution'
 import {
   HTTP_ROUTE_METHODS,
   calleeParts,
   collectExports,
   collectImports,
+  collectNamespaceImportLocalNames,
   collectRelativeImportLocalNames,
   isBareIdentifierCall,
   resolvePathArg
@@ -68,10 +71,14 @@ function collectRouterLocals(sourceFile: ts.SourceFile): Set<string> {
 function collectEndpointsAndMounts(
   sourceFile: ts.SourceFile,
   routerLocals: ReadonlySet<string>,
-  relativeImportLocalNames: ReadonlySet<string>
-): { endpoints: ParsedEndpoint[]; mounts: ParsedRouterMount[] } {
+  relativeImportLocalNames: ReadonlySet<string>,
+  namespaceImportLocalNames: ReadonlyMap<string, string>
+): { endpoints: ParsedEndpoint[]; mounts: ParsedRouterMount[]; syntheticImports: ParsedImport[] } {
   const endpoints: ParsedEndpoint[] = []
   const mounts: ParsedRouterMount[] = []
+  const syntheticImports: ParsedImport[] = []
+  let syntheticCounter = 0
+  const nextSyntheticLocalName = (): string => `__dynamicMountTarget${syntheticCounter++}`
 
   const visit = (node: ts.Node): void => {
     if (ts.isCallExpression(node)) {
@@ -116,13 +123,24 @@ function collectEndpointsAndMounts(
     if (!prefixArg || !ts.isStringLiteralLike(prefixArg)) {
       return
     }
-    if (!targetArg || !ts.isIdentifier(targetArg)) {
-      return
+    const target = resolveMountTargetArg(
+      targetArg,
+      namespaceImportLocalNames,
+      nextSyntheticLocalName
+    )
+    if (target?.kind === 'identifier') {
+      if (!routerLocals.has(target.name) && !relativeImportLocalNames.has(target.name)) {
+        return
+      }
+      mounts.push({ prefix: prefixArg.text, routerLocalName: target.name, parentLocalName })
+    } else if (target?.kind === 'moduleBinding') {
+      syntheticImports.push({
+        moduleSpecifier: target.moduleSpecifier,
+        isRelative: target.moduleSpecifier.startsWith('.'),
+        bindings: [{ localName: target.localName, importedName: target.importedName }]
+      })
+      mounts.push({ prefix: prefixArg.text, routerLocalName: target.localName, parentLocalName })
     }
-    if (!routerLocals.has(targetArg.text) && !relativeImportLocalNames.has(targetArg.text)) {
-      return
-    }
-    mounts.push({ prefix: prefixArg.text, routerLocalName: targetArg.text, parentLocalName })
   }
 
   // app.route('/x').get(h).post(h) — a chain of CallExpressions wrapping the base .route() call.
@@ -145,7 +163,7 @@ function collectEndpointsAndMounts(
   }
 
   visit(sourceFile)
-  return { endpoints, mounts }
+  return { endpoints, mounts, syntheticImports }
 }
 
 /** Pure Express/TS route extraction over an AST; never throws — invalid input yields a partial result. */
@@ -160,12 +178,14 @@ export function parseExpressRoutes(source: string, filePath: string): ParsedRout
     )
     const routerLocals = collectRouterLocals(sourceFile)
     const relativeImportLocalNames = collectRelativeImportLocalNames(sourceFile)
-    const { endpoints, mounts } = collectEndpointsAndMounts(
+    const namespaceImportLocalNames = collectNamespaceImportLocalNames(sourceFile)
+    const { endpoints, mounts, syntheticImports } = collectEndpointsAndMounts(
       sourceFile,
       routerLocals,
-      relativeImportLocalNames
+      relativeImportLocalNames,
+      namespaceImportLocalNames
     )
-    const imports = collectImports(sourceFile)
+    const imports = [...collectImports(sourceFile), ...syntheticImports]
     const exports = collectExports(sourceFile)
     return { filePath, endpoints, mounts, imports, exports }
   } catch {

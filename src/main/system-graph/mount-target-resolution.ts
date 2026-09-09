@@ -18,11 +18,9 @@ function dynamicModuleSpecifier(node: ts.Expression): string | null {
   return arg && ts.isStringLiteralLike(arg) ? arg.text : null
 }
 
-/** Namespace-import property access (`ns.prop`) is not handled here yet — returns null,
- * left as a hook for a later wave that wires in namespaceImportLocalNames. */
 function resolveDirectTarget(
   arg: ts.Expression,
-  _namespaceImportLocalNames: ReadonlyMap<string, string>,
+  namespaceImportLocalNames: ReadonlyMap<string, string>,
   syntheticLocalName: () => string
 ): MountTargetRef | null {
   const unwrapped = ts.isAwaitExpression(arg) ? arg.expression : arg
@@ -36,6 +34,17 @@ function resolveDirectTarget(
       localName: syntheticLocalName(),
       moduleSpecifier,
       importedName: 'default'
+    }
+  }
+  if (ts.isPropertyAccessExpression(unwrapped) && ts.isIdentifier(unwrapped.expression)) {
+    const nsModuleSpecifier = namespaceImportLocalNames.get(unwrapped.expression.text)
+    if (nsModuleSpecifier) {
+      return {
+        kind: 'moduleBinding',
+        localName: syntheticLocalName(),
+        moduleSpecifier: nsModuleSpecifier,
+        importedName: unwrapped.name.text
+      }
     }
   }
   return null

@@ -178,3 +178,39 @@ describe('parseFastifyRoutes: dynamic import()/require() plugin targets', () => 
     ])
   })
 })
+
+describe('parseFastifyRoutes: namespace-import property mount target', () => {
+  it('mounts a register(ns.default) target via a synthetic import binding', () => {
+    const source = `
+      import * as auth from './routes/auth'
+      const app = Fastify()
+      app.register(auth.default)
+    `
+    const result = parseFastifyRoutes(source, FILE)
+    expect(result.mounts).toEqual([])
+    expect(result.imports).toEqual([
+      {
+        moduleSpecifier: './routes/auth',
+        isRelative: true,
+        bindings: [{ localName: 'auth', importedName: '*' }]
+      },
+      {
+        moduleSpecifier: './routes/auth',
+        isRelative: true,
+        bindings: [{ localName: '__dynamicPluginTarget0', importedName: 'default' }]
+      }
+    ])
+  })
+
+  it('mounts a register(ns.default, {prefix}) target with a composed prefix mount', () => {
+    const source = `
+      import * as auth from './routes/auth'
+      const app = Fastify()
+      app.register(auth.default, { prefix: '/auth' })
+    `
+    const result = parseFastifyRoutes(source, FILE)
+    expect(result.mounts).toEqual([
+      { prefix: '/auth', routerLocalName: '__dynamicPluginTarget0', parentLocalName: 'app' }
+    ])
+  })
+})

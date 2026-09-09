@@ -108,3 +108,49 @@ describe('resolveMountTargetArg: one wrapper-call level', () => {
     expect(resolveMountTargetArg(arg, NO_NAMESPACES, syntheticLocalName())).toBeNull()
   })
 })
+
+describe('resolveMountTargetArg: namespace-import property access', () => {
+  it('resolves ns.default to a moduleBinding importedName default', () => {
+    const namespaces = new Map([['auth', './routes/auth']])
+    const arg = firstCallArg('register(auth.default)')!
+    expect(resolveMountTargetArg(arg, namespaces, syntheticLocalName())).toEqual({
+      kind: 'moduleBinding',
+      localName: '__mountTarget0',
+      moduleSpecifier: './routes/auth',
+      importedName: 'default'
+    })
+  })
+
+  it('resolves ns.prop to a moduleBinding importedName matching the property', () => {
+    const namespaces = new Map([['users', './routes/users']])
+    const arg = firstCallArg('register(users.router)')!
+    expect(resolveMountTargetArg(arg, namespaces, syntheticLocalName())).toEqual({
+      kind: 'moduleBinding',
+      localName: '__mountTarget0',
+      moduleSpecifier: './routes/users',
+      importedName: 'router'
+    })
+  })
+
+  it('unwraps fp(ns.default) to the same moduleBinding shape', () => {
+    const namespaces = new Map([['auth', './routes/auth']])
+    const arg = firstCallArg('register(fp(auth.default))')!
+    expect(resolveMountTargetArg(arg, namespaces, syntheticLocalName())).toEqual({
+      kind: 'moduleBinding',
+      localName: '__mountTarget0',
+      moduleSpecifier: './routes/auth',
+      importedName: 'default'
+    })
+  })
+
+  it('returns null for a property access on an unknown namespace', () => {
+    const arg = firstCallArg('register(unknownNs.default)')!
+    expect(resolveMountTargetArg(arg, NO_NAMESPACES, syntheticLocalName())).toBeNull()
+  })
+
+  it('returns null for a nested property access (ns.sub.prop)', () => {
+    const namespaces = new Map([['ns', './routes/ns']])
+    const arg = firstCallArg('register(ns.sub.prop)')!
+    expect(resolveMountTargetArg(arg, namespaces, syntheticLocalName())).toBeNull()
+  })
+})
