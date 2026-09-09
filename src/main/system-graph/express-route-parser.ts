@@ -1,34 +1,18 @@
 import ts from 'typescript-compiler-api'
+import type { ParsedEndpoint, ParsedRouteFile, ParsedRouterMount } from './framework-route-model'
+import { HTTP_ROUTE_METHODS, calleeParts, collectImports, resolvePathArg } from './route-call-ast'
 
-export type ParsedImport = { moduleSpecifier: string; isRelative: boolean }
-export type ParsedEndpoint = { method: string; path: string; routerLocalName: string | null }
-export type ParsedRouterMount = {
-  prefix: string
-  routerLocalName: string
-  parentLocalName: string | null
-}
-export type ParsedRouteFile = {
-  filePath: string
-  endpoints: ParsedEndpoint[]
-  mounts: ParsedRouterMount[]
-  imports: ParsedImport[]
-}
-
-const DYNAMIC_PATH = '<dynamic>'
-const ROUTE_METHODS = new Set(['get', 'post', 'put', 'delete', 'patch', 'options', 'head', 'all'])
+// Backwards-compat re-exports: other files still import the route model from here.
+export type {
+  ParsedImport,
+  ParsedEndpoint,
+  ParsedRouterMount,
+  ParsedRouteFile,
+  FrameworkRouteParser
+} from './framework-route-model'
 
 function emptyResult(filePath: string): ParsedRouteFile {
   return { filePath, endpoints: [], mounts: [], imports: [] }
-}
-
-/** Resolves a call argument to a URL-space path string, degrading anything non-literal.
- * isStringLiteralLike covers string literals and no-substitution templates; a template
- * WITH substitutions is a TemplateExpression, which correctly falls through to dynamic. */
-function resolvePathArg(arg: ts.Expression | undefined): string {
-  if (arg && ts.isStringLiteralLike(arg)) {
-    return arg.text
-  }
-  return DYNAMIC_PATH
 }
 
 function isRouterCreationCall(node: ts.Expression): boolean {
@@ -68,18 +52,6 @@ function collectRouterLocals(sourceFile: ts.SourceFile): Set<string> {
   return locals
 }
 
-function calleeParts(
-  expr: ts.LeftHandSideExpression
-): { objectName: string; methodName: string } | null {
-  if (!ts.isPropertyAccessExpression(expr) || !ts.isIdentifier(expr.name)) {
-    return null
-  }
-  if (!ts.isIdentifier(expr.expression)) {
-    return null
-  }
-  return { objectName: expr.expression.text, methodName: expr.name.text }
-}
-
 function collectEndpointsAndMounts(
   sourceFile: ts.SourceFile,
   routerLocals: ReadonlySet<string>
@@ -104,7 +76,7 @@ function collectEndpointsAndMounts(
       return
     }
 
-    if (ROUTE_METHODS.has(methodName)) {
+    if (HTTP_ROUTE_METHODS.has(methodName)) {
       endpoints.push({
         method: methodName.toUpperCase(),
         path: resolvePathArg(node.arguments[0]),
@@ -146,7 +118,7 @@ function collectEndpointsAndMounts(
     ) {
       const methodName = current.name.text
       const callExpr = current.parent
-      if (ROUTE_METHODS.has(methodName)) {
+      if (HTTP_ROUTE_METHODS.has(methodName)) {
         endpoints.push({ method: methodName.toUpperCase(), path, routerLocalName })
       }
       current = callExpr.parent
@@ -155,21 +127,6 @@ function collectEndpointsAndMounts(
 
   visit(sourceFile)
   return { endpoints, mounts }
-}
-
-function collectImports(sourceFile: ts.SourceFile): ParsedImport[] {
-  const imports: ParsedImport[] = []
-  for (const statement of sourceFile.statements) {
-    if (!ts.isImportDeclaration(statement)) {
-      continue
-    }
-    if (!ts.isStringLiteralLike(statement.moduleSpecifier)) {
-      continue
-    }
-    const moduleSpecifier = statement.moduleSpecifier.text
-    imports.push({ moduleSpecifier, isRelative: moduleSpecifier.startsWith('.') })
-  }
-  return imports
 }
 
 /** Pure Express/TS route extraction over an AST; never throws — invalid input yields a partial result. */

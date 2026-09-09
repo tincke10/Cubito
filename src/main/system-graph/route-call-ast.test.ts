@@ -1,0 +1,108 @@
+import ts from 'typescript-compiler-api'
+import { describe, expect, it } from 'vitest'
+import {
+  DYNAMIC_PATH,
+  HTTP_ROUTE_METHODS,
+  calleeParts,
+  collectImports,
+  resolvePathArg
+} from './route-call-ast'
+
+const FILE = 'src/routes.ts'
+
+function firstCallArg(source: string): ts.Expression | undefined {
+  const sourceFile = ts.createSourceFile(
+    FILE,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS
+  )
+  let found: ts.Expression | undefined
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node) && !found) {
+      found = node.arguments[0]
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(sourceFile)
+  return found
+}
+
+function firstCallExpression(source: string): ts.CallExpression | undefined {
+  const sourceFile = ts.createSourceFile(
+    FILE,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS
+  )
+  let found: ts.CallExpression | undefined
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node) && !found) {
+      found = node
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(sourceFile)
+  return found
+}
+
+describe('resolvePathArg', () => {
+  it('returns the literal text for a string literal argument', () => {
+    expect(resolvePathArg(firstCallArg("f('/users')"))).toBe('/users')
+  })
+
+  it('returns DYNAMIC_PATH for a missing argument', () => {
+    expect(resolvePathArg(undefined)).toBe(DYNAMIC_PATH)
+  })
+
+  it('returns DYNAMIC_PATH for a non-literal argument', () => {
+    expect(resolvePathArg(firstCallArg('f(computePath())'))).toBe(DYNAMIC_PATH)
+  })
+})
+
+describe('calleeParts', () => {
+  it('extracts objectName/methodName from a property access callee', () => {
+    const call = firstCallExpression("app.get('/x', h)")!
+    expect(calleeParts(call.expression)).toEqual({ objectName: 'app', methodName: 'get' })
+  })
+
+  it('returns null when the callee object is not a plain identifier', () => {
+    const call = firstCallExpression("app.sub.get('/x', h)")!
+    expect(calleeParts(call.expression)).toBeNull()
+  })
+
+  it('returns null for a bare identifier callee (no property access)', () => {
+    const call = firstCallExpression('standalone()')!
+    expect(calleeParts(call.expression)).toBeNull()
+  })
+})
+
+describe('collectImports', () => {
+  it('flags relative and package imports', () => {
+    const source = `
+      import { router } from './routes/users'
+      import express from 'express'
+    `
+    const sourceFile = ts.createSourceFile(
+      FILE,
+      source,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TS
+    )
+    expect(collectImports(sourceFile)).toEqual([
+      { moduleSpecifier: './routes/users', isRelative: true },
+      { moduleSpecifier: 'express', isRelative: false }
+    ])
+  })
+})
+
+describe('HTTP_ROUTE_METHODS', () => {
+  it('contains every recognized HTTP verb', () => {
+    expect([...HTTP_ROUTE_METHODS].sort()).toEqual(
+      ['all', 'delete', 'get', 'head', 'options', 'patch', 'post', 'put'].sort()
+    )
+  })
+})
