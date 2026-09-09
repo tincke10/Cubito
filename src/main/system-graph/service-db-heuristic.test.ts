@@ -65,6 +65,47 @@ describe('deriveServiceAndDatabaseNodes: database client detection', () => {
       'Redis'
     ])
   })
+
+  // A generic ORM label is noise once the concrete engine it's talking to is also detected.
+  it('collapses to the concrete engine when a generic ORM and its concrete driver are both present (typeorm+pg)', () => {
+    const result = deriveServiceAndDatabaseNodes({
+      routeFiles: [],
+      packageDependencies: ['typeorm', 'pg']
+    })
+    expect(result.databaseNodes).toEqual([
+      { id: 'database:PostgreSQL', kind: 'database', label: 'PostgreSQL', diff: null }
+    ])
+  })
+
+  it('collapses to the concrete engine for sequelize+mysql2', () => {
+    const result = deriveServiceAndDatabaseNodes({
+      routeFiles: [],
+      packageDependencies: ['sequelize', 'mysql2']
+    })
+    expect(result.databaseNodes).toEqual([
+      { id: 'database:MySQL', kind: 'database', label: 'MySQL', diff: null }
+    ])
+  })
+
+  it('collapses to the concrete engine for drizzle-orm+mongoose', () => {
+    const result = deriveServiceAndDatabaseNodes({
+      routeFiles: [],
+      packageDependencies: ['drizzle-orm', 'mongoose']
+    })
+    expect(result.databaseNodes).toEqual([
+      { id: 'database:MongoDB', kind: 'database', label: 'MongoDB', diff: null }
+    ])
+  })
+
+  it('falls back to the generic label when no concrete engine is present (typeorm alone)', () => {
+    const result = deriveServiceAndDatabaseNodes({
+      routeFiles: [],
+      packageDependencies: ['typeorm']
+    })
+    expect(result.databaseNodes).toEqual([
+      { id: 'database:SQL Database', kind: 'database', label: 'SQL Database', diff: null }
+    ])
+  })
 })
 
 describe('deriveServiceAndDatabaseNodes: service grouping from relative imports', () => {
@@ -239,6 +280,24 @@ describe('deriveServiceAndDatabaseNodes: edges', () => {
       to: 'database:Redis',
       kind: 'faint'
     })
+  })
+
+  it('targets only the concrete engine node for a faint edge when a generic ORM is also present', () => {
+    const files = [
+      routeFile({
+        filePath: 'src/routes/users.ts',
+        endpoints: [{ method: 'GET', path: '/users', routerLocalName: 'router' }],
+        imports: [{ moduleSpecifier: './services/user-service', isRelative: true }]
+      })
+    ]
+    const result = deriveServiceAndDatabaseNodes({
+      routeFiles: files,
+      packageDependencies: ['typeorm', 'pg']
+    })
+    const faintEdges = result.edges.filter((e) => e.kind === 'faint')
+    expect(faintEdges).toEqual([
+      { from: 'service:user-service', to: 'database:PostgreSQL', kind: 'faint' }
+    ])
   })
 })
 

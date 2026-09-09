@@ -185,11 +185,12 @@ describe('SystemGraphService: nest worktree golden', () => {
     const serviceLabels = nodes.filter((n) => n.kind === 'service').map((n) => n.label)
     expect(serviceLabels).toEqual(['users.service'])
 
+    // typeorm+pg: the concrete engine (pg) collapses the generic ORM label (typeorm) away.
     const databaseLabels = nodes
       .filter((n) => n.kind === 'database')
       .map((n) => n.label)
       .sort()
-    expect(databaseLabels).toEqual(['PostgreSQL', 'SQL Database'])
+    expect(databaseLabels).toEqual(['PostgreSQL'])
 
     expect(graph.edges).toContainEqual({
       from: 'router:src/users/users.controller.ts',
@@ -201,10 +202,6 @@ describe('SystemGraphService: nest worktree golden', () => {
       to: 'database:PostgreSQL',
       kind: 'faint'
     })
-    expect(graph.edges).toContainEqual({
-      from: 'service:users.service',
-      to: 'database:SQL Database',
-      kind: 'faint'
-    })
+    expect(graph.edges).not.toContainEqual(expect.objectContaining({ to: 'database:SQL Database' }))
   })
 })

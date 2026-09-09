@@ -7,9 +7,9 @@ import type {
 import { composeMountPrefixes, resolveRelativeModule } from './route-mount-composition'
 import type { EngineSystemEdge, EngineSystemGraph, EngineSystemNode } from './system-graph-model'
 
-// Why (D6, light heuristic): dep name -> database family label, deduped by label so
-// e.g. pg+postgres or typeorm+knex collapse to one node instead of one per package.
-const DB_CLIENT_LABELS: ReadonlyMap<string, string> = new Map([
+// Why (D6, light heuristic): dep name -> concrete database engine label, deduped by label so
+// e.g. pg+postgres collapse to one node instead of one per package.
+const CONCRETE_DB_LABELS: ReadonlyMap<string, string> = new Map([
   ['pg', 'PostgreSQL'],
   ['postgres', 'PostgreSQL'],
   ['mysql', 'MySQL'],
@@ -20,27 +20,38 @@ const DB_CLIENT_LABELS: ReadonlyMap<string, string> = new Map([
   ['better-sqlite3', 'SQLite'],
   ['redis', 'Redis'],
   ['ioredis', 'Redis'],
+  ['mssql', 'SQL Server'],
+  ['cassandra-driver', 'Cassandra']
+])
+
+// Why: an ORM/query-builder doesn't name a concrete engine on its own — only surfaced when
+// no concrete driver is also present, so e.g. typeorm+pg collapses to PostgreSQL, not both.
+const GENERIC_DB_LABELS: ReadonlyMap<string, string> = new Map([
   ['@prisma/client', 'Prisma'],
   ['prisma', 'Prisma'],
   ['typeorm', 'SQL Database'],
   ['sequelize', 'SQL Database'],
   ['knex', 'SQL Database'],
-  ['drizzle-orm', 'SQL Database'],
-  ['mssql', 'SQL Server'],
-  ['cassandra-driver', 'Cassandra']
+  ['drizzle-orm', 'SQL Database']
 ])
 
 const SERVICE_NODE_CAP = 24
 
 function detectDatabaseLabels(packageDependencies: readonly string[]): string[] {
-  const labels = new Set<string>()
+  const concreteLabels = new Set<string>()
+  const genericLabels = new Set<string>()
   for (const dep of packageDependencies) {
-    const label = DB_CLIENT_LABELS.get(dep)
-    if (label) {
-      labels.add(label)
+    const concrete = CONCRETE_DB_LABELS.get(dep)
+    if (concrete) {
+      concreteLabels.add(concrete)
+      continue
+    }
+    const generic = GENERIC_DB_LABELS.get(dep)
+    if (generic) {
+      genericLabels.add(generic)
     }
   }
-  return [...labels]
+  return [...(concreteLabels.size > 0 ? concreteLabels : genericLabels)]
 }
 
 /** Immediate module name for grouping: last path segment, collapsing a bare 'index' to its dir. */
