@@ -663,13 +663,7 @@ import {
   detectInstalledAgentsWithShellPathHydration,
   detectRemoteAgents
 } from '../preflight/agent-detection'
-import {
-  markClaudeWorkspaceTrusted,
-  markCodexProjectTrusted,
-  markCopilotFolderTrusted,
-  markCursorWorkspaceTrusted
-} from '../agent-trust-presets'
-import { markRemoteAgentWorkspaceTrusted } from '../remote-agent-trust-presets'
+import { markAgentWorkspaceTrusted } from '../agent-workspace-trust'
 import { applyAgentStatusHooksEnabled } from '../agent-hooks/managed-agent-hook-controls'
 import { recordManagedHookInstallFailure } from '../agent-hooks/install-telemetry'
 import {
@@ -26133,25 +26127,13 @@ export class OrcaRuntimeService {
     agent: TuiAgent,
     workspacePath: string
   ): Promise<void> {
-    const preset = TUI_AGENT_CONFIG[agent].preflightTrust
-    if (!preset) {
-      return
-    }
-    try {
-      if (preset === 'cursor') {
-        markCursorWorkspaceTrusted(workspacePath)
-      } else if (preset === 'copilot') {
-        markCopilotFolderTrusted(workspacePath)
-      } else if (preset === 'codex') {
-        // Why: the Codex write queues behind any in-flight hook grant, so the
-        // agent must not launch until it has actually landed.
-        await markCodexProjectTrusted(workspacePath)
-      } else if (preset === 'claude') {
-        markClaudeWorkspaceTrusted(workspacePath)
-      }
-    } catch {
-      // Best-effort: the user can still accept the agent trust prompt manually.
-    }
+    const claudeConfigDir = this.resolveClaudeConfigDirOverride(agent)
+    await markAgentWorkspaceTrusted({
+      preset: TUI_AGENT_CONFIG[agent].preflightTrust,
+      workspacePath,
+      host: { kind: 'local' },
+      ...(claudeConfigDir ? { claudeConfigDir } : {})
+    })
   }
 
   private async markRemoteWorkspaceTrustedForAgent(
@@ -26159,15 +26141,20 @@ export class OrcaRuntimeService {
     connectionId: string,
     workspacePath: string
   ): Promise<void> {
-    const preset = TUI_AGENT_CONFIG[agent].preflightTrust
-    if (!preset) {
-      return
-    }
-    try {
-      await markRemoteAgentWorkspaceTrusted({ preset, connectionId, workspacePath })
-    } catch {
-      // Best-effort: the user can still accept the remote agent trust prompt manually.
-    }
+    const claudeConfigDir = this.resolveClaudeConfigDirOverride(agent)
+    await markAgentWorkspaceTrusted({
+      preset: TUI_AGENT_CONFIG[agent].preflightTrust,
+      workspacePath,
+      host: { kind: 'remote', connectionId },
+      ...(claudeConfigDir ? { claudeConfigDir } : {})
+    })
+  }
+
+  // Why: a per-agent CLAUDE_CONFIG_DIR override changes which .claude.json the
+  // launched CLI reads, so trust must be written to the same file.
+  private resolveClaudeConfigDirOverride(agent: TuiAgent): string | undefined {
+    return resolveTuiAgentLaunchEnv(agent, this.requireStore().getSettings().agentDefaultEnv)
+      .CLAUDE_CONFIG_DIR
   }
 
   private recordCreatedWorktreeLineage(
