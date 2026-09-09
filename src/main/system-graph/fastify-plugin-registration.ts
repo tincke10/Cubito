@@ -3,6 +3,7 @@ import { collectFastifyEndpoints } from './fastify-endpoint-collector'
 import type { ParsedEndpoint, ParsedImport, ParsedRouterMount } from './framework-route-model'
 import { resolveMountTargetArg } from './mount-target-resolution'
 import {
+  DYNAMIC_PATH,
   calleeParts,
   collectExports,
   collectNamespaceImportLocalNames,
@@ -52,6 +53,8 @@ function collectPluginDefinitions(sourceFile: ts.SourceFile): Map<string, Plugin
   return plugins
 }
 
+/** Null means "no prefix key at all" (no mount, unchanged from before); a present-but-non-literal
+ * prefix value now renders as DYNAMIC_PATH instead of collapsing to the same "no mount" case. */
 function extractPrefix(optionsArg: ts.Expression | undefined): string | null {
   if (!optionsArg || !ts.isObjectLiteralExpression(optionsArg)) {
     return null
@@ -60,10 +63,9 @@ function extractPrefix(optionsArg: ts.Expression | undefined): string | null {
     if (
       ts.isPropertyAssignment(prop) &&
       ts.isIdentifier(prop.name) &&
-      prop.name.text === 'prefix' &&
-      ts.isStringLiteralLike(prop.initializer)
+      prop.name.text === 'prefix'
     ) {
-      return prop.initializer.text
+      return ts.isStringLiteralLike(prop.initializer) ? prop.initializer.text : DYNAMIC_PATH
     }
   }
   return null

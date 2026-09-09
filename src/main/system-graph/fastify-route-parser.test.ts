@@ -41,6 +41,29 @@ describe('parseFastifyRoutes: verb endpoints on a Fastify() instance', () => {
   })
 })
 
+describe('parseFastifyRoutes: no-substitution template literal (characterization)', () => {
+  it('treats a template-literal path with no substitutions as a literal, not dynamic', () => {
+    const source = `
+      const app = Fastify()
+      app.get(\`/health\`, h)
+    `
+    const result = parseFastifyRoutes(source, FILE)
+    expect(result.endpoints).toEqual([{ method: 'GET', path: '/health', routerLocalName: 'app' }])
+  })
+
+  it('treats a template-literal prefix with no substitutions as a literal, not dynamic', () => {
+    const source = `
+      const app = Fastify()
+      function usersPlugin(fastify, opts) { fastify.get('/users', h) }
+      app.register(usersPlugin, { prefix: \`/users\` })
+    `
+    const result = parseFastifyRoutes(source, FILE)
+    expect(result.mounts).toEqual([
+      { prefix: '/users', routerLocalName: 'usersPlugin', parentLocalName: 'app' }
+    ])
+  })
+})
+
 describe('parseFastifyRoutes: .route({...}) calls', () => {
   it('extracts a single endpoint for a string method', () => {
     const source = `
@@ -212,5 +235,29 @@ describe('parseFastifyRoutes: namespace-import property mount target', () => {
     expect(result.mounts).toEqual([
       { prefix: '/auth', routerLocalName: '__dynamicPluginTarget0', parentLocalName: 'app' }
     ])
+  })
+})
+
+describe('parseFastifyRoutes: dynamic/computed prefix', () => {
+  it('renders a present-but-non-literal prefix as <dynamic> instead of dropping the mount', () => {
+    const source = `
+      const app = Fastify()
+      function usersPlugin(fastify, opts) { fastify.get('/users', h) }
+      app.register(usersPlugin, { prefix: computePrefix() })
+    `
+    const result = parseFastifyRoutes(source, FILE)
+    expect(result.mounts).toEqual([
+      { prefix: '<dynamic>', routerLocalName: 'usersPlugin', parentLocalName: 'app' }
+    ])
+  })
+
+  it('still registers without a mount when the options object has no prefix key at all', () => {
+    const source = `
+      const app = Fastify()
+      function usersPlugin(fastify, opts) { fastify.get('/users', h) }
+      app.register(usersPlugin, { logLevel: 'info' })
+    `
+    const result = parseFastifyRoutes(source, FILE)
+    expect(result.mounts).toEqual([])
   })
 })

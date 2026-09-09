@@ -67,6 +67,14 @@ describe('resolvePathArg', () => {
   it('returns DYNAMIC_PATH for a non-literal argument', () => {
     expect(resolvePathArg(firstCallArg('f(computePath())'))).toBe(DYNAMIC_PATH)
   })
+
+  it('returns the literal text for a no-substitution template literal (characterization)', () => {
+    expect(resolvePathArg(firstCallArg('f(`/users`)'))).toBe('/users')
+  })
+
+  it('returns DYNAMIC_PATH for a template literal with a substitution', () => {
+    expect(resolvePathArg(firstCallArg('f(`/users/${id}`)'))).toBe(DYNAMIC_PATH)
+  })
 })
 
 describe('calleeParts', () => {

@@ -101,6 +101,30 @@ describe('parseExpressRoutes: app.use mount via namespace-import property access
   })
 })
 
+describe('parseExpressRoutes: dynamic/computed mount prefix', () => {
+  it('renders a present-but-non-literal prefix as <dynamic> instead of dropping the mount', () => {
+    const source = `
+      const app = express()
+      const router = express.Router()
+      app.use(computePrefix(), router)
+    `
+    const result = parseExpressRoutes(source, FILE)
+    expect(result.mounts).toEqual([
+      { prefix: '<dynamic>', routerLocalName: 'router', parentLocalName: 'app' }
+    ])
+  })
+
+  it('regression: a 1-arg app.use(router) still yields no mount at all', () => {
+    const source = `
+      const app = express()
+      const router = express.Router()
+      app.use(router)
+    `
+    const result = parseExpressRoutes(source, FILE)
+    expect(result.mounts).toEqual([])
+  })
+})
+
 describe('parseExpressRoutes: app.route() chains', () => {
   it('extracts each chained method as its own endpoint on the same path', () => {
     const source = `
@@ -133,6 +157,27 @@ describe('parseExpressRoutes: dynamic paths', () => {
     `
     const result = parseExpressRoutes(source, FILE)
     expect(result.endpoints).toEqual([{ method: 'GET', path: '<dynamic>', routerLocalName: 'app' }])
+  })
+
+  it('treats a template-literal path with no substitutions as a literal (characterization)', () => {
+    const source = `
+      const app = express()
+      app.get(\`/health\`, h)
+    `
+    const result = parseExpressRoutes(source, FILE)
+    expect(result.endpoints).toEqual([{ method: 'GET', path: '/health', routerLocalName: 'app' }])
+  })
+
+  it('treats a template-literal mount prefix with no substitutions as a literal (characterization)', () => {
+    const source = `
+      const app = express()
+      const router = express.Router()
+      app.use(\`/api\`, router)
+    `
+    const result = parseExpressRoutes(source, FILE)
+    expect(result.mounts).toEqual([
+      { prefix: '/api', routerLocalName: 'router', parentLocalName: 'app' }
+    ])
   })
 })
 

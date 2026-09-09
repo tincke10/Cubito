@@ -8,6 +8,7 @@ import type {
 } from './framework-route-model'
 import { resolveMountTargetArg } from './mount-target-resolution'
 import {
+  DYNAMIC_PATH,
   HTTP_ROUTE_METHODS,
   calleeParts,
   collectExports,
@@ -118,11 +119,14 @@ function collectEndpointsAndMounts(
 
   // Accepts a locally-created router OR one bound by a relative import — the latter is what
   // makes a cross-file mount (`app.use('/x', importedRouter)`) visible to route-mount-composition.ts.
+  // A 1-arg call (`app.use(router)`) has no prefix argument at all — no mount, unchanged from
+  // before; a 2-arg call with a non-literal prefix now renders DYNAMIC_PATH instead of dropping it.
   const handleMount = (parentLocalName: string, node: ts.CallExpression): void => {
-    const [prefixArg, targetArg] = node.arguments
-    if (!prefixArg || !ts.isStringLiteralLike(prefixArg)) {
+    if (node.arguments.length < 2) {
       return
     }
+    const [prefixArg, targetArg] = node.arguments
+    const prefix = ts.isStringLiteralLike(prefixArg) ? prefixArg.text : DYNAMIC_PATH
     const target = resolveMountTargetArg(
       targetArg,
       namespaceImportLocalNames,
@@ -132,14 +136,14 @@ function collectEndpointsAndMounts(
       if (!routerLocals.has(target.name) && !relativeImportLocalNames.has(target.name)) {
         return
       }
-      mounts.push({ prefix: prefixArg.text, routerLocalName: target.name, parentLocalName })
+      mounts.push({ prefix, routerLocalName: target.name, parentLocalName })
     } else if (target?.kind === 'moduleBinding') {
       syntheticImports.push({
         moduleSpecifier: target.moduleSpecifier,
         isRelative: target.moduleSpecifier.startsWith('.'),
         bindings: [{ localName: target.localName, importedName: target.importedName }]
       })
-      mounts.push({ prefix: prefixArg.text, routerLocalName: target.localName, parentLocalName })
+      mounts.push({ prefix, routerLocalName: target.localName, parentLocalName })
     }
   }
 

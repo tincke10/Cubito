@@ -285,6 +285,37 @@ describe('assembleSystemGraph: routers and endpoints', () => {
     })
   })
 
+  it('composes a standalone <dynamic> mount prefix into the endpoint path', () => {
+    const files = [
+      routeFile({
+        filePath: 'src/routes/users.ts',
+        endpoints: [{ method: 'GET', path: '/ping', routerLocalName: 'router' }],
+        mounts: [{ prefix: '<dynamic>', routerLocalName: 'router', parentLocalName: 'app' }]
+      })
+    ]
+    const graph = assembleSystemGraph({ routeFiles: files, packageDependencies: [] })
+    expect(graph.nodes.get('endpoint:src/routes/users.ts#0')).toMatchObject({
+      path: '<dynamic>/ping'
+    })
+  })
+
+  it('chains a <dynamic> prefix with a static outer prefix', () => {
+    const files = [
+      routeFile({
+        filePath: 'src/routes/users.ts',
+        endpoints: [{ method: 'GET', path: '/users', routerLocalName: 'v1' }],
+        mounts: [
+          { prefix: '<dynamic>', routerLocalName: 'v1', parentLocalName: 'api' },
+          { prefix: '/api', routerLocalName: 'api', parentLocalName: 'app' }
+        ]
+      })
+    ]
+    const graph = assembleSystemGraph({ routeFiles: files, packageDependencies: [] })
+    expect(graph.nodes.get('endpoint:src/routes/users.ts#0')).toMatchObject({
+      path: '/api<dynamic>/users'
+    })
+  })
+
   it('keeps router ids unique across files that reuse the same local router name', () => {
     const files = [
       routeFile({
