@@ -453,3 +453,81 @@ describe('assembleSystemGraph: golden through real parses of two Fastify files (
     expect(graph.nodes.get('endpoint:src/routes/auth.ts#0')).toMatchObject({ path: '/auth/login' })
   })
 })
+
+describe('assembleSystemGraph: excludes mounted route modules from the service heuristic', () => {
+  function serviceLabels(graph: ReturnType<typeof assembleSystemGraph>): string[] {
+    return [...graph.nodes.values()].filter((n) => n.kind === 'service').map((n) => n.label)
+  }
+
+  it('Express: a cross-file-mounted router import never becomes a service node', () => {
+    const index = parseExpressRoutes(
+      [
+        "import usersRouter from './routes/users'",
+        'const app = express()',
+        "app.use('/users', usersRouter)"
+      ].join('\n'),
+      'src/index.ts'
+    )
+    const users = parseExpressRoutes(
+      [
+        "import userService from '../services/user-service'",
+        'const router = express.Router()',
+        "router.get('/', (req, res) => userService.list())",
+        'export default router'
+      ].join('\n'),
+      'src/routes/users.ts'
+    )
+    const userService = parseExpressRoutes('export default {}', 'src/services/user-service.ts')
+
+    const graph = assembleSystemGraph({
+      routeFiles: [index, users, userService],
+      packageDependencies: []
+    })
+
+    expect(serviceLabels(graph)).not.toContain('users')
+    expect(serviceLabels(graph)).toContain('user-service')
+  })
+
+  it('Fastify: cross-file-registered plugin imports never become service nodes', () => {
+    const app = parseFastifyRoutes(
+      [
+        "import usersPlugin from './routes/users'",
+        "import authPlugin from './routes/auth'",
+        'const server = Fastify()',
+        "server.register(usersPlugin, { prefix: '/api' })",
+        'server.register(authPlugin)'
+      ].join('\n'),
+      'src/app.ts'
+    )
+    const users = parseFastifyRoutes(
+      [
+        "import userService from '../services/user.service'",
+        'async function usersPlugin(fastify, opts) {',
+        "  fastify.get('/', async () => userService.list())",
+        '}',
+        'export default usersPlugin'
+      ].join('\n'),
+      'src/routes/users.ts'
+    )
+    const auth = parseFastifyRoutes(
+      [
+        'async function authPlugin(fastify, opts) {',
+        "  fastify.post('/login', async () => 'ok')",
+        '}',
+        'export default authPlugin'
+      ].join('\n'),
+      'src/routes/auth.ts'
+    )
+    const userService = parseFastifyRoutes('export default {}', 'src/services/user.service.ts')
+
+    const graph = assembleSystemGraph({
+      routeFiles: [app, users, auth, userService],
+      packageDependencies: ['pg']
+    })
+
+    expect(serviceLabels(graph)).toEqual(['user.service'])
+    expect(
+      [...graph.nodes.values()].filter((n) => n.kind === 'database').map((n) => n.label)
+    ).toEqual(['PostgreSQL'])
+  })
+})

@@ -570,6 +570,9 @@ describe('SystemGraphService: fastify worktree golden (cross-file plugin registr
     expect(endpointLabels).toContain('POST /login')
 
     expect(nodes.some((n) => n.kind === 'database' && n.label === 'PostgreSQL')).toBe(true)
-    expect(nodes.some((n) => n.kind === 'service' && n.label === 'user.service')).toBe(true)
+    // The registered plugin imports ('./routes/users', './routes/auth') must NOT also turn
+    // into spurious service nodes — only the real service import should produce one.
+    const serviceLabels = nodes.filter((n) => n.kind === 'service').map((n) => n.label)
+    expect(serviceLabels).toEqual(['user.service'])
   })
 })

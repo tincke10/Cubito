@@ -16,8 +16,10 @@ function splitFileKey(key: FileKey): [filePath: string, localName: string] {
 }
 
 /** Resolves a relative import specifier against the known worktree file set — no fs access,
- * just candidate suffixes tried against the files this graph already has. */
-function resolveRelativeModule(
+ * just candidate suffixes tried against the files this graph already has. Exported for
+ * service-db-heuristic.ts, which reuses this same resolution to keep a mounted route module
+ * out of the service heuristic instead of duplicating the lookup. */
+export function resolveRelativeModule(
   fromFilePath: string,
   spec: string,
   knownFilePaths: ReadonlySet<string>

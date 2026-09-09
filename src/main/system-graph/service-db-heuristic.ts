@@ -1,5 +1,10 @@
-import type { ParsedEndpoint, ParsedRouteFile, ParsedRouterMount } from './framework-route-model'
-import { composeMountPrefixes } from './route-mount-composition'
+import type {
+  ParsedEndpoint,
+  ParsedImport,
+  ParsedRouteFile,
+  ParsedRouterMount
+} from './framework-route-model'
+import { composeMountPrefixes, resolveRelativeModule } from './route-mount-composition'
 import type { EngineSystemEdge, EngineSystemGraph, EngineSystemNode } from './system-graph-model'
 
 // Why (D6, light heuristic): dep name -> database family label, deduped by label so
@@ -48,12 +53,35 @@ function moduleNameFromSpecifier(spec: string): string {
   return last === 'index' && segments.length > 1 ? (segments.at(-2) as string) : last
 }
 
+/** A relative import is excluded from service-node consideration when it's clearly a route
+ * module, not a data/service dependency: its local binding is used as a same-file mount
+ * target (covers a mount recorded with no literal prefix — never in `file.mounts` at all —
+ * as well as one that is), or it resolves (route-mount-composition.ts's own resolver, so this
+ * never drifts from what a cross-file mount can actually reach) to a parsed file that itself
+ * declares endpoints — the shape every router/plugin file has and a service file doesn't. */
+function isRouteModuleImport(
+  file: ParsedRouteFile,
+  imp: ParsedImport,
+  filesByPath: ReadonlyMap<string, ParsedRouteFile>,
+  knownFilePaths: ReadonlySet<string>
+): boolean {
+  const boundLocalNames = new Set((imp.bindings ?? []).map((b) => b.localName))
+  if (file.mounts.some((m) => boundLocalNames.has(m.routerLocalName))) {
+    return true
+  }
+  const resolvedPath = resolveRelativeModule(file.filePath, imp.moduleSpecifier, knownFilePaths)
+  const targetFile = resolvedPath ? filesByPath.get(resolvedPath) : undefined
+  return !!targetFile && targetFile.endpoints.length > 0
+}
+
 function collectServiceModuleNames(routeFiles: readonly ParsedRouteFile[]): string[] {
+  const filesByPath = new Map(routeFiles.map((f) => [f.filePath, f]))
+  const knownFilePaths = new Set(filesByPath.keys())
   const seen = new Set<string>()
   const ordered: string[] = []
   for (const file of routeFiles) {
     for (const imp of file.imports) {
-      if (!imp.isRelative) {
+      if (!imp.isRelative || isRouteModuleImport(file, imp, filesByPath, knownFilePaths)) {
         continue
       }
       const name = moduleNameFromSpecifier(imp.moduleSpecifier)
