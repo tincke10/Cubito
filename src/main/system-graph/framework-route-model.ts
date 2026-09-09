@@ -1,17 +1,27 @@
 import type { EngineFramework } from './framework-detector'
 
-export type ParsedImport = { moduleSpecifier: string; isRelative: boolean }
+/** A local name an import statement binds, and the name it was imported as
+ * ('default' for a default import, '*' for a namespace import). */
+export type ParsedImportBinding = { localName: string; importedName: string }
+export type ParsedImport = {
+  moduleSpecifier: string
+  isRelative: boolean
+  bindings?: ParsedImportBinding[]
+}
 export type ParsedEndpoint = { method: string; path: string; routerLocalName: string | null }
 export type ParsedRouterMount = {
   prefix: string
   routerLocalName: string
   parentLocalName: string | null
 }
+/** A local name a file exports, and the name it's exported as ('default' for `export default`). */
+export type ParsedExport = { localName: string; exportedName: string }
 export type ParsedRouteFile = {
   filePath: string
   endpoints: ParsedEndpoint[]
   mounts: ParsedRouterMount[]
   imports: ParsedImport[]
+  exports: ParsedExport[]
 }
 
 /** Reader-agnostic per-file route parser for one detected framework. */

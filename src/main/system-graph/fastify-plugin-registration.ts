@@ -1,7 +1,7 @@
 import ts from 'typescript-compiler-api'
 import { collectFastifyEndpoints } from './fastify-endpoint-collector'
 import type { ParsedEndpoint, ParsedRouterMount } from './framework-route-model'
-import { calleeParts } from './route-call-ast'
+import { calleeParts, collectExports, collectRelativeImportLocalNames } from './route-call-ast'
 
 type PluginDefinition = { name: string; firstParamName: string; body: ts.Node }
 
@@ -80,17 +80,28 @@ function extractPrefix(optionsArg: ts.Expression | undefined): string | null {
   return null
 }
 
-/** Resolves same-file `instance.register(plugin, { prefix })` calls into mounts, and
- * collects the endpoints declared inside each registered plugin's body under the
- * plugin's OWN name — never its first-parameter name — so composeEndpointPath's
- * mount-chain walk (keyed by routerLocalName) reaches them unchanged. */
+/** Resolves `instance.register(plugin, { prefix })` calls into mounts — the plugin may be
+ * declared in this same file OR bound by a relative import (the dominant real-world layout,
+ * where a route file just declares + exports its plugin and never registers itself) — and
+ * collects the endpoints declared inside each LOCALLY-defined registered plugin's body under
+ * the plugin's OWN name — never its first-parameter name — so composeEndpointPath's mount-chain
+ * walk (keyed by routerLocalName) reaches them unchanged. A plugin exported from this file also
+ * gets its endpoints collected even with no same-file .register() call, since a cross-file
+ * caller resolves it by that same exported name (route-mount-composition.ts). */
 export function collectPluginRegistrations(
   sourceFile: ts.SourceFile,
   instanceLocals: ReadonlySet<string>
 ): { mounts: ParsedRouterMount[]; pluginEndpoints: ParsedEndpoint[] } {
   const plugins = collectPluginDefinitions(sourceFile)
+  const relativeImportLocalNames = collectRelativeImportLocalNames(sourceFile)
   const mounts: ParsedRouterMount[] = []
-  const registeredPluginNames = new Set<string>()
+  const activePluginNames = new Set<string>()
+
+  for (const exported of collectExports(sourceFile)) {
+    if (plugins.has(exported.localName)) {
+      activePluginNames.add(exported.localName)
+    }
+  }
 
   const visit = (node: ts.Node): void => {
     if (ts.isCallExpression(node)) {
@@ -98,12 +109,16 @@ export function collectPluginRegistrations(
       if (parts && instanceLocals.has(parts.objectName) && parts.methodName === 'register') {
         const [pluginArg, optionsArg] = node.arguments
         const pluginName = pluginIdentifierName(pluginArg)
-        if (pluginName && plugins.has(pluginName)) {
+        const isLocalPlugin = !!pluginName && plugins.has(pluginName)
+        const isImportedPlugin = !!pluginName && relativeImportLocalNames.has(pluginName)
+        if (pluginName && (isLocalPlugin || isImportedPlugin)) {
           const prefix = extractPrefix(optionsArg)
           if (prefix !== null) {
             mounts.push({ prefix, routerLocalName: pluginName, parentLocalName: parts.objectName })
           }
-          registeredPluginNames.add(pluginName)
+          if (isLocalPlugin) {
+            activePluginNames.add(pluginName)
+          }
         }
       }
     }
@@ -112,7 +127,7 @@ export function collectPluginRegistrations(
   visit(sourceFile)
 
   const pluginEndpoints: ParsedEndpoint[] = []
-  for (const pluginName of registeredPluginNames) {
+  for (const pluginName of activePluginNames) {
     const plugin = plugins.get(pluginName) as PluginDefinition
     pluginEndpoints.push(
       ...collectFastifyEndpoints(plugin.body, new Set([plugin.firstParamName]), () => plugin.name)

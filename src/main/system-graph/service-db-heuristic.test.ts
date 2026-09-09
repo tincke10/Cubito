@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import type { ParsedRouteFile } from './express-route-parser'
+import { parseExpressRoutes, type ParsedRouteFile } from './express-route-parser'
 import { parseFastifyRoutes } from './fastify-route-parser'
 import { assembleSystemGraph, deriveServiceAndDatabaseNodes } from './service-db-heuristic'
 
 function routeFile(overrides: Partial<ParsedRouteFile> & { filePath: string }): ParsedRouteFile {
-  return { endpoints: [], mounts: [], imports: [], ...overrides }
+  return { endpoints: [], mounts: [], imports: [], exports: [], ...overrides }
 }
 
 describe('deriveServiceAndDatabaseNodes: database client detection', () => {
@@ -380,5 +380,76 @@ describe('assembleSystemGraph: golden through a real Fastify parse (same-file pl
 
     expect(graph.nodes.get('endpoint:src/app.ts#0')).toMatchObject({ path: '/users/' })
     expect(graph.nodes.get('endpoint:src/app.ts#1')).toMatchObject({ path: '/users/:id' })
+  })
+})
+
+describe('assembleSystemGraph: golden through real parses of two Express files (cross-file mount)', () => {
+  it('composes the prefix for a router imported and mounted from a different file', () => {
+    const index = parseExpressRoutes(
+      [
+        "import usersRouter from './routes/users'",
+        'const app = express()',
+        "app.use('/users', usersRouter)"
+      ].join('\n'),
+      'src/index.ts'
+    )
+    const users = parseExpressRoutes(
+      ['const router = express.Router()', "router.get('/', h)", 'export default router'].join('\n'),
+      'src/routes/users.ts'
+    )
+
+    const graph = assembleSystemGraph({ routeFiles: [index, users], packageDependencies: [] })
+
+    expect(graph.nodes.get('endpoint:src/routes/users.ts#0')).toMatchObject({ path: '/users/' })
+  })
+})
+
+describe('assembleSystemGraph: golden through real parses of two Fastify files (cross-file registration)', () => {
+  it('composes the prefix for a plugin imported and registered from a different file', () => {
+    const app = parseFastifyRoutes(
+      [
+        "import usersPlugin from './routes/users'",
+        'const server = Fastify()',
+        "server.register(usersPlugin, { prefix: '/users' })"
+      ].join('\n'),
+      'src/app.ts'
+    )
+    const users = parseFastifyRoutes(
+      [
+        'async function usersPlugin(fastify, opts) {',
+        "  fastify.get('/', h)",
+        '}',
+        'export default usersPlugin'
+      ].join('\n'),
+      'src/routes/users.ts'
+    )
+
+    const graph = assembleSystemGraph({ routeFiles: [app, users], packageDependencies: [] })
+
+    expect(graph.nodes.get('endpoint:src/routes/users.ts#0')).toMatchObject({ path: '/users/' })
+  })
+
+  it('composes the prefix for an fp(...)-wrapped plugin registered from a different file', () => {
+    const app = parseFastifyRoutes(
+      [
+        "import authPlugin from './routes/auth'",
+        'const server = Fastify()',
+        "server.register(fp(authPlugin), { prefix: '/auth' })"
+      ].join('\n'),
+      'src/app.ts'
+    )
+    const auth = parseFastifyRoutes(
+      [
+        'function authPlugin(fastify, opts) {',
+        "  fastify.post('/login', h)",
+        '}',
+        'export default authPlugin'
+      ].join('\n'),
+      'src/routes/auth.ts'
+    )
+
+    const graph = assembleSystemGraph({ routeFiles: [app, auth], packageDependencies: [] })
+
+    expect(graph.nodes.get('endpoint:src/routes/auth.ts#0')).toMatchObject({ path: '/auth/login' })
   })
 })

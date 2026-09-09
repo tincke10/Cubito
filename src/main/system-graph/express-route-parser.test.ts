@@ -119,12 +119,24 @@ describe('parseExpressRoutes: imports', () => {
   it('flags relative imports as isRelative true', () => {
     const source = `import { router } from './routes/users'`
     const result = parseExpressRoutes(source, FILE)
-    expect(result.imports).toEqual([{ moduleSpecifier: './routes/users', isRelative: true }])
+    expect(result.imports).toEqual([
+      {
+        moduleSpecifier: './routes/users',
+        isRelative: true,
+        bindings: [{ localName: 'router', importedName: 'router' }]
+      }
+    ])
   })
 
   it('flags package imports as isRelative false', () => {
     const source = `import express from 'express'`
     const result = parseExpressRoutes(source, FILE)
-    expect(result.imports).toEqual([{ moduleSpecifier: 'express', isRelative: false }])
+    expect(result.imports).toEqual([
+      {
+        moduleSpecifier: 'express',
+        isRelative: false,
+        bindings: [{ localName: 'express', importedName: 'default' }]
+      }
+    ])
   })
 })

@@ -1,4 +1,5 @@
 import type { ParsedEndpoint, ParsedRouteFile, ParsedRouterMount } from './framework-route-model'
+import { composeMountPrefixes } from './route-mount-composition'
 import type { EngineSystemEdge, EngineSystemGraph, EngineSystemNode } from './system-graph-model'
 
 // Why (D6, light heuristic): dep name -> database family label, deduped by label so
@@ -150,6 +151,7 @@ export function assembleSystemGraph(input: {
 }): EngineSystemGraph {
   const nodes = new Map<string, EngineSystemNode>()
   const edges: EngineSystemEdge[] = []
+  const crossFileMounts = composeMountPrefixes(input.routeFiles)
 
   for (const file of input.routeFiles) {
     if (file.endpoints.length === 0) {
@@ -159,7 +161,15 @@ export function assembleSystemGraph(input: {
     nodes.set(routerId, { id: routerId, kind: 'router', label: file.filePath, diff: null })
 
     file.endpoints.forEach((endpoint, index) => {
-      const composedPath = composeEndpointPath(endpoint, file.mounts)
+      // A cross-file mount (import/export-resolved) is consulted first; a router local
+      // never reached by one falls back to the original same-file mount-chain walk.
+      const crossFilePrefix = endpoint.routerLocalName
+        ? crossFileMounts.get(file.filePath)?.get(endpoint.routerLocalName)
+        : undefined
+      const composedPath =
+        crossFilePrefix !== undefined
+          ? crossFilePrefix + endpoint.path
+          : composeEndpointPath(endpoint, file.mounts)
       const endpointId = `endpoint:${file.filePath}#${index}`
       nodes.set(endpointId, {
         id: endpointId,

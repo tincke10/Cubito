@@ -2,10 +2,10 @@ import ts from 'typescript-compiler-api'
 import { collectFastifyEndpoints } from './fastify-endpoint-collector'
 import { collectPluginRegistrations } from './fastify-plugin-registration'
 import type { FrameworkRouteParser, ParsedRouteFile } from './framework-route-model'
-import { collectImports, isBareIdentifierCall } from './route-call-ast'
+import { collectExports, collectImports, isBareIdentifierCall } from './route-call-ast'
 
 function emptyResult(filePath: string): ParsedRouteFile {
-  return { filePath, endpoints: [], mounts: [], imports: [] }
+  return { filePath, endpoints: [], mounts: [], imports: [], exports: [] }
 }
 
 /** Tracks identifiers bound to a Fastify instance (const x = Fastify() | fastify()).
@@ -43,11 +43,13 @@ export function parseFastifyRoutes(source: string, filePath: string): ParsedRout
     const topLevelEndpoints = collectFastifyEndpoints(sourceFile, instanceLocals, (name) => name)
     const { mounts, pluginEndpoints } = collectPluginRegistrations(sourceFile, instanceLocals)
     const imports = collectImports(sourceFile)
+    const exports = collectExports(sourceFile)
     return {
       filePath,
       endpoints: [...topLevelEndpoints, ...pluginEndpoints],
       mounts,
-      imports
+      imports,
+      exports
     }
   } catch {
     return emptyResult(filePath)

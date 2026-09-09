@@ -4,12 +4,17 @@ import {
   DYNAMIC_PATH,
   HTTP_ROUTE_METHODS,
   calleeParts,
+  collectExports,
   collectImports,
   isBareIdentifierCall,
   resolvePathArg
 } from './route-call-ast'
 
 const FILE = 'src/routes.ts'
+
+function parse(source: string): ts.SourceFile {
+  return ts.createSourceFile(FILE, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+}
 
 function firstCallArg(source: string): ts.Expression | undefined {
   const sourceFile = ts.createSourceFile(
@@ -86,17 +91,85 @@ describe('collectImports', () => {
       import { router } from './routes/users'
       import express from 'express'
     `
-    const sourceFile = ts.createSourceFile(
-      FILE,
-      source,
-      ts.ScriptTarget.Latest,
-      true,
-      ts.ScriptKind.TS
-    )
-    expect(collectImports(sourceFile)).toEqual([
-      { moduleSpecifier: './routes/users', isRelative: true },
-      { moduleSpecifier: 'express', isRelative: false }
+    expect(collectImports(parse(source))).toEqual([
+      {
+        moduleSpecifier: './routes/users',
+        isRelative: true,
+        bindings: [{ localName: 'router', importedName: 'router' }]
+      },
+      {
+        moduleSpecifier: 'express',
+        isRelative: false,
+        bindings: [{ localName: 'express', importedName: 'default' }]
+      }
     ])
+  })
+
+  it('captures a default import aliased locally alongside a renamed named import', () => {
+    const source = "import Users, { auth as authRouter } from './routes'"
+    expect(collectImports(parse(source))).toEqual([
+      {
+        moduleSpecifier: './routes',
+        isRelative: true,
+        bindings: [
+          { localName: 'Users', importedName: 'default' },
+          { localName: 'authRouter', importedName: 'auth' }
+        ]
+      }
+    ])
+  })
+
+  it('captures a namespace import', () => {
+    const source = "import * as routes from './routes'"
+    expect(collectImports(parse(source))).toEqual([
+      {
+        moduleSpecifier: './routes',
+        isRelative: true,
+        bindings: [{ localName: 'routes', importedName: '*' }]
+      }
+    ])
+  })
+})
+
+describe('collectExports', () => {
+  it('captures a default export of an identifier', () => {
+    const source = `
+      const router = express.Router()
+      export default router
+    `
+    expect(collectExports(parse(source))).toEqual([
+      { localName: 'router', exportedName: 'default' }
+    ])
+  })
+
+  it('captures a named export of a const declaration', () => {
+    const source = 'export const usersRouter = express.Router()'
+    expect(collectExports(parse(source))).toEqual([
+      { localName: 'usersRouter', exportedName: 'usersRouter' }
+    ])
+  })
+
+  it('captures an exported named function declaration', () => {
+    const source = 'export async function usersPlugin(fastify, opts) {}'
+    expect(collectExports(parse(source))).toEqual([
+      { localName: 'usersPlugin', exportedName: 'usersPlugin' }
+    ])
+  })
+
+  it('captures a default-exported named function declaration', () => {
+    const source = 'export default async function usersPlugin(fastify, opts) {}'
+    expect(collectExports(parse(source))).toEqual([
+      { localName: 'usersPlugin', exportedName: 'default' }
+    ])
+  })
+
+  it('captures a re-export list with an alias', () => {
+    const source = 'const a = 1\nexport { a as b }'
+    expect(collectExports(parse(source))).toEqual([{ localName: 'a', exportedName: 'b' }])
+  })
+
+  it('returns an empty array when nothing is exported', () => {
+    expect(collectExports(parse('const app = express()'))).toEqual([])
   })
 })
 

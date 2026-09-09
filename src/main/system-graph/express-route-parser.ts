@@ -8,7 +8,9 @@ import type {
 import {
   HTTP_ROUTE_METHODS,
   calleeParts,
+  collectExports,
   collectImports,
+  collectRelativeImportLocalNames,
   isBareIdentifierCall,
   resolvePathArg
 } from './route-call-ast'
@@ -23,7 +25,7 @@ export type {
 } from './framework-route-model'
 
 function emptyResult(filePath: string): ParsedRouteFile {
-  return { filePath, endpoints: [], mounts: [], imports: [] }
+  return { filePath, endpoints: [], mounts: [], imports: [], exports: [] }
 }
 
 function isRouterCreationCall(node: ts.Expression): boolean {
@@ -65,7 +67,8 @@ function collectRouterLocals(sourceFile: ts.SourceFile): Set<string> {
 
 function collectEndpointsAndMounts(
   sourceFile: ts.SourceFile,
-  routerLocals: ReadonlySet<string>
+  routerLocals: ReadonlySet<string>,
+  relativeImportLocalNames: ReadonlySet<string>
 ): { endpoints: ParsedEndpoint[]; mounts: ParsedRouterMount[] } {
   const endpoints: ParsedEndpoint[] = []
   const mounts: ParsedRouterMount[] = []
@@ -106,12 +109,17 @@ function collectEndpointsAndMounts(
     }
   }
 
+  // Accepts a locally-created router OR one bound by a relative import — the latter is what
+  // makes a cross-file mount (`app.use('/x', importedRouter)`) visible to route-mount-composition.ts.
   const handleMount = (parentLocalName: string, node: ts.CallExpression): void => {
     const [prefixArg, targetArg] = node.arguments
     if (!prefixArg || !ts.isStringLiteralLike(prefixArg)) {
       return
     }
-    if (!targetArg || !ts.isIdentifier(targetArg) || !routerLocals.has(targetArg.text)) {
+    if (!targetArg || !ts.isIdentifier(targetArg)) {
+      return
+    }
+    if (!routerLocals.has(targetArg.text) && !relativeImportLocalNames.has(targetArg.text)) {
       return
     }
     mounts.push({ prefix: prefixArg.text, routerLocalName: targetArg.text, parentLocalName })
@@ -151,9 +159,15 @@ export function parseExpressRoutes(source: string, filePath: string): ParsedRout
       ts.ScriptKind.TS
     )
     const routerLocals = collectRouterLocals(sourceFile)
-    const { endpoints, mounts } = collectEndpointsAndMounts(sourceFile, routerLocals)
+    const relativeImportLocalNames = collectRelativeImportLocalNames(sourceFile)
+    const { endpoints, mounts } = collectEndpointsAndMounts(
+      sourceFile,
+      routerLocals,
+      relativeImportLocalNames
+    )
     const imports = collectImports(sourceFile)
-    return { filePath, endpoints, mounts, imports }
+    const exports = collectExports(sourceFile)
+    return { filePath, endpoints, mounts, imports, exports }
   } catch {
     return emptyResult(filePath)
   }
