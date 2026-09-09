@@ -39,6 +39,7 @@
       #hud {
         position: fixed;
         inset: 12px 16px auto 16px;
+        z-index: 1; /* own stacking context above #app's positioned CSS2D node labels */
         font-size: 12px;
         line-height: 1.6;
         pointer-events: none;
