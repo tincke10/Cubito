@@ -26127,12 +26127,13 @@ export class OrcaRuntimeService {
     agent: TuiAgent,
     workspacePath: string
   ): Promise<void> {
-    const claudeConfigDir = this.resolveClaudeConfigDirOverride(agent)
+    const { claudeConfigDir, codexHome } = this.resolveAgentConfigDirOverrides(agent)
     await markAgentWorkspaceTrusted({
       preset: TUI_AGENT_CONFIG[agent].preflightTrust,
       workspacePath,
       host: { kind: 'local' },
-      ...(claudeConfigDir ? { claudeConfigDir } : {})
+      ...(claudeConfigDir ? { claudeConfigDir } : {}),
+      ...(codexHome ? { codexHome } : {})
     })
   }
 
@@ -26141,20 +26142,30 @@ export class OrcaRuntimeService {
     connectionId: string,
     workspacePath: string
   ): Promise<void> {
-    const claudeConfigDir = this.resolveClaudeConfigDirOverride(agent)
+    const { claudeConfigDir, codexHome } = this.resolveAgentConfigDirOverrides(agent)
     await markAgentWorkspaceTrusted({
       preset: TUI_AGENT_CONFIG[agent].preflightTrust,
       workspacePath,
       host: { kind: 'remote', connectionId },
-      ...(claudeConfigDir ? { claudeConfigDir } : {})
+      ...(claudeConfigDir ? { claudeConfigDir } : {}),
+      ...(codexHome ? { codexHome } : {})
     })
   }
 
-  // Why: a per-agent CLAUDE_CONFIG_DIR override changes which .claude.json the
-  // launched CLI reads, so trust must be written to the same file.
-  private resolveClaudeConfigDirOverride(agent: TuiAgent): string | undefined {
-    return resolveTuiAgentLaunchEnv(agent, this.requireStore().getSettings().agentDefaultEnv)
-      .CLAUDE_CONFIG_DIR
+  // Why: a per-agent CLAUDE_CONFIG_DIR/CODEX_HOME override changes which config
+  // file the launched CLI reads, so trust must be written to the same file.
+  private resolveAgentConfigDirOverrides(agent: TuiAgent): {
+    claudeConfigDir?: string
+    codexHome?: string
+  } {
+    const launchEnv = resolveTuiAgentLaunchEnv(
+      agent,
+      this.requireStore().getSettings().agentDefaultEnv
+    )
+    return {
+      ...(launchEnv.CLAUDE_CONFIG_DIR ? { claudeConfigDir: launchEnv.CLAUDE_CONFIG_DIR } : {}),
+      ...(launchEnv.CODEX_HOME ? { codexHome: launchEnv.CODEX_HOME } : {})
+    }
   }
 
   private recordCreatedWorktreeLineage(

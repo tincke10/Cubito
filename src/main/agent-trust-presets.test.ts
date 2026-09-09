@@ -413,6 +413,34 @@ describe('markCodexProjectTrusted', () => {
       rmSync(workspace, { recursive: true, force: true })
     }
   })
+
+  // Why: an explicit CODEX_HOME override (agentDefaultEnv.codex.CODEX_HOME) makes
+  // prepareForCodexLaunch skip injecting its own managed home, so trust must land there too.
+  it('also writes trust to an explicit codexHome override, independently locked', async () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'orca-codex-ws-'))
+    const codexHome = mkdtempSync(join(tmpdir(), 'orca-codex-explicit-home-'))
+    try {
+      const realpath = realpathSync.native(workspace)
+      await markCodexProjectTrusted(workspace, codexHome)
+
+      const configPath = join(testState.fakeHomeDir, '.codex', 'config.toml')
+      const runtimeConfigPath = join(
+        testState.userDataDir,
+        'codex-runtime-home',
+        'home',
+        'config.toml'
+      )
+      const overrideConfigPath = join(codexHome, 'config.toml')
+      for (const path of [configPath, runtimeConfigPath, overrideConfigPath]) {
+        const written = readFileSync(path, 'utf-8')
+        expect(written).toContain(`[projects."${escapeTomlBasicString(realpath)}"]`)
+        expect(written).toContain('trust_level = "trusted"')
+      }
+    } finally {
+      rmSync(workspace, { recursive: true, force: true })
+      rmSync(codexHome, { recursive: true, force: true })
+    }
+  })
 })
 
 function escapeTomlBasicString(value: string): string {

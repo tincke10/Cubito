@@ -56,6 +56,19 @@ describe('markLocalWorkspaceTrustedForAgent — dispatch to the shared trust mod
       claudeConfigDir: '/acct-2'
     })
   })
+
+  it('forwards a per-agent CODEX_HOME override', async () => {
+    const internal = createRuntime({ codex: { CODEX_HOME: '/managed-codex-home' } })
+
+    await internal.markLocalWorkspaceTrustedForAgent('codex', '/tmp/worktree-1')
+
+    expect(mocks.markAgentWorkspaceTrusted).toHaveBeenCalledWith({
+      preset: 'codex',
+      workspacePath: '/tmp/worktree-1',
+      host: { kind: 'local' },
+      codexHome: '/managed-codex-home'
+    })
+  })
 })
 
 describe('markRemoteWorkspaceTrustedForAgent — dispatch to the shared trust module', () => {
@@ -81,6 +94,19 @@ describe('markRemoteWorkspaceTrustedForAgent — dispatch to the shared trust mo
       workspacePath: '/tmp/worktree-1',
       host: { kind: 'remote', connectionId: 'ssh-1' },
       claudeConfigDir: '/acct-2'
+    })
+  })
+
+  it('forwards a per-agent CODEX_HOME override on a remote host', async () => {
+    const internal = createRuntime({ codex: { CODEX_HOME: '/managed-codex-home' } })
+
+    await internal.markRemoteWorkspaceTrustedForAgent('codex', 'ssh-1', '/tmp/worktree-1')
+
+    expect(mocks.markAgentWorkspaceTrusted).toHaveBeenCalledWith({
+      preset: 'codex',
+      workspacePath: '/tmp/worktree-1',
+      host: { kind: 'remote', connectionId: 'ssh-1' },
+      codexHome: '/managed-codex-home'
     })
   })
 })

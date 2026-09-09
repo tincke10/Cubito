@@ -75,6 +75,27 @@ describe('spawnLocalStartupAndSetupTerminals — startup trust dispatch', () => 
     })
   })
 
+  it('forwards a per-agent CODEX_HOME override from settings', async () => {
+    const runtime = makeRuntime()
+
+    await spawnLocalStartupAndSetupTerminals({
+      runtime,
+      worktree,
+      startup: { command: 'codex' },
+      setup: undefined,
+      defaultTabs: undefined,
+      settings: makeSettings({ codex: { CODEX_HOME: '/managed-codex-home' } }),
+      createdWithAgent: 'codex'
+    })
+
+    expect(mocks.markAgentWorkspaceTrusted).toHaveBeenCalledWith({
+      preset: 'codex',
+      workspacePath: '/repo/worktree',
+      host: { kind: 'local' },
+      codexHome: '/managed-codex-home'
+    })
+  })
+
   it.each(['cursor', 'copilot', 'codex'] as const)(
     'routes %s through the shared dispatcher with a local host',
     async (agent) => {

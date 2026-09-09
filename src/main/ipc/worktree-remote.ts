@@ -378,15 +378,13 @@ export async function spawnLocalStartupAndSetupTerminals(args: {
   try {
     // Why: only after `git worktree add` + metadata registration is the path safe for a runtime PTY to boot the agent while setup runs alongside.
     if (isTuiAgent(createdWithAgent)) {
-      const claudeConfigDir = resolveTuiAgentLaunchEnv(
-        createdWithAgent,
-        settings.agentDefaultEnv
-      ).CLAUDE_CONFIG_DIR
+      const launchEnv = resolveTuiAgentLaunchEnv(createdWithAgent, settings.agentDefaultEnv)
       await markAgentWorkspaceTrusted({
         preset: TUI_AGENT_CONFIG[createdWithAgent].preflightTrust,
         workspacePath: worktree.path,
         host: { kind: 'local' },
-        ...(claudeConfigDir ? { claudeConfigDir } : {})
+        ...(launchEnv.CLAUDE_CONFIG_DIR ? { claudeConfigDir: launchEnv.CLAUDE_CONFIG_DIR } : {}),
+        ...(launchEnv.CODEX_HOME ? { codexHome: launchEnv.CODEX_HOME } : {})
       })
     }
     const terminal = await runtime.createTerminal(`id:${worktree.id}`, {

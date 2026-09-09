@@ -13,6 +13,7 @@ export async function markRemoteAgentWorkspaceTrusted(args: {
   connectionId: string
   workspacePath: string
   claudeConfigDir?: string
+  codexHome?: string
 }): Promise<void> {
   const home = await resolveRemoteHome(args.connectionId)
   const fsProvider = getSshFilesystemProvider(args.connectionId)
@@ -22,7 +23,7 @@ export async function markRemoteAgentWorkspaceTrusted(args: {
 
   const workspacePath = await canonicalizeRemoteWorkspacePath(fsProvider, args.workspacePath)
   if (args.preset === 'codex') {
-    await markRemoteCodexProjectTrusted(fsProvider, home, workspacePath)
+    await markRemoteCodexProjectTrusted(fsProvider, home, workspacePath, args.codexHome)
   } else if (args.preset === 'cursor') {
     await markRemoteCursorWorkspaceTrusted(fsProvider, home, workspacePath)
   } else if (args.preset === 'copilot') {
@@ -81,7 +82,8 @@ async function readRemoteTextFile(
 async function markRemoteCodexProjectTrusted(
   fsProvider: IFilesystemProvider,
   remoteHome: string,
-  workspacePath: string
+  workspacePath: string,
+  codexHome?: string
 ): Promise<void> {
   const codexDir = `${remoteHome}/.codex`
   const configPath = `${codexDir}/config.toml`
@@ -91,11 +93,30 @@ async function markRemoteCodexProjectTrusted(
     // realpath would canonicalize the wrong machine on SSH.
     alreadyCanonical: true
   })
-  if (updated === existing) {
+  if (updated !== existing) {
+    await fsProvider.createDir(codexDir)
+    await fsProvider.writeFile(configPath, updated)
+  }
+  if (!codexHome) {
     return
   }
-  await fsProvider.createDir(codexDir)
-  await fsProvider.writeFile(configPath, updated)
+  // Why: an explicit CODEX_HOME override makes the remote Codex launch skip the
+  // Orca-managed home entirely, so trust written only above would never be seen.
+  const overrideConfigPath = `${codexHome.replace(/\/$/, '')}/config.toml`
+  const existingOverride = await readRemoteTextFile(fsProvider, overrideConfigPath)
+  const updatedOverride = upsertProjectTrustLevelInContent(
+    existingOverride,
+    workspacePath,
+    'trusted',
+    {
+      alreadyCanonical: true
+    }
+  )
+  if (updatedOverride === existingOverride) {
+    return
+  }
+  await fsProvider.createDir(codexHome)
+  await fsProvider.writeFile(overrideConfigPath, updatedOverride)
 }
 
 async function markRemoteCursorWorkspaceTrusted(

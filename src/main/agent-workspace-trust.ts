@@ -19,6 +19,7 @@ export async function markAgentWorkspaceTrusted(args: {
   workspacePath: string
   host: AgentWorkspaceTrustHost
   claudeConfigDir?: string
+  codexHome?: string
 }): Promise<void> {
   if (!args.preset) {
     return
@@ -29,7 +30,8 @@ export async function markAgentWorkspaceTrusted(args: {
         preset: args.preset,
         connectionId: args.host.connectionId,
         workspacePath: args.workspacePath,
-        ...(args.claudeConfigDir ? { claudeConfigDir: args.claudeConfigDir } : {})
+        ...(args.claudeConfigDir ? { claudeConfigDir: args.claudeConfigDir } : {}),
+        ...(args.codexHome ? { codexHome: args.codexHome } : {})
       })
       return
     }
@@ -43,7 +45,7 @@ export async function markAgentWorkspaceTrusted(args: {
       case 'codex':
         // Why: the Codex write queues behind any in-flight hook grant, so the agent must not
         // launch until it has actually landed.
-        await markCodexProjectTrusted(args.workspacePath)
+        await markCodexProjectTrusted(args.workspacePath, args.codexHome)
         return
       case 'claude':
         if (args.claudeConfigDir) {

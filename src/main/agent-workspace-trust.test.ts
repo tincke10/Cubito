@@ -82,7 +82,18 @@ describe('markAgentWorkspaceTrusted', () => {
       host: { kind: 'local' }
     })
 
-    expect(mocks.markCodexProjectTrusted).toHaveBeenCalledWith('/w')
+    expect(mocks.markCodexProjectTrusted).toHaveBeenCalledWith('/w', undefined)
+  })
+
+  it('routes codex preset with codexHome to markCodexProjectTrusted locally', async () => {
+    await markAgentWorkspaceTrusted({
+      preset: 'codex',
+      workspacePath: '/w',
+      host: { kind: 'local' },
+      codexHome: '/managed-codex-home'
+    })
+
+    expect(mocks.markCodexProjectTrusted).toHaveBeenCalledWith('/w', '/managed-codex-home')
   })
 
   it('routes claude preset without an override to markClaudeWorkspaceTrusted with no second arg', async () => {
@@ -136,6 +147,22 @@ describe('markAgentWorkspaceTrusted', () => {
       connectionId: 'ssh-1',
       workspacePath: '/w',
       claudeConfigDir: '/acct-2'
+    })
+  })
+
+  it('routes a remote codex preset to markRemoteAgentWorkspaceTrusted with codexHome', async () => {
+    await markAgentWorkspaceTrusted({
+      preset: 'codex',
+      workspacePath: '/w',
+      host: { kind: 'remote', connectionId: 'ssh-1' },
+      codexHome: '/managed-codex-home'
+    })
+
+    expect(mocks.markRemoteAgentWorkspaceTrusted).toHaveBeenCalledWith({
+      preset: 'codex',
+      connectionId: 'ssh-1',
+      workspacePath: '/w',
+      codexHome: '/managed-codex-home'
     })
   })
 
