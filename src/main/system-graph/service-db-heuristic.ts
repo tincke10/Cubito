@@ -53,12 +53,33 @@ function moduleNameFromSpecifier(spec: string): string {
   return last === 'index' && segments.length > 1 ? (segments.at(-2) as string) : last
 }
 
+/** True when `file` has a relative import that itself resolves to a file with endpoints —
+ * i.e. `file` is a wiring/descriptor file (e.g. a Nest `@Module()` file with no decorator of
+ * its own) that references a route/controller file, rather than a data/service dependency.
+ * One level deep only: enough to clear an entry file's import of such a wiring file (main.ts
+ * -> app.module.ts -> users.controller.ts) without recursing into arbitrary import chains. */
+function wiresRouteModule(
+  file: ParsedRouteFile,
+  filesByPath: ReadonlyMap<string, ParsedRouteFile>,
+  knownFilePaths: ReadonlySet<string>
+): boolean {
+  return file.imports.some((imp) => {
+    if (!imp.isRelative) {
+      return false
+    }
+    const resolvedPath = resolveRelativeModule(file.filePath, imp.moduleSpecifier, knownFilePaths)
+    const targetFile = resolvedPath ? filesByPath.get(resolvedPath) : undefined
+    return !!targetFile && targetFile.endpoints.length > 0
+  })
+}
+
 /** A relative import is excluded from service-node consideration when it's clearly a route
  * module, not a data/service dependency: its local binding is used as a same-file mount
  * target (covers a mount recorded with no literal prefix — never in `file.mounts` at all —
- * as well as one that is), or it resolves (route-mount-composition.ts's own resolver, so this
+ * as well as one that is), it resolves (route-mount-composition.ts's own resolver, so this
  * never drifts from what a cross-file mount can actually reach) to a parsed file that itself
- * declares endpoints — the shape every router/plugin file has and a service file doesn't. */
+ * declares endpoints — the shape every router/plugin file has and a service file doesn't —
+ * or that file is itself wiring for a route/controller file one level further in (D_v4-4). */
 function isRouteModuleImport(
   file: ParsedRouteFile,
   imp: ParsedImport,
@@ -71,7 +92,12 @@ function isRouteModuleImport(
   }
   const resolvedPath = resolveRelativeModule(file.filePath, imp.moduleSpecifier, knownFilePaths)
   const targetFile = resolvedPath ? filesByPath.get(resolvedPath) : undefined
-  return !!targetFile && targetFile.endpoints.length > 0
+  if (!targetFile) {
+    return false
+  }
+  return (
+    targetFile.endpoints.length > 0 || wiresRouteModule(targetFile, filesByPath, knownFilePaths)
+  )
 }
 
 function collectServiceModuleNames(routeFiles: readonly ParsedRouteFile[]): string[] {

@@ -588,3 +588,43 @@ describe('assembleSystemGraph: excludes mounted route modules from the service h
     ).toEqual(['PostgreSQL'])
   })
 })
+
+// Nest-shaped wiring: an entry file (0 endpoints, no mounts) imports a module-descriptor file
+// (0 endpoints, no mounts of its own) that in turn imports controller files (endpoints > 0).
+// Neither the entry file nor the module-descriptor file is a data/service dependency — the
+// module-descriptor is wiring, not a service, even though it never appears in any `mounts` array.
+describe('deriveServiceAndDatabaseNodes: excludes a module-descriptor file reached only through another zero-endpoint file', () => {
+  it('does not turn an entry-file import of a wiring module into a service node', () => {
+    const main = routeFile({
+      filePath: 'src/main.ts',
+      imports: [
+        {
+          moduleSpecifier: './app.module',
+          isRelative: true,
+          bindings: [{ localName: 'AppModule', importedName: 'AppModule' }]
+        }
+      ]
+    })
+    const appModule = routeFile({
+      filePath: 'src/app.module.ts',
+      imports: [
+        {
+          moduleSpecifier: './users/users.controller',
+          isRelative: true,
+          bindings: [{ localName: 'UsersController', importedName: 'UsersController' }]
+        }
+      ]
+    })
+    const usersController = routeFile({
+      filePath: 'src/users/users.controller.ts',
+      endpoints: [{ method: 'GET', path: '/users', routerLocalName: 'UsersController' }]
+    })
+
+    const result = deriveServiceAndDatabaseNodes({
+      routeFiles: [main, appModule, usersController],
+      packageDependencies: []
+    })
+
+    expect(result.serviceNodes).toEqual([])
+  })
+})
