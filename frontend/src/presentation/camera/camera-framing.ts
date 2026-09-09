@@ -108,12 +108,13 @@ export type LitterLayout = { count: number; centers: readonly Vec3[] }
  *  layout moved the existing members (e.g. the post-batch `refetch()` swaps in the host's real
  *  worktree.list positions — a discrete store event, not a tween, so a missed one leaves a
  *  member off-screen), or on the very first framing (`previous === null`). Never on a shrink —
- *  a failed/removed member must not yank the camera in. */
+ *  a failed/removed member must not yank the camera in — and never for a single member: at
+ *  submit the litter is just the parent, and zooming onto it alone reads as a jolt. */
 export const frameLitterOnLayout = (
   previous: LitterLayout | null,
   next: LitterLayout
 ): CameraFraming | null => {
-  if (next.count <= 0) return null
+  if (next.count <= 1) return null
   if (previous === null) return frameAll(next.centers)
   if (next.count > previous.count) return frameAll(next.centers)
   if (next.count < previous.count) return null

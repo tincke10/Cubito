@@ -235,4 +235,9 @@ describe('frameLitterOnLayout', () => {
     const next: LitterLayout = { count: 0, centers: [] }
     expect(frameLitterOnLayout(previous, next)).toBeNull()
   })
+
+  it('does not frame a single-member litter on first sight (the parent alone is not a litter)', () => {
+    const next: LitterLayout = { count: 1, centers: [v(0, 0, 0)] }
+    expect(frameLitterOnLayout(null, next)).toBeNull()
+  })
 })
