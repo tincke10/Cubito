@@ -1,6 +1,17 @@
 import ts from 'typescript-compiler-api'
-import type { ParsedEndpoint, ParsedRouteFile, ParsedRouterMount } from './framework-route-model'
-import { HTTP_ROUTE_METHODS, calleeParts, collectImports, resolvePathArg } from './route-call-ast'
+import type {
+  FrameworkRouteParser,
+  ParsedEndpoint,
+  ParsedRouteFile,
+  ParsedRouterMount
+} from './framework-route-model'
+import {
+  HTTP_ROUTE_METHODS,
+  calleeParts,
+  collectImports,
+  isBareIdentifierCall,
+  resolvePathArg
+} from './route-call-ast'
 
 // Backwards-compat re-exports: other files still import the route model from here.
 export type {
@@ -17,13 +28,13 @@ function emptyResult(filePath: string): ParsedRouteFile {
 
 function isRouterCreationCall(node: ts.Expression): boolean {
   // express() or express.Router()
+  if (isBareIdentifierCall(node)) {
+    return true // const app = express()
+  }
   if (!ts.isCallExpression(node)) {
     return false
   }
   const callee = node.expression
-  if (ts.isIdentifier(callee)) {
-    return true // const app = express()
-  }
   if (
     ts.isPropertyAccessExpression(callee) &&
     ts.isIdentifier(callee.name) &&
@@ -146,4 +157,9 @@ export function parseExpressRoutes(source: string, filePath: string): ParsedRout
   } catch {
     return emptyResult(filePath)
   }
+}
+
+export const expressRouteParser: FrameworkRouteParser = {
+  framework: 'express',
+  parse: parseExpressRoutes
 }

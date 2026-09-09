@@ -23,6 +23,12 @@ export function resolvePathArg(arg: ts.Expression | undefined): string {
   return DYNAMIC_PATH
 }
 
+/** const x = someIdentifier() — the shared, name-agnostic instance-creation shape used by
+ * both Express (app/router locals) and Fastify (server instance / plugin-function locals). */
+export function isBareIdentifierCall(node: ts.Expression): boolean {
+  return ts.isCallExpression(node) && ts.isIdentifier(node.expression)
+}
+
 export function calleeParts(
   expr: ts.LeftHandSideExpression
 ): { objectName: string; methodName: string } | null {

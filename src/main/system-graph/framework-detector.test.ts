@@ -46,9 +46,9 @@ describe('detectFramework', () => {
     await expect(detectFramework(reader)).resolves.toBeNull()
   })
 
-  it('returns null when express is absent entirely', async () => {
+  it('returns null when neither express nor fastify is present', async () => {
     const reader = fakeReader({
-      readPackageJson: async () => ({ dependencies: { fastify: '^4.0.0' } }),
+      readPackageJson: async () => ({ dependencies: { koa: '^2.0.0' } }),
       readFileText: async (rel) => (rel === 'tsconfig.json' ? '{}' : null)
     })
     await expect(detectFramework(reader)).resolves.toBeNull()
@@ -57,5 +57,40 @@ describe('detectFramework', () => {
   it('returns null when package.json is missing', async () => {
     const reader = fakeReader({})
     await expect(detectFramework(reader)).resolves.toBeNull()
+  })
+
+  it('detects fastify via the fastify dependency plus a typescript dep', async () => {
+    const reader = fakeReader({
+      readPackageJson: async () => ({
+        dependencies: { fastify: '^4.0.0' },
+        devDependencies: { typescript: '^5.5.0' }
+      })
+    })
+    await expect(detectFramework(reader)).resolves.toBe('fastify')
+  })
+
+  it('detects fastify via any @fastify/ scoped dependency', async () => {
+    const reader = fakeReader({
+      readPackageJson: async () => ({ dependencies: { '@fastify/cors': '^9.0.0' } }),
+      readFileText: async (rel) => (rel === 'tsconfig.json' ? '{}' : null)
+    })
+    await expect(detectFramework(reader)).resolves.toBe('fastify')
+  })
+
+  it('returns null when fastify is present but no TS signal exists', async () => {
+    const reader = fakeReader({
+      readPackageJson: async () => ({ dependencies: { fastify: '^4.0.0' } })
+    })
+    await expect(detectFramework(reader)).resolves.toBeNull()
+  })
+
+  it('prefers express when both express and fastify dependencies are present', async () => {
+    const reader = fakeReader({
+      readPackageJson: async () => ({
+        dependencies: { express: '^4.19.0', fastify: '^4.0.0' },
+        devDependencies: { typescript: '^5.5.0' }
+      })
+    })
+    await expect(detectFramework(reader)).resolves.toBe('express')
   })
 })

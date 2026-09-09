@@ -1,7 +1,8 @@
 import type { FsChangeEvent } from '../../shared/filesystem-entry-types'
 import type { IFilesystemProvider } from '../providers/types'
 import { detectFramework } from './framework-detector'
-import { parseExpressRoutes, type ParsedRouteFile } from './express-route-parser'
+import { frameworkRouteParsers } from './framework-route-parser-registry'
+import type { ParsedRouteFile } from './framework-route-model'
 import { assembleSystemGraph } from './service-db-heuristic'
 import { emptyEngineSystemGraph, type EngineSystemGraph } from './system-graph-model'
 import { createSystemGraphWatchScheduler } from './system-graph-watch-scheduler'
@@ -89,7 +90,7 @@ export class SystemGraphService {
           if (source === null) {
             continue
           }
-          routeFiles.push(parseExpressRoutes(source, filePath))
+          routeFiles.push(frameworkRouteParsers[framework].parse(source, filePath))
         } catch {
           // Why: one unreadable/unparsable file must not abort the whole rebuild.
         }

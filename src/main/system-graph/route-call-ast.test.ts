@@ -5,6 +5,7 @@ import {
   HTTP_ROUTE_METHODS,
   calleeParts,
   collectImports,
+  isBareIdentifierCall,
   resolvePathArg
 } from './route-call-ast'
 
@@ -96,6 +97,16 @@ describe('collectImports', () => {
       { moduleSpecifier: './routes/users', isRelative: true },
       { moduleSpecifier: 'express', isRelative: false }
     ])
+  })
+})
+
+describe('isBareIdentifierCall', () => {
+  it('returns true for a call whose callee is a plain identifier', () => {
+    expect(isBareIdentifierCall(firstCallExpression('fastify()')!)).toBe(true)
+  })
+
+  it('returns false for a property-access callee', () => {
+    expect(isBareIdentifierCall(firstCallExpression('express.Router()')!)).toBe(false)
   })
 })
 

@@ -1,4 +1,4 @@
-import type { ParsedEndpoint, ParsedRouteFile, ParsedRouterMount } from './express-route-parser'
+import type { ParsedEndpoint, ParsedRouteFile, ParsedRouterMount } from './framework-route-model'
 import type { EngineSystemEdge, EngineSystemGraph, EngineSystemNode } from './system-graph-model'
 
 // Why (D6, light heuristic): dep name -> database family label, deduped by label so
