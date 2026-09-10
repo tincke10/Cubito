@@ -1,8 +1,8 @@
 name: Cubito CI
 
 # Backend-logic gates for the fork: the runtime must build and run without
-# Electron, and its unit suite must stay green. Frontend CI is added
-# separately once the 3D client stabilizes.
+# Electron, and its unit suite must stay green. The frontend/ 3D client's
+# typecheck, tests and lint run in the frontend job below.
 
 on:
   push:
@@ -64,3 +64,41 @@ jobs:
     uses: ./.github/workflows/unit-tests.yml
     with:
       node_versions: '["24"]'
+
+  # frontend/ is a separate pnpm project (own lockfile/workspace); the shared
+  # install-node-dependencies action installs the root graph plus a native
+  # runtime the frontend needs neither of, so it installs standalone here.
+  frontend:
+    name: frontend typecheck + tests + lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.24.0
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        run: pnpm --dir frontend install --frozen-lockfile
+
+      - name: Typecheck frontend
+        run: pnpm --dir frontend run typecheck
+
+      - name: Test frontend
+        run: pnpm --dir frontend run test
+
+      - name: Lint frontend
+        run: pnpm --dir frontend run lint
