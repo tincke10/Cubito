@@ -89,8 +89,11 @@ function wiresRouteModule(
  * target (covers a mount recorded with no literal prefix — never in `file.mounts` at all —
  * as well as one that is), it resolves (route-mount-composition.ts's own resolver, so this
  * never drifts from what a cross-file mount can actually reach) to a parsed file that itself
- * declares endpoints — the shape every router/plugin file has and a service file doesn't —
- * or that file is itself wiring for a route/controller file one level further in (D_v4-4). */
+ * declares endpoints — the shape every router/plugin file has and a service file doesn't —,
+ * carries a parsed Nest `moduleDescriptor` (any `@Module(...)` file is always wiring, even a
+ * pure grouping module with zero endpoints and zero imports of its own, e.g. a RouterModule.
+ * register target — more robust than the one-level-deep import walk below), or that file is
+ * itself wiring for a route/controller file one level further in (D_v4-4). */
 function isRouteModuleImport(
   file: ParsedRouteFile,
   imp: ParsedImport,
@@ -107,7 +110,9 @@ function isRouteModuleImport(
     return false
   }
   return (
-    targetFile.endpoints.length > 0 || wiresRouteModule(targetFile, filesByPath, knownFilePaths)
+    targetFile.endpoints.length > 0 ||
+    targetFile.moduleDescriptor !== undefined ||
+    wiresRouteModule(targetFile, filesByPath, knownFilePaths)
   )
 }
 

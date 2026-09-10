@@ -686,4 +686,32 @@ describe('deriveServiceAndDatabaseNodes: excludes a module-descriptor file reach
 
     expect(result.serviceNodes).toEqual([])
   })
+
+  // A pure grouping @Module({}) (e.g. AdminModule used only as a RouterModule.register target)
+  // has ZERO endpoints AND zero relative imports of its own — wiresRouteModule's one-level-deep
+  // check can't see past it. Any file with a parsed moduleDescriptor must be always-wiring.
+  it('does not turn an import of a pure grouping @Module({}) file into a service node', () => {
+    const controller = routeFile({
+      filePath: 'src/admin/users/admin-users.controller.ts',
+      endpoints: [{ method: 'GET', path: '/', routerLocalName: 'AdminUsersController' }],
+      imports: [
+        {
+          moduleSpecifier: '../admin.module',
+          isRelative: true,
+          bindings: [{ localName: 'AdminModule', importedName: 'AdminModule' }]
+        }
+      ]
+    })
+    const adminModule = routeFile({
+      filePath: 'src/admin/admin.module.ts',
+      moduleDescriptor: { controllers: [], routerRoutes: [] }
+    })
+
+    const result = deriveServiceAndDatabaseNodes({
+      routeFiles: [controller, adminModule],
+      packageDependencies: []
+    })
+
+    expect(result.serviceNodes).toEqual([])
+  })
 })
