@@ -2,6 +2,7 @@ import ts from 'typescript-compiler-api'
 import type { FrameworkRouteParser, ParsedRouteFile } from './framework-route-model'
 import { collectGlobalPrefix } from './nest-global-prefix'
 import { collectNestEndpoints } from './nest-controller-collector'
+import { collectModuleDescriptor } from './nest-router-module-registration'
 import { collectExports, collectImports } from './route-call-ast'
 
 function emptyResult(filePath: string): ParsedRouteFile {
@@ -21,13 +22,15 @@ export function parseNestRoutes(source: string, filePath: string): ParsedRouteFi
       ts.ScriptKind.TS
     )
     const globalPrefix = collectGlobalPrefix(sourceFile)
+    const moduleDescriptor = collectModuleDescriptor(sourceFile)
     return {
       filePath,
       endpoints: collectNestEndpoints(sourceFile),
       mounts: [],
       imports: collectImports(sourceFile),
       exports: collectExports(sourceFile),
-      ...(globalPrefix !== undefined ? { globalPrefix } : {})
+      ...(globalPrefix !== undefined ? { globalPrefix } : {}),
+      ...(moduleDescriptor !== undefined ? { moduleDescriptor } : {})
     }
   } catch {
     return emptyResult(filePath)

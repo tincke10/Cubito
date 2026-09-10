@@ -86,4 +86,30 @@ describe('parseNestRoutes', () => {
     )
     expect('globalPrefix' in result).toBe(false)
   })
+
+  it('sets moduleDescriptor when the file has an @Module decorator', () => {
+    const result = parseNestRoutes(
+      [
+        '@Module({',
+        '  controllers: [UsersController, AuthController]',
+        '})',
+        'export class AppModule {}'
+      ].join('\n'),
+      'src/app.module.ts'
+    )
+    expect(result.moduleDescriptor).toEqual({
+      controllers: ['UsersController', 'AuthController'],
+      routerRoutes: []
+    })
+  })
+
+  it('omits moduleDescriptor (not undefined-valued) when the file has no @Module decorator', () => {
+    const result = parseNestRoutes(
+      ['@Controller("users")', 'class UsersController {', '  @Get()', '  list() {}', '}'].join(
+        '\n'
+      ),
+      'src/users/users.controller.ts'
+    )
+    expect('moduleDescriptor' in result).toBe(false)
+  })
 })
