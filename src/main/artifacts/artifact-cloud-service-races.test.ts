@@ -33,7 +33,8 @@ function createResponse(slug: string): Response {
         renderedContentType: 'text/html',
         createdAt: '2026-08-06T00:00:00.000Z',
         updatedAt: '2026-08-06T00:00:00.000Z',
-        expiresAt: '2026-09-06T00:00:00.000Z',
+        // Why: the store prunes expired records against the real clock; keep the fixture ahead of it.
+        expiresAt: new Date(Date.now() + 30 * 86_400_000).toISOString(),
         byteSize: 12,
         deletedAt: null
       },

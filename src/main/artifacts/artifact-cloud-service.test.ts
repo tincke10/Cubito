@@ -43,7 +43,11 @@ const cloudB: OrcaProfileCloudSummary = {
   linkedAt: 2
 }
 
-function createResponse(slug = 'artifact-a', expiresAt = '2026-09-06T00:00:00.000Z'): Response {
+// Why: the share-record store prunes expired records against the real clock, so a
+// literal date turns into a time bomb once the calendar passes it.
+const FIXTURE_EXPIRES_AT = new Date(Date.now() + 30 * 86_400_000).toISOString()
+
+function createResponse(slug = 'artifact-a', expiresAt = FIXTURE_EXPIRES_AT): Response {
   return new Response(
     JSON.stringify({
       artifact: {
