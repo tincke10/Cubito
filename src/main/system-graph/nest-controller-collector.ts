@@ -32,8 +32,9 @@ function findDecorator(node: ts.Node, name: string): ts.Decorator | undefined {
   return (ts.getDecorators(node) ?? []).find((d) => decoratorName(d) === name)
 }
 
-/** '' for absent/'/'; otherwise a leading-slash, no-trailing-slash path segment. */
-function normalizePathSegment(raw: string): string {
+/** '' for absent/'/'; otherwise a leading-slash, no-trailing-slash path segment. Exported for
+ * nest-global-prefix.ts, which needs the same normalization for setGlobalPrefix's arg. */
+export function normalizePathSegment(raw: string): string {
   if (raw === '' || raw === '/') {
     return ''
   }
