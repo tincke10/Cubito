@@ -4,6 +4,7 @@ import type {
   ParsedRouteFile,
   ParsedRouterMount
 } from './framework-route-model'
+import { composeRouterModulePrefixes } from './nest-router-module-composition'
 import { composeMountPrefixes, resolveRelativeModule } from './route-mount-composition'
 import type { EngineSystemEdge, EngineSystemGraph, EngineSystemNode } from './system-graph-model'
 
@@ -215,6 +216,21 @@ export function deriveServiceAndDatabaseNodes(input: {
   return { serviceNodes, databaseNodes, edges }
 }
 
+/** Nest-only prefix join: an empty prefix is a no-op; a bare '/' path collapses to the prefix
+ * alone (avoids a trailing slash, e.g. an empty-@Controller() root under a router-module
+ * prefix); otherwise concatenate, inserting a separating '/' only when `path` doesn't already
+ * carry one — the raw dynamic-path marker never does. Applies uniformly to the globalPrefix and
+ * routerModulePrefix layers, and is a no-op for every express/fastify file (empty prefix). */
+export function appendNestPrefix(prefix: string, path: string): string {
+  if (prefix === '') {
+    return path
+  }
+  if (path === '/') {
+    return prefix
+  }
+  return path.startsWith('/') ? prefix + path : `${prefix}/${path}`
+}
+
 export function assembleSystemGraph(input: {
   routeFiles: ParsedRouteFile[]
   packageDependencies: string[]
@@ -222,6 +238,9 @@ export function assembleSystemGraph(input: {
   const nodes = new Map<string, EngineSystemNode>()
   const edges: EngineSystemEdge[] = []
   const crossFileMounts = composeMountPrefixes(input.routeFiles)
+  const routerModulePrefixes = composeRouterModulePrefixes(input.routeFiles)
+  const globalPrefix =
+    input.routeFiles.find((f) => f.globalPrefix !== undefined)?.globalPrefix ?? ''
 
   for (const file of input.routeFiles) {
     if (file.endpoints.length === 0) {
@@ -236,10 +255,19 @@ export function assembleSystemGraph(input: {
       const crossFilePrefix = endpoint.routerLocalName
         ? crossFileMounts.get(file.filePath)?.get(endpoint.routerLocalName)
         : undefined
-      const composedPath =
+      const basePath =
         crossFilePrefix !== undefined
           ? crossFilePrefix + endpoint.path
           : composeEndpointPath(endpoint, file.mounts)
+      // Nest-only outer layers, both no-ops for express/fastify: a RouterModule.register prefix
+      // applies first, then the graph-wide app.setGlobalPrefix(...) prefix applies over that.
+      const routerModulePrefix = endpoint.routerLocalName
+        ? (routerModulePrefixes.get(file.filePath)?.get(endpoint.routerLocalName) ?? '')
+        : ''
+      const composedPath = appendNestPrefix(
+        globalPrefix,
+        appendNestPrefix(routerModulePrefix, basePath)
+      )
       const endpointId = `endpoint:${file.filePath}#${index}`
       nodes.set(endpointId, {
         id: endpointId,

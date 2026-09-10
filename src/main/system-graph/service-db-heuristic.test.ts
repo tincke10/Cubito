@@ -1,11 +1,28 @@
 import { describe, expect, it } from 'vitest'
 import { parseExpressRoutes, type ParsedRouteFile } from './express-route-parser'
 import { parseFastifyRoutes } from './fastify-route-parser'
-import { assembleSystemGraph, deriveServiceAndDatabaseNodes } from './service-db-heuristic'
+import {
+  appendNestPrefix,
+  assembleSystemGraph,
+  deriveServiceAndDatabaseNodes
+} from './service-db-heuristic'
 
 function routeFile(overrides: Partial<ParsedRouteFile> & { filePath: string }): ParsedRouteFile {
   return { endpoints: [], mounts: [], imports: [], exports: [], ...overrides }
 }
+
+describe('appendNestPrefix', () => {
+  const cases: [string, string, string][] = [
+    ['', '/', '/'],
+    ['/api', '/', '/api'],
+    ['/api', '/users', '/api/users'],
+    ['/api', '<dynamic>', '/api/<dynamic>']
+  ]
+
+  it.each(cases)('appendNestPrefix(%j, %j) -> %j', (prefix, path, expected) => {
+    expect(appendNestPrefix(prefix, path)).toBe(expected)
+  })
+})
 
 describe('deriveServiceAndDatabaseNodes: database client detection', () => {
   const cases: [string, string][] = [
@@ -713,5 +730,67 @@ describe('deriveServiceAndDatabaseNodes: excludes a module-descriptor file reach
     })
 
     expect(result.serviceNodes).toEqual([])
+  })
+})
+
+describe('assembleSystemGraph: nest global prefix and RouterModule composition', () => {
+  it('prefixes every endpoint across files when one file sets a global prefix', () => {
+    const main = routeFile({ filePath: 'src/main.ts', globalPrefix: '/api' })
+    const users = routeFile({
+      filePath: 'src/users/users.controller.ts',
+      endpoints: [{ method: 'GET', path: '/users', routerLocalName: 'UsersController' }]
+    })
+    const auth = routeFile({
+      filePath: 'src/auth/auth.controller.ts',
+      endpoints: [{ method: 'POST', path: '/auth/login', routerLocalName: 'AuthController' }]
+    })
+
+    const graph = assembleSystemGraph({ routeFiles: [main, users, auth], packageDependencies: [] })
+    const endpointPaths = [...graph.nodes.values()]
+      .filter((n) => n.kind === 'endpoint')
+      .map((n) => n.path)
+
+    expect(endpointPaths).toEqual(['/api/users', '/api/auth/login'])
+  })
+
+  it('composes a routerModulePrefix with an already-prefixed endpoint path', () => {
+    const appModule = routeFile({
+      filePath: 'src/app.module.ts',
+      imports: [
+        {
+          moduleSpecifier: './admin/admin.module',
+          isRelative: true,
+          bindings: [{ localName: 'AdminModule', importedName: 'AdminModule' }]
+        }
+      ],
+      moduleDescriptor: {
+        controllers: [],
+        routerRoutes: [{ path: 'admin', moduleLocalName: 'AdminModule', children: [] }]
+      }
+    })
+    const adminModule = routeFile({
+      filePath: 'src/admin/admin.module.ts',
+      imports: [
+        {
+          moduleSpecifier: './admin.controller',
+          isRelative: true,
+          bindings: [{ localName: 'AdminController', importedName: 'AdminController' }]
+        }
+      ],
+      moduleDescriptor: { controllers: ['AdminController'], routerRoutes: [] }
+    })
+    const adminController = routeFile({
+      filePath: 'src/admin/admin.controller.ts',
+      endpoints: [{ method: 'GET', path: '/', routerLocalName: 'AdminController' }]
+    })
+
+    const graph = assembleSystemGraph({
+      routeFiles: [appModule, adminModule, adminController],
+      packageDependencies: []
+    })
+
+    expect(graph.nodes.get('endpoint:src/admin/admin.controller.ts#0')).toEqual(
+      expect.objectContaining({ path: '/admin', label: 'GET /admin' })
+    )
   })
 })
