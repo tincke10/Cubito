@@ -1,10 +1,10 @@
 # Design System
 
-All UI work — layout, color, typography, spacing, component selection, UX behavior — must follow [`docs/STYLEGUIDE.md`](./docs/STYLEGUIDE.md). Use the tokens defined in `src/renderer/src/assets/main.css` (the canonical source) and the shadcn primitives in `src/renderer/src/components/ui/`. Don't invent new color values, font sizes, or shadow tiers when a documented one already covers the role. When STYLEGUIDE.md is silent, follow the resolution order in its final section.
+The fork's UI lives in `frontend/` (vanilla TypeScript + Three.js + SVG, no React/Electron shell). All CSS lives in `frontend/index.html`, using the `--cubito-*` custom properties defined there. Reuse an existing token before inventing a new color, size, or shadow value.
 
-## Electron UI Validation
+## Frontend Validation
 
-Use the `$electron` skill and Playwright CDP for rendered Orca UI checks. Do not use computer-use for Orca UI validation.
+Validate rendered UI against a headless `orcad` (`node out/orcad/orcad.js --port <p> --json`), paired with the frontend dev server (`pnpm --dir frontend run dev`) through the printed pairing URL, in a real browser. Never use computer-use for this.
 
 # Style
 
@@ -32,6 +32,7 @@ Never use vague names like `helpers`, `utils`, `common`, `misc`, or `shared-stuf
 - **Typecheck**: `pnpm tc` (or `tc:node` / `tc:cli` / `tc:web`)
 - **Test**: `pnpm test [path/to/file.test.ts]`
 - **Lint**: `oxlint`, or `pnpm run check:code-quality:changed` for changed files (full `pnpm lint` is slow); format with `pnpm format`
+- **Frontend**: `pnpm --dir frontend run typecheck`; `pnpm --dir frontend run test` (single file: `pnpm --dir frontend exec vitest run <path>`); `pnpm --dir frontend run lint`
 
 # Considerations
 
