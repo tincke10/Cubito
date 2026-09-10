@@ -1,5 +1,6 @@
 import ts from 'typescript-compiler-api'
 import type { FrameworkRouteParser, ParsedRouteFile } from './framework-route-model'
+import { collectGlobalPrefix } from './nest-global-prefix'
 import { collectNestEndpoints } from './nest-controller-collector'
 import { collectExports, collectImports } from './route-call-ast'
 
@@ -19,12 +20,14 @@ export function parseNestRoutes(source: string, filePath: string): ParsedRouteFi
       /* setParentNodes */ true,
       ts.ScriptKind.TS
     )
+    const globalPrefix = collectGlobalPrefix(sourceFile)
     return {
       filePath,
       endpoints: collectNestEndpoints(sourceFile),
       mounts: [],
       imports: collectImports(sourceFile),
-      exports: collectExports(sourceFile)
+      exports: collectExports(sourceFile),
+      ...(globalPrefix !== undefined ? { globalPrefix } : {})
     }
   } catch {
     return emptyResult(filePath)

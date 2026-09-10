@@ -63,4 +63,27 @@ describe('parseNestRoutes', () => {
       exports: [{ localName: 'x', exportedName: 'x' }]
     })
   })
+
+  it('sets globalPrefix when the file calls setGlobalPrefix', () => {
+    const result = parseNestRoutes(
+      [
+        'async function bootstrap() {',
+        '  const app = await NestFactory.create(AppModule)',
+        "  app.setGlobalPrefix('api')",
+        '}'
+      ].join('\n'),
+      'src/main.ts'
+    )
+    expect(result.globalPrefix).toBe('/api')
+  })
+
+  it('omits globalPrefix (not undefined-valued) when the file has no setGlobalPrefix call', () => {
+    const result = parseNestRoutes(
+      ['@Controller("users")', 'class UsersController {', '  @Get()', '  list() {}', '}'].join(
+        '\n'
+      ),
+      'src/users/users.controller.ts'
+    )
+    expect('globalPrefix' in result).toBe(false)
+  })
 })

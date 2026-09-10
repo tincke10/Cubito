@@ -22,6 +22,9 @@ export type ParsedRouteFile = {
   mounts: ParsedRouterMount[]
   imports: ParsedImport[]
   exports: ParsedExport[]
+  /** Nest-only: set on whichever file calls `app.setGlobalPrefix(...)` (normally main.ts).
+   * Omitted (never undefined-valued) for every other file/framework. */
+  globalPrefix?: string
 }
 
 /** Reader-agnostic per-file route parser for one detected framework. */
