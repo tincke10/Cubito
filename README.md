@@ -11,6 +11,10 @@
   <img src="https://img.shields.io/badge/engine-orcad%20(headless)-4493F8?style=flat" alt="Engine: orcad headless" />
 </p>
 
+<p align="center">
+  <img src="docs/readme/cubito-hero.svg" width="100%" alt="A green main worktree cube spawns three blue child cubes along drawn edges; one pauses in amber waiting for input, another finishes; a command palette types the prompt and a status ticker narrates the run." />
+</p>
+
 ---
 
 ## The improvement
@@ -44,6 +48,12 @@ All of the following is shipped, covered by tests, and was validated against a r
 | Terminals | Multiple PTYs per worktree, agent terminal first, new shell with a keystroke |
 | Agents | Trust pre-marked per worktree for Claude Code, Codex, Cursor and Copilot, so a starting agent lands on its prompt without a dialog; per-account `CLAUDE_CONFIG_DIR` and `CODEX_HOME` honoured, locally and over SSH |
 | Compatibility | Capability negotiation on pairing: a newer Cubito degrades gracefully against an older `orcad`, and optional fields never break an older client |
+
+The live system graph is the piece no other window offers: the source in each worktree, parsed into what it exposes and what it talks to, refreshed as the agents write.
+
+<p align="center">
+  <img src="docs/readme/cubito-live-system.svg" width="100%" alt="A NestJS controller parsed into routers, endpoints, a service and a PostgreSQL database; while an agent edits the controller, the uncommitted diff lights the file and a new endpoint is born on the graph." />
+</p>
 
 ### Keys
 
