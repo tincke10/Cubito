@@ -113,20 +113,54 @@ const NEST_WORKTREE: FakeWorktree = {
       "import { AppModule } from './app.module'",
       'async function bootstrap() {',
       '  const app = await NestFactory.create(AppModule)',
+      "  app.setGlobalPrefix('api')",
       '  await app.listen(3000)',
       '}',
       'bootstrap()'
     ].join('\n'),
+    // Kept alongside the new RouterModule wiring on purpose, to prove the two registration
+    // paths coexist: UsersController/AuthController still register directly via `controllers`.
     'src/app.module.ts': [
       "import { Module } from '@nestjs/common'",
+      "import { RouterModule } from '@nestjs/core'",
       "import { UsersController } from './users/users.controller'",
       "import { AuthController } from './auth/auth.controller'",
       "import { UsersService } from './users/users.service'",
+      "import { AdminModule } from './admin/admin.module'",
+      "import { AdminUsersModule } from './admin/users/admin-users.module'",
       '@Module({',
       '  controllers: [UsersController, AuthController],',
-      '  providers: [UsersService]',
+      '  providers: [UsersService],',
+      '  imports: [',
+      '    RouterModule.register([',
+      "      { path: 'admin', module: AdminModule, children: [",
+      "        { path: 'users', module: AdminUsersModule }",
+      '      ] }',
+      '    ])',
+      '  ]',
       '})',
       'export class AppModule {}'
+    ].join('\n'),
+    'src/admin/admin.module.ts': [
+      "import { Module } from '@nestjs/common'",
+      '@Module({})',
+      'export class AdminModule {}'
+    ].join('\n'),
+    'src/admin/users/admin-users.module.ts': [
+      "import { Module } from '@nestjs/common'",
+      "import { AdminUsersController } from './admin-users.controller'",
+      '@Module({',
+      '  controllers: [AdminUsersController]',
+      '})',
+      'export class AdminUsersModule {}'
+    ].join('\n'),
+    'src/admin/users/admin-users.controller.ts': [
+      "import { Controller, Get } from '@nestjs/common'",
+      '@Controller()',
+      'export class AdminUsersController {',
+      '  @Get()',
+      '  list() {}',
+      '}'
     ].join('\n'),
     'src/users/users.controller.ts': [
       "import { Controller, Get, Post } from '@nestjs/common'",
@@ -171,17 +205,26 @@ describe('SystemGraphService: nest worktree golden', () => {
 
     expect(graph.nodes.has('router:src/main.ts')).toBe(false)
     expect(graph.nodes.has('router:src/app.module.ts')).toBe(false)
+    expect(graph.nodes.has('router:src/admin/admin.module.ts')).toBe(false)
+    expect(graph.nodes.has('router:src/admin/users/admin-users.module.ts')).toBe(false)
     expect(graph.nodes.has('router:src/users/users.controller.ts')).toBe(true)
     expect(graph.nodes.has('router:src/auth/auth.controller.ts')).toBe(true)
+    expect(graph.nodes.has('router:src/admin/users/admin-users.controller.ts')).toBe(true)
 
+    // app.setGlobalPrefix('api') prefixes every endpoint, including the ones registered
+    // directly via `controllers` AND the one reached only through RouterModule.register.
     const endpointLabels = nodes.filter((n) => n.kind === 'endpoint').map((n) => n.label)
-    expect(endpointLabels).toContain('GET /users')
-    expect(endpointLabels).toContain('GET /users/:id')
-    expect(endpointLabels).toContain('POST /users')
-    expect(endpointLabels).toContain('POST /auth/login')
+    expect(endpointLabels).toContain('GET /api/users')
+    expect(endpointLabels).toContain('GET /api/users/:id')
+    expect(endpointLabels).toContain('POST /api/users')
+    expect(endpointLabels).toContain('POST /api/auth/login')
+    expect(endpointLabels).toContain('GET /api/admin/users')
+    expect(endpointLabels).not.toContain('GET /users')
+    expect(endpointLabels).not.toContain('POST /auth/login')
 
-    // The entry file (main.ts) and the @Module() descriptor (app.module.ts) must not leak in
-    // as bogus service nodes just because they have relative imports and zero endpoints.
+    // The entry file (main.ts) and every @Module() descriptor (app.module.ts, admin.module.ts,
+    // admin-users.module.ts) must not leak in as bogus service nodes just because they have
+    // relative imports and zero endpoints of their own.
     const serviceLabels = nodes.filter((n) => n.kind === 'service').map((n) => n.label)
     expect(serviceLabels).toEqual(['users.service'])
 
