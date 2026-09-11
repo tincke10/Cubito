@@ -1,15 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import {
   CAMERA_DISTANCE,
+  CAMERA_FAR,
+  CAMERA_HEIGHT_PRESETS,
+  CAMERA_NEAR,
   ELEVATION,
   FIT_MIN_RADIUS,
   FLOW_PERIOD_SECONDS,
   FOCUS_RADIUS,
+  MAX_DOLLY_DISTANCE,
   MAX_RADIUS,
+  MIN_DOLLY_DISTANCE,
   MIN_RADIUS,
   NODE_HEIGHT,
   ORBIT_DAMPING,
   NODE_SIZE,
+  PICK_DRAG_SLOP_PX,
   REFERENCE_HALF_HEIGHT,
   ROOT_MIN_ELEVATION,
   SHADOW_Y
@@ -51,5 +57,40 @@ describe('scene-metrics', () => {
     expect(MIN_RADIUS).toBe(3)
     expect(MAX_RADIUS).toBe(60)
     expect(ORBIT_DAMPING).toBe(0.08)
+  })
+
+  it('pins the perspective rig constants', () => {
+    expect(CAMERA_NEAR).toBe(0.1)
+    expect(CAMERA_FAR).toBe(400)
+    expect(MIN_DOLLY_DISTANCE).toBe(4)
+    expect(MAX_DOLLY_DISTANCE).toBe(120)
+    expect(PICK_DRAG_SLOP_PX).toBe(4)
+  })
+
+  it('pins the four camera height presets', () => {
+    expect(CAMERA_HEIGHT_PRESETS.general).toEqual({
+      position: { x: 6, y: 58, z: 74 },
+      lookAt: { x: -13, y: 0, z: -8 },
+      fov: 40,
+      durationMs: 600
+    })
+    expect(CAMERA_HEIGHT_PRESETS.isla).toEqual({
+      position: { x: 12, y: 15, z: 24 },
+      lookAt: { x: -0.5, y: 0, z: -1.5 },
+      fov: 38,
+      durationMs: 420
+    })
+    expect(CAMERA_HEIGHT_PRESETS.foco).toEqual({
+      position: { x: 3.4, y: 2.6, z: 4.6 },
+      lookAt: { x: 0, y: 0.7, z: 0 },
+      fov: 34,
+      durationMs: 420
+    })
+    expect(CAMERA_HEIGHT_PRESETS.comparar).toEqual({
+      position: { x: 0, y: 5.5, z: 15 },
+      lookAt: { x: 0, y: 0.8, z: -8 },
+      fov: 44,
+      durationMs: 600
+    })
   })
 })

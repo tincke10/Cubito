@@ -58,6 +58,41 @@ export const MIN_POLAR_DEG = 15
 export const MAX_POLAR_DEG = 80 // never dip below the ground plane
 export const MS_PER_SECOND = 1000 // FOCUS_DURATION_MS is milliseconds; camera clock ticks in seconds
 
+// ── camera heights (perspective presets; offsets from a world ground anchor) ──────────────────
+// Not typed against CameraHeight here — that would close an import cycle through
+// camera/camera-framing.ts (same trap ELEVATION documents above). See camera/height-presets.ts.
+export const CAMERA_HEIGHT_PRESETS = {
+  general: {
+    position: { x: 6, y: 58, z: 74 },
+    lookAt: { x: -13, y: 0, z: -8 },
+    fov: 40,
+    durationMs: 600
+  },
+  isla: {
+    position: { x: 12, y: 15, z: 24 },
+    lookAt: { x: -0.5, y: 0, z: -1.5 },
+    fov: 38,
+    durationMs: 420
+  },
+  foco: {
+    position: { x: 3.4, y: 2.6, z: 4.6 },
+    lookAt: { x: 0, y: 0.7, z: 0 },
+    fov: 34,
+    durationMs: 420
+  },
+  comparar: {
+    position: { x: 0, y: 5.5, z: 15 },
+    lookAt: { x: 0, y: 0.8, z: -8 },
+    fov: 44,
+    durationMs: 600
+  }
+} as const
+export const CAMERA_NEAR = 0.1
+export const CAMERA_FAR = 400
+export const MIN_DOLLY_DISTANCE = 4
+export const MAX_DOLLY_DISTANCE = 120
+export const PICK_DRAG_SLOP_PX = 4
+
 // ── decorations ─────────────────────────────────────────────────────────
 export const SELECTION_RING_RADIUS = 1.412 // mockup rx 48 ÷ 34
 export const SELECTION_RING_WIDTH = 1.5 // screen px (LineMaterial)
