@@ -65,8 +65,11 @@ describe('commandCatalog', () => {
   })
 
   it('carries the static Spanish labels and keybinding hints', () => {
-    expect(findCommand(mac, 'focus')).toMatchObject({ label: 'focus', keybindingHint: 'f' })
-    expect(findCommand(mac, 'fit-all')).toMatchObject({ label: 'ver todo', keybindingHint: 'v' })
+    expect(findCommand(mac, 'focus')).toMatchObject({ label: 'foco', keybindingHint: 'f' })
+    expect(findCommand(mac, 'fit-all')).toMatchObject({
+      label: 'general · ver todo',
+      keybindingHint: 'v'
+    })
     expect(findCommand(mac, 'open-terminal')).toMatchObject({
       label: 'abrir terminal',
       keybindingHint: 't'

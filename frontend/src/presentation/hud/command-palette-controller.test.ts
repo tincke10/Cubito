@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from 'vitest'
 import { createCommandPaletteController } from './command-palette-controller'
 import type { CommandPaletteControllerDeps } from './command-palette-controller'
 import { createSceneStore } from '../../application/scene-store'
+import { commandCatalog } from '../../application/command-catalog'
 import type { CommandId } from '../../application/command-catalog'
+import { hudModel } from './hud-model'
+import { resolveNavCommand } from '../navigation/keymap'
 import type { CommandPaletteHandle } from './command-palette-element'
 import type { CommandPaletteViewModel } from './command-palette-view-model'
 import { inertActivity } from '../../domain/worktree-graph/node-activity'
@@ -321,5 +324,24 @@ describe('createCommandPaletteController', () => {
     openAndMount(setupResult)
     setupResult.controller.dispose()
     expect(setupResult.handles[0]!.disposed).toBe(true)
+  })
+
+  describe('cross-surface label agreement (KEY-10)', () => {
+    it('the palette catalog, the chip row and the keymap all agree on foco/general · ver todo', () => {
+      const setupResult = setup()
+      const catalog = commandCatalog(LINUX)
+      const chips = hudModel(setupResult.store.get(), LINUX).chips
+
+      const focusLabel = catalog.find((c) => c.id === 'focus')!.label
+      const fitAllLabel = catalog.find((c) => c.id === 'fit-all')!.label
+      expect(chips.find((c) => c.key === 'f')?.description).toBe(focusLabel)
+      expect(chips.find((c) => c.key === 'v')?.description).toBe(fitAllLabel)
+      expect(
+        resolveNavCommand('f', { alt: false, ctrl: false, meta: false, shift: false }, LINUX)
+      ).toEqual({ kind: 'set-height', height: 'foco' })
+      expect(
+        resolveNavCommand('v', { alt: false, ctrl: false, meta: false, shift: false }, LINUX)
+      ).toEqual({ kind: 'set-height', height: 'general' })
+    })
   })
 })

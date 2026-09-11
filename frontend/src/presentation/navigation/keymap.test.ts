@@ -15,16 +15,28 @@ describe('resolveNavCommand', () => {
     ['ArrowRight', { kind: 'move', direction: 'child' }],
     ['ArrowUp', { kind: 'move', direction: 'prev-sibling' }],
     ['ArrowDown', { kind: 'move', direction: 'next-sibling' }],
-    ['f', { kind: 'focus' }],
-    ['v', { kind: 'fit-all' }]
+    ['f', { kind: 'set-height', height: 'foco' }],
+    ['v', { kind: 'set-height', height: 'general' }],
+    ['Enter', { kind: 'descend-island' }]
   ] as const)('maps %s with no modifiers to %o', (key, expected) => {
     expect(resolveNavCommand(key, noModifiers, LINUX)).toEqual(expected)
   })
 
   it('returns null for any other key', () => {
     expect(resolveNavCommand('q', noModifiers, LINUX)).toBeNull()
-    expect(resolveNavCommand('Enter', noModifiers, LINUX)).toBeNull()
     expect(resolveNavCommand('', noModifiers, LINUX)).toBeNull()
+  })
+
+  it('Enter with any modifier resolves to null', () => {
+    expect(resolveNavCommand('Enter', { ...noModifiers, ctrl: true }, LINUX)).toBeNull()
+    expect(resolveNavCommand('Enter', { ...noModifiers, meta: true }, LINUX)).toBeNull()
+    expect(resolveNavCommand('Enter', { ...noModifiers, shift: true }, LINUX)).toBeNull()
+    expect(resolveNavCommand('Enter', { ...noModifiers, alt: true }, LINUX)).toBeNull()
+  })
+
+  it('c still resolves to open-compare and Tab to next-terminal (regression guard)', () => {
+    expect(resolveNavCommand('c', noModifiers, LINUX)).toEqual({ kind: 'open-compare' })
+    expect(resolveNavCommand('Tab', noModifiers, LINUX)).toEqual({ kind: 'next-terminal' })
   })
 
   it.each([
@@ -184,13 +196,19 @@ describe('shift+f fan-out chord — platform-uniform, targeted exception to the 
     })
   })
 
-  it('bare f (no modifier) still resolves to focus on either platform', () => {
-    expect(resolveNavCommand('f', noModifiers, MAC)).toEqual({ kind: 'focus' })
-    expect(resolveNavCommand('f', noModifiers, LINUX)).toEqual({ kind: 'focus' })
+  it('bare f (no modifier) still resolves to set-height foco on either platform', () => {
+    expect(resolveNavCommand('f', noModifiers, MAC)).toEqual({ kind: 'set-height', height: 'foco' })
+    expect(resolveNavCommand('f', noModifiers, LINUX)).toEqual({
+      kind: 'set-height',
+      height: 'foco'
+    })
   })
 
   it('F without shift (e.g. caps-lock) is unaffected — no modifier means bare f, unrelated here', () => {
-    expect(resolveNavCommand('f', noModifiers, LINUX)).toEqual({ kind: 'focus' })
+    expect(resolveNavCommand('f', noModifiers, LINUX)).toEqual({
+      kind: 'set-height',
+      height: 'foco'
+    })
   })
 
   it('shift+f with ctrl, alt or meta also held stays gated to null', () => {

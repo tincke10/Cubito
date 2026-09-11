@@ -93,8 +93,8 @@ const activeRepoLine = (state: SceneState): HudModel['repo'] => {
 
 const chipsFor = (platform: { isMac: boolean }): readonly HudChip[] => [
   { key: 'hjkl', description: 'navegar' },
-  { key: 'f', description: 'focus' },
-  { key: 'v', description: 'ver todo' },
+  { key: 'f', description: 'foco' },
+  { key: 'v', description: 'general · ver todo' },
   { key: 's', description: 'spawn' },
   { key: platform.isMac ? '⌘K' : 'Ctrl+K', description: 'paleta' },
   { key: platform.isMac ? '⌘P' : 'Ctrl+P', description: 'proyectos' }

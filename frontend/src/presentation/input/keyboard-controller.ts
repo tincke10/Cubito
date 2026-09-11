@@ -1,7 +1,7 @@
 import type { SceneStore } from '../../application/scene-store'
 import { isTextEntryTarget, resolveNavCommand } from '../navigation/keymap'
-import { moveSelection } from '../navigation/selection-model'
-import { nextIsland } from '../../application/repos-model'
+import { islandEntrySelection, moveSelection } from '../navigation/selection-model'
+import { cycleIsland, nextIsland } from '../../application/repos-model'
 import { fanOutMemberIds } from '../../application/fan-out-model'
 import type { CameraHeightController } from './camera-height-controller'
 
@@ -99,6 +99,18 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
       // enabled chip, so this is a handled no-op that must not drag the graph selection
       // out from under the anchored menu.
       if (store.get().spawnMenu.view === 'radial') return true
+      // general repurposes hjkl/arrows to island-cycling (KEY-07): child/next-sibling (l/j)
+      // step forward, parent/prev-sibling (h/k) step backward. Always handled, even with 0/1 repos.
+      if (heights.current() === 'general') {
+        const step = command.direction === 'child' || command.direction === 'next-sibling' ? 1 : -1
+        const repos = store.get().repos
+        const next = cycleIsland(repos.list, repos.activeRepoId, step)
+        if (next !== null) {
+          store.dispatchRepos({ type: 'set-active', repoId: next })
+          heights.reanchorIsland(next)
+        }
+        return true
+      }
       const graph = store.get().graph
       const current = store.get().selection.selectedId
       const next = moveSelection(graph, current, command.direction)
@@ -108,12 +120,19 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
       heights.onSelectionChanged(next)
       return true
     }
-    if (command.kind === 'focus') {
-      heights.goTo('foco')
+    if (command.kind === 'set-height') {
+      heights.goTo(command.height)
       return true
     }
-    if (command.kind === 'fit-all') {
-      heights.goTo('general')
+    if (command.kind === 'descend-island') {
+      // Enter only descends FROM general (KEY-04) — outside it, unbound.
+      if (heights.current() !== 'general') return false
+      const repoId = store.get().repos.activeRepoId
+      const mainId = islandEntrySelection(store.get().graph, repoId)
+      heights.goTo('isla')
+      if (mainId !== null) {
+        store.update({ selection: { selectedId: mainId } })
+      }
       return true
     }
     if (command.kind === 'open-terminal') {

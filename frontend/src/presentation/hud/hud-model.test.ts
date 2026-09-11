@@ -160,6 +160,12 @@ describe('hudModel', () => {
     expect(paletteChip?.key).toContain('Ctrl+K')
   })
 
+  it('chips label f as foco and v as general · ver todo (KEY-10 cross-surface agreement)', () => {
+    const model = hudModel(baseState(), { isMac: true })
+    expect(model.chips).toContainEqual({ key: 'f', description: 'foco' })
+    expect(model.chips).toContainEqual({ key: 'v', description: 'general · ver todo' })
+  })
+
   it('chips include the Mac-labeled projects shortcut when isMac is true', () => {
     const model = hudModel(baseState(), { isMac: true })
     expect(model.chips).toContainEqual({ key: '⌘P', description: 'proyectos' })

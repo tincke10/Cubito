@@ -37,8 +37,13 @@ export const toCommandAvailability = (state: SceneState): CommandAvailability =>
 /** Static, ordered ⌘K catalog (proposal order). Pure and deterministic given platform — the one
  *  platform-variant hint (open-projects) resolves here instead of through DOM/env lookups. */
 export const commandCatalog = (platform: { isMac: boolean }): readonly PaletteCommand[] => [
-  { id: 'focus', label: 'focus', keybindingHint: 'f', isAvailable: (a) => a.hasSelection },
-  { id: 'fit-all', label: 'ver todo', keybindingHint: 'v', isAvailable: () => true },
+  { id: 'focus', label: 'foco', keybindingHint: 'f', isAvailable: (a) => a.hasSelection },
+  {
+    id: 'fit-all',
+    label: 'general · ver todo',
+    keybindingHint: 'v',
+    isAvailable: () => true
+  },
   {
     id: 'open-terminal',
     label: 'abrir terminal',

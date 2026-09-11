@@ -1,9 +1,12 @@
+import type { CameraHeight } from '../camera/camera-pose'
+
 export type NavDirection = 'parent' | 'child' | 'prev-sibling' | 'next-sibling'
 
 export type NavCommand =
   | { kind: 'move'; direction: NavDirection }
-  | { kind: 'focus' }
-  | { kind: 'fit-all' }
+  | { kind: 'set-height'; height: CameraHeight }
+  /** Bare Enter: descend general -> isla, selecting the entered island's main (KEY-04). */
+  | { kind: 'descend-island' }
   /** forceNew (shift+t, v3-3): skip attach-to-existing-host-pty, always spawn a fresh shell. */
   | { kind: 'open-terminal'; forceNew?: boolean }
   | { kind: 'pin-terminal' }
@@ -103,10 +106,13 @@ export function resolveNavCommand(
     return { kind: 'move', direction: MOVE_DIRECTIONS[key as keyof typeof MOVE_DIRECTIONS] }
   }
   if (key === 'f') {
-    return { kind: 'focus' }
+    return { kind: 'set-height', height: 'foco' }
   }
   if (key === 'v') {
-    return { kind: 'fit-all' }
+    return { kind: 'set-height', height: 'general' }
+  }
+  if (key === 'Enter') {
+    return { kind: 'descend-island' }
   }
   if (key === 't') {
     return { kind: 'open-terminal' }
