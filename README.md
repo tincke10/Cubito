@@ -98,40 +98,53 @@ The live system graph is the piece no other window offers: the source in each wo
 
 The frontend is a separate package under `frontend/`, with its own lockfile and test suite. The engine lives under `src/main/` and builds to a single bundle, `out/orcad/orcad.js`.
 
-## Run it
+## Install it
 
-Requirements: Node 24 and pnpm 10.
+Cubito is isolated by construction: it never touches an existing Orca install. It keeps its own data under `~/.cubito` and its own worktrees under `~/cubito/workspaces` — never `~/.orca` or `~/orca/workspaces` — so a machine can run both side by side.
 
-```bash
-# engine (install skips the Electron-targeted postinstall; node-pty is rebuilt for Node instead)
-pnpm install --ignore-scripts
-node config/scripts/ensure-native-runtime.mjs --runtime=node
-pnpm build:cli && pnpm build:orcad
-node out/orcad/orcad.js --port 6799 --json
-# the first JSON line carries pairing.url — keep it
+### macOS
 
-# frontend, in another shell
-pnpm --dir frontend install
-pnpm --dir frontend run dev --port 5180
-```
-
-Open the frontend with the pairing URL in the fragment:
-
-```
-http://localhost:5180/#pairing=<url-encoded pairing.url>
-```
-
-Without a fragment, or with a rejected one, the frontend starts in demo mode with a synthetic graph. `orcad` binds to `127.0.0.1` by default; use `--bind` to expose it, or an SSH local port-forward from another machine.
-
-The engine keeps its data under the ORCA profile directory. To run against an isolated profile, set `ORCA_USER_DATA` to a short path before starting `orcad` (the daemon's unix socket rejects long paths).
-
-The ORCA CLI still works against the same data:
+Requirements: Node 24, pnpm 10.24 (via corepack), git, and the Xcode Command Line Tools (`xcode-select --install`) — `node-pty` is compiled from source.
 
 ```bash
-export ORCA_USER_DATA_PATH=~/cubito-data      # same directory, CLI-side variable
-node out/cli/index.js repo add --path /path/to/repo --json
-node out/cli/index.js worktree create --repo path:/path/to/repo --name my-task --json
-node out/cli/index.js worktree list --json
+git clone https://github.com/tincke10/Cubito.git
+cd Cubito
+pnpm cubito:install   # preflights the toolchain, then installs and builds engine + frontend
+pnpm cubito:start      # boots orcad and the frontend, prints the pairing URL, opens it
+```
+
+`cubito:install` fails fast with an actionable fix line for any missing prerequisite. `cubito:start` prints the pairing URL once both processes are ready and opens it in your default browser. If you reload that tab, re-open the printed URL instead — a soft reload drops the pairing fragment and lands you in demo mode.
+
+Override the defaults with flags or environment variables: `--data-dir` / `$ORCA_USER_DATA`, `--worktree-root` / `$CUBITO_WORKTREE_ROOT`, `--port` / `$CUBITO_ORCAD_PORT`, `--frontend-port` / `$CUBITO_FRONTEND_PORT`, `--no-open` / `$CUBITO_NO_OPEN`. Running two Cubitos at once needs two different data dirs — pass a second `--data-dir` (and a free `--port`/`--frontend-port` pair) for the second one.
+
+### Docker
+
+Requirement: Docker Desktop.
+
+```bash
+docker compose up --build   # or: pnpm cubito:docker
+```
+
+This builds the image and starts a `cubito` container publishing `6799` (orcad) and `5180` (the frontend), with data in the `cubito-data`, `cubito-workspaces` and `cubito-repos` named volumes. Watch the logs for the printed pairing URL and open it on the host at `http://localhost:5180/...`.
+
+Coding agents run inside the container, so log them in there:
+
+```bash
+docker compose exec cubito claude login
+```
+
+Repos to work on live under `/repos` inside the container. Clone one in, then add it from the command palette (`⌘K` / `Ctrl+K`):
+
+```bash
+docker compose exec cubito git clone <url> /repos/<name>
+```
+
+A demo NestJS repo (`/repos/demo-nest`) is seeded on first boot so the live system graph has something to show immediately.
+
+To reset everything — data, worktrees and cloned repos:
+
+```bash
+docker compose down -v
 ```
 
 ## Verify
