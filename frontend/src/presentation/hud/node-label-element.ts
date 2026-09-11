@@ -63,7 +63,8 @@ export function createNodeLabel(): NodeLabelHandle {
   return {
     object,
     apply(model: NodeLabelModel) {
-      root.style.display = model.visible ? '' : 'none'
+      // CSS2DRenderer rewrites element.style.display from object.visible on every render.
+      object.visible = model.visible
       if (!model.visible) return
       applyLine(primary, model.primary)
       applyLine(secondary, model.secondary)
