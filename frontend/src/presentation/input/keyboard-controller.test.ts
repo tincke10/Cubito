@@ -5,8 +5,9 @@ import { createKeyboardController } from './keyboard-controller'
 import type { KeyboardControllerEvent, ScenePositions } from './keyboard-controller'
 import { createSceneStore } from '../../application/scene-store'
 import { moveSelection } from '../navigation/selection-model'
-import { frameAll, frameIsland, frameNode, isWithinFraming } from '../camera/camera-framing'
+import { frameAll, frameIsland, frameNode } from '../camera/camera-framing'
 import type { Vec3 } from '../camera/camera-framing'
+import { poseForExtent } from '../camera/height-presets'
 import { inertActivity } from '../../domain/worktree-graph/node-activity'
 import type { WorktreeGraph, WorktreeNode } from '../../domain/worktree-graph/types'
 import { FOCUS_DURATION_MS, NODE_SIZE } from '../theme/scene-metrics'
@@ -73,6 +74,20 @@ function fakeTerminalCommandPort() {
 const LINUX = { isMac: false }
 const MAC = { isMac: true }
 
+/** Fixed fov so pose-shaped assertions (`poseForExtent(framing, FAKE_FOV)`) are deterministic. */
+const FAKE_FOV = 38
+function fakeCameraRig() {
+  return {
+    animateTo: vi.fn(),
+    currentPose: vi.fn(() => ({
+      position: { x: 0, y: 0, z: 0 },
+      lookAt: { x: 0, y: 0, z: 0 },
+      fov: FAKE_FOV
+    })),
+    isPointInView: vi.fn(() => true)
+  }
+}
+
 /** Drives fan-out-model's real reducer to a 'running' slice with real created children —
  *  open-compare anchors on this slice, not on graph/selection. */
 function withRunningCamada(
@@ -92,7 +107,7 @@ function withRunningCamada(
 function setup(selectedId: string | null = 'b', platform = LINUX) {
   const store = createSceneStore()
   store.update({ graph: buildFanGraph(), selection: { selectedId } })
-  const cameraRig = { animateTo: vi.fn() }
+  const cameraRig = fakeCameraRig()
   const scenePositions = fakeScenePositions()
   const terminal = fakeTerminalCommandPort()
   const controller = createKeyboardController({
@@ -132,7 +147,7 @@ function setupWithRepos() {
   const store = createSceneStore()
   store.update({ graph: buildTwoRepoGraph(), selection: { selectedId: null } })
   store.dispatchRepos({ type: 'set-list', list: [REPO_1, REPO_2] })
-  const cameraRig = { animateTo: vi.fn() }
+  const cameraRig = fakeCameraRig()
   const scenePositions: ScenePositions = {
     nodeCenter: (id) => ISLAND_CENTERS[id] ?? null,
     nodeCenters: () => Object.values(ISLAND_CENTERS)
@@ -185,7 +200,10 @@ describe('createKeyboardController', () => {
     controller.handleKeyDown(baseEvent({ key: 'f' }))
 
     expect(cameraRig.animateTo).toHaveBeenCalledTimes(1)
-    expect(cameraRig.animateTo).toHaveBeenCalledWith(frameNode(CENTERS['a']!), FOCUS_DURATION_MS)
+    expect(cameraRig.animateTo).toHaveBeenCalledWith(
+      poseForExtent(frameNode(CENTERS['a']!), FAKE_FOV),
+      FOCUS_DURATION_MS
+    )
   })
 
   it('v fits every node through camera-rig.animateTo — no direct camera math here', () => {
@@ -195,7 +213,7 @@ describe('createKeyboardController', () => {
 
     expect(cameraRig.animateTo).toHaveBeenCalledTimes(1)
     expect(cameraRig.animateTo).toHaveBeenCalledWith(
-      frameAll(scenePositions.nodeCenters()),
+      poseForExtent(frameAll(scenePositions.nodeCenters()), FAKE_FOV),
       FOCUS_DURATION_MS
     )
   })
@@ -249,19 +267,19 @@ describe('createKeyboardController', () => {
   })
 
   it('guard rail: an out-of-view selection change issues an implicit frameNode', () => {
-    // Sanity check that the fixture actually exercises the boundary: framed tightly on
-    // 'b', 'c' (10 units away — the fan's diameter) sits outside FOCUS_RADIUS(6)+NODE_SIZE margin.
-    const tightFraming = frameNode(CENTERS.b!)
-    expect(isWithinFraming(CENTERS.c!, tightFraming, NODE_SIZE)).toBe(false)
-
     const { store, cameraRig, controller } = setup('b')
     controller.handleKeyDown(baseEvent({ key: 'f' })) // establishes a tight framing on 'b'
     cameraRig.animateTo.mockClear()
+    cameraRig.isPointInView.mockReturnValue(false) // simulate 'c' falling outside the live frustum
 
-    controller.handleKeyDown(baseEvent({ key: 'j' })) // b -> c: moves out of the current framing
+    controller.handleKeyDown(baseEvent({ key: 'j' })) // b -> c: moves out of view
 
     expect(store.get().selection.selectedId).toBe('c')
-    expect(cameraRig.animateTo).toHaveBeenCalledWith(frameNode(CENTERS.c!), FOCUS_DURATION_MS)
+    expect(cameraRig.isPointInView).toHaveBeenCalledWith(CENTERS.c, NODE_SIZE)
+    expect(cameraRig.animateTo).toHaveBeenCalledWith(
+      poseForExtent(frameNode(CENTERS.c!), FAKE_FOV),
+      FOCUS_DURATION_MS
+    )
   })
 
   it('attach()/detach() are a thin DOM wrapper — smoke-tested via a fake EventTarget', () => {
@@ -531,7 +549,7 @@ describe('createKeyboardController', () => {
       expect(handled).toBe(true)
       expect(store.get().repos.activeRepoId).toBe('r2')
       expect(cameraRig.animateTo).toHaveBeenCalledWith(
-        frameIsland(store.get().graph, 'r2', scenePositions.nodeCenter),
+        poseForExtent(frameIsland(store.get().graph, 'r2', scenePositions.nodeCenter), FAKE_FOV),
         FOCUS_DURATION_MS
       )
     })

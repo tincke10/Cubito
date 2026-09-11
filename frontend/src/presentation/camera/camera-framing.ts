@@ -41,28 +41,6 @@ export const frameAll = (centers: Iterable<Vec3>): CameraFraming => {
 export const easeInOutCubic = (t: number): number =>
   t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2
 
-const lerp = (a: number, b: number, t: number): number => {
-  if (t <= 0) return a
-  if (t >= 1) return b
-  return a + (b - a) * t
-}
-
-export const interpolateFraming = (
-  from: CameraFraming,
-  to: CameraFraming,
-  t: number
-): CameraFraming => ({
-  target: {
-    x: lerp(from.target.x, to.target.x, t),
-    y: lerp(from.target.y, to.target.y, t),
-    z: lerp(from.target.z, to.target.z, t)
-  },
-  radius: lerp(from.radius, to.radius, t)
-})
-
-export const isWithinFraming = (point: Vec3, framing: CameraFraming, margin: number): boolean =>
-  distance(point, framing.target) <= framing.radius + margin
-
 /** Centers of every node in `repoId`'s island, via an injected lookup (design Area 7) — shared by
  *  the keyboard-controller's Tab island-cycle and the ⌘P selector's activate. */
 export const islandCenters = (

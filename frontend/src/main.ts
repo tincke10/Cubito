@@ -10,6 +10,7 @@ import type { RuntimeGateway } from './application/ports/runtime-gateway'
 import type { RawWorktreeRecord } from './domain/worktree-graph/build-graph'
 import { frameAll, frameIsland } from './presentation/camera/camera-framing'
 import type { Vec3 } from './presentation/camera/camera-framing'
+import { poseForExtent } from './presentation/camera/height-presets'
 import { createFanOutBinder } from './bind-fan-out'
 import { createSystemViewBinder } from './bind-system-view'
 import { demoSystemGraph } from './demo-system-graph'
@@ -216,7 +217,8 @@ const fanOutBinder = createFanOutBinder({
   store,
   hud: hudElement,
   nodeCenter: (id) => graphView.nodeCenter(id),
-  animateTo: (framing, durationMs) => cameraRig.animateTo(framing, durationMs),
+  animateTo: (framing, durationMs) =>
+    cameraRig.animateTo(poseForExtent(framing, cameraRig.currentPose().fov), durationMs),
   focusDurationMs: FOCUS_DURATION_MS,
   demoGateway
 })
@@ -345,7 +347,7 @@ store.subscribe((state) => {
   commandPaletteController.sync(state.commandPalette, state)
   if (!framed && state.graph.nodes.size > 0) {
     framed = true
-    cameraRig.apply(frameAll(graphView.nodeCenters()))
+    cameraRig.apply(poseForExtent(frameAll(graphView.nodeCenters()), cameraRig.currentPose().fov))
   }
 })
 
@@ -417,7 +419,7 @@ function bindProjects(connection: LiveSyncConnection): void {
     reposDispatch: (action) => store.dispatchRepos(action),
     focusIsland: (repoId) => {
       const framing = frameIsland(store.get().graph, repoId, graphView.nodeCenter)
-      cameraRig.animateTo(framing, FOCUS_DURATION_MS)
+      cameraRig.animateTo(poseForExtent(framing, cameraRig.currentPose().fov), FOCUS_DURATION_MS)
     },
     refetch: () => syncWorktreeGraph(projectsGateway, store)
   })

@@ -3,13 +3,14 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
 import type { ScenePalette } from '../theme/scene-palette'
 import {
-  CAMERA_DISTANCE,
+  CAMERA_FAR,
+  CAMERA_HEIGHT_PRESETS,
+  CAMERA_NEAR,
+  MAX_DOLLY_DISTANCE,
   MAX_POLAR_DEG,
-  MAX_RADIUS,
+  MIN_DOLLY_DISTANCE,
   MIN_POLAR_DEG,
-  ORBIT_DAMPING,
-  MIN_RADIUS,
-  REFERENCE_HALF_HEIGHT
+  ORBIT_DAMPING
 } from '../theme/scene-metrics'
 import { createIsoGrid } from './iso-grid'
 
@@ -18,7 +19,7 @@ export type ResizeCallback = (width: number, height: number) => void
 
 export type CubitoScene = {
   scene: THREE.Scene
-  camera: THREE.OrthographicCamera
+  camera: THREE.PerspectiveCamera
   renderer: THREE.WebGLRenderer
   labelRenderer: CSS2DRenderer
   labelLayer: THREE.Object3D
@@ -35,8 +36,6 @@ export type CubitoScene = {
 }
 
 const MAX_PIXEL_RATIO = 2
-/** Ortho depth range around the framing target; generous because ortho has no perspective cost. */
-const DEPTH_MARGIN = MAX_RADIUS * 2 * 2
 
 /**
  * Renderer / camera / controls / label-layer bootstrap and the app's ONLY
@@ -53,13 +52,11 @@ export function createScene(container: HTMLElement, palette: ScenePalette): Cubi
   const height = container.clientHeight
   const aspect = width / height
 
-  const camera = new THREE.OrthographicCamera(
-    -REFERENCE_HALF_HEIGHT * aspect,
-    REFERENCE_HALF_HEIGHT * aspect,
-    REFERENCE_HALF_HEIGHT,
-    -REFERENCE_HALF_HEIGHT,
-    CAMERA_DISTANCE - DEPTH_MARGIN,
-    CAMERA_DISTANCE + DEPTH_MARGIN
+  const camera = new THREE.PerspectiveCamera(
+    CAMERA_HEIGHT_PRESETS.isla.fov,
+    aspect,
+    CAMERA_NEAR,
+    CAMERA_FAR
   )
 
   const renderer = new THREE.WebGLRenderer({ antialias: true })
@@ -83,8 +80,8 @@ export function createScene(container: HTMLElement, palette: ScenePalette): Cubi
   controls.screenSpacePanning = false
   controls.minPolarAngle = THREE.MathUtils.degToRad(MIN_POLAR_DEG)
   controls.maxPolarAngle = THREE.MathUtils.degToRad(MAX_POLAR_DEG)
-  controls.minZoom = REFERENCE_HALF_HEIGHT / MAX_RADIUS
-  controls.maxZoom = REFERENCE_HALF_HEIGHT / MIN_RADIUS
+  controls.minDistance = MIN_DOLLY_DISTANCE
+  controls.maxDistance = MAX_DOLLY_DISTANCE
 
   const grid = createIsoGrid()
   grid.apply(palette.gridLine)

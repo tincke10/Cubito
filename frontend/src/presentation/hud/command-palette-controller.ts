@@ -10,6 +10,7 @@ import type {
   TerminalCommandPort
 } from '../input/keyboard-controller'
 import { frameAll, frameNode } from '../camera/camera-framing'
+import { poseForExtent } from '../camera/height-presets'
 import { FOCUS_DURATION_MS } from '../theme/scene-metrics'
 import { fanOutMemberIds } from '../../application/fan-out-model'
 
@@ -44,10 +45,18 @@ export function createCommandPaletteController(
     focus: () => {
       const selectedId = store.get().selection.selectedId
       const center = selectedId !== null ? scenePositions.nodeCenter(selectedId) : null
-      if (center) cameraRig.animateTo(frameNode(center), FOCUS_DURATION_MS)
+      if (center) {
+        cameraRig.animateTo(
+          poseForExtent(frameNode(center), cameraRig.currentPose().fov),
+          FOCUS_DURATION_MS
+        )
+      }
     },
     'fit-all': () => {
-      cameraRig.animateTo(frameAll(scenePositions.nodeCenters()), FOCUS_DURATION_MS)
+      cameraRig.animateTo(
+        poseForExtent(frameAll(scenePositions.nodeCenters()), cameraRig.currentPose().fov),
+        FOCUS_DURATION_MS
+      )
     },
     'open-terminal': () => {
       const selectedId = store.get().selection.selectedId

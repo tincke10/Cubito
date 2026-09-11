@@ -3,8 +3,6 @@
 // and EstadosNodo.dc.html (see SDD nucleo-grafo design §1-2 for the derivations).
 
 // ── projection ──────────────────────────────────────────────────────────
-export const ISO_AZIMUTH_DEG = 45
-export const ISO_ELEVATION_DEG = 30
 export const PX_PER_UNIT = 48.08 // mockup px per world unit — traceability only
 export const PX_PER_UNIT_VERTICAL = 41.64 // = PX_PER_UNIT · cos(30°)
 
@@ -45,13 +43,9 @@ export const MIN_ANGULAR_SEPARATION = NODE_SIZE * 1.8
 export const ROOT_SPREAD = DEPTH_STEP * 2
 
 // ── camera ──────────────────────────────────────────────────────────────
-export const REFERENCE_HALF_HEIGHT = 10 // mockup default framing ≈ 450px / 48.08 = 9.36
-export const CAMERA_DISTANCE = 200 // irrelevant to ortho projection; drives near/far
 export const FOCUS_RADIUS = 6 // node + its immediate family
 export const FIT_PADDING = 1.5
 export const FIT_MIN_RADIUS = 6
-export const MIN_RADIUS = 3
-export const MAX_RADIUS = 60
 export const FOCUS_DURATION_MS = 420
 export const ORBIT_DAMPING = 0.08
 export const MIN_POLAR_DEG = 15

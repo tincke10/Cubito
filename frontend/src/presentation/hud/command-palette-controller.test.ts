@@ -7,7 +7,10 @@ import type { CommandPaletteHandle } from './command-palette-element'
 import type { CommandPaletteViewModel } from './command-palette-view-model'
 import { frameAll, frameNode } from '../camera/camera-framing'
 import type { Vec3 } from '../camera/camera-framing'
+import { poseForExtent } from '../camera/height-presets'
 import { FOCUS_DURATION_MS } from '../theme/scene-metrics'
+
+const FAKE_FOV = 38
 import { inertActivity } from '../../domain/worktree-graph/node-activity'
 import type { WorktreeGraph, WorktreeNode } from '../../domain/worktree-graph/types'
 
@@ -107,7 +110,15 @@ function setup(selectedId: string | null = 'a', connected = true) {
     selection: { selectedId },
     connection: connected ? { state: 'connected', runtimeId: 'r' } : { state: 'down', reason: 'x' }
   })
-  const cameraRig = { animateTo: vi.fn() }
+  const cameraRig = {
+    animateTo: vi.fn(),
+    currentPose: vi.fn(() => ({
+      position: { x: 0, y: 0, z: 0 },
+      lookAt: { x: 0, y: 0, z: 0 },
+      fov: FAKE_FOV
+    })),
+    isPointInView: vi.fn(() => true)
+  }
   const scenePositions = {
     nodeCenter: (id: string) => CENTERS[id] ?? null,
     nodeCenters: () => Object.values(CENTERS)
@@ -184,7 +195,7 @@ describe('createCommandPaletteController', () => {
       setupResult.handles[0]!.emitActivate('focus')
       expect(setupResult.store.get().commandPalette.view).toBe('closed')
       expect(setupResult.cameraRig.animateTo).toHaveBeenCalledWith(
-        frameNode(CENTERS.a!),
+        poseForExtent(frameNode(CENTERS.a!), FAKE_FOV),
         FOCUS_DURATION_MS
       )
     })
@@ -201,7 +212,7 @@ describe('createCommandPaletteController', () => {
       openAndMount(setupResult)
       setupResult.handles[0]!.emitActivate('fit-all')
       expect(setupResult.cameraRig.animateTo).toHaveBeenCalledWith(
-        frameAll(setupResult.scenePositions.nodeCenters()),
+        poseForExtent(frameAll(setupResult.scenePositions.nodeCenters()), FAKE_FOV),
         FOCUS_DURATION_MS
       )
     })

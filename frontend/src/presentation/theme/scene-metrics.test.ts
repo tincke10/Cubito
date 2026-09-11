@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import {
-  CAMERA_DISTANCE,
   CAMERA_FAR,
   CAMERA_HEIGHT_PRESETS,
   CAMERA_NEAR,
@@ -9,14 +8,11 @@ import {
   FLOW_PERIOD_SECONDS,
   FOCUS_RADIUS,
   MAX_DOLLY_DISTANCE,
-  MAX_RADIUS,
   MIN_DOLLY_DISTANCE,
-  MIN_RADIUS,
   NODE_HEIGHT,
   ORBIT_DAMPING,
   NODE_SIZE,
   PICK_DRAG_SLOP_PX,
-  REFERENCE_HALF_HEIGHT,
   ROOT_MIN_ELEVATION,
   SHADOW_Y
 } from './scene-metrics'
@@ -50,12 +46,8 @@ describe('scene-metrics', () => {
   })
 
   it('exposes camera constants', () => {
-    expect(CAMERA_DISTANCE).toBe(200)
-    expect(REFERENCE_HALF_HEIGHT).toBe(10)
     expect(FOCUS_RADIUS).toBe(6)
     expect(FIT_MIN_RADIUS).toBe(6)
-    expect(MIN_RADIUS).toBe(3)
-    expect(MAX_RADIUS).toBe(60)
     expect(ORBIT_DAMPING).toBe(0.08)
   })
 

@@ -7,9 +7,7 @@ import {
   frameLitter,
   frameLitterOnLayout,
   frameNode,
-  interpolateFraming,
   islandCenters,
-  isWithinFraming,
   type LitterLayout,
   type Vec3
 } from './camera-framing'
@@ -76,45 +74,6 @@ describe('easeInOutCubic', () => {
       expect(value).toBeGreaterThanOrEqual(previous)
       previous = value
     }
-  })
-})
-
-describe('interpolateFraming', () => {
-  const from = { target: v(0, 0, 0), radius: 6 }
-  const to = { target: v(10, 2, -4), radius: 12 }
-
-  it('returns the start framing at t=0', () => {
-    expect(interpolateFraming(from, to, 0)).toEqual(from)
-  })
-
-  it('returns the end framing at t=1', () => {
-    expect(interpolateFraming(from, to, 1)).toEqual(to)
-  })
-
-  it('is strictly between componentwise at t=0.5', () => {
-    const mid = interpolateFraming(from, to, 0.5)
-    expect(mid.target.x).toBeGreaterThan(from.target.x)
-    expect(mid.target.x).toBeLessThan(to.target.x)
-    expect(mid.target.z).toBeLessThan(from.target.z)
-    expect(mid.target.z).toBeGreaterThan(to.target.z)
-    expect(mid.radius).toBeGreaterThan(from.radius)
-    expect(mid.radius).toBeLessThan(to.radius)
-  })
-})
-
-describe('isWithinFraming', () => {
-  const framing = { target: v(0, 0, 0), radius: 5 }
-
-  it('is true strictly inside the radius', () => {
-    expect(isWithinFraming(v(3, 0, 0), framing, 0)).toBe(true)
-  })
-
-  it('is true exactly at the boundary plus margin', () => {
-    expect(isWithinFraming(v(6, 0, 0), framing, 1)).toBe(true)
-  })
-
-  it('is false just beyond the boundary plus margin', () => {
-    expect(isWithinFraming(v(6.01, 0, 0), framing, 1)).toBe(false)
   })
 })
 

@@ -1,47 +1,45 @@
 import * as THREE from 'three'
 import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { easeInOutCubic, interpolateFraming } from '../camera/camera-framing'
-import type { CameraFraming } from '../camera/camera-framing'
-import {
-  CAMERA_DISTANCE,
-  ISO_AZIMUTH_DEG,
-  ISO_ELEVATION_DEG,
-  MS_PER_SECOND,
-  REFERENCE_HALF_HEIGHT
-} from '../theme/scene-metrics'
+import { easeInOutCubic } from '../camera/camera-framing'
+import type { Vec3 } from '../camera/camera-framing'
+import { interpolatePose } from '../camera/camera-pose'
+import type { CameraPose } from '../camera/camera-pose'
+import { MS_PER_SECOND } from '../theme/scene-metrics'
 
 export type CameraRig = {
-  apply(framing: CameraFraming): void
-  animateTo(framing: CameraFraming, durationMs: number): void
+  apply(pose: CameraPose): void
+  animateTo(pose: CameraPose, durationMs: number): void
+  currentPose(): CameraPose
   tick(elapsedSeconds: number): void
   setAspect(aspect: number): void
+  isPointInView(point: Vec3, margin: number): boolean
   dispose(): void
 }
 
 type Tween = {
-  from: CameraFraming
-  to: CameraFraming
+  from: CameraPose
+  to: CameraPose
   startSeconds: number | null
   durationSeconds: number
 }
 
-const azimuthRad = THREE.MathUtils.degToRad(ISO_AZIMUTH_DEG)
-const elevationRad = THREE.MathUtils.degToRad(ISO_ELEVATION_DEG)
-
-/** Unit vector from the framing target to the camera, per design §9. */
-const CAMERA_DIRECTION = new THREE.Vector3(
-  Math.sin(azimuthRad) * Math.cos(elevationRad),
-  Math.sin(elevationRad),
-  Math.cos(azimuthRad) * Math.cos(elevationRad)
-)
+// Reused across isPointInView calls (runs on every hjkl) to avoid per-call allocation.
+const frustum = new THREE.Frustum()
+const projScreenMatrix = new THREE.Matrix4()
+const sphere = new THREE.Sphere()
+const point = new THREE.Vector3()
 
 /**
- * Orthographic iso rig coexisting with OrbitControls: framing drives `zoom`
- * (never the frustum, which OrbitControls' own dolly also mutates), and the
- * only `setAnimationLoop` in the app lives in create-scene — this owns no
- * loop, it just applies whatever `tick` is fed.
+ * Perspective rig coexisting with OrbitControls: `applyPose` owns orientation via
+ * `controls.target`/`controls.update()` — `camera.lookAt` is never called (risk 1) — and the
+ * fov is re-applied via `updateProjectionMatrix()` every frame so a tween doesn't snap (risk 8).
+ * The only `setAnimationLoop` in the app lives in create-scene; this owns no loop, it just
+ * applies whatever `tick` is fed.
  */
-export function createCameraRig(camera: THREE.OrthographicCamera, controls: OrbitControls): CameraRig {
+export function createCameraRig(
+  camera: THREE.PerspectiveCamera,
+  controls: OrbitControls
+): CameraRig {
   let tween: Tween | null = null
 
   const cancelTween = (): void => {
@@ -49,40 +47,34 @@ export function createCameraRig(camera: THREE.OrthographicCamera, controls: Orbi
   }
   controls.addEventListener('start', cancelTween)
 
-  camera.top = REFERENCE_HALF_HEIGHT
-  camera.bottom = -REFERENCE_HALF_HEIGHT
-
-  const applyFraming = (framing: CameraFraming): void => {
-    camera.zoom = REFERENCE_HALF_HEIGHT / framing.radius
-    camera.position.set(
-      framing.target.x + CAMERA_DISTANCE * CAMERA_DIRECTION.x,
-      framing.target.y + CAMERA_DISTANCE * CAMERA_DIRECTION.y,
-      framing.target.z + CAMERA_DISTANCE * CAMERA_DIRECTION.z
-    )
-    controls.target.set(framing.target.x, framing.target.y, framing.target.z)
-    camera.lookAt(controls.target)
+  const applyPose = (pose: CameraPose): void => {
+    camera.position.set(pose.position.x, pose.position.y, pose.position.z)
+    camera.fov = pose.fov
     camera.updateProjectionMatrix()
+    controls.target.set(pose.lookAt.x, pose.lookAt.y, pose.lookAt.z)
+    controls.update()
   }
 
-  const currentFraming = (): CameraFraming => ({
-    target: { x: controls.target.x, y: controls.target.y, z: controls.target.z },
-    radius: REFERENCE_HALF_HEIGHT / camera.zoom
+  const currentPose = (): CameraPose => ({
+    position: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
+    lookAt: { x: controls.target.x, y: controls.target.y, z: controls.target.z },
+    fov: camera.fov
   })
 
   return {
-    apply(framing) {
+    apply(pose) {
       tween = null
-      applyFraming(framing)
+      applyPose(pose)
     },
-    animateTo(framing, durationMs) {
+    animateTo(pose, durationMs) {
       if (durationMs <= 0) {
         tween = null
-        applyFraming(framing)
+        applyPose(pose)
         return
       }
       tween = {
-        from: currentFraming(),
-        to: framing,
+        from: currentPose(),
+        to: pose,
         startSeconds: null,
         durationSeconds: durationMs / MS_PER_SECOND
       }
@@ -98,15 +90,23 @@ export function createCameraRig(camera: THREE.OrthographicCamera, controls: Orbi
         tween.durationSeconds <= 0
           ? 1
           : Math.min(1, (elapsedSeconds - tween.startSeconds) / tween.durationSeconds)
-      applyFraming(interpolateFraming(tween.from, tween.to, easeInOutCubic(t)))
+      applyPose(interpolatePose(tween.from, tween.to, easeInOutCubic(t)))
       if (t >= 1) {
         tween = null
       }
     },
+    currentPose,
     setAspect(aspect) {
-      camera.left = -REFERENCE_HALF_HEIGHT * aspect
-      camera.right = REFERENCE_HALF_HEIGHT * aspect
+      camera.aspect = aspect
       camera.updateProjectionMatrix()
+    },
+    isPointInView(target, margin) {
+      camera.updateMatrixWorld()
+      projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
+      frustum.setFromProjectionMatrix(projScreenMatrix)
+      point.set(target.x, target.y, target.z)
+      sphere.set(point, margin)
+      return frustum.intersectsSphere(sphere)
     },
     dispose() {
       controls.removeEventListener('start', cancelTween)

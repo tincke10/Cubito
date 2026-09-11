@@ -2,15 +2,19 @@ import type { SceneStore } from '../../application/scene-store'
 import type { WorktreeId } from '../../domain/worktree-graph/types'
 import { isTextEntryTarget, resolveNavCommand } from '../navigation/keymap'
 import { moveSelection } from '../navigation/selection-model'
-import { frameAll, frameIsland, frameNode, isWithinFraming } from '../camera/camera-framing'
+import { frameAll, frameIsland, frameNode } from '../camera/camera-framing'
 import type { CameraFraming, Vec3 } from '../camera/camera-framing'
+import type { CameraPose } from '../camera/camera-pose'
+import { poseForExtent } from '../camera/height-presets'
 import { nextIsland } from '../../application/repos-model'
 import { fanOutMemberIds } from '../../application/fan-out-model'
 import { FOCUS_DURATION_MS, NODE_SIZE } from '../theme/scene-metrics'
 
 /** The subset of camera-rig the controller drives — never the camera/frustum directly. */
 export type CameraRigLike = {
-  animateTo(framing: CameraFraming, durationMs: number): void
+  animateTo(pose: CameraPose, durationMs: number): void
+  currentPose(): CameraPose
+  isPointInView(point: Vec3, margin: number): boolean
 }
 
 /** Ground-truth node positions, supplied by whatever owns the THREE scene (graph-view). */
@@ -65,11 +69,9 @@ type DomKeydownTarget = {
  */
 export function createKeyboardController(deps: KeyboardControllerDeps): KeyboardController {
   const { store, cameraRig, scenePositions, terminal, platform } = deps
-  let currentFraming: CameraFraming | null = null
 
   const focusFraming = (framing: CameraFraming): void => {
-    cameraRig.animateTo(framing, FOCUS_DURATION_MS)
-    currentFraming = framing
+    cameraRig.animateTo(poseForExtent(framing, cameraRig.currentPose().fov), FOCUS_DURATION_MS)
   }
 
   const guardSelectionInView = (id: WorktreeId): void => {
@@ -77,8 +79,7 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
     if (!center) {
       return
     }
-    const framing = currentFraming ?? frameAll(scenePositions.nodeCenters())
-    if (!isWithinFraming(center, framing, NODE_SIZE)) {
+    if (!cameraRig.isPointInView(center, NODE_SIZE)) {
       focusFraming(frameNode(center))
     }
   }
