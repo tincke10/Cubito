@@ -1,0 +1,155 @@
+import { describe, expect, it } from 'vitest'
+import {
+  composeFrontendUrl,
+  parseReadinessLine,
+  resolveLaunchPlan,
+  settingsSeedContent,
+  settingsSeedPath
+} from './cubito-launch-plan.mjs'
+
+const HOME = '/Users/dev'
+const BASE = { argv: [], env: {}, homedir: HOME, platform: 'darwin' }
+
+describe('resolveLaunchPlan', () => {
+  it('defaults to an isolated data dir, worktree root, and ports', () => {
+    const plan = resolveLaunchPlan(BASE)
+    expect(plan.dataDir).toBe('/Users/dev/.cubito')
+    expect(plan.worktreeRoot).toBe('/Users/dev/cubito/workspaces')
+    expect(plan.orcadPort).toBe(6799)
+    expect(plan.frontendPort).toBe(5180)
+  })
+
+  it('never defaults into the real Orca profile or workspace root', () => {
+    const plan = resolveLaunchPlan(BASE)
+    expect(plan.dataDir).not.toBe('/Users/dev/.orca')
+    expect(plan.worktreeRoot).not.toBe('/Users/dev/orca/workspaces')
+  })
+
+  it('honors env overrides for data dir, worktree root, and both ports', () => {
+    const plan = resolveLaunchPlan({
+      ...BASE,
+      env: {
+        ORCA_USER_DATA: '/tmp/data',
+        CUBITO_WORKTREE_ROOT: '/tmp/work',
+        CUBITO_ORCAD_PORT: '7000',
+        CUBITO_FRONTEND_PORT: '5555'
+      }
+    })
+    expect(plan.dataDir).toBe('/tmp/data')
+    expect(plan.worktreeRoot).toBe('/tmp/work')
+    expect(plan.orcadPort).toBe(7000)
+    expect(plan.frontendPort).toBe(5555)
+  })
+
+  it('flags beat env for data dir, worktree root, and both ports', () => {
+    const plan = resolveLaunchPlan({
+      ...BASE,
+      argv: [
+        '--data-dir',
+        '/flag/data',
+        '--worktree-root',
+        '/flag/work',
+        '--port',
+        '7100',
+        '--frontend-port',
+        '5656'
+      ],
+      env: {
+        ORCA_USER_DATA: '/tmp/data',
+        CUBITO_WORKTREE_ROOT: '/tmp/work',
+        CUBITO_ORCAD_PORT: '7000',
+        CUBITO_FRONTEND_PORT: '5555'
+      }
+    })
+    expect(plan.dataDir).toBe('/flag/data')
+    expect(plan.worktreeRoot).toBe('/flag/work')
+    expect(plan.orcadPort).toBe(7100)
+    expect(plan.frontendPort).toBe(5656)
+  })
+
+  it('always carries --json plus the resolved --port in orcadArgs', () => {
+    const plan = resolveLaunchPlan(BASE)
+    expect(plan.orcadArgs).toEqual(['--port', '6799', '--json'])
+  })
+
+  it('adds --bind and --pairing-address only when the env vars are set', () => {
+    const plan = resolveLaunchPlan({
+      ...BASE,
+      env: { CUBITO_ORCAD_BIND: '0.0.0.0', CUBITO_PAIRING_ADDRESS: '127.0.0.1:6799' }
+    })
+    expect(plan.orcadArgs).toEqual([
+      '--port',
+      '6799',
+      '--json',
+      '--bind',
+      '0.0.0.0',
+      '--pairing-address',
+      '127.0.0.1:6799'
+    ])
+  })
+
+  it('opens the browser on darwin by default', () => {
+    expect(resolveLaunchPlan(BASE).openInBrowser).toBe(true)
+  })
+
+  it('never opens the browser off darwin', () => {
+    expect(resolveLaunchPlan({ ...BASE, platform: 'linux' }).openInBrowser).toBe(false)
+    expect(resolveLaunchPlan({ ...BASE, platform: 'win32' }).openInBrowser).toBe(false)
+  })
+
+  it('does not open the browser under --no-open or $CUBITO_NO_OPEN', () => {
+    expect(resolveLaunchPlan({ ...BASE, argv: ['--no-open'] }).openInBrowser).toBe(false)
+    expect(resolveLaunchPlan({ ...BASE, env: { CUBITO_NO_OPEN: '1' } }).openInBrowser).toBe(false)
+  })
+})
+
+describe('settingsSeedPath', () => {
+  it('points at the local-default profile data file under the data dir', () => {
+    expect(settingsSeedPath('/Users/dev/.cubito')).toBe(
+      '/Users/dev/.cubito/profiles/local-default/orca-data.json'
+    )
+  })
+})
+
+describe('settingsSeedContent', () => {
+  it('seeds only workspaceDir, leaving every other default setting untouched', () => {
+    expect(settingsSeedContent('/Users/dev/cubito/workspaces')).toEqual({
+      settings: { workspaceDir: '/Users/dev/cubito/workspaces' }
+    })
+  })
+})
+
+describe('parseReadinessLine', () => {
+  it('extracts the pairing url from an orca_server_ready line', () => {
+    const line = JSON.stringify({
+      type: 'orca_server_ready',
+      pairing: { url: 'orca://pair?code=abc' }
+    })
+    expect(parseReadinessLine(line)).toEqual({ pairingUrl: 'orca://pair?code=abc' })
+  })
+
+  it('ignores non-JSON lines', () => {
+    expect(parseReadinessLine('not json at all')).toBeNull()
+  })
+
+  it('ignores JSON lines of the wrong type', () => {
+    expect(parseReadinessLine(JSON.stringify({ type: 'something_else' }))).toBeNull()
+  })
+
+  it('ignores a ready line with no pairing url', () => {
+    expect(parseReadinessLine(JSON.stringify({ type: 'orca_server_ready' }))).toBeNull()
+  })
+})
+
+describe('composeFrontendUrl', () => {
+  it('encodes the pairing url into a localhost fragment', () => {
+    const pairingUrl = 'orca://pair?code=ab+c/d=&device=1'
+    const url = composeFrontendUrl(5180, pairingUrl)
+    expect(url).toBe(`http://localhost:5180/#pairing=${encodeURIComponent(pairingUrl)}`)
+    expect(url).toContain(encodeURIComponent('?'))
+    expect(url).toContain(encodeURIComponent('&'))
+    expect(url).toContain(encodeURIComponent('='))
+    expect(url).toContain(encodeURIComponent('+'))
+    expect(url).toContain(encodeURIComponent('/'))
+  })
+})
