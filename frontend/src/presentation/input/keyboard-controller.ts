@@ -1,27 +1,9 @@
 import type { SceneStore } from '../../application/scene-store'
-import type { WorktreeId } from '../../domain/worktree-graph/types'
 import { isTextEntryTarget, resolveNavCommand } from '../navigation/keymap'
 import { moveSelection } from '../navigation/selection-model'
-import { frameAll, frameIsland, frameNode } from '../camera/camera-framing'
-import type { CameraFraming, Vec3 } from '../camera/camera-framing'
-import type { CameraPose } from '../camera/camera-pose'
-import { poseForExtent } from '../camera/height-presets'
 import { nextIsland } from '../../application/repos-model'
 import { fanOutMemberIds } from '../../application/fan-out-model'
-import { FOCUS_DURATION_MS, NODE_SIZE } from '../theme/scene-metrics'
-
-/** The subset of camera-rig the controller drives — never the camera/frustum directly. */
-export type CameraRigLike = {
-  animateTo(pose: CameraPose, durationMs: number): void
-  currentPose(): CameraPose
-  isPointInView(point: Vec3, margin: number): boolean
-}
-
-/** Ground-truth node positions, supplied by whatever owns the THREE scene (graph-view). */
-export type ScenePositions = {
-  nodeCenter(id: WorktreeId): Vec3 | null
-  nodeCenters(): Vec3[]
-}
+import type { CameraHeightController } from './camera-height-controller'
 
 /** Framework-agnostic input — a real KeyboardEvent is structurally adapted onto this by `attach`. */
 export type KeyboardControllerEvent = {
@@ -34,7 +16,7 @@ export type KeyboardControllerEvent = {
 }
 
 /** The terminal-panel-controller operations the keyboard layer delegates to (design Area 8) —
- *  a narrow structural subset, like `CameraRigLike`/`ScenePositions` above. */
+ *  a narrow structural subset, like `CameraHeightController` below. */
 export type TerminalCommandPort = {
   focusActivePanel(): void
   closeActiveSession(): void
@@ -42,8 +24,7 @@ export type TerminalCommandPort = {
 
 export type KeyboardControllerDeps = {
   store: SceneStore
-  cameraRig: CameraRigLike
-  scenePositions: ScenePositions
+  heights: CameraHeightController
   terminal: TerminalCommandPort
   /** Mac vs. Linux/Windows — selects the ⌘P/Ctrl+P chord (PROJ-005). */
   platform: { isMac: boolean }
@@ -63,26 +44,12 @@ type DomKeydownTarget = {
 }
 
 /**
- * Wires keymap + selection-model + camera-framing to the store and an injected
- * camera rig / scene-position lookup. `h/j/k/l` move the selection only; `f`/`v`
- * drive the camera. No parent/sibling/camera math lives here — it all delegates.
+ * Wires keymap + selection-model to the store and an injected camera-height controller.
+ * `h/j/k/l` move the selection (or cycle islands in `general`); `f`/`v` drive the camera
+ * height. No camera math lives here — it all delegates to `heights`.
  */
 export function createKeyboardController(deps: KeyboardControllerDeps): KeyboardController {
-  const { store, cameraRig, scenePositions, terminal, platform } = deps
-
-  const focusFraming = (framing: CameraFraming): void => {
-    cameraRig.animateTo(poseForExtent(framing, cameraRig.currentPose().fov), FOCUS_DURATION_MS)
-  }
-
-  const guardSelectionInView = (id: WorktreeId): void => {
-    const center = scenePositions.nodeCenter(id)
-    if (!center) {
-      return
-    }
-    if (!cameraRig.isPointInView(center, NODE_SIZE)) {
-      focusFraming(frameNode(center))
-    }
-  }
+  const { store, heights, terminal, platform } = deps
 
   const handleKeyDown = (event: KeyboardControllerEvent): boolean => {
     const command = resolveNavCommand(
@@ -138,21 +105,15 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
       if (next !== current) {
         store.update({ selection: { selectedId: next } })
       }
-      if (next !== null) {
-        guardSelectionInView(next)
-      }
+      heights.onSelectionChanged(next)
       return true
     }
     if (command.kind === 'focus') {
-      const selectedId = store.get().selection.selectedId
-      const center = selectedId !== null ? scenePositions.nodeCenter(selectedId) : null
-      if (center) {
-        focusFraming(frameNode(center))
-      }
+      heights.goTo('foco')
       return true
     }
     if (command.kind === 'fit-all') {
-      focusFraming(frameAll(scenePositions.nodeCenters()))
+      heights.goTo('general')
       return true
     }
     if (command.kind === 'open-terminal') {
@@ -191,7 +152,7 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
       const next = nextIsland(repos.list, repos.activeRepoId)
       if (next === null) return false
       store.dispatchRepos({ type: 'set-active', repoId: next })
-      focusFraming(frameIsland(store.get().graph, next, scenePositions.nodeCenter))
+      heights.reanchorIsland(next)
       return true
     }
     if (command.kind === 'open-spawn') {
@@ -272,9 +233,11 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
       store.dispatchCompareView({ type: 'close' })
       return true
     }
-    if (!store.get().terminals.activePanel) return false
-    terminal.closeActiveSession()
-    return true
+    if (store.get().terminals.activePanel) {
+      terminal.closeActiveSession()
+      return true
+    }
+    return heights.pop()
   }
 
   const attach = (target: DomKeydownTarget): (() => void) => {

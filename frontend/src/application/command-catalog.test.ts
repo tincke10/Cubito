@@ -12,6 +12,7 @@ import { emptyFanOutSlice } from './fan-out-model'
 import { emptySystemViewSlice } from './system-view-model'
 import { emptyDiffViewSlice } from './diff-view-model'
 import { emptyCompareViewSlice } from './compare-view-model'
+import { DEFAULT_CAMERA_HEIGHT } from '../presentation/camera/camera-pose'
 
 const state = (overrides: Partial<SceneState> = {}): SceneState => ({
   graph: emptyWorktreeGraph(),
@@ -27,6 +28,7 @@ const state = (overrides: Partial<SceneState> = {}): SceneState => ({
   systemView: emptySystemViewSlice(),
   diffView: emptyDiffViewSlice(),
   compareView: emptyCompareViewSlice(),
+  camera: { height: DEFAULT_CAMERA_HEIGHT },
   ...overrides
 })
 

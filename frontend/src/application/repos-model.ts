@@ -19,16 +19,26 @@ export function reconcileActiveRepoId(
   return list[0]?.id ?? null
 }
 
-/** Wrap-around cycle for Tab: the repo after `activeRepoId`, or the first when absent/null. */
-export function nextIsland(
+/** Wrap-around cycle by `step` (+1/-1): the repo `step` away from `activeRepoId`, first when
+ *  absent/null, `null` for an empty list — shared by Tab's next-only and general-mode hjkl. */
+export function cycleIsland(
   list: readonly RepoSummary[],
-  activeRepoId: string | null
+  activeRepoId: string | null,
+  step: 1 | -1
 ): string | null {
   if (list.length === 0) {
     return null
   }
   const index = list.findIndex((repo) => repo.id === activeRepoId)
-  return index === -1 ? list[0]!.id : list[(index + 1) % list.length]!.id
+  return index === -1 ? list[0]!.id : list[(index + step + list.length) % list.length]!.id
+}
+
+/** Wrap-around cycle for Tab: the repo after `activeRepoId`, or the first when absent/null. */
+export function nextIsland(
+  list: readonly RepoSummary[],
+  activeRepoId: string | null
+): string | null {
+  return cycleIsland(list, activeRepoId, 1)
 }
 
 export function reduceRepos(slice: ReposSlice, action: ReposAction): ReposSlice {

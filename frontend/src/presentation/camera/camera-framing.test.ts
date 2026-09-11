@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { FIT_MIN_RADIUS, FIT_PADDING, FOCUS_RADIUS } from '../theme/scene-metrics'
+import { FIT_MIN_RADIUS, FIT_PADDING } from '../theme/scene-metrics'
 import {
   easeInOutCubic,
   frameAll,
   frameIsland,
   frameLitter,
   frameLitterOnLayout,
-  frameNode,
   islandCenters,
   type LitterLayout,
   type Vec3
@@ -17,15 +16,6 @@ import type { WorktreeGraph, WorktreeId, WorktreeNode } from '../../domain/workt
 const v = (x: number, y: number, z: number): Vec3 => ({ x, y, z })
 const distance = (a: Vec3, b: Vec3): number =>
   Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (a.z - b.z) ** 2)
-
-describe('frameNode', () => {
-  it('targets the given center at the fixed focus radius', () => {
-    const center = v(3, 0.6, -4)
-    const framing = frameNode(center)
-    expect(framing.target).toBe(center)
-    expect(framing.radius).toBe(FOCUS_RADIUS)
-  })
-})
 
 describe('frameAll', () => {
   it('frames the origin at the minimum radius when given no centers', () => {

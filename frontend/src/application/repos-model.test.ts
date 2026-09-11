@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { emptyReposSlice, nextIsland, reconcileActiveRepoId, reduceRepos } from './repos-model'
+import {
+  cycleIsland,
+  emptyReposSlice,
+  nextIsland,
+  reconcileActiveRepoId,
+  reduceRepos
+} from './repos-model'
 import type { RepoSummary } from './ports/runtime-gateway'
 
 const repo = (id: string): RepoSummary => ({ id, path: `/${id}`, displayName: id, kind: 'git' })
@@ -75,5 +81,31 @@ describe('nextIsland', () => {
 
   it('is null for an empty list', () => {
     expect(nextIsland([], null)).toBeNull()
+  })
+})
+
+describe('cycleIsland', () => {
+  it('wraps forward with step 1, same as nextIsland', () => {
+    const list = [repo('a'), repo('b'), repo('c')]
+    expect(cycleIsland(list, 'c', 1)).toBe('a')
+    expect(cycleIsland(list, 'a', 1)).toBe('b')
+  })
+
+  it('wraps backward with step -1', () => {
+    const list = [repo('a'), repo('b'), repo('c')]
+    expect(cycleIsland(list, 'a', -1)).toBe('c')
+    expect(cycleIsland(list, 'b', -1)).toBe('a')
+  })
+
+  it('returns the first repo when the active id is unknown, on either step', () => {
+    const list = [repo('a'), repo('b')]
+    expect(cycleIsland(list, 'ghost', 1)).toBe('a')
+    expect(cycleIsland(list, 'ghost', -1)).toBe('a')
+    expect(cycleIsland(list, null, -1)).toBe('a')
+  })
+
+  it('returns null for an empty list on either step', () => {
+    expect(cycleIsland([], null, 1)).toBeNull()
+    expect(cycleIsland([], null, -1)).toBeNull()
   })
 })

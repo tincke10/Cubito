@@ -2,15 +2,13 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
 import { createKeyboardController } from './keyboard-controller'
-import type { KeyboardControllerEvent, ScenePositions } from './keyboard-controller'
+import type { KeyboardControllerEvent } from './keyboard-controller'
+import type { CameraHeightController } from './camera-height-controller'
+import type { CameraHeight } from '../camera/camera-pose'
 import { createSceneStore } from '../../application/scene-store'
 import { moveSelection } from '../navigation/selection-model'
-import { frameAll, frameIsland, frameNode } from '../camera/camera-framing'
-import type { Vec3 } from '../camera/camera-framing'
-import { poseForExtent } from '../camera/height-presets'
 import { inertActivity } from '../../domain/worktree-graph/node-activity'
 import type { WorktreeGraph, WorktreeNode } from '../../domain/worktree-graph/types'
-import { FOCUS_DURATION_MS, NODE_SIZE } from '../theme/scene-metrics'
 
 const node = (
   id: string,
@@ -41,20 +39,6 @@ function buildFanGraph(): WorktreeGraph {
   return { nodes, edges: [], rootIds: ['root'] }
 }
 
-const CENTERS: Record<string, Vec3> = {
-  root: { x: 0, y: 0, z: 0 },
-  a: { x: -5, y: 0, z: 0 },
-  b: { x: 5, y: 0, z: 0 },
-  c: { x: 0, y: 0, z: 5 }
-}
-
-function fakeScenePositions(): ScenePositions {
-  return {
-    nodeCenter: (id) => CENTERS[id] ?? null,
-    nodeCenters: () => Object.values(CENTERS)
-  }
-}
-
 function baseEvent(overrides: Partial<KeyboardControllerEvent>): KeyboardControllerEvent {
   return {
     key: '',
@@ -74,17 +58,17 @@ function fakeTerminalCommandPort() {
 const LINUX = { isMac: false }
 const MAC = { isMac: true }
 
-/** Fixed fov so pose-shaped assertions (`poseForExtent(framing, FAKE_FOV)`) are deterministic. */
-const FAKE_FOV = 38
-function fakeCameraRig() {
+/** All camera-height math is unit-tested against the real controller in
+ *  camera-height-controller.test.ts — here the controller is a bare fake so keyboard-controller's
+ *  own tests only assert WHICH heights method got called, never any camera math. */
+function fakeHeights(): CameraHeightController {
   return {
-    animateTo: vi.fn(),
-    currentPose: vi.fn(() => ({
-      position: { x: 0, y: 0, z: 0 },
-      lookAt: { x: 0, y: 0, z: 0 },
-      fov: FAKE_FOV
-    })),
-    isPointInView: vi.fn(() => true)
+    current: vi.fn((): CameraHeight => 'isla'),
+    goTo: vi.fn(() => true),
+    pop: vi.fn(() => false),
+    reanchorIsland: vi.fn(),
+    animateToExtent: vi.fn(),
+    onSelectionChanged: vi.fn()
   }
 }
 
@@ -107,17 +91,15 @@ function withRunningCamada(
 function setup(selectedId: string | null = 'b', platform = LINUX) {
   const store = createSceneStore()
   store.update({ graph: buildFanGraph(), selection: { selectedId } })
-  const cameraRig = fakeCameraRig()
-  const scenePositions = fakeScenePositions()
+  const heights = fakeHeights()
   const terminal = fakeTerminalCommandPort()
   const controller = createKeyboardController({
     store,
-    cameraRig,
-    scenePositions,
+    heights,
     terminal,
     platform
   })
-  return { store, cameraRig, scenePositions, terminal, controller }
+  return { store, heights, terminal, controller }
 }
 
 /** Two-island graph (repos 'r1'/'r2') for Tab island-cycling (PROJ-008). */
@@ -134,12 +116,6 @@ function buildTwoRepoGraph(): WorktreeGraph {
   return { nodes, edges: [], rootIds: ['x1', 'y1'] }
 }
 
-const ISLAND_CENTERS: Record<string, Vec3> = {
-  x1: { x: -20, y: 0, z: 0 },
-  y1: { x: 20, y: 0, z: 0 },
-  y2: { x: 20, y: 0, z: 5 }
-}
-
 const REPO_1 = { id: 'r1', path: '/r1', displayName: 'R1', kind: 'git' as const }
 const REPO_2 = { id: 'r2', path: '/r2', displayName: 'R2', kind: 'git' as const }
 
@@ -147,20 +123,15 @@ function setupWithRepos() {
   const store = createSceneStore()
   store.update({ graph: buildTwoRepoGraph(), selection: { selectedId: null } })
   store.dispatchRepos({ type: 'set-list', list: [REPO_1, REPO_2] })
-  const cameraRig = fakeCameraRig()
-  const scenePositions: ScenePositions = {
-    nodeCenter: (id) => ISLAND_CENTERS[id] ?? null,
-    nodeCenters: () => Object.values(ISLAND_CENTERS)
-  }
+  const heights = fakeHeights()
   const terminal = fakeTerminalCommandPort()
   const controller = createKeyboardController({
     store,
-    cameraRig,
-    scenePositions,
+    heights,
     terminal,
     platform: LINUX
   })
-  return { store, cameraRig, scenePositions, terminal, controller }
+  return { store, heights, terminal, controller }
 }
 
 describe('createKeyboardController', () => {
@@ -194,32 +165,26 @@ describe('createKeyboardController', () => {
     expect(store.get().selection.selectedId).toBe(expectedK)
   })
 
-  it('f frames the selected node through camera-rig.animateTo — no direct camera math here', () => {
-    const { cameraRig, controller } = setup('a')
+  it('f delegates to heights.goTo("foco") — no direct camera math here', () => {
+    const { heights, controller } = setup('a')
 
     controller.handleKeyDown(baseEvent({ key: 'f' }))
 
-    expect(cameraRig.animateTo).toHaveBeenCalledTimes(1)
-    expect(cameraRig.animateTo).toHaveBeenCalledWith(
-      poseForExtent(frameNode(CENTERS['a']!), FAKE_FOV),
-      FOCUS_DURATION_MS
-    )
+    expect(heights.goTo).toHaveBeenCalledOnce()
+    expect(heights.goTo).toHaveBeenCalledWith('foco')
   })
 
-  it('v fits every node through camera-rig.animateTo — no direct camera math here', () => {
-    const { cameraRig, scenePositions, controller } = setup('a')
+  it('v delegates to heights.goTo("general") — no direct camera math here', () => {
+    const { heights, controller } = setup('a')
 
     controller.handleKeyDown(baseEvent({ key: 'v' }))
 
-    expect(cameraRig.animateTo).toHaveBeenCalledTimes(1)
-    expect(cameraRig.animateTo).toHaveBeenCalledWith(
-      poseForExtent(frameAll(scenePositions.nodeCenters()), FAKE_FOV),
-      FOCUS_DURATION_MS
-    )
+    expect(heights.goTo).toHaveBeenCalledOnce()
+    expect(heights.goTo).toHaveBeenCalledWith('general')
   })
 
   it('any modifier held resolves to null — zero store updates, zero camera calls', () => {
-    const { store, cameraRig, controller } = setup('b')
+    const { store, heights, controller } = setup('b')
     const before = store.get().selection.selectedId
 
     controller.handleKeyDown(baseEvent({ key: 'h', ctrlKey: true }))
@@ -228,21 +193,21 @@ describe('createKeyboardController', () => {
     controller.handleKeyDown(baseEvent({ key: 'l', altKey: true }))
 
     expect(store.get().selection.selectedId).toBe(before)
-    expect(cameraRig.animateTo).not.toHaveBeenCalled()
+    expect(heights.goTo).not.toHaveBeenCalled()
   })
 
   it('an unmapped key is a no-op', () => {
-    const { store, cameraRig, controller } = setup('b')
+    const { store, heights, controller } = setup('b')
     const before = store.get().selection.selectedId
 
     controller.handleKeyDown(baseEvent({ key: 'q' }))
 
     expect(store.get().selection.selectedId).toBe(before)
-    expect(cameraRig.animateTo).not.toHaveBeenCalled()
+    expect(heights.goTo).not.toHaveBeenCalled()
   })
 
   it('ignores keys while focus is inside a text-entry target (isTextEntryTarget guard)', () => {
-    const { store, cameraRig, controller } = setup('b')
+    const { store, heights, controller } = setup('b')
     const before = store.get().selection.selectedId
 
     controller.handleKeyDown(
@@ -253,7 +218,7 @@ describe('createKeyboardController', () => {
     )
 
     expect(store.get().selection.selectedId).toBe(before)
-    expect(cameraRig.animateTo).not.toHaveBeenCalled()
+    expect(heights.goTo).not.toHaveBeenCalled()
   })
 
   it('still acts on a non-text DOM target', () => {
@@ -266,20 +231,21 @@ describe('createKeyboardController', () => {
     expect(store.get().selection.selectedId).toBe('root')
   })
 
-  it('guard rail: an out-of-view selection change issues an implicit frameNode', () => {
-    const { store, cameraRig, controller } = setup('b')
-    controller.handleKeyDown(baseEvent({ key: 'f' })) // establishes a tight framing on 'b'
-    cameraRig.animateTo.mockClear()
-    cameraRig.isPointInView.mockReturnValue(false) // simulate 'c' falling outside the live frustum
+  it('a selection move notifies heights.onSelectionChanged with the new id — no camera math here', () => {
+    const { store, heights, controller } = setup('b')
 
-    controller.handleKeyDown(baseEvent({ key: 'j' })) // b -> c: moves out of view
+    controller.handleKeyDown(baseEvent({ key: 'j' })) // b -> c
 
     expect(store.get().selection.selectedId).toBe('c')
-    expect(cameraRig.isPointInView).toHaveBeenCalledWith(CENTERS.c, NODE_SIZE)
-    expect(cameraRig.animateTo).toHaveBeenCalledWith(
-      poseForExtent(frameNode(CENTERS.c!), FAKE_FOV),
-      FOCUS_DURATION_MS
-    )
+    expect(heights.onSelectionChanged).toHaveBeenCalledWith('c')
+  })
+
+  it('a move that clamps in place (no id change) still notifies heights.onSelectionChanged', () => {
+    const { heights, controller } = setup('c') // 'c' is the last sibling — j clamps to itself
+
+    controller.handleKeyDown(baseEvent({ key: 'j' }))
+
+    expect(heights.onSelectionChanged).toHaveBeenCalledWith('c')
   })
 
   it('attach()/detach() are a thin DOM wrapper — smoke-tested via a fake EventTarget', () => {
@@ -528,30 +494,26 @@ describe('createKeyboardController', () => {
     })
 
     it('Tab with the selector open is consumed as a no-op — never reaches terminal or island cycling', () => {
-      const { store, cameraRig, controller } = setupWithRepos()
+      const { store, heights, controller } = setupWithRepos()
       controller.handleKeyDown(baseEvent({ key: 'p', ctrlKey: true })) // open selector
-      cameraRig.animateTo.mockClear()
       const activeBefore = store.get().repos.activeRepoId
 
       const handled = controller.handleKeyDown(baseEvent({ key: 'Tab' }))
 
       expect(handled).toBe(true)
       expect(store.get().repos.activeRepoId).toBe(activeBefore)
-      expect(cameraRig.animateTo).not.toHaveBeenCalled()
+      expect(heights.reanchorIsland).not.toHaveBeenCalled()
     })
 
-    it('Tab with no terminal open cycles to the next island, dispatching set-active and framing its centers', () => {
-      const { store, cameraRig, scenePositions, controller } = setupWithRepos()
+    it('Tab with no terminal open cycles to the next island, dispatching set-active and reanchoring on it', () => {
+      const { store, heights, controller } = setupWithRepos()
       expect(store.get().repos.activeRepoId).toBe('r1') // reconciled default
 
       const handled = controller.handleKeyDown(baseEvent({ key: 'Tab' }))
 
       expect(handled).toBe(true)
       expect(store.get().repos.activeRepoId).toBe('r2')
-      expect(cameraRig.animateTo).toHaveBeenCalledWith(
-        poseForExtent(frameIsland(store.get().graph, 'r2', scenePositions.nodeCenter), FAKE_FOV),
-        FOCUS_DURATION_MS
-      )
+      expect(heights.reanchorIsland).toHaveBeenCalledWith('r2')
     })
 
     it('Tab island-cycle wraps back to the first repo and is a no-op with zero repos', () => {
@@ -708,7 +670,7 @@ describe('createKeyboardController', () => {
     })
 
     it('Tab with the palette open is consumed as a no-op — never reaches selector/terminal/island cycling', () => {
-      const { store, cameraRig, controller } = setupWithRepos()
+      const { store, heights, controller } = setupWithRepos()
       store.dispatchCommandPalette({ type: 'open' })
       const activeBefore = store.get().repos.activeRepoId
 
@@ -716,7 +678,7 @@ describe('createKeyboardController', () => {
 
       expect(handled).toBe(true)
       expect(store.get().repos.activeRepoId).toBe(activeBefore)
-      expect(cameraRig.animateTo).not.toHaveBeenCalled()
+      expect(heights.reanchorIsland).not.toHaveBeenCalled()
     })
   })
 
@@ -1022,6 +984,38 @@ describe('createKeyboardController', () => {
       controller.handleKeyDown(baseEvent({ key: 'c' }))
       expect(store.get().compareView.view).toBe('closed')
       expect(store.get().systemView.view).toBe('open')
+    })
+  })
+
+  describe('Esc height-pop — final rung of the precedence ladder (KEY-06)', () => {
+    it('pops a pushed height only after the whole existing ladder has declined', () => {
+      const { heights, controller } = setup('a')
+      heights.pop = vi.fn(() => true)
+
+      const handled = controller.handleKeyDown(baseEvent({ key: 'Escape' }))
+
+      expect(handled).toBe(true)
+      expect(heights.pop).toHaveBeenCalledOnce()
+    })
+
+    it('Escape returns false when the height stack is empty (heights.pop returns false)', () => {
+      const { terminal, controller } = setup('a')
+
+      const handled = controller.handleKeyDown(baseEvent({ key: 'Escape' }))
+
+      expect(handled).toBe(false)
+      expect(terminal.closeActiveSession).not.toHaveBeenCalled()
+    })
+
+    it('an open terminal still wins over heights.pop (ladder order preserved)', () => {
+      const { heights, terminal, controller } = setup('a')
+      controller.handleKeyDown(baseEvent({ key: 't' }))
+
+      const handled = controller.handleKeyDown(baseEvent({ key: 'Escape' }))
+
+      expect(handled).toBe(true)
+      expect(terminal.closeActiveSession).toHaveBeenCalledOnce()
+      expect(heights.pop).not.toHaveBeenCalled()
     })
   })
 })

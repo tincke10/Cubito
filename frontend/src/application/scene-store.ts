@@ -1,5 +1,7 @@
 import { emptyWorktreeGraph } from '../domain/worktree-graph/types'
 import type { WorktreeGraph, WorktreeId } from '../domain/worktree-graph/types'
+import { DEFAULT_CAMERA_HEIGHT } from '../presentation/camera/camera-pose'
+import type { CameraHeight } from '../presentation/camera/camera-pose'
 import { emptyTerminalsState, reduceTerminals } from './terminal-session-model'
 import type { TerminalAction, TerminalsState } from './terminal-session-model'
 import { emptySpawnMenuSlice, reduceSpawnMenu } from './spawn-menu-model'
@@ -45,6 +47,7 @@ export type SceneState = {
   systemView: SystemViewSlice
   diffView: DiffViewSlice
   compareView: CompareViewSlice
+  camera: { height: CameraHeight }
 }
 
 export type SceneStore = {
@@ -85,7 +88,8 @@ const initialSceneState = (): SceneState => ({
   fanOut: emptyFanOutSlice(),
   systemView: emptySystemViewSlice(),
   diffView: emptyDiffViewSlice(),
-  compareView: emptyCompareViewSlice()
+  compareView: emptyCompareViewSlice(),
+  camera: { height: DEFAULT_CAMERA_HEIGHT }
 })
 
 /** Minimal observable store; swap for a richer signal system when the UI grows. */

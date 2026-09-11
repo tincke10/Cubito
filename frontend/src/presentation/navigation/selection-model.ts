@@ -1,5 +1,7 @@
+import { emptyWorktreeGraph } from '../../domain/worktree-graph/types'
 import type { WorktreeGraph, WorktreeId } from '../../domain/worktree-graph/types'
 import { childrenOf, parentOf, siblingsOf } from '../../domain/worktree-graph/graph-traversal'
+import { partitionGraphByRepo } from '../../domain/worktree-graph/repo-partition'
 import type { NavDirection } from './keymap'
 
 /** The main root when present, else the first root, else `null` for an empty graph. */
@@ -12,7 +14,19 @@ export function initialSelection(graph: WorktreeGraph): WorktreeId | null {
   return graph.rootIds[0] ?? null
 }
 
-const clampIndex = (index: number, length: number): number => Math.min(Math.max(index, 0), length - 1)
+/** The island's main-else-first-root pick (HGT-08 anchor); `null` repoId scopes to the whole graph. */
+export function islandEntrySelection(
+  graph: WorktreeGraph,
+  repoId: string | null
+): WorktreeId | null {
+  if (repoId === null) {
+    return initialSelection(graph)
+  }
+  return initialSelection(partitionGraphByRepo(graph).get(repoId) ?? emptyWorktreeGraph())
+}
+
+const clampIndex = (index: number, length: number): number =>
+  Math.min(Math.max(index, 0), length - 1)
 
 /** CLAMP per design §4 — reversible: flip to modulo wrap here + the boundary tests if UX testing disagrees. */
 function stepSibling(graph: WorktreeGraph, currentId: WorktreeId, offset: number): WorktreeId {
@@ -60,7 +74,10 @@ function survivingParentOf(graph: WorktreeGraph, id: WorktreeId): WorktreeId | n
  * ancestor when the graph still references it (via a surviving node's raw childIds),
  * else falls back to `initialSelection` at minimum. Never throws.
  */
-export function reconcileSelection(graph: WorktreeGraph, currentId: WorktreeId | null): WorktreeId | null {
+export function reconcileSelection(
+  graph: WorktreeGraph,
+  currentId: WorktreeId | null
+): WorktreeId | null {
   if (currentId !== null && graph.nodes.has(currentId)) {
     return currentId
   }

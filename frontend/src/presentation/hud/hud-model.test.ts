@@ -14,6 +14,7 @@ import { emptySystemViewSlice } from '../../application/system-view-model'
 import { emptyDiffViewSlice } from '../../application/diff-view-model'
 import { emptyCompareViewSlice } from '../../application/compare-view-model'
 import type { SceneState } from '../../application/scene-store'
+import { DEFAULT_CAMERA_HEIGHT } from '../camera/camera-pose'
 import { buildWorktreeGraph } from '../../domain/worktree-graph/build-graph'
 
 const baseState = (overrides: Partial<SceneState> = {}): SceneState => ({
@@ -30,6 +31,7 @@ const baseState = (overrides: Partial<SceneState> = {}): SceneState => ({
   systemView: emptySystemViewSlice(),
   diffView: emptyDiffViewSlice(),
   compareView: emptyCompareViewSlice(),
+  camera: { height: DEFAULT_CAMERA_HEIGHT },
   ...overrides
 })
 

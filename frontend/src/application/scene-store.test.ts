@@ -10,6 +10,7 @@ import { emptyFanOutSlice, FANOUT_PLACEHOLDER_PREFIX } from './fan-out-model'
 import { emptySystemViewSlice } from './system-view-model'
 import { emptyDiffViewSlice } from './diff-view-model'
 import { emptyCompareViewSlice } from './compare-view-model'
+import { DEFAULT_CAMERA_HEIGHT } from '../presentation/camera/camera-pose'
 import { inertActivity } from '../domain/worktree-graph/node-activity'
 import type { WorktreeGraph, WorktreeNode } from '../domain/worktree-graph/types'
 
@@ -506,6 +507,19 @@ describe('createSceneStore', () => {
       const systemBefore = store.get().systemView
       store.dispatchCompareView({ type: 'close' })
       expect(store.get().systemView).toBe(systemBefore)
+    })
+  })
+
+  describe('camera height slice', () => {
+    it('starts at the default camera height', () => {
+      const store = createSceneStore()
+      expect(store.get().camera).toEqual({ height: DEFAULT_CAMERA_HEIGHT })
+    })
+
+    it('updates via a plain patch, no dedicated dispatcher', () => {
+      const store = createSceneStore()
+      store.update({ camera: { height: 'general' } })
+      expect(store.get().camera).toEqual({ height: 'general' })
     })
   })
 })

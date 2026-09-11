@@ -6,7 +6,6 @@ import {
   ELEVATION,
   FIT_MIN_RADIUS,
   FLOW_PERIOD_SECONDS,
-  FOCUS_RADIUS,
   MAX_DOLLY_DISTANCE,
   MIN_DOLLY_DISTANCE,
   NODE_HEIGHT,
@@ -46,7 +45,6 @@ describe('scene-metrics', () => {
   })
 
   it('exposes camera constants', () => {
-    expect(FOCUS_RADIUS).toBe(6)
     expect(FIT_MIN_RADIUS).toBe(6)
     expect(ORBIT_DAMPING).toBe(0.08)
   })

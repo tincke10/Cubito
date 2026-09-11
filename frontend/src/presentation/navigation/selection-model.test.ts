@@ -1,8 +1,40 @@
 import { describe, expect, it } from 'vitest'
-import { initialSelection, moveSelection, reconcileSelection } from './selection-model'
+import {
+  initialSelection,
+  islandEntrySelection,
+  moveSelection,
+  reconcileSelection
+} from './selection-model'
 import type { WorktreeGraph, WorktreeNode } from '../../domain/worktree-graph/types'
 import { inertActivity } from '../../domain/worktree-graph/node-activity'
 import { emptyWorktreeGraph } from '../../domain/worktree-graph/types'
+
+const islandNode = (
+  overrides: Partial<WorktreeNode> & Pick<WorktreeNode, 'id' | 'repoId'>
+): WorktreeNode => ({
+  branch: `refs/heads/${overrides.id}`,
+  path: `/path/${overrides.id}`,
+  status: 'in-progress',
+  isMain: false,
+  kind: 'worktree',
+  parentId: null,
+  childIds: [],
+  activity: inertActivity(),
+  ...overrides
+})
+
+const twoRepoGraph = (): WorktreeGraph => {
+  const nodes = [
+    islandNode({ id: 'r1-main', repoId: 'r1', isMain: true }),
+    islandNode({ id: 'r1-other', repoId: 'r1' }),
+    islandNode({ id: 'r2-root', repoId: 'r2' })
+  ]
+  return {
+    nodes: new Map(nodes.map((n) => [n.id, n])),
+    edges: [],
+    rootIds: nodes.map((n) => n.id)
+  }
+}
 
 const node = (overrides: Partial<WorktreeNode> & Pick<WorktreeNode, 'id'>): WorktreeNode => ({
   repoId: 'repo',
@@ -146,5 +178,23 @@ describe('reconcileSelection', () => {
 
   it('returns null for an empty graph with no resolvable id', () => {
     expect(reconcileSelection(emptyWorktreeGraph(), 'ghost')).toBeNull()
+  })
+})
+
+describe('islandEntrySelection', () => {
+  it("returns that island's main node", () => {
+    expect(islandEntrySelection(twoRepoGraph(), 'r1')).toBe('r1-main')
+  })
+
+  it("falls back to the island's first root when no node is flagged main", () => {
+    expect(islandEntrySelection(twoRepoGraph(), 'r2')).toBe('r2-root')
+  })
+
+  it('falls back to the whole graph when repoId is null', () => {
+    expect(islandEntrySelection(twoRepoGraph(), null)).toBe('r1-main')
+  })
+
+  it('returns null for an unknown repoId', () => {
+    expect(islandEntrySelection(twoRepoGraph(), 'ghost')).toBeNull()
   })
 })

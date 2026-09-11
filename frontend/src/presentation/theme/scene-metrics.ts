@@ -43,7 +43,6 @@ export const MIN_ANGULAR_SEPARATION = NODE_SIZE * 1.8
 export const ROOT_SPREAD = DEPTH_STEP * 2
 
 // ── camera ──────────────────────────────────────────────────────────────
-export const FOCUS_RADIUS = 6 // node + its immediate family
 export const FIT_PADDING = 1.5
 export const FIT_MIN_RADIUS = 6
 export const FOCUS_DURATION_MS = 420

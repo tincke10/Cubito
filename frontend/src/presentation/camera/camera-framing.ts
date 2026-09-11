@@ -1,4 +1,4 @@
-import { FIT_MIN_RADIUS, FIT_PADDING, FOCUS_RADIUS } from '../theme/scene-metrics'
+import { FIT_MIN_RADIUS, FIT_PADDING } from '../theme/scene-metrics'
 import type { WorktreeGraph, WorktreeId } from '../../domain/worktree-graph/types'
 
 export type Vec3 = { x: number; y: number; z: number }
@@ -6,9 +6,6 @@ export type CameraFraming = { target: Vec3; radius: number }
 
 const distance = (a: Vec3, b: Vec3): number =>
   Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (a.z - b.z) ** 2)
-
-/** Camera-type-agnostic on purpose — the rig is the only file that knows it's orthographic. */
-export const frameNode = (center: Vec3): CameraFraming => ({ target: center, radius: FOCUS_RADIUS })
 
 /** Bounding sphere: min/max midpoint as center, max radial distance + padding as radius. */
 export const frameAll = (centers: Iterable<Vec3>): CameraFraming => {

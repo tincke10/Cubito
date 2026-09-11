@@ -5,12 +5,6 @@ import { createSceneStore } from '../../application/scene-store'
 import type { CommandId } from '../../application/command-catalog'
 import type { CommandPaletteHandle } from './command-palette-element'
 import type { CommandPaletteViewModel } from './command-palette-view-model'
-import { frameAll, frameNode } from '../camera/camera-framing'
-import type { Vec3 } from '../camera/camera-framing'
-import { poseForExtent } from '../camera/height-presets'
-import { FOCUS_DURATION_MS } from '../theme/scene-metrics'
-
-const FAKE_FOV = 38
 import { inertActivity } from '../../domain/worktree-graph/node-activity'
 import type { WorktreeGraph, WorktreeNode } from '../../domain/worktree-graph/types'
 
@@ -96,11 +90,6 @@ function buildGraph(): WorktreeGraph {
   return { nodes, edges: [], rootIds: ['root'] }
 }
 
-const CENTERS: Record<string, Vec3> = {
-  root: { x: 0, y: 0, z: 0 },
-  a: { x: -5, y: 0, z: 0 }
-}
-
 const LINUX = { isMac: false }
 
 function setup(selectedId: string | null = 'a', connected = true) {
@@ -110,26 +99,16 @@ function setup(selectedId: string | null = 'a', connected = true) {
     selection: { selectedId },
     connection: connected ? { state: 'connected', runtimeId: 'r' } : { state: 'down', reason: 'x' }
   })
-  const cameraRig = {
-    animateTo: vi.fn(),
-    currentPose: vi.fn(() => ({
-      position: { x: 0, y: 0, z: 0 },
-      lookAt: { x: 0, y: 0, z: 0 },
-      fov: FAKE_FOV
-    })),
-    isPointInView: vi.fn(() => true)
-  }
-  const scenePositions = {
-    nodeCenter: (id: string) => CENTERS[id] ?? null,
-    nodeCenters: () => Object.values(CENTERS)
-  }
+  // All camera-height math is unit-tested against the real controller in
+  // camera-height-controller.test.ts — here it's a bare fake so these tests only assert
+  // WHICH heights method got called for each command.
+  const heights = { goTo: vi.fn() }
   const terminal = { focusActivePanel: vi.fn() }
   const hud = { appendChild: vi.fn() }
   const handles: FakeHandle[] = []
   const deps: CommandPaletteControllerDeps = {
     store,
-    cameraRig,
-    scenePositions,
+    heights,
     terminal,
     createElement: () => {
       const h = createFakeHandle()
@@ -140,7 +119,7 @@ function setup(selectedId: string | null = 'a', connected = true) {
     platform: LINUX
   }
   const controller = createCommandPaletteController(deps)
-  return { store, cameraRig, scenePositions, terminal, hud, handles, controller }
+  return { store, heights, terminal, hud, handles, controller }
 }
 
 const openAndMount = (setupResult: ReturnType<typeof setup>): void => {
@@ -189,32 +168,19 @@ describe('createCommandPaletteController', () => {
   })
 
   describe('activate — close-then-run for every command', () => {
-    it('focus frames the selected node through cameraRig.animateTo, and closes the palette first', () => {
+    it('focus delegates to heights.goTo("foco"), and closes the palette first', () => {
       const setupResult = setup('a')
       openAndMount(setupResult)
       setupResult.handles[0]!.emitActivate('focus')
       expect(setupResult.store.get().commandPalette.view).toBe('closed')
-      expect(setupResult.cameraRig.animateTo).toHaveBeenCalledWith(
-        poseForExtent(frameNode(CENTERS.a!), FAKE_FOV),
-        FOCUS_DURATION_MS
-      )
+      expect(setupResult.heights.goTo).toHaveBeenCalledWith('foco')
     })
 
-    it('focus with no selection is a no-op (still closes the palette)', () => {
-      const setupResult = setup(null)
-      openAndMount(setupResult)
-      setupResult.handles[0]!.emitActivate('focus')
-      expect(setupResult.cameraRig.animateTo).not.toHaveBeenCalled()
-    })
-
-    it('fit-all frames every node', () => {
+    it('fit-all delegates to heights.goTo("general")', () => {
       const setupResult = setup('a')
       openAndMount(setupResult)
       setupResult.handles[0]!.emitActivate('fit-all')
-      expect(setupResult.cameraRig.animateTo).toHaveBeenCalledWith(
-        poseForExtent(frameAll(setupResult.scenePositions.nodeCenters()), FAKE_FOV),
-        FOCUS_DURATION_MS
-      )
+      expect(setupResult.heights.goTo).toHaveBeenCalledWith('general')
     })
 
     it('open-terminal opens a terminal for the selected node and focuses the panel', () => {

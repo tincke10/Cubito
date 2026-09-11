@@ -4,20 +4,13 @@ import { commandCatalog, toCommandAvailability } from '../../application/command
 import type { CommandPaletteSlice } from '../../application/command-palette-model'
 import { commandPaletteViewModel } from './command-palette-view-model'
 import type { CommandPaletteHandle } from './command-palette-element'
-import type {
-  CameraRigLike,
-  ScenePositions,
-  TerminalCommandPort
-} from '../input/keyboard-controller'
-import { frameAll, frameNode } from '../camera/camera-framing'
-import { poseForExtent } from '../camera/height-presets'
-import { FOCUS_DURATION_MS } from '../theme/scene-metrics'
+import type { TerminalCommandPort } from '../input/keyboard-controller'
+import type { CameraHeightController } from '../input/camera-height-controller'
 import { fanOutMemberIds } from '../../application/fan-out-model'
 
 export type CommandPaletteControllerDeps = {
   store: SceneStore
-  cameraRig: CameraRigLike
-  scenePositions: ScenePositions
+  heights: Pick<CameraHeightController, 'goTo'>
   terminal: Pick<TerminalCommandPort, 'focusActivePanel'>
   createElement: () => CommandPaletteHandle
   hud: { appendChild(element: unknown): void }
@@ -37,26 +30,16 @@ export type CommandPaletteController = {
 export function createCommandPaletteController(
   deps: CommandPaletteControllerDeps
 ): CommandPaletteController {
-  const { store, cameraRig, scenePositions, terminal } = deps
+  const { store, heights, terminal } = deps
   const catalog = commandCatalog(deps.platform)
   let element: CommandPaletteHandle | null = null
 
   const run: Record<CommandId, () => void> = {
     focus: () => {
-      const selectedId = store.get().selection.selectedId
-      const center = selectedId !== null ? scenePositions.nodeCenter(selectedId) : null
-      if (center) {
-        cameraRig.animateTo(
-          poseForExtent(frameNode(center), cameraRig.currentPose().fov),
-          FOCUS_DURATION_MS
-        )
-      }
+      heights.goTo('foco')
     },
     'fit-all': () => {
-      cameraRig.animateTo(
-        poseForExtent(frameAll(scenePositions.nodeCenters()), cameraRig.currentPose().fov),
-        FOCUS_DURATION_MS
-      )
+      heights.goTo('general')
     },
     'open-terminal': () => {
       const selectedId = store.get().selection.selectedId

@@ -8,9 +8,8 @@ import { connectOrcad } from './infrastructure/rpc/connect-orcad'
 import { consumePairingFragment } from './infrastructure/rpc/pairing-fragment'
 import type { RuntimeGateway } from './application/ports/runtime-gateway'
 import type { RawWorktreeRecord } from './domain/worktree-graph/build-graph'
-import { frameAll, frameIsland } from './presentation/camera/camera-framing'
 import type { Vec3 } from './presentation/camera/camera-framing'
-import { poseForExtent } from './presentation/camera/height-presets'
+import { createCameraHeightController } from './presentation/input/camera-height-controller'
 import { createFanOutBinder } from './bind-fan-out'
 import { createSystemViewBinder } from './bind-system-view'
 import { demoSystemGraph } from './demo-system-graph'
@@ -181,6 +180,7 @@ const cubitoScene = createScene(container, palette)
 const graphView = createGraphView(cubitoScene.scene, cubitoScene.labelLayer)
 const cameraRig = createCameraRig(cubitoScene.camera, cubitoScene.controls)
 const store = createSceneStore()
+const heights = createCameraHeightController({ store, rig: cameraRig, scenePositions: graphView })
 
 const hudOverlay = createHudOverlay()
 hud.appendChild(hudOverlay.root)
@@ -217,8 +217,7 @@ const fanOutBinder = createFanOutBinder({
   store,
   hud: hudElement,
   nodeCenter: (id) => graphView.nodeCenter(id),
-  animateTo: (framing, durationMs) =>
-    cameraRig.animateTo(poseForExtent(framing, cameraRig.currentPose().fov), durationMs),
+  animateTo: (framing, durationMs) => heights.animateToExtent(framing, durationMs),
   focusDurationMs: FOCUS_DURATION_MS,
   demoGateway
 })
@@ -271,8 +270,7 @@ const terminalCommands = {
 
 const keyboardController = createKeyboardController({
   store,
-  cameraRig,
-  scenePositions: graphView,
+  heights,
   terminal: terminalCommands,
   platform
 })
@@ -284,8 +282,7 @@ keyboardController.attach(window)
 // catalog's isAvailable predicates until connection.state === 'connected'.
 const commandPaletteController = createCommandPaletteController({
   store,
-  cameraRig,
-  scenePositions: graphView,
+  heights,
   terminal: terminalCommands,
   createElement: createCommandPalette,
   hud: hudElement,
@@ -347,7 +344,7 @@ store.subscribe((state) => {
   commandPaletteController.sync(state.commandPalette, state)
   if (!framed && state.graph.nodes.size > 0) {
     framed = true
-    cameraRig.apply(poseForExtent(frameAll(graphView.nodeCenters()), cameraRig.currentPose().fov))
+    heights.goTo('isla')
   }
 })
 
@@ -417,10 +414,7 @@ function bindProjects(connection: LiveSyncConnection): void {
     hud: hudElement,
     dispatch: (action) => store.dispatchProjectSelector(action),
     reposDispatch: (action) => store.dispatchRepos(action),
-    focusIsland: (repoId) => {
-      const framing = frameIsland(store.get().graph, repoId, graphView.nodeCenter)
-      cameraRig.animateTo(poseForExtent(framing, cameraRig.currentPose().fov), FOCUS_DURATION_MS)
-    },
+    focusIsland: (repoId) => heights.reanchorIsland(repoId),
     refetch: () => syncWorktreeGraph(projectsGateway, store)
   })
   projectSelectorController.sync(store.get().projectSelector, store.get().repos)
