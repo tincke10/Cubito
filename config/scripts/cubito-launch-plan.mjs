@@ -58,6 +58,28 @@ function parseFlags(argv) {
   return flags
 }
 
+const DAEMON_SOCKET_DIR = '/daemon/'
+// Observed socket name `.p94b43b2e22` is 12 chars; +1 margin so a 13-char name still fits.
+const SOCKET_NAME_MARGIN = 13
+const SUN_PATH_LIMITS = { darwin: 104, linux: 108 }
+
+/** `null`, or a message, if `dataDir`'s worst-case daemon socket path would exceed the OS's `sun_path` limit. */
+export function dataDirSocketPathProblem(dataDir, platform) {
+  const limit = SUN_PATH_LIMITS[platform]
+  if (limit === undefined) {
+    return null
+  }
+  const worstCaseLength = dataDir.length + DAEMON_SOCKET_DIR.length + SOCKET_NAME_MARGIN
+  if (worstCaseLength <= limit) {
+    return null
+  }
+  return (
+    `data dir "${dataDir}" would produce a daemon socket path of ~${worstCaseLength} chars, ` +
+    `over the ${platform} unix socket limit of ${limit}. Use a shorter --data-dir or ` +
+    `ORCA_USER_DATA, e.g. ~/.cubito.`
+  )
+}
+
 /** Where orcad's `local-default` profile persists global settings under a given data dir. */
 export function settingsSeedPath(dataDir) {
   return join(dataDir, 'profiles', PROFILE_ID, 'orca-data.json')

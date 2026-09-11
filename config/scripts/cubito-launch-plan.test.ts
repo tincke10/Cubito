@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   composeFrontendUrl,
+  dataDirSocketPathProblem,
   parseReadinessLine,
   resolveLaunchPlan,
   settingsSeedContent,
@@ -138,6 +139,34 @@ describe('parseReadinessLine', () => {
 
   it('ignores a ready line with no pairing url', () => {
     expect(parseReadinessLine(JSON.stringify({ type: 'orca_server_ready' }))).toBeNull()
+  })
+})
+
+describe('dataDirSocketPathProblem', () => {
+  const shortDataDir = '/Users/dev/.cubito'
+  // 85 chars: dataDir.length + '/daemon/'.length(8) + margin(13) = 106 — over darwin's 104, under linux's 108.
+  const borderlineDataDir = `/Users/dev/${'x'.repeat(74)}`
+
+  it('passes a short data dir on darwin and linux', () => {
+    expect(dataDirSocketPathProblem(shortDataDir, 'darwin')).toBeNull()
+    expect(dataDirSocketPathProblem(shortDataDir, 'linux')).toBeNull()
+  })
+
+  it('fails on darwin once the worst-case socket path leaves less than the margin', () => {
+    const problem = dataDirSocketPathProblem(borderlineDataDir, 'darwin')
+    expect(problem).not.toBeNull()
+    expect(problem).toContain('104')
+    expect(problem).toMatch(/--data-dir|ORCA_USER_DATA/)
+    expect(problem).toContain('~/.cubito')
+  })
+
+  it('passes the same borderline dir on linux, proving the platform-specific limit', () => {
+    expect(dataDirSocketPathProblem(borderlineDataDir, 'linux')).toBeNull()
+  })
+
+  it('never fails on win32, regardless of length', () => {
+    const veryLongDataDir = `/Users/dev/${'x'.repeat(500)}`
+    expect(dataDirSocketPathProblem(veryLongDataDir, 'win32')).toBeNull()
   })
 })
 

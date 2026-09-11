@@ -11,6 +11,7 @@ import process from 'node:process'
 import { createInterface } from 'node:readline'
 import {
   composeFrontendUrl,
+  dataDirSocketPathProblem,
   parseReadinessLine,
   resolveLaunchPlan,
   settingsSeedContent,
@@ -29,6 +30,12 @@ const plan = resolveLaunchPlan({
   homedir: homedir(),
   platform: process.platform
 })
+
+const socketPathProblem = dataDirSocketPathProblem(plan.dataDir, process.platform)
+if (socketPathProblem) {
+  console.error(`[cubito] ${socketPathProblem}`)
+  process.exit(1)
+}
 
 seedIsolatedProfile(plan)
 
