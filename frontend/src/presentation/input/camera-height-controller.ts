@@ -1,6 +1,6 @@
 import type { SceneStore } from '../../application/scene-store'
 import type { WorktreeId } from '../../domain/worktree-graph/types'
-import { frameIsland } from '../camera/camera-framing'
+import { frameAll, frameIsland } from '../camera/camera-framing'
 import type { CameraFraming, Vec3 } from '../camera/camera-framing'
 import { panPoseTo } from '../camera/camera-pose'
 import type { CameraHeight, CameraPose } from '../camera/camera-pose'
@@ -34,8 +34,8 @@ export type CameraHeightController = {
   goTo(height: CameraHeight): boolean
   /** Tweens back to the popped pose at the popped height's own duration. False on an empty stack. */
   pop(): boolean
-  /** Tab/⌘P island activate: 'general' re-anchors to its fixed preset over the new island; every
-   *  other height fits the island's extent. Never pushes. */
+  /** Tab/⌘P island activate: 'general' anchors on the galaxy centroid, so activating an island
+   *  never moves the camera; every other height fits the island's extent. Never pushes. */
   reanchorIsland(repoId: string): void
   /** Fan-out litter reframe at the CURRENT fov, so a reframe never changes height. */
   animateToExtent(framing: CameraFraming, durationMs: number): void
@@ -62,6 +62,15 @@ export function createCameraHeightController(
     return center ? { x: center.x, y: 0, z: center.z } : null
   }
 
+  /** general anchors on the galaxy centroid (design D6 fallback) — independent of the active
+   *  island, unlike every other height's `groundAnchor`. */
+  const generalAnchor = (): Vec3 | null => {
+    const centers = scenePositions.nodeCenters()
+    if (centers.length === 0) return null
+    const { target } = frameAll(centers)
+    return { x: target.x, y: 0, z: target.z }
+  }
+
   const computePose = (height: CameraHeight): CameraPose | null => {
     if (height === 'foco') {
       const selectedId = store.get().selection.selectedId
@@ -69,6 +78,10 @@ export function createCameraHeightController(
       if (selection === null) return null
       const anchor = groundAnchor(store.get().repos.activeRepoId) ?? { x: 0, y: 0, z: 0 }
       return poseForHeight('foco', anchor, selection)
+    }
+    if (height === 'general') {
+      const anchor = generalAnchor()
+      return anchor === null ? null : poseForHeight('general', anchor, null)
     }
     const anchor = groundAnchor(store.get().repos.activeRepoId)
     if (anchor === null) return null
@@ -99,11 +112,8 @@ export function createCameraHeightController(
 
   const reanchorIsland = (repoId: string): void => {
     const height = current()
-    if (height === 'general') {
-      const anchor = groundAnchor(repoId) ?? { x: 0, y: 0, z: 0 }
-      rig.animateTo(poseForHeight('general', anchor, null), heightDurationMs('general'))
-      return
-    }
+    // general's anchor is the whole-galaxy centroid — activating a different island can't move it.
+    if (height === 'general') return
     const framing = frameIsland(store.get().graph, repoId, scenePositions.nodeCenter)
     rig.animateTo(poseForExtent(framing, rig.currentPose().fov), heightDurationMs(height))
   }

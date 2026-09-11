@@ -5,7 +5,7 @@ import { createSceneStore } from '../../application/scene-store'
 import { poseForExtent, poseForHeight } from '../camera/height-presets'
 import { panPoseTo } from '../camera/camera-pose'
 import type { CameraPose } from '../camera/camera-pose'
-import { frameIsland } from '../camera/camera-framing'
+import { frameAll, frameIsland } from '../camera/camera-framing'
 import type { Vec3 } from '../camera/camera-framing'
 import { inertActivity } from '../../domain/worktree-graph/node-activity'
 import type { WorktreeGraph, WorktreeNode } from '../../domain/worktree-graph/types'
@@ -71,7 +71,13 @@ const DEFAULT_POSE: CameraPose = {
   fov: FAKE_FOV
 }
 
-function setup(overrides: { selectedId?: string | null; activeRepoId?: string | null } = {}) {
+function setup(
+  overrides: {
+    selectedId?: string | null
+    activeRepoId?: string | null
+    scenePositions?: ScenePositions
+  } = {}
+) {
   const store = createSceneStore()
   store.update({
     graph: buildTwoRepoGraph(),
@@ -82,7 +88,7 @@ function setup(overrides: { selectedId?: string | null; activeRepoId?: string | 
     store.update({ repos: { ...store.get().repos, activeRepoId: overrides.activeRepoId } })
   }
   const rig = fakeCameraRig(DEFAULT_POSE)
-  const scenePositions = fakeScenePositions()
+  const scenePositions = overrides.scenePositions ?? fakeScenePositions()
   const heights = createCameraHeightController({ store, rig, scenePositions })
   return { store, rig, scenePositions, heights }
 }
@@ -101,7 +107,8 @@ describe('createCameraHeightController', () => {
 
     expect(pushed).toBe(true)
     expect(store.get().camera.height).toBe('general')
-    const anchor = { x: CENTERS['r1-main']!.x, y: 0, z: CENTERS['r1-main']!.z }
+    const centroid = frameAll(Object.values(CENTERS)).target
+    const anchor = { x: centroid.x, y: 0, z: centroid.z }
     expect(rig.animateTo).toHaveBeenCalledWith(poseForHeight('general', anchor, null), 600)
   })
 
@@ -167,7 +174,7 @@ describe('createCameraHeightController', () => {
     expect(store.get().camera.height).toBe('isla')
   })
 
-  it('reanchorIsland fits the island extent in isla, and holds the fixed preset in general', () => {
+  it('reanchorIsland fits the island extent in isla, and leaves the camera untouched in general', () => {
     const { store, rig, scenePositions, heights } = setup({ activeRepoId: 'r1' })
 
     heights.reanchorIsland('r2')
@@ -176,9 +183,9 @@ describe('createCameraHeightController', () => {
 
     heights.goTo('general')
     rig.animateTo.mockClear()
+    // general anchors on the whole-galaxy centroid, which doesn't depend on the active island.
     heights.reanchorIsland('r2')
-    const anchor = { x: CENTERS['r2-root']!.x, y: 0, z: CENTERS['r2-root']!.z }
-    expect(rig.animateTo).toHaveBeenCalledWith(poseForHeight('general', anchor, null), 600)
+    expect(rig.animateTo).not.toHaveBeenCalled()
   })
 
   it('animateToExtent keeps the current fov', () => {
@@ -232,28 +239,49 @@ describe('createCameraHeightController', () => {
     expect(rig.animateTo).not.toHaveBeenCalled()
   })
 
-  it('the anchor is the active island main node ground point, with y forced to 0', () => {
-    const { rig, heights } = setup({ activeRepoId: 'r1' })
+  it('general anchors on the centroid of all node centers, ground y = 0', () => {
+    const { rig, heights, scenePositions } = setup({ activeRepoId: 'r1' })
     heights.goTo('general')
-    // r1-main's raw y is 0.52 (CENTERS) but the anchor forces y=0 before adding the preset offset.
-    const groundedAnchor = { x: CENTERS['r1-main']!.x, y: 0, z: CENTERS['r1-main']!.z }
-    expect(rig.animateTo).toHaveBeenCalledWith(poseForHeight('general', groundedAnchor, null), 600)
-  })
-
-  it("the anchor falls back to the island's first root node when no node is flagged isMain", () => {
-    const { rig, heights } = setup({ activeRepoId: 'r2' })
-    const pushed = heights.goTo('general')
-    expect(pushed).toBe(true)
-    const anchor = { x: CENTERS['r2-root']!.x, y: 0, z: CENTERS['r2-root']!.z }
+    // the centroid's raw y is non-zero (CENTERS has r1-main at 0.52) but the anchor forces y=0.
+    const centroid = frameAll(scenePositions.nodeCenters()).target
+    const anchor = { x: centroid.x, y: 0, z: centroid.z }
     expect(rig.animateTo).toHaveBeenCalledWith(poseForHeight('general', anchor, null), 600)
   })
 
-  it('goTo targeting general/isla/comparar is a no-op when the active island has zero nodes', () => {
+  it("comparar falls back to the island's first root node when no node is flagged isMain", () => {
+    const { rig, heights } = setup({ activeRepoId: 'r2' })
+    const pushed = heights.goTo('comparar')
+    expect(pushed).toBe(true)
+    const anchor = { x: CENTERS['r2-root']!.x, y: 0, z: CENTERS['r2-root']!.z }
+    expect(rig.animateTo).toHaveBeenCalledWith(poseForHeight('comparar', anchor, null), 600)
+  })
+
+  it('goTo targeting isla/comparar is a no-op when the active island has zero nodes', () => {
     const { store, rig, heights } = setup({ activeRepoId: 'r1' })
     store.update({ graph: { nodes: new Map(), edges: [], rootIds: [] } })
 
-    expect(heights.goTo('general')).toBe(false)
+    expect(heights.goTo('isla')).toBe(false)
     expect(heights.goTo('comparar')).toBe(false)
+    expect(rig.animateTo).not.toHaveBeenCalled()
+    expect(store.get().camera.height).toBe('isla')
+  })
+
+  it('goTo general does not depend on the active island: it still succeeds with zero graph nodes', () => {
+    const { store, rig, heights } = setup({ activeRepoId: 'r1' })
+    store.update({ graph: { nodes: new Map(), edges: [], rootIds: [] } })
+
+    expect(heights.goTo('general')).toBe(true)
+    expect(rig.animateTo).toHaveBeenCalled()
+  })
+
+  it('goTo general is a no-op only when there are no node centers anywhere', () => {
+    const emptyScenePositions: ScenePositions = { nodeCenter: () => null, nodeCenters: () => [] }
+    const { store, rig, heights } = setup({
+      activeRepoId: 'r1',
+      scenePositions: emptyScenePositions
+    })
+
+    expect(heights.goTo('general')).toBe(false)
     expect(rig.animateTo).not.toHaveBeenCalled()
     expect(store.get().camera.height).toBe('isla')
   })

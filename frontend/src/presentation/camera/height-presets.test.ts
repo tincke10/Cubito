@@ -23,8 +23,8 @@ describe('poseForHeight', () => {
   it('offsets position and lookAt from the anchor ground point for general', () => {
     const anchor: Vec3 = { x: 10, y: 7, z: -4 }
     const pose = poseForHeight('general', anchor, null)
-    expect(pose.position).toEqual({ x: 10 + 6, y: 58, z: -4 + 74 })
-    expect(pose.lookAt).toEqual({ x: 10 - 13, y: 0, z: -4 - 8 })
+    expect(pose.position).toEqual({ x: 10 + 19, y: 58, z: -4 + 82 })
+    expect(pose.lookAt).toEqual({ x: 10, y: 0, z: -4 })
     expect(pose.fov).toBe(40)
   })
 

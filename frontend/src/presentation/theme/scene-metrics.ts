@@ -56,8 +56,9 @@ export const MS_PER_SECOND = 1000 // FOCUS_DURATION_MS is milliseconds; camera c
 // camera/camera-framing.ts (same trap ELEVATION documents above). See camera/height-presets.ts.
 export const CAMERA_HEIGHT_PRESETS = {
   general: {
-    position: { x: 6, y: 58, z: 74 },
-    lookAt: { x: -13, y: 0, z: -8 },
+    // anchored on the galaxy centroid (design D6 fallback), not the active island's main node.
+    position: { x: 19, y: 58, z: 82 },
+    lookAt: { x: 0, y: 0, z: 0 },
     fov: 40,
     durationMs: 600
   },

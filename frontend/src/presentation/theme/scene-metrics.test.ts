@@ -59,8 +59,8 @@ describe('scene-metrics', () => {
 
   it('pins the four camera height presets', () => {
     expect(CAMERA_HEIGHT_PRESETS.general).toEqual({
-      position: { x: 6, y: 58, z: 74 },
-      lookAt: { x: -13, y: 0, z: -8 },
+      position: { x: 19, y: 58, z: 82 },
+      lookAt: { x: 0, y: 0, z: 0 },
       fov: 40,
       durationMs: 600
     })
