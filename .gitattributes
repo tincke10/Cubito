@@ -22,3 +22,5 @@
 # the reviewable change, and pin LF because they are compared byte-for-byte.
 # Not -diff: the shell diff is the review surface when a wrapper does change.
 /src/main/__fixtures__/shell-wrapper-snapshots/*.txt linguist-generated=true text eol=lf
+# Shell scripts run inside Linux containers; a CRLF checkout breaks the shebang.
+*.sh text eol=lf

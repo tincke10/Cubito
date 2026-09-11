@@ -1,0 +1,7 @@
+node_modules
+frontend/node_modules
+out
+frontend/dist
+.git
+tests/e2e/.cross-version-checkouts
+*.log
