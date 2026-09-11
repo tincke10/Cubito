@@ -15,8 +15,7 @@ export type BindPointerPickingDeps = {
 
 /**
  * Raycaster pointer wiring (design escena-3d-alturas §2.5): DOM event listeners only — all
- * hover/click/drag math lives in node-pick.ts. Declared exclusion from unit coverage (mirrors
- * create-scene.ts) because it drives real PointerEvents against a real canvas.
+ * hover/click/drag math lives in node-pick.ts.
  */
 export function bindPointerPicking(deps: BindPointerPickingDeps): () => void {
   const { store, canvas, camera, pickableObjects, heights } = deps
