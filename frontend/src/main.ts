@@ -252,7 +252,8 @@ const compareViewBinder = createCompareViewBinder({
   store,
   compareSlot,
   keyboardBarSlot,
-  demoGateway
+  demoGateway,
+  heights
 })
 
 // Worktree HUD/keyboard-bar/3D scene chrome, hidden while EITHER scene-replacing mode (sistema

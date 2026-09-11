@@ -1,9 +1,14 @@
 import { createCompareViewController } from './presentation/compare/compare-view-controller'
 import { createCompareRail } from './presentation/compare/compare-rail-element'
+import type { CompareRailHandle } from './presentation/compare/compare-rail-element'
 import { createDiffRail } from './presentation/diff/diff-rail-element'
+import type { DiffRailHandle } from './presentation/diff/diff-rail-element'
 import { createDiffPanel } from './presentation/diff/diff-panel-element'
+import type { DiffPanelHandle } from './presentation/diff/diff-panel-element'
 import { createCompareHud } from './presentation/compare/compare-hud-element'
+import type { CompareHudHandle } from './presentation/compare/compare-hud-element'
 import { createCompareMergeAction } from './presentation/compare/compare-merge-action-element'
+import type { CompareMergeActionHandle } from './presentation/compare/compare-merge-action-element'
 import { createCompareLiveLoader } from './application/compare-live-loader'
 import type { CompareLiveLoaderGatewayPort } from './application/compare-live-loader'
 import { runCompareMerge } from './application/compare-merge-run'
@@ -13,6 +18,7 @@ import {
   GIT_MERGE_WINNER_SYNC_CAPABILITY
 } from './application/runtime-capability-keys'
 import type { SceneStore } from './application/scene-store'
+import type { CameraHeightController } from './presentation/input/camera-height-controller'
 import type { WorktreeId } from './domain/worktree-graph/types'
 
 type CompareGatewayPort = CompareLiveLoaderGatewayPort & CompareMergeGatewayPort
@@ -22,6 +28,13 @@ export type BindCompareViewDeps = {
   compareSlot: { appendChild(element: unknown): void }
   keyboardBarSlot: { appendChild(element: unknown): void }
   demoGateway: CompareGatewayPort
+  heights: Pick<CameraHeightController, 'goTo' | 'pop'>
+  /** DOM element factory overrides — tests substitute fakes, production uses the defaults. */
+  createChildRail?: () => CompareRailHandle
+  createFileRail?: () => DiffRailHandle
+  createPanel?: () => DiffPanelHandle
+  createHud?: () => CompareHudHandle
+  createMergeAction?: () => CompareMergeActionHandle
 }
 
 export type CompareViewBinder = {
@@ -44,11 +57,11 @@ export function createCompareViewBinder(deps: BindCompareViewDeps): CompareViewB
   let capabilities: readonly string[] = []
 
   const controller = createCompareViewController({
-    createChildRail: createCompareRail,
-    createFileRail: createDiffRail,
-    createPanel: createDiffPanel,
-    createHud: createCompareHud,
-    createMergeAction: createCompareMergeAction,
+    createChildRail: deps.createChildRail ?? createCompareRail,
+    createFileRail: deps.createFileRail ?? createDiffRail,
+    createPanel: deps.createPanel ?? createDiffPanel,
+    createHud: deps.createHud ?? createCompareHud,
+    createMergeAction: deps.createMergeAction ?? createCompareMergeAction,
     hud: deps.compareSlot,
     keyboardBarSlot: deps.keyboardBarSlot,
     onFocusChild: (childId) => deps.store.dispatchCompareView({ type: 'focus-child', childId }),
@@ -73,6 +86,7 @@ export function createCompareViewBinder(deps: BindCompareViewDeps): CompareViewB
   })
 
   let wasOpen = false
+  let pushedHeight = false
 
   const branchLabelFor = (childId: WorktreeId): string =>
     deps.store.get().graph.nodes.get(childId)?.branch ?? childId
@@ -85,8 +99,17 @@ export function createCompareViewBinder(deps: BindCompareViewDeps): CompareViewB
       const transitionToOpen = isOpen && !wasOpen
       const transitionToClosed = !isOpen && wasOpen
       wasOpen = isOpen
-      if (transitionToOpen && compareView.view === 'open') loader.start(compareView.members)
-      if (transitionToClosed) loader.stop()
+      if (transitionToOpen && compareView.view === 'open') {
+        loader.start(compareView.members)
+        pushedHeight = deps.heights.goTo('comparar')
+      }
+      if (transitionToClosed) {
+        loader.stop()
+        if (pushedHeight) {
+          deps.heights.pop()
+          pushedHeight = false
+        }
+      }
 
       controller.sync(
         compareView,
