@@ -28,12 +28,12 @@ export type NodeLabelHandle = {
 }
 
 /**
- * Thin CSS2DObject-backed label (design §3, Decision 2). Untestable under
- * `environment:'node'` (no `document`) — content/tone logic lives entirely in
- * node-label-model.ts; this file only paints it.
+ * Thin CSS2DObject-backed label (design §3, Decision 2). Content/tone logic lives entirely in
+ * node-label-model.ts; this file only paints it. DOM is injectable (mirrors fan-out-element.ts)
+ * so it runs under vitest's `environment: 'node'` (no `document`) with a fake `doc`.
  */
-export function createNodeLabel(): NodeLabelHandle {
-  const root = document.createElement('div')
+export function createNodeLabel(doc: Document = document): NodeLabelHandle {
+  const root = doc.createElement('div')
   root.className = 'cubito-node-label'
   root.style.pointerEvents = 'none'
   root.style.textAlign = 'center'
@@ -43,15 +43,15 @@ export function createNodeLabel(): NodeLabelHandle {
   // CSS2DRenderer overwrites `root.style.transform` every frame to position the
   // object on screen, so the mockup's fixed +26px-below-shadow offset lives on an
   // inner wrapper instead — setting it on `root` would be clobbered each frame.
-  const inner = document.createElement('div')
+  const inner = doc.createElement('div')
   inner.style.transform = 'translate(-50%, 26px)'
   root.appendChild(inner)
 
-  const primary = document.createElement('div')
-  const secondary = document.createElement('div')
-  const callout = document.createElement('div')
-  const calloutTitle = document.createElement('div')
-  const calloutHint = document.createElement('div')
+  const primary = doc.createElement('div')
+  const secondary = doc.createElement('div')
+  const callout = doc.createElement('div')
+  const calloutTitle = doc.createElement('div')
+  const calloutHint = doc.createElement('div')
   callout.appendChild(calloutTitle)
   callout.appendChild(calloutHint)
   inner.appendChild(primary)
