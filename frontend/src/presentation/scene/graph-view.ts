@@ -1,6 +1,10 @@
 import * as THREE from 'three'
+import { childrenOf } from '../../domain/worktree-graph/graph-traversal'
 import type { WorktreeGraph, WorktreeId } from '../../domain/worktree-graph/types'
+import { DEFAULT_CAMERA_HEIGHT } from '../camera/camera-pose'
+import type { CameraHeight } from '../camera/camera-pose'
 import type { Vec3 } from '../camera/camera-framing'
+import { labelVisibleAt } from '../hud/label-visibility-model'
 import { createNodeLabel } from '../hud/node-label-element'
 import type { NodeLabelHandle } from '../hud/node-label-element'
 import { nodeLabelModel } from '../hud/node-label-model'
@@ -24,6 +28,8 @@ export type GraphViewInput = {
   palette: ScenePalette
   /** repoId of the active island — undimmed. Optional: main.ts is the only caller that knows it. */
   activeRepoId?: string | null
+  /** Drives per-node label visibility (design D12). Defaults to DEFAULT_CAMERA_HEIGHT. */
+  cameraHeight?: CameraHeight
 }
 
 /** Injectable so the reconciliation suite runs under `environment:'node'`, where the real
@@ -39,6 +45,8 @@ export type GraphView = {
   setResolution(width: number, height: number): void
   nodeCenter(id: WorktreeId): Vec3 | null
   nodeCenters(): Vec3[]
+  /** Node groups eligible for raycast picking (wired up in W7 — empty stub until then). */
+  pickableObjects(): readonly THREE.Object3D[]
   dispose(): void
 }
 
@@ -85,8 +93,17 @@ export function createGraphView(
     edges.delete(key)
   }
 
-  const syncNodes = ({ graph, selectedId, palette, activeRepoId = null }: GraphViewInput): void => {
+  const syncNodes = ({
+    graph,
+    selectedId,
+    palette,
+    activeRepoId = null,
+    cameraHeight = DEFAULT_CAMERA_HEIGHT
+  }: GraphViewInput): void => {
     const positions = galaxyLayout(graph)
+    const childrenOfMain = new Set<WorktreeId>(
+      [...graph.nodes.values()].filter((n) => n.isMain).flatMap((n) => childrenOf(graph, n.id))
+    )
 
     for (const node of graph.nodes.values()) {
       const ground = positions.get(node.id)
@@ -95,7 +112,13 @@ export function createGraphView(
       const state = deriveNodeState(node)
       const decorations = deriveDecorations(node, node.id === selectedId, activeRepoId)
       const elevation = elevationFor(state, node.kind)
-      const label = nodeLabelModel(node, state, decorations)
+      const visible = labelVisibleAt(cameraHeight, {
+        isMain: node.isMain,
+        isSelected: node.id === selectedId,
+        isChildOfMain: childrenOfMain.has(node.id),
+        state
+      })
+      const label = nodeLabelModel(node, state, decorations, visible)
 
       let entry = nodes.get(node.id)
       if (!entry) {
@@ -174,6 +197,9 @@ export function createGraphView(
     },
     nodeCenters(): Vec3[] {
       return [...centers.values()]
+    },
+    pickableObjects(): readonly THREE.Object3D[] {
+      return [] // W7 returns the node groups; unused until then.
     },
     dispose(): void {
       for (const [id, entry] of [...nodes]) dropNode(id, entry)

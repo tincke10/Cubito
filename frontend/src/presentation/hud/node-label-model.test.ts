@@ -23,9 +23,9 @@ const node = (
   ...overrides
 })
 
-const modelFor = (n: WorktreeNode): ReturnType<typeof nodeLabelModel> => {
+const modelFor = (n: WorktreeNode, visible = true): ReturnType<typeof nodeLabelModel> => {
   const state = deriveNodeState(n)
-  return nodeLabelModel(n, state, deriveDecorations(n, false))
+  return nodeLabelModel(n, state, deriveDecorations(n, false), visible)
 }
 
 const SEMANTIC_TONES: readonly LabelTone[] = [
@@ -105,6 +105,11 @@ describe('nodeLabelModel', () => {
         expect(SEMANTIC_TONES).toContain(model.callout.hint.tone)
       }
     }
+  })
+
+  it('carries the visible flag through untouched', () => {
+    expect(modelFor(node(), true).visible).toBe(true)
+    expect(modelFor(node(), false).visible).toBe(false)
   })
 
   it('never emits a raw hex value — every tone is a semantic name', () => {

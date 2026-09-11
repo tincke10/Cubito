@@ -63,6 +63,8 @@ export function createNodeLabel(): NodeLabelHandle {
   return {
     object,
     apply(model: NodeLabelModel) {
+      root.style.display = model.visible ? '' : 'none'
+      if (!model.visible) return
       applyLine(primary, model.primary)
       applyLine(secondary, model.secondary)
       callout.style.display = model.callout === null ? 'none' : ''

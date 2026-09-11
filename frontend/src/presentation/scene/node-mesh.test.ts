@@ -10,7 +10,8 @@ import { DIM_OPACITY } from '../theme/scene-metrics'
 const emptyLabel: NodeLabelModel = {
   primary: { text: 'main', tone: 'primary' },
   secondary: null,
-  callout: null
+  callout: null,
+  visible: true
 }
 
 const groundOrigin = { x: 0, y: 0, z: 0 }

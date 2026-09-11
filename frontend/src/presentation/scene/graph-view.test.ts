@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { buildWorktreeGraph } from '../../domain/worktree-graph/build-graph'
 import type { RawWorktreeRecord } from '../../domain/worktree-graph/build-graph'
 import type { WorktreeGraph, WorktreeId } from '../../domain/worktree-graph/types'
+import type { CameraHeight } from '../camera/camera-pose'
+import type { NodeLabelModel } from '../hud/node-label-model'
 import type { NodeLabelHandle } from '../hud/node-label-element'
 import { darkPalette } from '../theme/scene-palette'
 import { NODE_HALF_HEIGHT } from '../theme/scene-metrics'
@@ -52,7 +54,12 @@ type Harness = {
   scene: THREE.Object3D
   labelLayer: THREE.Object3D
   labels: NodeLabelHandle[]
-  update(graph: WorktreeGraph, selectedId?: WorktreeId | null, activeRepoId?: string | null): void
+  update(
+    graph: WorktreeGraph,
+    selectedId?: WorktreeId | null,
+    activeRepoId?: string | null,
+    cameraHeight?: CameraHeight
+  ): void
 }
 
 const harness = (): Harness => {
@@ -71,10 +78,26 @@ const harness = (): Harness => {
     scene,
     labelLayer,
     labels,
-    update(graph, selectedId = null, activeRepoId = null) {
-      view.update({ graph, selectedId, palette: darkPalette, activeRepoId })
+    update(graph, selectedId = null, activeRepoId = null, cameraHeight) {
+      view.update({
+        graph,
+        selectedId,
+        palette: darkPalette,
+        activeRepoId,
+        ...(cameraHeight !== undefined ? { cameraHeight } : {})
+      })
     }
   }
+}
+
+/** Labels are pushed in `graph.nodes.values()` order on first creation — same assumption the
+ *  existing "disposes the removed node label" test above relies on. */
+const lastLabelModel = (labels: NodeLabelHandle[], index: number): NodeLabelModel => {
+  const label = labels[index]
+  if (!label) throw new Error(`no label at index ${index}`)
+  const lastCall = (label.apply as ReturnType<typeof vi.fn>).mock.calls.at(-1)
+  if (!lastCall) throw new Error(`label ${index} was never applied`)
+  return lastCall[0]
 }
 
 const nodeObject = (view: GraphView, id: WorktreeId): THREE.Object3D | undefined =>
@@ -288,6 +311,39 @@ describe('createGraphView', () => {
 
     for (const material of surfaceMaterialsOf(h.view, 'root')) expect(material.opacity).toBe(1)
     for (const material of surfaceMaterialsOf(h.view, 'a')) expect(material.opacity).toBe(1)
+  })
+
+  it("the label model's visible flag follows the active camera height", () => {
+    const h = harness()
+    const graph = baseGraph() // root is main, isla shows main; foco shows only the selected
+
+    h.update(graph, 'a', null, 'isla')
+    expect(lastLabelModel(h.labels, 0).visible).toBe(true) // root — isMain
+    expect(lastLabelModel(h.labels, 1).visible).toBe(false) // a — merely selected
+
+    h.update(graph, 'a', null, 'foco')
+    expect(lastLabelModel(h.labels, 0).visible).toBe(false) // root — main, but not selected
+    expect(lastLabelModel(h.labels, 1).visible).toBe(true) // a — selected
+  })
+
+  it('isChildOfMain is derived from the main node children', () => {
+    const h = harness()
+    const graph = baseGraph() // root -> (a, b), root is main
+
+    h.update(graph, null, null, 'comparar')
+
+    expect(lastLabelModel(h.labels, 0).visible).toBe(false) // root — main itself, not a child
+    expect(lastLabelModel(h.labels, 1).visible).toBe(true) // a — child of main
+    expect(lastLabelModel(h.labels, 2).visible).toBe(true) // b — child of main
+  })
+
+  it('an absent cameraHeight defaults to isla', () => {
+    const h = harness()
+    const graph = baseGraph()
+
+    h.update(graph, null, null)
+
+    expect(lastLabelModel(h.labels, 0).visible).toBe(true) // root — isMain, isla shows it
   })
 
   it('disposes every binding and label on dispose and detaches from the scene', () => {

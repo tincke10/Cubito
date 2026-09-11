@@ -323,7 +323,8 @@ store.subscribe((state) => {
     graph: state.graph,
     selectedId: state.selection.selectedId,
     palette,
-    activeRepoId: state.repos.activeRepoId
+    activeRepoId: state.repos.activeRepoId,
+    cameraHeight: state.camera.height
   })
   const model = hudModel(state, platform)
   hudOverlay.apply(model)

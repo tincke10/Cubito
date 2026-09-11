@@ -8,6 +8,7 @@ export type NodeLabelModel = {
   readonly primary: LabelLine
   readonly secondary: LabelLine | null
   readonly callout: { readonly title: LabelLine; readonly hint: LabelLine } | null
+  readonly visible: boolean
 }
 
 const MINUS = '−'
@@ -51,7 +52,8 @@ const secondaryFor = (
 export function nodeLabelModel(
   node: WorktreeNode,
   state: NodeState,
-  decorations: NodeDecorations
+  decorations: NodeDecorations,
+  visible: boolean
 ): NodeLabelModel {
   return {
     primary: { text: shortBranchName(node.branch), tone: 'primary' },
@@ -62,6 +64,7 @@ export function nodeLabelModel(
             title: { text: 'esperando input', tone: 'amber' },
             hint: { text: 'revisá el agente para continuar', tone: 'amberDim' }
           }
-        : null
+        : null,
+    visible
   }
 }
