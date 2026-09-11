@@ -346,6 +346,18 @@ describe('createGraphView', () => {
     expect(lastLabelModel(h.labels, 0).visible).toBe(true) // root — isMain, isla shows it
   })
 
+  it('pickableObjects returns exactly the node groups', () => {
+    const h = harness()
+    const graph = baseGraph()
+    h.update(graph)
+
+    const rootObject = nodeObject(h.view, 'root')
+    const aObject = nodeObject(h.view, 'a')
+    const bObject = nodeObject(h.view, 'b')
+
+    expect(new Set(h.view.pickableObjects())).toEqual(new Set([rootObject, aObject, bObject]))
+  })
+
   it('disposes every binding and label on dispose and detaches from the scene', () => {
     const h = harness()
     h.update(baseGraph())

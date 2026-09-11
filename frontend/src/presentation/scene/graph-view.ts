@@ -45,7 +45,7 @@ export type GraphView = {
   setResolution(width: number, height: number): void
   nodeCenter(id: WorktreeId): Vec3 | null
   nodeCenters(): Vec3[]
-  /** Node groups eligible for raycast picking (wired up in W7 — empty stub until then). */
+  /** Node groups eligible for raycast picking (node-pick.ts). */
   pickableObjects(): readonly THREE.Object3D[]
   dispose(): void
 }
@@ -199,7 +199,7 @@ export function createGraphView(
       return [...centers.values()]
     },
     pickableObjects(): readonly THREE.Object3D[] {
-      return [] // W7 returns the node groups; unused until then.
+      return [...nodes.values()].map((entry) => entry.binding.object)
     },
     dispose(): void {
       for (const [id, entry] of [...nodes]) dropNode(id, entry)

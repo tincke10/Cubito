@@ -10,6 +10,7 @@ import type { RuntimeGateway } from './application/ports/runtime-gateway'
 import type { RawWorktreeRecord } from './domain/worktree-graph/build-graph'
 import type { Vec3 } from './presentation/camera/camera-framing'
 import { createCameraHeightController } from './presentation/input/camera-height-controller'
+import { bindPointerPicking } from './bind-pointer-picking'
 import { createFanOutBinder } from './bind-fan-out'
 import { createSystemViewBinder } from './bind-system-view'
 import { demoSystemGraph } from './demo-system-graph'
@@ -181,6 +182,13 @@ const graphView = createGraphView(cubitoScene.scene, cubitoScene.labelLayer)
 const cameraRig = createCameraRig(cubitoScene.camera, cubitoScene.controls)
 const store = createSceneStore()
 const heights = createCameraHeightController({ store, rig: cameraRig, scenePositions: graphView })
+bindPointerPicking({
+  store,
+  canvas: cubitoScene.renderer.domElement,
+  camera: cubitoScene.camera,
+  pickableObjects: graphView.pickableObjects,
+  heights
+})
 
 const hudOverlay = createHudOverlay()
 hud.appendChild(hudOverlay.root)

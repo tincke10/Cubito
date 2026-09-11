@@ -29,6 +29,10 @@ export type NodeBinding = {
 
 type SurfaceKind = 'solid' | 'wireframe'
 
+/** Rebuilt every apply() (below) — pickNodeId (node-pick.ts) filters raycast hits to this
+ *  name so the glow sprite and ground shadow never register as pickable (design C7). */
+export const NODE_SURFACE_NAME = 'surface'
+
 const faceMaterialGroups = [0, 0, 1, 1, 2, 2] as const // BoxGeometry groups → [right, right, top, top, left, left]
 
 export const createNodeBinding = (resources: SceneResources): NodeBinding => {
@@ -103,14 +107,14 @@ export const createNodeBinding = (resources: SceneResources): NodeBinding => {
         resources.cubeGeometry,
         faceMaterialGroups.map((i) => materials[i])
       )
-      mesh.name = 'surface'
+      mesh.name = NODE_SURFACE_NAME
       surface = mesh
       surfaceMaterials = materials
     } else {
       const material = new THREE.LineDashedMaterial({ transparent: true })
       const lines = new THREE.LineSegments(resources.wireGeometry, material)
       lines.computeLineDistances()
-      lines.name = 'surface'
+      lines.name = NODE_SURFACE_NAME
       surface = lines
       surfaceMaterials = [material]
     }
