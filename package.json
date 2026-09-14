@@ -28,6 +28,7 @@
     "cubito:start": "node config/scripts/cubito-start.mjs",
     "cubito:docker": "docker compose up --build",
     "test": "node config/scripts/ensure-native-runtime.mjs --runtime=node && vitest run --config config/vitest.config.ts",
+    "test:ci-shard": "node config/scripts/ensure-native-runtime.mjs --runtime=node && node config/scripts/run-unit-test-shard.mjs",
     "test:skill-sharing:release": "vitest run --config config/vitest.config.ts src/main/skills src/main/runtime/rpc/methods/skills.test.ts src/relay/skill-install-handler.test.ts src/shared/skill-bundle-install-contract.test.ts src/shared/skill-install-contract.test.ts src/shared/skill-install-failure.test.ts src/shared/skill-package-manifest.test.ts",
     "check:reliability-gates": "node config/scripts/check-reliability-gates.mjs",
     "check:max-lines-ratchet": "node config/scripts/check-max-lines-ratchet.mjs",
