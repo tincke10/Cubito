@@ -1,4 +1,4 @@
-import { readdirSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
@@ -8,6 +8,7 @@ import {
 } from './cubito-web-client-staging.mjs'
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..')
+const FRONTEND_DIST = join(REPO_ROOT, 'frontend', 'dist')
 
 function dirent(name: string, isDir = false) {
   return { name, isDirectory: () => isDir }
@@ -53,8 +54,9 @@ describe('unservableDistEntries', () => {
     ).toEqual(['robots.txt'])
   })
 
-  it('passes the real frontend/dist build output', () => {
-    const entries = readdirSync(join(REPO_ROOT, 'frontend', 'dist'), { withFileTypes: true })
+  // A build artifact, not a source: only checkable where `pnpm --dir frontend run build` ran.
+  it.skipIf(!existsSync(FRONTEND_DIST))('passes the real frontend/dist build output', () => {
+    const entries = readdirSync(FRONTEND_DIST, { withFileTypes: true })
     expect(unservableDistEntries(entries)).toEqual([])
   })
 })
