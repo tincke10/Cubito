@@ -18,6 +18,13 @@ export const SCENE_MODE_SWITCHER_CHIPS: readonly HudChip[] = [
   { key: 't', description: 'terminal' }
 ]
 
+/** Compare's bar: the litter-navigation chip first, then the shared mode switcher. Winner and
+ *  merge stay mouse-only (design C4), so no chip claims Enter or m. */
+export const COMPARE_CHIPS: readonly HudChip[] = [
+  { key: 'h l', description: 'hijo anterior / siguiente' },
+  ...SCENE_MODE_SWITCHER_CHIPS
+]
+
 export type HudModel = {
   connection: { label: string; dotColor: ConnectionDotTone }
   repo: { displayName: string; nodeCount: number } | null

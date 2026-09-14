@@ -1,4 +1,4 @@
-import { SCENE_MODE_SWITCHER_CHIPS, connectionDotColor, connectionLabel } from '../hud/hud-model'
+import { COMPARE_CHIPS, connectionDotColor, connectionLabel } from '../hud/hud-model'
 import { createKeyboardBar } from '../hud/keyboard-bar'
 import type { ConnectionDotTone } from '../hud/hud-model'
 import type { KeyboardBarHandle } from '../hud/keyboard-bar'
@@ -58,7 +58,7 @@ export function createCompareHud(doc: Document = document): CompareHudHandle {
   root.appendChild(winnerLine)
 
   const keyboardBar = createKeyboardBar(doc)
-  keyboardBar.apply(SCENE_MODE_SWITCHER_CHIPS)
+  keyboardBar.apply(COMPARE_CHIPS)
 
   return {
     root,

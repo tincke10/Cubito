@@ -26,6 +26,7 @@ const buildRow = (
   winnerToggle.addEventListener('click', (event) => {
     event.stopPropagation() // the winner button lives inside the focus-on-click row
     onSetWinner(row.isWinner ? null : row.childId)
+    winnerToggle.blur?.() // release focus — a focused button re-fires on Enter (risk 3)
   })
 
   rowElement.appendChild(label)

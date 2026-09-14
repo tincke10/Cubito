@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { emptyCompareViewSlice, reduceCompareView } from './compare-view-model'
+import {
+  emptyCompareViewSlice,
+  reduceCompareView,
+  sceneSelectedId,
+  stepCompareFocus
+} from './compare-view-model'
 import { emptyCompareChildLoad } from './compare-child-load'
 import type { DiffFileRow } from './diff-view-model'
 
@@ -23,12 +28,12 @@ describe('emptyCompareViewSlice', () => {
 })
 
 describe('reduceCompareView — open/close', () => {
-  it('open anchors to every member with an idle-loading child load each, no focus, no winner', () => {
+  it('open anchors to every member and auto-focuses the first one (design D4)', () => {
     const slice = openSlice()
     expect(slice).toEqual({
       view: 'open',
       members: MEMBERS,
-      focusedChildId: null,
+      focusedChildId: 'w-child-1',
       winnerId: null,
       merge: { phase: 'idle' },
       childLoads: {
@@ -38,20 +43,69 @@ describe('reduceCompareView — open/close', () => {
     })
   })
 
+  it('opening an empty litter leaves the focus null', () => {
+    const slice = openSlice([])
+    expect(slice).toMatchObject({ view: 'open', members: [], focusedChildId: null })
+  })
+
   it('close returns to closed from any open state', () => {
     expect(reduceCompareView(openSlice(), { type: 'close' })).toEqual({ view: 'closed' })
   })
 
-  it('re-opening replaces the member set and resets every child load', () => {
+  it('re-opening replaces the member set, resets every child load and refocuses the new first member', () => {
     const slice = reduceCompareView(openSlice(), { type: 'open', members: ['w-child-3'] })
     expect(slice).toEqual({
       view: 'open',
       members: ['w-child-3'],
-      focusedChildId: null,
+      focusedChildId: 'w-child-3',
       winnerId: null,
       merge: { phase: 'idle' },
       childLoads: { 'w-child-3': emptyCompareChildLoad() }
     })
+  })
+})
+
+describe('stepCompareFocus', () => {
+  const members = ['w-1', 'w-2', 'w-3']
+
+  it('walks forward and backward in rail order', () => {
+    expect(stepCompareFocus(members, 'w-1', 1)).toBe('w-2')
+    expect(stepCompareFocus(members, 'w-2', 1)).toBe('w-3')
+    expect(stepCompareFocus(members, 'w-3', -1)).toBe('w-2')
+    expect(stepCompareFocus(members, 'w-2', -1)).toBe('w-1')
+  })
+
+  it('wraps at both ends', () => {
+    expect(stepCompareFocus(members, 'w-3', 1)).toBe('w-1')
+    expect(stepCompareFocus(members, 'w-1', -1)).toBe('w-3')
+  })
+
+  it('enters at the first member going forward and the last member going backward from null', () => {
+    expect(stepCompareFocus(members, null, 1)).toBe('w-1')
+    expect(stepCompareFocus(members, null, -1)).toBe('w-3')
+  })
+
+  it('returns null for empty members', () => {
+    expect(stepCompareFocus([], null, 1)).toBeNull()
+    expect(stepCompareFocus([], 'w-1', -1)).toBeNull()
+  })
+
+  it('returns the first member when the focus is not in members (a member removed mid-camada)', () => {
+    expect(stepCompareFocus(members, 'w-removed', 1)).toBe('w-1')
+    expect(stepCompareFocus(members, 'w-removed', -1)).toBe('w-1')
+  })
+})
+
+describe('sceneSelectedId', () => {
+  it('projects the compare focus while open and the graph selection while closed', () => {
+    const open = openSlice()
+    expect(sceneSelectedId(open, 'graph-selected')).toBe('w-child-1')
+    expect(sceneSelectedId(emptyCompareViewSlice(), 'graph-selected')).toBe('graph-selected')
+  })
+
+  it('is null while compare is open with no focus', () => {
+    const openEmpty = openSlice([])
+    expect(sceneSelectedId(openEmpty, 'graph-selected')).toBeNull()
   })
 })
 

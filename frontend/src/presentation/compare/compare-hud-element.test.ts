@@ -77,13 +77,13 @@ describe('createCompareHud', () => {
     expect(dot.style.backgroundColor).toBe('var(--cubito-amber-dim)')
   })
 
-  it('renders its own [g][x][d][c][t] keyboard bar, separate from the root', () => {
+  it('renders its own [h l][g][x][d][c][t] keyboard bar, litter nav first, separate from the root', () => {
     const hud = createCompareHud(createFakeDocument())
     expect(hud.keyboardBar.root).not.toBe(hud.root)
     const bar = hud.keyboardBar.root as unknown as FakeElement
-    expect(bar.children).toHaveLength(5)
+    expect(bar.children).toHaveLength(6)
     const keys = bar.children.map((chip) => chip.children[0]!.textContent)
-    expect(keys).toEqual(['g', 'x', 'd', 'c', 't'])
+    expect(keys).toEqual(['h l', 'g', 'x', 'd', 'c', 't'])
   })
 
   it('dispose removes the root and disposes the keyboard bar', () => {

@@ -68,7 +68,7 @@ export function reduceCompareView(
       return {
         view: 'open',
         members: action.members,
-        focusedChildId: null,
+        focusedChildId: action.members[0] ?? null, // auto-focus (design D4)
         winnerId: null,
         merge: idleMerge(),
         childLoads: Object.fromEntries(
@@ -117,3 +117,25 @@ export function reduceCompareView(
       return slice
   }
 }
+
+/** ±1 over `members` in RAIL order, wrapping (design D5). A null focus enters at the first
+ *  member going forward, the last going backward. A focus no longer in `members` (a removed
+ *  child) resets to the first member. Empty members → null. */
+export const stepCompareFocus = (
+  members: readonly WorktreeId[],
+  focusedChildId: WorktreeId | null,
+  step: 1 | -1
+): WorktreeId | null => {
+  if (members.length === 0) return null
+  if (focusedChildId === null) return step === 1 ? members[0]! : members[members.length - 1]!
+  const index = members.indexOf(focusedChildId)
+  if (index === -1) return members[0]!
+  return members[(index + step + members.length) % members.length]!
+}
+
+/** The id the 3D selection ring follows: while compare is open the litter focus IS the
+ *  selection (design D3) — a pure projection, never a store write. */
+export const sceneSelectedId = (
+  compareView: CompareViewSlice,
+  selectedId: WorktreeId | null
+): WorktreeId | null => (compareView.view === 'open' ? compareView.focusedChildId : selectedId)

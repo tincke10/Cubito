@@ -11,6 +11,7 @@ type FakeElement = {
   hidden: boolean
   disabled: boolean
   checked: boolean
+  blurCount: number
   readonly children: FakeElement[]
   className: string
   textContent: string
@@ -19,6 +20,7 @@ type FakeElement = {
   remove(): void
   addEventListener(type: string, handler: Handler): void
   dispatch(type: string, event?: { key?: string }): void
+  blur(): void
 }
 
 const createFakeElement = (tag: string): FakeElement => {
@@ -29,6 +31,7 @@ const createFakeElement = (tag: string): FakeElement => {
     hidden: false,
     disabled: false,
     checked: false,
+    blurCount: 0,
     children: [],
     className: '',
     textContent: '',
@@ -45,6 +48,9 @@ const createFakeElement = (tag: string): FakeElement => {
     },
     dispatch(type, event = {}) {
       handlers[type]?.(event)
+    },
+    blur() {
+      el.blurCount++
     }
   }
   return el
@@ -131,6 +137,16 @@ describe('createCompareMergeAction', () => {
     button.dispatch('click')
     button.dispatch('click')
     expect(fired).toEqual([true])
+  })
+
+  it('blurs itself after the confirming click (risk 3: a focused button re-fires on Enter, which descend-island would otherwise leave un-prevented)', () => {
+    const action = createCompareMergeAction(createFakeDocument())
+    action.apply(model())
+    action.onMergeWinner(() => {})
+    const button = buttonOf(rootOf(action))
+    button.dispatch('click')
+    button.dispatch('click')
+    expect(button.blurCount).toBe(1)
   })
 
   it('blur disarms an armed confirm', () => {

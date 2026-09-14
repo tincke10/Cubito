@@ -10,11 +10,13 @@ type FakeElement = {
   readonly children: FakeElement[]
   className: string
   textContent: string
+  blurCount: number
   appendChild(child: FakeElement): FakeElement
   replaceChildren(): void
   remove(): void
   dispatchClick(): void
   addEventListener(type: string, handler: ClickHandler): void
+  blur(): void
 }
 
 const createFakeElement = (tag: string): FakeElement => {
@@ -25,6 +27,7 @@ const createFakeElement = (tag: string): FakeElement => {
     children: [],
     className: '',
     textContent: '',
+    blurCount: 0,
     appendChild(child) {
       el.children.push(child)
       return child
@@ -38,6 +41,9 @@ const createFakeElement = (tag: string): FakeElement => {
     },
     dispatchClick() {
       clickHandler?.({ stopPropagation: () => {} })
+    },
+    blur() {
+      el.blurCount++
     }
   }
   return el
@@ -112,6 +118,14 @@ describe('createCompareRail', () => {
     rail.onSetWinner((childId) => winners.push(childId))
     rootOf(rail).children[0]!.children[2]!.dispatchClick() // the winner-toggle button
     expect(winners).toEqual(['a'])
+  })
+
+  it('blurs the winner toggle after a click (risk 3: a focused button re-fires on Enter, which descend-island would otherwise leave un-prevented)', () => {
+    const rail = createCompareRail(createFakeDocument())
+    rail.apply([row({ childId: 'a' })])
+    const winnerToggle = rootOf(rail).children[0]!.children[2]!
+    winnerToggle.dispatchClick()
+    expect(winnerToggle.blurCount).toBe(1)
   })
 
   it('calls onSetWinner with null to clear when the row is already the winner', () => {

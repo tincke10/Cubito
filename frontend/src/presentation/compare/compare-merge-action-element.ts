@@ -106,6 +106,7 @@ export function createCompareMergeAction(doc: Document = document): CompareMerge
     const syncWorkingTree = syncCheckbox.checked
     disarm()
     mergeCallback?.(syncWorkingTree)
+    button.blur?.() // release focus — a focused button re-fires on Enter (risk 3)
   })
   button.addEventListener('blur', disarm)
   button.addEventListener('keydown', (event: KeyboardEvent) => {

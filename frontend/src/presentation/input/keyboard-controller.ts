@@ -3,6 +3,7 @@ import { isTextEntryTarget, resolveNavCommand } from '../navigation/keymap'
 import { islandEntrySelection, moveSelection } from '../navigation/selection-model'
 import { cycleIsland, nextIsland } from '../../application/repos-model'
 import { fanOutMemberIds } from '../../application/fan-out-model'
+import { stepCompareFocus } from '../../application/compare-view-model'
 import type { CameraHeightController } from './camera-height-controller'
 
 /** Framework-agnostic input — a real KeyboardEvent is structurally adapted onto this by `attach`. */
@@ -79,18 +80,33 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
     if (!command) {
       return false
     }
-    // While the system, diff OR compare view owns the screen, every graph-nav/terminal/spawn/
-    // open-system/open-diff/open-compare command is a handled no-op — only 'close-scene-mode'
-    // (bare g) and 'escape' (routed through the precedence ladder below) may act. ⌘K/⌘P already
+    // System and diff still REPLACE the scene: every command is a handled no-op except
+    // 'close-scene-mode' (bare g) and 'escape' (routed through the ladder below). ⌘K/⌘P already
     // returned above, unaffected by this gate.
     const systemOpen = store.get().systemView.view === 'open'
     const diffOpen = store.get().diffView.view === 'open'
-    const compareOpen = store.get().compareView.view === 'open'
-    if ((systemOpen || diffOpen || compareOpen) && command.kind !== 'escape') {
+    const compareView = store.get().compareView
+    const compareOpen = compareView.view === 'open'
+    if ((systemOpen || diffOpen) && command.kind !== 'escape') {
       if (command.kind === 'close-scene-mode') {
         if (systemOpen) store.dispatchSystemView({ type: 'close' })
         if (diffOpen) store.dispatchDiffView({ type: 'close' })
         if (compareOpen) store.dispatchCompareView({ type: 'close' })
+      }
+      return true
+    }
+    // Compare is a SIDE panel: the scene stays live, so hjkl/arrows drive the litter focus
+    // (which the ring follows, design D3) instead of being swallowed. f/v stay swallowed — a
+    // second height while the panel owns the screen would desync the Esc pose stack (design C5).
+    if (compareOpen && command.kind !== 'escape') {
+      if (command.kind === 'close-scene-mode') {
+        store.dispatchCompareView({ type: 'close' })
+        return true
+      }
+      if (command.kind === 'move' && compareView.view === 'open') {
+        const step = command.direction === 'child' || command.direction === 'next-sibling' ? 1 : -1
+        const next = stepCompareFocus(compareView.members, compareView.focusedChildId, step)
+        if (next !== null) store.dispatchCompareView({ type: 'focus-child', childId: next })
       }
       return true
     }

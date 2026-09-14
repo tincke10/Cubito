@@ -1,7 +1,13 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { connectionDotColor, connectionLabel, hudModel } from './hud-model'
+import {
+  COMPARE_CHIPS,
+  SCENE_MODE_SWITCHER_CHIPS,
+  connectionDotColor,
+  connectionLabel,
+  hudModel
+} from './hud-model'
 import { countNodeStates } from '../theme/node-state'
 import { emptyWorktreeGraph } from '../../domain/worktree-graph/types'
 import { emptyTerminalsState, reduceTerminals } from '../../application/terminal-session-model'
@@ -249,5 +255,12 @@ describe('hudModel', () => {
   it('never reads the global navigator to decide platform — it only takes `platform.isMac`', () => {
     const source = readFileSync(fileURLToPath(new URL('./hud-model.ts', import.meta.url)), 'utf-8')
     expect(source).not.toMatch(/\bnavigator\b/)
+  })
+})
+
+describe('COMPARE_CHIPS', () => {
+  it('leads with the h/l litter-navigation chip, then the whole mode switcher (Enter/m stay mouse-only, design C4)', () => {
+    expect(COMPARE_CHIPS[0]).toEqual({ key: 'h l', description: 'hijo anterior / siguiente' })
+    expect(COMPARE_CHIPS.slice(1)).toEqual(SCENE_MODE_SWITCHER_CHIPS)
   })
 })
