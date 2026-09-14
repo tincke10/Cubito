@@ -2,8 +2,6 @@
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "entry": [
     "src/main/index.ts",
-    "src/preload/index.ts",
-    "src/preload/browser-window-close.ts",
     "src/main/daemon/daemon-entry.ts",
     "src/main/plugins/plugin-host-entry.ts",
     "src/main/computer/sidecar-entry.ts",
@@ -25,8 +23,6 @@
     "src/relay/wsl-agent-hook-relay.ts",
     "config/scripts/**/*.{mjs,cjs,js,ts}",
     "config/build-plugins/**/*.ts",
-    "electron.vite.config.ts",
-    "vite.web.config.ts",
     "config/vitest.config.ts",
     "config/i18next.config.ts",
     "config/electron-builder.config.cjs",

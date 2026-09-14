@@ -122,7 +122,6 @@ docs/**
 # Stably CLI (only docs/ are tracked)
 .stably/*
 !.stably/docs/
-.playwright-cli
 .validate-ui-screenshots/
 validation-screenshots/
 .stably-browser
@@ -130,10 +129,6 @@ validation-screenshots/
 # Local scratch notes and PR evidence screenshots (not part of the product).
 /notes/
 /pr-evidence/
-
-# Playwright
-test-results/
-playwright-report/
 
 # Agent skill installations (machine-local, populated by agent tooling)
 /.claude/skills/

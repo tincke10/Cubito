@@ -16,8 +16,6 @@ const OPERATOR_SPLIT = /\s*(?:&&|\|\||;|\|)\s*/
 const PATH_PREFIXES = ['config/', 'tests/', 'resources/', 'scripts/', 'src/', 'frontend/', 'docs/']
 const PATH_EXTENSIONS = /\.(mjs|cjs|js|ts|json|sh|cmd|ps1)$/
 const GLOB_OR_SUBST = /[*?[\]{}]|\$|%/
-// --project is excluded: every occurrence in this repo's scripts is a Playwright
-// project name (e.g. "electron-headless"), never a filesystem path.
 const PATH_FLAGS = new Set(['--config', '-p'])
 
 function stripQuotes(token: string): string {
