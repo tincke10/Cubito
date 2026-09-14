@@ -12,6 +12,8 @@ const REPO_ROOT = join(import.meta.dirname, '..', '..')
 // E2E suite) genuinely launches Electron through its `_electron` driver. Only the deleted
 // suite's own package, @playwright/test, and every tests/e2e/* path are banned outright.
 const BANNED_PACKAGES = ['@playwright/test']
+// This guard's own source names the banned package literally; exclude it from its own scan.
+const SELF_FILE = 'config/scripts/playwright-suite-absence.test.ts'
 
 function trackedFiles(): string[] {
   return execFileSync('git', ['ls-files', '*.ts', '*.tsx', '*.mjs', '*.cjs'], {
@@ -21,6 +23,7 @@ function trackedFiles(): string[] {
   })
     .split('\n')
     .filter(Boolean)
+    .filter((rel) => rel !== SELF_FILE)
 }
 
 describe('Playwright/Electron E2E suite absence', () => {
