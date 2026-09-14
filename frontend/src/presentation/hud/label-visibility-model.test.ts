@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { labelVisibleAt } from './label-visibility-model'
+import { labelPriorityAt, labelRenderOrder, labelVisibleAt } from './label-visibility-model'
+import { LABEL_PRIORITY } from './label-visibility-model'
 import type { NodeLabelRole } from './label-visibility-model'
 import { CAMERA_HEIGHTS } from '../camera/camera-pose'
 import type { CameraHeight } from '../camera/camera-pose'
@@ -102,5 +103,36 @@ describe('labelVisibleAt', () => {
   it('a node matching any applicable column is visible (OR over matching roles)', () => {
     const bothMainAndWorking: NodeState = 'working'
     expect(labelVisibleAt('isla', role({ isMain: true, state: bothMainAndWorking }))).toBe(true)
+  })
+})
+
+describe('labelPriorityAt', () => {
+  it('ranks selected > waiting-input > working > main > rest', () => {
+    expect(labelPriorityAt(role({ isSelected: true }))).toBe(LABEL_PRIORITY.selected)
+    expect(labelPriorityAt(role({ state: 'waiting-input' }))).toBe(LABEL_PRIORITY.waitingInput)
+    expect(labelPriorityAt(role({ state: 'working' }))).toBe(LABEL_PRIORITY.working)
+    expect(labelPriorityAt(role({ isMain: true }))).toBe(LABEL_PRIORITY.main)
+    expect(labelPriorityAt(role())).toBe(LABEL_PRIORITY.rest)
+  })
+
+  it('a node that is both main and waiting-input takes the higher rank', () => {
+    expect(labelPriorityAt(role({ isMain: true, state: 'waiting-input' }))).toBe(
+      LABEL_PRIORITY.waitingInput
+    )
+  })
+})
+
+describe('labelRenderOrder', () => {
+  it('is strictly negative for every priority, so terminal/spawn panels at 0 always win', () => {
+    for (const priority of Object.values(LABEL_PRIORITY)) {
+      expect(labelRenderOrder(priority)).toBeLessThan(0)
+    }
+  })
+
+  it('is strictly increasing in priority', () => {
+    const ordered = Object.values(LABEL_PRIORITY).sort((a, b) => a - b)
+    for (let i = 1; i < ordered.length; i++) {
+      expect(labelRenderOrder(ordered[i]!)).toBeGreaterThan(labelRenderOrder(ordered[i - 1]!))
+    }
   })
 })

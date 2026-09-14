@@ -337,6 +337,18 @@ describe('createGraphView', () => {
     expect(lastLabelModel(h.labels, 2).visible).toBe(true) // b — child of main
   })
 
+  it("a selected node's label renderOrder exceeds an idle sibling's, and both stay negative", () => {
+    const h = harness()
+    const graph = baseGraph() // root -> (a, b); root is main
+
+    h.update(graph, 'a', null, 'isla')
+
+    const [rootLabel, aLabel] = h.labels as [NodeLabelHandle, NodeLabelHandle]
+    expect(aLabel.object.renderOrder).toBeGreaterThan(rootLabel.object.renderOrder)
+    expect(aLabel.object.renderOrder).toBeLessThan(0)
+    expect(rootLabel.object.renderOrder).toBeLessThan(0)
+  })
+
   it('an absent cameraHeight defaults to isla', () => {
     const h = harness()
     const graph = baseGraph()

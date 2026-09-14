@@ -4,7 +4,7 @@ import type { WorktreeGraph, WorktreeId } from '../../domain/worktree-graph/type
 import { DEFAULT_CAMERA_HEIGHT } from '../camera/camera-pose'
 import type { CameraHeight } from '../camera/camera-pose'
 import type { Vec3 } from '../camera/camera-framing'
-import { labelVisibleAt } from '../hud/label-visibility-model'
+import { labelPriorityAt, labelRenderOrder, labelVisibleAt } from '../hud/label-visibility-model'
 import { createNodeLabel } from '../hud/node-label-element'
 import type { NodeLabelHandle } from '../hud/node-label-element'
 import { nodeLabelModel } from '../hud/node-label-model'
@@ -112,12 +112,13 @@ export function createGraphView(
       const state = deriveNodeState(node)
       const decorations = deriveDecorations(node, node.id === selectedId, activeRepoId)
       const elevation = elevationFor(state, node.kind)
-      const visible = labelVisibleAt(cameraHeight, {
+      const role = {
         isMain: node.isMain,
         isSelected: node.id === selectedId,
         isChildOfMain: childrenOfMain.has(node.id),
         state
-      })
+      }
+      const visible = labelVisibleAt(cameraHeight, role)
       const label = nodeLabelModel(node, state, decorations, visible)
 
       let entry = nodes.get(node.id)
@@ -140,6 +141,7 @@ export function createGraphView(
       })
       entry.label.apply(label)
       entry.label.object.position.set(ground.x, 0, ground.z)
+      entry.label.object.renderOrder = labelRenderOrder(labelPriorityAt(role))
 
       states.set(node.id, state)
       centers.set(node.id, { x: ground.x, y: elevation.height + NODE_HALF_HEIGHT, z: ground.z })
