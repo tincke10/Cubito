@@ -109,13 +109,15 @@ Requirements: Node 24, pnpm 10.24 (via corepack), git, and the Xcode Command Lin
 ```bash
 git clone https://github.com/tincke10/Cubito.git
 cd Cubito
-pnpm cubito:install   # preflights the toolchain, then installs and builds engine + frontend
-pnpm cubito:start      # boots orcad and the frontend, prints the pairing URL, opens it
+pnpm cubito:install   # preflights the toolchain, installs and builds engine + frontend, stages the web client
+pnpm cubito:start      # boots orcad, which serves the frontend on the same port; prints the pairing URL and opens it
 ```
 
-`cubito:install` fails fast with an actionable fix line for any missing prerequisite. `cubito:start` prints the pairing URL once both processes are ready and opens it in your default browser. If you reload that tab, re-open the printed URL instead — a soft reload drops the pairing fragment and lands you in demo mode.
+`cubito:install` fails fast with an actionable fix line for any missing prerequisite. `cubito:start` boots a single `orcad` process — no separate frontend server — and prints one URL, `http://127.0.0.1:6799/web-index.html#pairing=...`, once it's ready, opening it in your default browser. If you reload that tab, re-open the printed URL instead — a soft reload drops the pairing fragment and lands you in demo mode.
 
-Override the defaults with flags or environment variables: `--data-dir` / `$ORCA_USER_DATA`, `--worktree-root` / `$CUBITO_WORKTREE_ROOT`, `--port` / `$CUBITO_ORCAD_PORT`, `--frontend-port` / `$CUBITO_FRONTEND_PORT`, `--no-open` / `$CUBITO_NO_OPEN`. Running two Cubitos at once needs two different data dirs — pass a second `--data-dir` (and a free `--port`/`--frontend-port` pair) for the second one.
+Override the defaults with flags or environment variables: `--data-dir` / `$ORCA_USER_DATA`, `--worktree-root` / `$CUBITO_WORKTREE_ROOT`, `--port` / `$CUBITO_ORCAD_PORT`, `--no-open` / `$CUBITO_NO_OPEN`. Running two Cubitos at once needs two different data dirs — pass a second `--data-dir` (and a free `--port`) for the second one.
+
+**Developing the frontend**: `pnpm --dir frontend run dev` still runs its own Vite dev server on `5180` for hot reload, separate from the staged build `cubito:start` serves. `cubito:start` also prints a "dev frontend" URL carrying the same pairing fragment for that server.
 
 ### Docker
 
@@ -125,7 +127,7 @@ Requirement: Docker Desktop.
 docker compose up --build   # or: pnpm cubito:docker
 ```
 
-This builds the image and starts a `cubito` container publishing `6799` (orcad) and `5180` (the frontend), with data in the `cubito-data`, `cubito-workspaces` and `cubito-repos` named volumes. Watch the logs for the printed pairing URL and open it on the host at `http://localhost:5180/...`.
+This builds the image and starts a `cubito` container publishing only `6799` — orcad serves the frontend on that same port — with data in the `cubito-data`, `cubito-workspaces` and `cubito-repos` named volumes. Watch the logs for the printed pairing URL and open it on the host at `http://localhost:6799/...`.
 
 Coding agents run inside the container, so log them in there:
 
@@ -139,7 +141,7 @@ Repos to work on live under `/repos` inside the container. Clone one in, then ad
 docker compose exec cubito git clone <url> /repos/<name>
 ```
 
-A demo NestJS repo (`/repos/demo-nest`) is seeded on first boot so the live system graph has something to show immediately.
+A demo NestJS repo (`/repos/demo-nest`) is seeded and registered on first boot, so it's already visible in the UI — no `⌘K` needed for it.
 
 To reset everything — data, worktrees and cloned repos:
 
