@@ -31,6 +31,9 @@ Use `KillMode=mixed` (the default) or `process`, and never `--send-sigkill` on t
 
 `--bind <literal-ip>`, **default `127.0.0.1`**.
 
+`--web-client-root <dir>` serves a built static web client (index at `web-index.html`) from
+the same listener as the RPC WebSocket — one port, one process. Omitted, orcad serves RPC only.
+
 Only literal IPs are accepted; hostnames are refused because DNS would decide which
 interface got bound. `localhost` maps to `127.0.0.1`. `0.0.0.0` / `::` are the explicit
 opt-ins to network reach, and the startup log says so on every launch.

@@ -92,6 +92,8 @@ export type OrcadOptions = {
   pairingAddress?: string
   /** Literal IP to bind. Defaults to loopback; see orcad-bind-address.ts. */
   bind?: string
+  /** Static web client root; when set, one listener serves both the page and the WS. */
+  webClientRoot?: string
 }
 
 export type OrcadHandle = {
@@ -223,7 +225,8 @@ async function startOrcadRuntime(
     // once a device has connected, so a loopback deployment would silently go wide one
     // restart after its first client paired.
     pinnedBindHost: bindHost,
-    ...(options.port !== undefined ? { wsPort: options.port, preferPinnedWsPort: true } : {})
+    ...(options.port !== undefined ? { wsPort: options.port, preferPinnedWsPort: true } : {}),
+    ...(options.webClientRoot !== undefined ? { webClientRoot: options.webClientRoot } : {})
   })
   await rpc.start()
   console.error(`[orcad] ${describeOrcadBindExposure(bindHost)}`)
@@ -321,6 +324,13 @@ export function parseArgs(argv: string[]): OrcadOptions {
         throw new Error('--pairing-address expects a value')
       }
       options.pairingAddress = value
+      i += 1
+    } else if (arg === '--web-client-root') {
+      const value = argv[i + 1]
+      if (value === undefined) {
+        throw new Error('--web-client-root expects a value')
+      }
+      options.webClientRoot = value
       i += 1
     } else {
       throw new Error(`Unknown argument: ${arg}`)

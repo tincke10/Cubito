@@ -27,6 +27,24 @@ describe('parseArgs', () => {
     expect(() => parseArgs(['--bind'])).toThrow('--bind expects a value')
     expect(() => parseArgs(['--bind', '--json'])).not.toThrow()
   })
+
+  it('accepts --web-client-root alone and combined with other flags', () => {
+    expect(parseArgs(['--web-client-root', '/app/out/orcad/web-client'])).toEqual({
+      webClientRoot: '/app/out/orcad/web-client'
+    })
+    expect(
+      parseArgs(['--port', '6799', '--web-client-root', '/dir', '--json', '--bind', '0.0.0.0'])
+    ).toEqual({
+      port: 6799,
+      webClientRoot: '/dir',
+      json: true,
+      bind: '0.0.0.0'
+    })
+  })
+
+  it('rejects --web-client-root with no value', () => {
+    expect(() => parseArgs(['--web-client-root'])).toThrow('--web-client-root expects a value')
+  })
 })
 
 describe('resolveOrcadExitCode', () => {
