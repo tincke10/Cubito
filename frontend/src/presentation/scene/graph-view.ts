@@ -4,6 +4,8 @@ import type { WorktreeGraph, WorktreeId } from '../../domain/worktree-graph/type
 import { DEFAULT_CAMERA_HEIGHT } from '../camera/camera-pose'
 import type { CameraHeight } from '../camera/camera-pose'
 import type { Vec3 } from '../camera/camera-framing'
+import { labelBoxPx, labelRectAt, resolveLabelCollisions } from '../hud/label-collision-model'
+import type { LabelAnchorProjection, LabelBox, LabelCandidate } from '../hud/label-collision-model'
 import { labelPriorityAt, labelRenderOrder, labelVisibleAt } from '../hud/label-visibility-model'
 import { createNodeLabel } from '../hud/node-label-element'
 import type { NodeLabelHandle } from '../hud/node-label-element'
@@ -47,10 +49,18 @@ export type GraphView = {
   nodeCenters(): Vec3[]
   /** Node groups eligible for raycast picking (node-pick.ts). */
   pickableObjects(): readonly THREE.Object3D[]
+  /** Per-frame screen-space pass (design D3). Only ever HIDES; the height policy decides what is eligible. */
+  resolveLabelOverlaps(project: LabelAnchorProjection): void
   dispose(): void
 }
 
-type NodeEntry = { binding: NodeBinding; label: NodeLabelHandle }
+type NodeEntry = {
+  binding: NodeBinding
+  label: NodeLabelHandle
+  priority: number
+  box: LabelBox
+  policyVisible: boolean
+}
 
 const edgeKey = (from: WorktreeId, to: WorktreeId): string => `${from}->${to}`
 
@@ -75,6 +85,7 @@ export function createGraphView(
   const edges = new Map<string, EdgeBinding>()
   const centers = new Map<WorktreeId, Vec3>()
   const states = new Map<WorktreeId, NodeState>()
+  const hiddenByCollision = new Set<WorktreeId>()
   let resolution: { width: number; height: number } | null = null
 
   const dropNode = (id: WorktreeId, entry: NodeEntry): void => {
@@ -85,6 +96,7 @@ export function createGraphView(
     nodes.delete(id)
     centers.delete(id)
     states.delete(id)
+    hiddenByCollision.delete(id)
   }
 
   const dropEdge = (key: string, binding: EdgeBinding): void => {
@@ -120,6 +132,8 @@ export function createGraphView(
       }
       const visible = labelVisibleAt(cameraHeight, role)
       const label = nodeLabelModel(node, state, decorations, visible)
+      const priority = labelPriorityAt(role)
+      const box = labelBoxPx(label)
 
       let entry = nodes.get(node.id)
       if (!entry) {
@@ -128,9 +142,12 @@ export function createGraphView(
         group.add(binding.object)
         const labelHandle = makeLabel()
         labelLayer.add(labelHandle.object)
-        entry = { binding, label: labelHandle }
+        entry = { binding, label: labelHandle, priority, box, policyVisible: visible }
         nodes.set(node.id, entry)
       }
+      entry.priority = priority
+      entry.box = box
+      entry.policyVisible = visible
 
       entry.binding.apply({
         visual: nodeVisual(node.kind, state, decorations, palette),
@@ -139,9 +156,11 @@ export function createGraphView(
         label,
         shadowColor: palette.shadow
       })
-      entry.label.apply(label)
+      // Masked with the LAST frame's collision result — a store-driven update() must never
+      // resurrect a label the per-frame pass just hid (design D3 data flow).
+      entry.label.apply({ ...label, visible: label.visible && !hiddenByCollision.has(node.id) })
       entry.label.object.position.set(ground.x, 0, ground.z)
-      entry.label.object.renderOrder = labelRenderOrder(labelPriorityAt(role))
+      entry.label.object.renderOrder = labelRenderOrder(priority)
 
       states.set(node.id, state)
       centers.set(node.id, { x: ground.x, y: elevation.height + NODE_HALF_HEIGHT, z: ground.z })
@@ -180,12 +199,32 @@ export function createGraphView(
     }
   }
 
+  const resolveLabelOverlaps = (project: LabelAnchorProjection): void => {
+    const candidates: LabelCandidate[] = []
+    for (const [id, entry] of nodes) {
+      if (!entry.policyVisible) continue
+      const anchor = project(entry.label.object.position)
+      if (!anchor.visible) continue
+      candidates.push({ id, rect: labelRectAt(anchor, entry.box), priority: entry.priority })
+    }
+    const nextHidden =
+      candidates.length < 2
+        ? new Set<WorktreeId>()
+        : resolveLabelCollisions(candidates, hiddenByCollision)
+    hiddenByCollision.clear()
+    for (const id of nextHidden) hiddenByCollision.add(id)
+    for (const [id, entry] of nodes) {
+      entry.label.object.visible = entry.policyVisible && !hiddenByCollision.has(id)
+    }
+  }
+
   return {
     group,
     update(input: GraphViewInput): void {
       syncNodes(input)
       syncEdges(input)
     },
+    resolveLabelOverlaps,
     tick(elapsedSeconds: number): void {
       for (const entry of nodes.values()) entry.binding.tick(elapsedSeconds)
       for (const binding of edges.values()) binding.tick(elapsedSeconds)

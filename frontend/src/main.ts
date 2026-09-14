@@ -27,6 +27,7 @@ import { createSpawnMenu } from './presentation/hud/spawn-menu-element'
 import { createSpawnForm } from './presentation/hud/spawn-form-element'
 import { createSpawnMenuController } from './presentation/hud/spawn-menu-controller'
 import type { SpawnMenuController } from './presentation/hud/spawn-menu-controller'
+import { projectToScreen } from './presentation/hud/terminal-connector-projector'
 import { createProjectSelector } from './presentation/hud/project-selector-element'
 import { createProjectSelectorController } from './presentation/hud/project-selector-controller'
 import type { ProjectSelectorController } from './presentation/hud/project-selector-controller'
@@ -312,6 +313,7 @@ cubitoScene.onFrame((elapsedSeconds) => {
   cameraRig.tick(elapsedSeconds)
   terminalController?.tick()
   spawnController?.tick()
+  graphView.resolveLabelOverlaps(projectLabelAnchor)
 })
 
 cubitoScene.onResize((width, height) => {
@@ -359,12 +361,19 @@ store.subscribe((state) => {
 })
 
 /** Impure THREE camera projection (design Area 6) — the only place this math is allowed to
- *  touch `three` directly; the pure remainder lives in terminal-connector-projector.ts. */
+ *  touch `three` directly; the pure remainder lives in terminal-connector-projector.ts.
+ *  Scratch vector hoisted — called per label per frame plus by the terminal connector. */
+const projectionScratch = new THREE.Vector3()
 const projectWorldToNdc = (world: Vec3): { x: number; y: number; z: number } => {
-  const vector = new THREE.Vector3(world.x, world.y, world.z)
-  vector.project(cubitoScene.camera)
-  return { x: vector.x, y: vector.y, z: vector.z }
+  projectionScratch.set(world.x, world.y, world.z)
+  projectionScratch.project(cubitoScene.camera)
+  return { x: projectionScratch.x, y: projectionScratch.y, z: projectionScratch.z }
 }
+
+/** Label anchor projection for the per-frame collision pass (design D3) — reuses the same
+ *  pure NDC->px projector as the terminal connector overlay (terminal-connector-projector.ts). */
+const projectLabelAnchor = (ground: Vec3): { x: number; y: number; visible: boolean } =>
+  projectToScreen(projectWorldToNdc(ground), viewportSize.width, viewportSize.height)
 
 /** Builds the terminal controller on the first connection, rebinds its port on every
  *  reconnect thereafter (design Area 7) — the xterm instance/DOM panel is never recreated. */

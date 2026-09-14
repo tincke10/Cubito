@@ -4,8 +4,11 @@ import { buildWorktreeGraph } from '../../domain/worktree-graph/build-graph'
 import type { RawWorktreeRecord } from '../../domain/worktree-graph/build-graph'
 import type { WorktreeGraph, WorktreeId } from '../../domain/worktree-graph/types'
 import type { CameraHeight } from '../camera/camera-pose'
+import { labelBoxPx } from '../hud/label-collision-model'
+import type { LabelAnchorProjection } from '../hud/label-collision-model'
 import type { NodeLabelModel } from '../hud/node-label-model'
 import type { NodeLabelHandle } from '../hud/node-label-element'
+import { projectToScreen } from '../hud/terminal-connector-projector'
 import { darkPalette } from '../theme/scene-palette'
 import { NODE_HALF_HEIGHT } from '../theme/scene-metrics'
 import { createGraphView } from './graph-view'
@@ -130,6 +133,34 @@ const ringedNodeIds = (view: GraphView, graph: WorktreeGraph): WorktreeId[] =>
     const object = nodeObject(view, id)
     return object !== undefined && ringOf(object)?.visible === true
   })
+
+/** Huge FOV (long lens' opposite — tan(halfFov) blows up) + large distance: every node's
+ *  ground point collapses to nearly the same screen point, so any two eligible labels are
+ *  guaranteed to overlap regardless of the real layout distances — a real THREE camera + the
+ *  pure projector, no DOM. */
+const collapsingProjection = (): LabelAnchorProjection => {
+  const camera = new THREE.PerspectiveCamera(178, 1, 1, 5000)
+  camera.position.set(0, 0, 200)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld()
+  return (ground) => {
+    const vector = new THREE.Vector3(ground.x, ground.y, ground.z)
+    vector.project(camera)
+    return projectToScreen(vector, 800, 600)
+  }
+}
+
+/** Maps `fromWorldZ` to screen x=0 and `toWorldZ` to screen x=screenGapPx (galaxyLayout fans
+ *  siblings apart in z, not x — see the layout debug), so a test can dial in an exact pixel
+ *  overlap between two real, layout-derived ground positions. */
+const affineProjectionBetween = (
+  fromWorldZ: number,
+  toWorldZ: number,
+  screenGapPx: number
+): LabelAnchorProjection => {
+  const scale = screenGapPx / (toWorldZ - fromWorldZ)
+  return (ground) => ({ x: (ground.z - fromWorldZ) * scale, y: 0, visible: true })
+}
 
 describe('createGraphView', () => {
   it('adds its group to the scene and one object per node and edge', () => {
@@ -383,5 +414,99 @@ describe('createGraphView', () => {
     expect(spy).toHaveBeenCalled()
     expect(h.scene.children).not.toContain(h.view.group)
     for (const label of h.labels) expect(label.dispose).toHaveBeenCalled()
+  })
+})
+
+describe('resolveLabelOverlaps', () => {
+  it('hides the lower-priority label when two eligible labels overlap on screen', () => {
+    const h = harness()
+    const graph = graphOf(
+      record('root', null, ['a', 'b']),
+      record('a', 'root', [], { agentStatus: 'working' }),
+      record('b', 'root', [])
+    )
+    h.update(graph, null, null, 'isla') // root: main (priority 1); a: working (priority 2); b: idle — not eligible
+
+    h.view.resolveLabelOverlaps(collapsingProjection())
+
+    const [rootLabel, aLabel] = h.labels as [NodeLabelHandle, NodeLabelHandle]
+    expect(rootLabel.object.visible).toBe(false)
+    expect(aLabel.object.visible).toBe(true)
+  })
+
+  it('a subsequent update() does not resurrect a label hidden by collision', () => {
+    const h = harness()
+    const graph = graphOf(
+      record('root', null, ['a', 'b']),
+      record('a', 'root', [], { agentStatus: 'working' }),
+      record('b', 'root', [])
+    )
+    h.update(graph, null, null, 'isla')
+    h.view.resolveLabelOverlaps(collapsingProjection())
+    expect(h.labels[0]!.object.visible).toBe(false)
+
+    h.update(graph, null, null, 'isla')
+
+    expect(lastLabelModel(h.labels, 0).visible).toBe(false)
+  })
+
+  it('a node hidden by the height policy never becomes a collision candidate', () => {
+    const h = harness()
+    const graph = baseGraph() // root -> (a, b); root is main
+    h.update(graph, 'a', null, 'isla') // a is merely selected (priority 4) but not eligible at isla
+
+    h.view.resolveLabelOverlaps(collapsingProjection())
+
+    const [rootLabel, aLabel] = h.labels as [NodeLabelHandle, NodeLabelHandle]
+    expect(rootLabel.object.visible).toBe(true) // survives despite a's higher priority — a was never a candidate
+    expect(aLabel.object.visible).toBe(false)
+  })
+
+  it('at foco (one eligible label) nothing is ever hidden', () => {
+    const h = harness()
+    const graph = baseGraph()
+    h.update(graph, 'a', null, 'foco') // only 'a' is eligible
+
+    h.view.resolveLabelOverlaps(collapsingProjection())
+
+    expect(h.labels[1]!.object.visible).toBe(true)
+  })
+
+  it('dropNode clears the id from the hidden set — a recreated id starts unhidden', () => {
+    const h = harness()
+    const withLoser = graphOf(
+      record('root', null, ['winner', 'loser']),
+      record('winner', 'root', [], { agentStatus: 'working' }),
+      record('loser', 'root', [], { agentStatus: 'working' })
+    )
+    h.update(withLoser, 'winner', null, 'isla') // winner: selected (priority 4); loser: working (priority 2)
+
+    const halfSumOf = (): number =>
+      (labelBoxPx(lastLabelModel(h.labels, 1)).width +
+        labelBoxPx(lastLabelModel(h.labels, 2)).width) /
+      2
+
+    const winnerZ1 = h.view.nodeCenter('winner')!.z
+    const loserZ1 = h.view.nodeCenter('loser')!.z
+    h.view.resolveLabelOverlaps(affineProjectionBetween(winnerZ1, loserZ1, halfSumOf() - 6))
+    expect(h.labels[2]!.object.visible).toBe(false) // hidden: 6px overlap exceeds the dead band
+
+    const withoutLoser = graphOf(
+      record('root', null, ['winner']),
+      record('winner', 'root', [], { agentStatus: 'working' })
+    )
+    h.update(withoutLoser, 'winner', null, 'isla') // drops 'loser' — must clear it from hiddenByCollision
+
+    const recreated = graphOf(
+      record('root', null, ['winner', 'loser']),
+      record('winner', 'root', [], { agentStatus: 'working' }),
+      record('loser', 'root', [], { agentStatus: 'working' })
+    )
+    h.update(recreated, 'winner', null, 'isla')
+    const winnerZ2 = h.view.nodeCenter('winner')!.z
+    const loserZ2 = h.view.nodeCenter('loser')!.z
+    h.view.resolveLabelOverlaps(affineProjectionBetween(winnerZ2, loserZ2, halfSumOf() - 3))
+
+    expect(h.labels.at(-1)!.object.visible).toBe(true) // fresh id, not pre-hidden — 3px overlap stays in the dead band
   })
 })
