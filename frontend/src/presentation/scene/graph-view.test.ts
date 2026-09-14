@@ -61,7 +61,8 @@ type Harness = {
     graph: WorktreeGraph,
     selectedId?: WorktreeId | null,
     activeRepoId?: string | null,
-    cameraHeight?: CameraHeight
+    cameraHeight?: CameraHeight,
+    labelAnchorId?: WorktreeId | null
   ): void
 }
 
@@ -81,13 +82,14 @@ const harness = (): Harness => {
     scene,
     labelLayer,
     labels,
-    update(graph, selectedId = null, activeRepoId = null, cameraHeight) {
+    update(graph, selectedId = null, activeRepoId = null, cameraHeight, labelAnchorId) {
       view.update({
         graph,
         selectedId,
         palette: darkPalette,
         activeRepoId,
-        ...(cameraHeight !== undefined ? { cameraHeight } : {})
+        ...(cameraHeight !== undefined ? { cameraHeight } : {}),
+        ...(labelAnchorId !== undefined ? { labelAnchorId } : {})
       })
     }
   }
@@ -357,7 +359,7 @@ describe('createGraphView', () => {
     expect(lastLabelModel(h.labels, 1).visible).toBe(true) // a — selected
   })
 
-  it('isChildOfMain is derived from the main node children', () => {
+  it("an absent labelAnchorId falls back to every main node's children (today's behavior)", () => {
     const h = harness()
     const graph = baseGraph() // root -> (a, b), root is main
 
@@ -366,6 +368,52 @@ describe('createGraphView', () => {
     expect(lastLabelModel(h.labels, 0).visible).toBe(false) // root — main itself, not a child
     expect(lastLabelModel(h.labels, 1).visible).toBe(true) // a — child of main
     expect(lastLabelModel(h.labels, 2).visible).toBe(true) // b — child of main
+  })
+
+  it("labelAnchorId scopes the comparar labels to that node's children, not main's", () => {
+    const h = harness()
+    // root -> (a, b); a -> (c, d) — the camada is on `a`, a non-root, non-main node.
+    const graph = graphOf(
+      record('root', null, ['a', 'b']),
+      record('a', 'root', ['c', 'd']),
+      record('b', 'root', []),
+      record('c', 'a', []),
+      record('d', 'a', [])
+    )
+
+    h.update(graph, null, null, 'comparar', 'a')
+
+    expect(lastLabelModel(h.labels, 0).visible).toBe(false) // root — not a's child
+    expect(lastLabelModel(h.labels, 1).visible).toBe(false) // a — the anchor itself
+    expect(lastLabelModel(h.labels, 2).visible).toBe(false) // b — a's sibling, not its child
+    expect(lastLabelModel(h.labels, 3).visible).toBe(true) // c — child of the anchor
+    expect(lastLabelModel(h.labels, 4).visible).toBe(true) // d — child of the anchor
+  })
+
+  it('a camada parent that is not main still gets its own children labelled', () => {
+    const h = harness()
+    const graph = graphOf(
+      record('root', null, ['p']),
+      record('p', 'root', ['c1', 'c2']),
+      record('c1', 'p', []),
+      record('c2', 'p', [])
+    )
+
+    h.update(graph, null, null, 'comparar', 'p')
+
+    expect(lastLabelModel(h.labels, 2).visible).toBe(true) // c1
+    expect(lastLabelModel(h.labels, 3).visible).toBe(true) // c2
+  })
+
+  it('an unknown labelAnchorId labels nothing in comparar', () => {
+    const h = harness()
+    const graph = baseGraph() // root -> (a, b)
+
+    h.update(graph, null, null, 'comparar', 'does-not-exist')
+
+    expect(lastLabelModel(h.labels, 0).visible).toBe(false)
+    expect(lastLabelModel(h.labels, 1).visible).toBe(false)
+    expect(lastLabelModel(h.labels, 2).visible).toBe(false)
   })
 
   it("a selected node's label renderOrder exceeds an idle sibling's, and both stay negative", () => {

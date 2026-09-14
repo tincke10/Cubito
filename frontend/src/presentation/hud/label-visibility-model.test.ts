@@ -10,7 +10,7 @@ import type { NodeState } from '../theme/node-state'
 const role = (overrides: Partial<NodeLabelRole> = {}): NodeLabelRole => ({
   isMain: false,
   isSelected: false,
-  isChildOfMain: false,
+  isChildOfAnchor: false,
   state: 'idle',
   ...overrides
 })
@@ -22,7 +22,7 @@ const TABLE: Record<CameraHeight, Record<string, boolean>> = {
     selected: false,
     working: false,
     waitingInput: false,
-    childOfMain: false,
+    childOfAnchor: false,
     other: false
   },
   isla: {
@@ -30,7 +30,7 @@ const TABLE: Record<CameraHeight, Record<string, boolean>> = {
     selected: false,
     working: true,
     waitingInput: true,
-    childOfMain: false,
+    childOfAnchor: false,
     other: false
   },
   foco: {
@@ -38,7 +38,7 @@ const TABLE: Record<CameraHeight, Record<string, boolean>> = {
     selected: true,
     working: false,
     waitingInput: false,
-    childOfMain: false,
+    childOfAnchor: false,
     other: false
   },
   comparar: {
@@ -46,7 +46,7 @@ const TABLE: Record<CameraHeight, Record<string, boolean>> = {
     selected: false,
     working: false,
     waitingInput: false,
-    childOfMain: true,
+    childOfAnchor: true,
     other: false
   }
 }
@@ -61,8 +61,8 @@ const roleFor = (column: string): NodeLabelRole => {
       return role({ state: 'working' })
     case 'waitingInput':
       return role({ state: 'waiting-input' })
-    case 'childOfMain':
-      return role({ isChildOfMain: true })
+    case 'childOfAnchor':
+      return role({ isChildOfAnchor: true })
     default:
       return role()
   }
@@ -95,9 +95,16 @@ describe('labelVisibleAt', () => {
     expect(labelVisibleAt('foco', role({ isMain: true, state: 'working' }))).toBe(false)
   })
 
-  it('comparar shows only the children of main', () => {
-    expect(labelVisibleAt('comparar', role({ isChildOfMain: true }))).toBe(true)
+  it("comparar shows only the anchor's children (the camada parent, or every main when absent)", () => {
+    expect(labelVisibleAt('comparar', role({ isChildOfAnchor: true }))).toBe(true)
     expect(labelVisibleAt('comparar', role({ isMain: true, isSelected: true }))).toBe(false)
+  })
+
+  it('no other height reads isChildOfAnchor', () => {
+    const anchored = role({ isChildOfAnchor: true })
+    expect(labelVisibleAt('general', anchored)).toBe(false)
+    expect(labelVisibleAt('isla', anchored)).toBe(false)
+    expect(labelVisibleAt('foco', anchored)).toBe(false)
   })
 
   it('a node matching any applicable column is visible (OR over matching roles)', () => {

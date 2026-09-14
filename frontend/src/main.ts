@@ -40,6 +40,7 @@ import { createGraphView } from './presentation/scene/graph-view'
 import { needsRemeasure } from './presentation/scene/canvas-box-remeasure'
 import type { CanvasBox } from './presentation/scene/canvas-box-remeasure'
 import { sceneSelectedId } from './application/compare-view-model'
+import { fanOutParentId } from './application/fan-out-model'
 import { applyCssTheme } from './presentation/theme/css-theme'
 import { FOCUS_DURATION_MS } from './presentation/theme/scene-metrics'
 import { paletteFor } from './presentation/theme/scene-palette'
@@ -345,7 +346,8 @@ store.subscribe((state) => {
     selectedId: sceneSelectedId(state.compareView, state.selection.selectedId),
     palette,
     activeRepoId: state.repos.activeRepoId,
-    cameraHeight: state.camera.height
+    cameraHeight: state.camera.height,
+    labelAnchorId: fanOutParentId(state.fanOut)
   })
   const model = hudModel(state, platform)
   hudOverlay.apply(model)

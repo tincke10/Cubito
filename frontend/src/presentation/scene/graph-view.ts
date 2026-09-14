@@ -32,6 +32,9 @@ export type GraphViewInput = {
   activeRepoId?: string | null
   /** Drives per-node label visibility (design D12). Defaults to DEFAULT_CAMERA_HEIGHT. */
   cameraHeight?: CameraHeight
+  /** Whose children get labels in `comparar` (design §1.4): the camada parent, which may not
+   *  be main. Null/absent falls back to every `isMain` node — today's behavior. */
+  labelAnchorId?: WorktreeId | null
 }
 
 /** Injectable so the reconciliation suite runs under `environment:'node'`, where the real
@@ -110,12 +113,15 @@ export function createGraphView(
     selectedId,
     palette,
     activeRepoId = null,
-    cameraHeight = DEFAULT_CAMERA_HEIGHT
+    cameraHeight = DEFAULT_CAMERA_HEIGHT,
+    labelAnchorId = null
   }: GraphViewInput): void => {
     const positions = galaxyLayout(graph)
-    const childrenOfMain = new Set<WorktreeId>(
-      [...graph.nodes.values()].filter((n) => n.isMain).flatMap((n) => childrenOf(graph, n.id))
-    )
+    const anchorIds =
+      labelAnchorId != null
+        ? [labelAnchorId]
+        : [...graph.nodes.values()].filter((n) => n.isMain).map((n) => n.id)
+    const childrenOfAnchor = new Set<WorktreeId>(anchorIds.flatMap((id) => childrenOf(graph, id)))
 
     for (const node of graph.nodes.values()) {
       const ground = positions.get(node.id)
@@ -127,7 +133,7 @@ export function createGraphView(
       const role = {
         isMain: node.isMain,
         isSelected: node.id === selectedId,
-        isChildOfMain: childrenOfMain.has(node.id),
+        isChildOfAnchor: childrenOfAnchor.has(node.id),
         state
       }
       const visible = labelVisibleAt(cameraHeight, role)

@@ -4,7 +4,9 @@ import type { NodeState } from '../theme/node-state'
 export type NodeLabelRole = {
   readonly isMain: boolean
   readonly isSelected: boolean
-  readonly isChildOfMain: boolean
+  /** Child of the comparar label anchor — the camada parent while comparing, else any main
+   *  node (design compare-side-panel §1.4/W4). */
+  readonly isChildOfAnchor: boolean
   readonly state: NodeState
 }
 
@@ -18,7 +20,7 @@ export function labelVisibleAt(height: CameraHeight, role: NodeLabelRole): boole
     case 'foco':
       return role.isSelected
     case 'comparar':
-      return role.isChildOfMain
+      return role.isChildOfAnchor
   }
 }
 
