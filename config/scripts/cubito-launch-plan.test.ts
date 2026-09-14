@@ -3,6 +3,7 @@ import {
   composeFrontendUrl,
   dataDirSocketPathProblem,
   parseReadinessLine,
+  repoAddArgs,
   resolveLaunchPlan,
   settingsSeedContent,
   settingsSeedPath
@@ -115,6 +116,32 @@ describe('resolveLaunchPlan', () => {
     expect(resolveLaunchPlan({ ...BASE, argv: ['--no-open'] }).openInBrowser).toBe(false)
     expect(resolveLaunchPlan({ ...BASE, env: { CUBITO_NO_OPEN: '1' } }).openInBrowser).toBe(false)
   })
+
+  it('has no repos to register by default', () => {
+    expect(resolveLaunchPlan(BASE).registerRepoPaths).toEqual([])
+  })
+
+  it('collects repeated --register-repo flags', () => {
+    const plan = resolveLaunchPlan({
+      ...BASE,
+      argv: ['--register-repo', '/repos/a', '--register-repo', '/repos/b']
+    })
+    expect(plan.registerRepoPaths).toEqual(['/repos/a', '/repos/b'])
+  })
+
+  it('splits $CUBITO_REGISTER_REPOS on commas', () => {
+    const plan = resolveLaunchPlan({ ...BASE, env: { CUBITO_REGISTER_REPOS: '/repos/a,/repos/b' } })
+    expect(plan.registerRepoPaths).toEqual(['/repos/a', '/repos/b'])
+  })
+
+  it('merges --register-repo flags with $CUBITO_REGISTER_REPOS', () => {
+    const plan = resolveLaunchPlan({
+      ...BASE,
+      argv: ['--register-repo', '/repos/flag'],
+      env: { CUBITO_REGISTER_REPOS: '/repos/env' }
+    })
+    expect(plan.registerRepoPaths).toEqual(['/repos/flag', '/repos/env'])
+  })
 })
 
 describe('settingsSeedPath', () => {
@@ -194,6 +221,19 @@ describe('dataDirSocketPathProblem', () => {
   it('never fails on win32, regardless of length', () => {
     const veryLongDataDir = `/Users/dev/${'x'.repeat(500)}`
     expect(dataDirSocketPathProblem(veryLongDataDir, 'win32')).toBeNull()
+  })
+})
+
+describe('repoAddArgs', () => {
+  it('builds the CLI argv for `orca repo add` over the local unix socket', () => {
+    expect(repoAddArgs('/app/out/cli/index.js', '/repos/demo-nest')).toEqual([
+      '/app/out/cli/index.js',
+      'repo',
+      'add',
+      '--path',
+      '/repos/demo-nest',
+      '--json'
+    ])
   })
 })
 

@@ -22,7 +22,27 @@ export function resolveLaunchPlan({ argv, env, homedir, platform, repoRoot }) {
     orcadArgs.push('--pairing-address', env.CUBITO_PAIRING_ADDRESS)
   }
   const openInBrowser = platform === 'darwin' && !flags.noOpen && !env.CUBITO_NO_OPEN
-  return { dataDir, worktreeRoot, orcadPort, frontendPort, webClientRoot, orcadArgs, openInBrowser }
+  const registerRepoPaths = [...flags.registerRepoPaths, ...parseRegisterReposEnv(env)]
+  return {
+    dataDir,
+    worktreeRoot,
+    orcadPort,
+    frontendPort,
+    webClientRoot,
+    orcadArgs,
+    openInBrowser,
+    registerRepoPaths
+  }
+}
+
+/** Comma-delimited, trimmed, empty entries dropped. */
+function parseRegisterReposEnv(env) {
+  if (!env.CUBITO_REGISTER_REPOS) {
+    return []
+  }
+  return env.CUBITO_REGISTER_REPOS.split(',')
+    .map((path) => path.trim())
+    .filter(Boolean)
 }
 
 /** `null` for absent/non-numeric so a caller's `??` chain falls through cleanly. */
@@ -40,7 +60,8 @@ function parseFlags(argv) {
     worktreeRoot: null,
     orcadPort: null,
     frontendPort: null,
-    noOpen: false
+    noOpen: false,
+    registerRepoPaths: []
   }
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]
@@ -54,6 +75,8 @@ function parseFlags(argv) {
       flags.frontendPort = Number(argv[++i])
     } else if (arg === '--no-open') {
       flags.noOpen = true
+    } else if (arg === '--register-repo') {
+      flags.registerRepoPaths.push(argv[++i])
     }
   }
   return flags
@@ -108,4 +131,9 @@ export function parseReadinessLine(line) {
 /** The frontend URL that carries the pairing offer in its fragment. */
 export function composeFrontendUrl(frontendPort, pairingUrl) {
   return `http://localhost:${frontendPort}/#pairing=${encodeURIComponent(pairingUrl)}`
+}
+
+/** Argv for `orca repo add`, run against the in-container unix socket — same path as ⌘K. */
+export function repoAddArgs(cliEntry, path) {
+  return [cliEntry, 'repo', 'add', '--path', path, '--json']
 }

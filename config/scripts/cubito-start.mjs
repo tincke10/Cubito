@@ -4,7 +4,7 @@
 // client on the same port. Decisions live in cubito-launch-plan.mjs (pure, unit-tested); this is
 // spawn/fs glue.
 
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -14,6 +14,7 @@ import {
   composeFrontendUrl,
   dataDirSocketPathProblem,
   parseReadinessLine,
+  repoAddArgs,
   resolveLaunchPlan,
   settingsSeedContent,
   settingsSeedPath
@@ -22,6 +23,7 @@ import {
 const scriptDir = import.meta.dirname
 const repoRoot = resolve(scriptDir, '..', '..')
 const orcadEntry = join(repoRoot, 'out', 'orcad', 'orcad.js')
+const cliEntry = join(repoRoot, 'out', 'cli', 'index.js')
 const READY_TIMEOUT_MS = 120_000
 
 const plan = resolveLaunchPlan({
@@ -68,6 +70,22 @@ async function main() {
   console.log(`[cubito] dev frontend: ${composeFrontendUrl(plan.frontendPort, pairingUrl)}`)
   if (plan.openInBrowser) {
     spawn('open', [webClientUrl], { stdio: 'ignore' })
+  }
+  registerRepos(plan)
+}
+
+/** Registers seeded repos over the CLI's local unix socket, same path as ⌘K. A repo that fails
+ * to register is a convenience lost, not a boot failure — warn and keep going. */
+function registerRepos(plan) {
+  for (const path of plan.registerRepoPaths) {
+    const result = spawnSync(process.execPath, repoAddArgs(cliEntry, path), {
+      cwd: repoRoot,
+      env: { ...process.env, ORCA_USER_DATA_PATH: plan.dataDir },
+      stdio: 'inherit'
+    })
+    if (result.status !== 0) {
+      console.error(`[cubito] failed to register repo ${path} (exit ${result.status ?? 'error'})`)
+    }
   }
 }
 
