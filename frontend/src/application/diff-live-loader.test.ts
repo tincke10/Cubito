@@ -3,7 +3,7 @@ import { createDiffLiveLoader } from './diff-live-loader'
 import type { DiffLiveLoaderGatewayPort } from './diff-live-loader'
 import { createSceneStore } from './scene-store'
 import type { SceneStore } from './scene-store'
-import type { BranchCompare, DiffFileContent } from './ports/runtime-gateway'
+import type { BranchCompare, DiffFileContent, GitStatus } from './ports/runtime-gateway'
 import type { WorktreeGraph, WorktreeNode } from '../domain/worktree-graph/types'
 import { emptyWorktreeGraph } from '../domain/worktree-graph/types'
 import { inertActivity } from '../domain/worktree-graph/node-activity'
@@ -52,8 +52,16 @@ const branchCompare = (overrides: Partial<BranchCompare> = {}): BranchCompare =>
   ...overrides
 })
 
+const workingTreeStatus = (overrides: Partial<GitStatus> = {}): GitStatus => ({
+  entries: [],
+  branch: 'main',
+  branchLineTotal: 0,
+  ...overrides
+})
+
 type FakeGateway = DiffLiveLoaderGatewayPort & {
   compareCalls: Array<{ worktree: string; baseRef: string }>
+  statusCalls: string[]
   diffCalls: Array<{
     worktree: string
     compare: { mergeBase: string; headOid: string }
@@ -67,11 +75,13 @@ type FakeGateway = DiffLiveLoaderGatewayPort & {
     filePath: string,
     oldPath?: string
   ) => Promise<DiffFileContent>
+  gitStatusImpl?: (worktree: string) => Promise<GitStatus>
 }
 
 function createFakeGateway(): FakeGateway {
   const gw: FakeGateway = {
     compareCalls: [],
+    statusCalls: [],
     diffCalls: [],
     gitBranchCompare: async (worktree, baseRef) => {
       gw.compareCalls.push({ worktree, baseRef })
@@ -87,6 +97,11 @@ function createFakeGateway(): FakeGateway {
       })
       if (gw.gitBranchDiffImpl) return gw.gitBranchDiffImpl(worktree, compare, filePath, oldPath)
       return { kind: 'text', originalContent: 'a', modifiedContent: 'b', truncated: false }
+    },
+    gitStatus: async (worktree) => {
+      gw.statusCalls.push(worktree)
+      if (gw.gitStatusImpl) return gw.gitStatusImpl(worktree)
+      return workingTreeStatus()
     }
   }
   return gw
@@ -130,7 +145,9 @@ describe('createDiffLiveLoader', () => {
     const slice = store.get().diffView
     if (slice.view === 'open') {
       expect(slice.compare).toEqual({ headOid: 'head-oid', mergeBase: 'merge-base' })
-      expect(slice.files).toEqual([{ path: 'src/a.ts', status: 'modified', added: 3, removed: 1 }])
+      expect(slice.files).toEqual([
+        { path: 'src/a.ts', status: 'modified', added: 3, removed: 1, origin: 'branch' }
+      ])
     }
     loader.stop()
   })
@@ -232,6 +249,98 @@ describe('createDiffLiveLoader', () => {
     if (slice.view === 'open') {
       expect(slice.files).toEqual([])
     }
+    loader.stop()
+  })
+
+  it('lists a working-tree-only file when branchCompare returns ready with no entries (the reported bug)', async () => {
+    setupGraph()
+    const gateway = createFakeGateway()
+    gateway.gitBranchCompareImpl = async () => branchCompare({ entries: [] })
+    gateway.gitStatusImpl = async () =>
+      workingTreeStatus({
+        entries: [{ path: 'src/auth/auth.controller.ts', status: 'modified', added: 4, removed: 1 }]
+      })
+    const loader = createDiffLiveLoader({ store, gateway })
+
+    loader.start('repo::child')
+    await vi.waitFor(() => {
+      const slice = store.get().diffView
+      expect(slice.view === 'open' && slice.status).toBe('ready')
+    })
+    const slice = store.get().diffView
+    if (slice.view === 'open') {
+      expect(slice.files).toEqual([
+        {
+          path: 'src/auth/auth.controller.ts',
+          status: 'modified',
+          added: 4,
+          removed: 1,
+          origin: 'working'
+        }
+      ])
+    }
+    loader.stop()
+  })
+
+  it("merges a path changed both on the branch and in the working tree into one row tagged 'both'", async () => {
+    setupGraph()
+    const gateway = createFakeGateway()
+    gateway.gitBranchCompareImpl = async () =>
+      branchCompare({
+        entries: [{ path: 'src/a.ts', status: 'modified', added: 3, removed: 1 }]
+      })
+    gateway.gitStatusImpl = async () =>
+      workingTreeStatus({
+        entries: [{ path: 'src/a.ts', status: 'modified', added: 2, removed: 0 }]
+      })
+    const loader = createDiffLiveLoader({ store, gateway })
+
+    loader.start('repo::child')
+    await vi.waitFor(() => {
+      const slice = store.get().diffView
+      expect(slice.view === 'open' && slice.status).toBe('ready')
+    })
+    const slice = store.get().diffView
+    if (slice.view === 'open') {
+      expect(slice.files).toEqual([
+        { path: 'src/a.ts', status: 'modified', added: 5, removed: 1, origin: 'both' }
+      ])
+    }
+    loader.stop()
+  })
+
+  it('keeps branch rows when gitStatus rejects (degrade, never throw)', async () => {
+    setupGraph()
+    const gateway = createFakeGateway()
+    gateway.gitStatusImpl = () => Promise.reject(new Error('status boom'))
+    const loader = createDiffLiveLoader({ store, gateway })
+
+    loader.start('repo::child')
+    await vi.waitFor(() => {
+      const slice = store.get().diffView
+      expect(slice.view === 'open' && slice.status).toBe('ready')
+    })
+    const slice = store.get().diffView
+    if (slice.view === 'open') {
+      expect(slice.files).toEqual([
+        { path: 'src/a.ts', status: 'modified', added: 3, removed: 1, origin: 'branch' }
+      ])
+    }
+    loader.stop()
+  })
+
+  it('rail stays empty only when both sources are empty', async () => {
+    setupGraph()
+    const gateway = createFakeGateway()
+    gateway.gitBranchCompareImpl = async () => branchCompare({ entries: [] })
+    gateway.gitStatusImpl = async () => workingTreeStatus({ entries: [] })
+    const loader = createDiffLiveLoader({ store, gateway })
+
+    loader.start('repo::child')
+    await vi.waitFor(() => {
+      const slice = store.get().diffView
+      expect(slice.view === 'open' && slice.status).toBe('empty')
+    })
     loader.stop()
   })
 

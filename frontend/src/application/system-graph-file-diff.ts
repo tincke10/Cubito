@@ -94,32 +94,48 @@ export function applyFileDiffToSystemGraph(
   }
 }
 
-/** Union of committed (branch-compare) and working-tree (git.status) rows, keyed by file path. */
-export function mergeFileDiffEntries(
+export type FileDiffOrigin = 'branch' | 'working' | 'both'
+
+export type MergedFileDiffEntry = GitStatusRow & { origin: FileDiffOrigin }
+
+/** Union of committed (branch-compare) and working-tree (git.status) rows, keyed by file path,
+ *  tagged with which side(s) contributed. Sums added/removed on collision (see design R2: an
+ *  honest-but-larger total when the same lines changed in both a commit and the working tree). */
+export function mergeFileDiffEntriesWithOrigin(
   committed: readonly GitStatusRow[] | null,
   working: readonly GitStatusRow[] | null
-): readonly GitStatusRow[] | null {
-  if (committed === null) return working
-  if (working === null) return committed
+): readonly MergedFileDiffEntry[] | null {
+  if (committed === null && working === null) return null
 
-  const byKey = new Map<string, GitStatusRow>()
-  for (const entry of committed) {
-    byKey.set(normalizeSystemFilePath(entry.path), entry)
+  const byKey = new Map<string, MergedFileDiffEntry>()
+  for (const entry of committed ?? []) {
+    byKey.set(normalizeSystemFilePath(entry.path), { ...entry, origin: 'branch' })
   }
-  for (const entry of working) {
+  for (const entry of working ?? []) {
     const key = normalizeSystemFilePath(entry.path)
     const existing = byKey.get(key)
     byKey.set(
       key,
       existing === undefined
-        ? entry
+        ? { ...entry, origin: 'working' }
         : {
-            path: existing.path,
-            status: existing.status,
+            ...existing,
             added: existing.added + entry.added,
-            removed: existing.removed + entry.removed
+            removed: existing.removed + entry.removed,
+            origin: 'both'
           }
     )
   }
   return [...byKey.values()]
+}
+
+/** Union of committed and working-tree rows, origin-free — the system view's join. Delegates to
+ *  mergeFileDiffEntriesWithOrigin and strips `origin` so this stays byte-identical for callers. */
+export function mergeFileDiffEntries(
+  committed: readonly GitStatusRow[] | null,
+  working: readonly GitStatusRow[] | null
+): readonly GitStatusRow[] | null {
+  const merged = mergeFileDiffEntriesWithOrigin(committed, working)
+  if (merged === null) return null
+  return merged.map(({ origin: _origin, ...row }) => row)
 }

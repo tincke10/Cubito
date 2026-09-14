@@ -1,15 +1,17 @@
 import type { WorktreeId } from '../domain/worktree-graph/types'
 import type { DiffFileContent } from './ports/runtime-gateway'
+import type { FileDiffOrigin } from './system-graph-file-diff'
 
 export type DiffRailStatus = 'loading' | 'ready' | 'empty' | 'error'
 
-/** One row in the diff rail — from a BranchCompare entry. */
+/** One row in the diff rail — joined from BranchCompare and/or git.status (see mergeFileDiffEntriesWithOrigin). */
 export type DiffFileRow = {
   path: string
   status: string
   added: number
   removed: number
   oldPath?: string
+  origin?: FileDiffOrigin
 }
 
 export type DiffPanelState =

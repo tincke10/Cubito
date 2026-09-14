@@ -1,11 +1,16 @@
 import { resolveBaseRef } from '../domain/worktree-graph/resolve-base-ref'
 import type { WorktreeId } from '../domain/worktree-graph/types'
 import { fetchBranchCompareEntries } from './branch-compare-entries-fetch'
+import { fetchWorkingTreeEntries } from './working-tree-entries-fetch'
+import { mergeFileDiffEntriesWithOrigin } from './system-graph-file-diff'
 import type { RuntimeGateway } from './ports/runtime-gateway'
 import type { SceneStore } from './scene-store'
 
 /** Only the methods diff mode needs — narrow like the other controller ports. */
-export type DiffLiveLoaderGatewayPort = Pick<RuntimeGateway, 'gitBranchCompare' | 'gitBranchDiff'>
+export type DiffLiveLoaderGatewayPort = Pick<
+  RuntimeGateway,
+  'gitBranchCompare' | 'gitBranchDiff' | 'gitStatus'
+>
 
 export type DiffLiveLoaderDeps = {
   store: SceneStore
@@ -34,24 +39,34 @@ export function createDiffLiveLoader(deps: DiffLiveLoaderDeps): DiffLiveLoader {
   }
 
   async function loadRail(nodeId: WorktreeId): Promise<void> {
-    const result = await fetchBranchCompareEntries(gateway, deps.store.get().graph, nodeId)
+    // Joined with git.status (working tree) so uncommitted changes show up alongside branch
+    // ones — see design sdd/diff-working-tree. Both fetches run concurrently either way.
+    const [result, workingResult] = await Promise.all([
+      fetchBranchCompareEntries(gateway, deps.store.get().graph, nodeId),
+      fetchWorkingTreeEntries(gateway, nodeId)
+    ])
     if (stopped) return
     const slice = deps.store.get().diffView
     if (slice.view !== 'open' || slice.focusedNodeId !== nodeId) return // stale — node changed mid-flight
     switch (result.outcome) {
-      case 'ready':
+      case 'ready': {
+        // gitStatus rejecting degrades to branch-only rows — never throws the whole rail away.
+        const working = workingResult.outcome === 'ready' ? workingResult.entries : null
+        const merged = mergeFileDiffEntriesWithOrigin(result.entries, working) ?? []
         dispatch({
           type: 'rail-loaded',
           compare: result.compare,
-          files: result.entries.map((entry) => ({
+          files: merged.map((entry) => ({
             path: entry.path,
             status: entry.status,
             added: entry.added,
             removed: entry.removed,
+            origin: entry.origin,
             ...(entry.oldPath === undefined ? {} : { oldPath: entry.oldPath })
           }))
         })
         return
+      }
       case 'not-ready':
         dispatch({ type: 'rail-error', message: railErrorMessageFor(result.status) })
         return

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   applyFileDiffToSystemGraph,
   mergeFileDiffEntries,
+  mergeFileDiffEntriesWithOrigin,
   normalizeSystemFilePath,
   systemGraphFileSetKey,
   systemNodeFilePath
@@ -305,6 +306,65 @@ describe('mergeFileDiffEntries', () => {
     const merged = mergeFileDiffEntries(committed, working)
 
     expect(merged).toEqual([{ path: 'src/a.ts', status: 'modified', added: 5, removed: 1 }])
+  })
+})
+
+describe('mergeFileDiffEntriesWithOrigin', () => {
+  it("tags a committed-only path 'branch'", () => {
+    const committed = [entry({ path: 'src/a.ts', status: 'modified', added: 3, removed: 1 })]
+
+    const merged = mergeFileDiffEntriesWithOrigin(committed, [])
+
+    expect(merged).toEqual([
+      { path: 'src/a.ts', status: 'modified', added: 3, removed: 1, origin: 'branch' }
+    ])
+  })
+
+  it("tags a git.status-only path 'working'", () => {
+    const working = [entry({ path: 'src/b.ts', status: 'untracked', added: 5, removed: 0 })]
+
+    const merged = mergeFileDiffEntriesWithOrigin([], working)
+
+    expect(merged).toEqual([
+      { path: 'src/b.ts', status: 'untracked', added: 5, removed: 0, origin: 'working' }
+    ])
+  })
+
+  it("tags a path present in both 'both' and sums the line counts", () => {
+    const committed = [entry({ path: 'src/a.ts', status: 'modified', added: 3, removed: 1 })]
+    const working = [entry({ path: 'src/a.ts', status: 'modified', added: 2, removed: 4 })]
+
+    const merged = mergeFileDiffEntriesWithOrigin(committed, working)
+
+    expect(merged).toEqual([
+      { path: 'src/a.ts', status: 'modified', added: 5, removed: 5, origin: 'both' }
+    ])
+  })
+
+  it('preserves oldPath from a renamed entry', () => {
+    const committed = [
+      entry({ path: 'b.ts', status: 'renamed', oldPath: 'a.ts', added: 1, removed: 0 })
+    ]
+
+    const merged = mergeFileDiffEntriesWithOrigin(committed, [])
+
+    expect(merged).toEqual([
+      { path: 'b.ts', status: 'renamed', oldPath: 'a.ts', added: 1, removed: 0, origin: 'branch' }
+    ])
+  })
+
+  it('returns null when both sides are null', () => {
+    expect(mergeFileDiffEntriesWithOrigin(null, null)).toBeNull()
+  })
+
+  it('mergeFileDiffEntries still returns origin-free rows (system-view non-regression)', () => {
+    const committed = [entry({ path: 'src/a.ts', status: 'modified', added: 3, removed: 1 })]
+    const working = [entry({ path: 'src/a.ts', status: 'modified', added: 2, removed: 4 })]
+
+    const merged = mergeFileDiffEntries(committed, working)
+
+    expect(merged).toEqual([{ path: 'src/a.ts', status: 'modified', added: 5, removed: 5 }])
+    expect(merged?.[0]).not.toHaveProperty('origin')
   })
 })
 

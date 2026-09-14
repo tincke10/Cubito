@@ -96,7 +96,8 @@ function createFakeGateway(): FakeGateway {
         truncated: false
       }
       return content
-    }
+    },
+    gitStatus: async () => ({ entries: [], branch: '', branchLineTotal: 0 })
   }
   return gw
 }
