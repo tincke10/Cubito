@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
-// Boots orcad + the frontend preview server on an isolated data dir/worktree root, prints the
-// pairing URL. Decisions live in cubito-launch-plan.mjs (pure, unit-tested); this is spawn/fs glue.
+// Boots orcad on an isolated data dir/worktree root; orcad serves the staged frontend as its web
+// client on the same port. Decisions live in cubito-launch-plan.mjs (pure, unit-tested); this is
+// spawn/fs glue.
 
 import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
@@ -22,13 +23,13 @@ const scriptDir = import.meta.dirname
 const repoRoot = resolve(scriptDir, '..', '..')
 const orcadEntry = join(repoRoot, 'out', 'orcad', 'orcad.js')
 const READY_TIMEOUT_MS = 120_000
-const FRONTEND_READY_TIMEOUT_MS = 30_000
 
 const plan = resolveLaunchPlan({
   argv: process.argv.slice(2),
   env: process.env,
   homedir: homedir(),
-  platform: process.platform
+  platform: process.platform,
+  repoRoot
 })
 
 const socketPathProblem = dataDirSocketPathProblem(plan.dataDir, process.platform)
@@ -37,10 +38,18 @@ if (socketPathProblem) {
   process.exit(1)
 }
 
+const webIndexPath = join(plan.webClientRoot, 'web-index.html')
+if (!existsSync(webIndexPath)) {
+  console.error(
+    `[cubito] no web client staged at ${plan.webClientRoot} — run \`pnpm cubito:install\` ` +
+      '(or `node config/scripts/cubito-stage-web-client.mjs`) first.'
+  )
+  process.exit(1)
+}
+
 seedIsolatedProfile(plan)
 
 let orcadChild = null
-let frontendChild = null
 let stopAttempts = 0
 
 await main()
@@ -54,20 +63,11 @@ async function main() {
   })
   registerSignalForwarding()
 
-  const pairingUrl = await waitForPairingUrl(orcadChild)
-  console.log(`[cubito] orcad ready, pairing URL: ${pairingUrl}`)
-
-  frontendChild = spawn('pnpm', ['--dir', 'frontend', 'run', 'preview'], {
-    cwd: repoRoot,
-    detached: process.platform !== 'win32',
-    stdio: ['ignore', 'pipe', 'pipe']
-  })
-  await waitForFrontendReady(frontendChild)
-
-  const url = composeFrontendUrl(plan.frontendPort, pairingUrl)
-  console.log(`[cubito] open: ${url}`)
+  const { pairingUrl, webClientUrl } = await waitForReadiness(orcadChild)
+  console.log(`[cubito] open: ${webClientUrl}`)
+  console.log(`[cubito] dev frontend: ${composeFrontendUrl(plan.frontendPort, pairingUrl)}`)
   if (plan.openInBrowser) {
-    spawn('open', [url], { stdio: 'ignore' })
+    spawn('open', [webClientUrl], { stdio: 'ignore' })
   }
 }
 
@@ -84,7 +84,7 @@ function seedIsolatedProfile(launchPlan) {
 }
 
 /** Reads orcad's stdout for the ready line; rejects on timeout or an exit before one arrives. */
-function waitForPairingUrl(child) {
+function waitForReadiness(child) {
   return new Promise((resolvePromise, rejectPromise) => {
     let stderr = ''
     child.stderr.setEncoding('utf8')
@@ -101,7 +101,7 @@ function waitForPairingUrl(child) {
       if (parsed) {
         clearTimeout(timer)
         lines.close()
-        resolvePromise(parsed.pairingUrl)
+        resolvePromise(parsed)
       }
     })
     child.once('exit', (code) => {
@@ -113,32 +113,7 @@ function waitForPairingUrl(child) {
   })
 }
 
-/** Waits for vite preview's "Local:" line; a short poll would race the same output. */
-function waitForFrontendReady(child) {
-  return new Promise((resolvePromise, rejectPromise) => {
-    const timer = setTimeout(
-      () =>
-        rejectPromise(
-          new Error(`frontend preview printed no ready line within ${FRONTEND_READY_TIMEOUT_MS}ms`)
-        ),
-      FRONTEND_READY_TIMEOUT_MS
-    )
-    const lines = createInterface({ input: child.stdout })
-    lines.on('line', (line) => {
-      if (line.includes('Local:')) {
-        clearTimeout(timer)
-        lines.close()
-        resolvePromise()
-      }
-    })
-    child.once('exit', (code) => {
-      clearTimeout(timer)
-      rejectPromise(new Error(`frontend preview exited with ${code} before becoming ready`))
-    })
-  })
-}
-
-/** Forwards SIGINT/SIGTERM to both spawned process groups; a second signal escalates to SIGKILL. */
+/** Forwards SIGINT/SIGTERM to orcad's process group; a second signal escalates to SIGKILL. */
 function registerSignalForwarding() {
   process.on('SIGINT', () => stopChildren('SIGINT'))
   process.on('SIGTERM', () => stopChildren('SIGTERM'))
@@ -147,9 +122,7 @@ function registerSignalForwarding() {
 function stopChildren(signal) {
   stopAttempts += 1
   const targetSignal = stopAttempts > 1 ? 'SIGKILL' : signal
-  for (const child of [orcadChild, frontendChild]) {
-    killProcessGroup(child, targetSignal)
-  }
+  killProcessGroup(orcadChild, targetSignal)
   if (stopAttempts > 1) {
     process.exit(1)
   }

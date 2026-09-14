@@ -5,7 +5,7 @@ const DEFAULT_FRONTEND_PORT = 5180
 const PROFILE_ID = 'local-default'
 
 /** Isolated launch plan: flags beat env, env beats defaults — never `~/.orca` or `~/orca/workspaces`. */
-export function resolveLaunchPlan({ argv, env, homedir, platform }) {
+export function resolveLaunchPlan({ argv, env, homedir, platform, repoRoot }) {
   const flags = parseFlags(argv)
   const dataDir = flags.dataDir ?? env.ORCA_USER_DATA ?? join(homedir, '.cubito')
   const worktreeRoot =
@@ -13,7 +13,8 @@ export function resolveLaunchPlan({ argv, env, homedir, platform }) {
   const orcadPort = flags.orcadPort ?? numberEnv(env.CUBITO_ORCAD_PORT) ?? DEFAULT_ORCAD_PORT
   const frontendPort =
     flags.frontendPort ?? numberEnv(env.CUBITO_FRONTEND_PORT) ?? DEFAULT_FRONTEND_PORT
-  const orcadArgs = ['--port', String(orcadPort), '--json']
+  const webClientRoot = join(repoRoot, 'out', 'orcad', 'web-client')
+  const orcadArgs = ['--port', String(orcadPort), '--json', '--web-client-root', webClientRoot]
   if (env.CUBITO_ORCAD_BIND) {
     orcadArgs.push('--bind', env.CUBITO_ORCAD_BIND)
   }
@@ -21,7 +22,7 @@ export function resolveLaunchPlan({ argv, env, homedir, platform }) {
     orcadArgs.push('--pairing-address', env.CUBITO_PAIRING_ADDRESS)
   }
   const openInBrowser = platform === 'darwin' && !flags.noOpen && !env.CUBITO_NO_OPEN
-  return { dataDir, worktreeRoot, orcadPort, frontendPort, orcadArgs, openInBrowser }
+  return { dataDir, worktreeRoot, orcadPort, frontendPort, webClientRoot, orcadArgs, openInBrowser }
 }
 
 /** `null` for absent/non-numeric so a caller's `??` chain falls through cleanly. */
@@ -101,7 +102,7 @@ export function parseReadinessLine(line) {
   if (!payload || payload.type !== 'orca_server_ready' || !payload.pairing?.url) {
     return null
   }
-  return { pairingUrl: payload.pairing.url }
+  return { pairingUrl: payload.pairing.url, webClientUrl: payload.pairing.webClientUrl ?? null }
 }
 
 /** The frontend URL that carries the pairing offer in its fragment. */

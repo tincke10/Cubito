@@ -9,7 +9,8 @@ import {
 } from './cubito-launch-plan.mjs'
 
 const HOME = '/Users/dev'
-const BASE = { argv: [], env: {}, homedir: HOME, platform: 'darwin' }
+const REPO_ROOT = '/repo'
+const BASE = { argv: [], env: {}, homedir: HOME, platform: 'darwin', repoRoot: REPO_ROOT }
 
 describe('resolveLaunchPlan', () => {
   it('defaults to an isolated data dir, worktree root, and ports', () => {
@@ -18,6 +19,10 @@ describe('resolveLaunchPlan', () => {
     expect(plan.worktreeRoot).toBe('/Users/dev/cubito/workspaces')
     expect(plan.orcadPort).toBe(6799)
     expect(plan.frontendPort).toBe(5180)
+  })
+
+  it('derives the web client root from the repo root', () => {
+    expect(resolveLaunchPlan(BASE).webClientRoot).toBe('/repo/out/orcad/web-client')
   })
 
   it('never defaults into the real Orca profile or workspace root', () => {
@@ -68,9 +73,15 @@ describe('resolveLaunchPlan', () => {
     expect(plan.frontendPort).toBe(5656)
   })
 
-  it('always carries --json plus the resolved --port in orcadArgs', () => {
+  it('always carries --json plus the resolved --port and --web-client-root in orcadArgs', () => {
     const plan = resolveLaunchPlan(BASE)
-    expect(plan.orcadArgs).toEqual(['--port', '6799', '--json'])
+    expect(plan.orcadArgs).toEqual([
+      '--port',
+      '6799',
+      '--json',
+      '--web-client-root',
+      '/repo/out/orcad/web-client'
+    ])
   })
 
   it('adds --bind and --pairing-address only when the env vars are set', () => {
@@ -82,6 +93,8 @@ describe('resolveLaunchPlan', () => {
       '--port',
       '6799',
       '--json',
+      '--web-client-root',
+      '/repo/out/orcad/web-client',
       '--bind',
       '0.0.0.0',
       '--pairing-address',
@@ -126,7 +139,21 @@ describe('parseReadinessLine', () => {
       type: 'orca_server_ready',
       pairing: { url: 'orca://pair?code=abc' }
     })
-    expect(parseReadinessLine(line)).toEqual({ pairingUrl: 'orca://pair?code=abc' })
+    expect(parseReadinessLine(line)).toEqual({
+      pairingUrl: 'orca://pair?code=abc',
+      webClientUrl: null
+    })
+  })
+
+  it('extracts the webClientUrl when present', () => {
+    const line = JSON.stringify({
+      type: 'orca_server_ready',
+      pairing: { url: 'orca://pair?code=abc', webClientUrl: 'http://127.0.0.1:6799/web-index.html' }
+    })
+    expect(parseReadinessLine(line)).toEqual({
+      pairingUrl: 'orca://pair?code=abc',
+      webClientUrl: 'http://127.0.0.1:6799/web-index.html'
+    })
   })
 
   it('ignores non-JSON lines', () => {
