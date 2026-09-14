@@ -18,6 +18,7 @@ runStep('pnpm', ['run', 'build:cli'])
 runStep('pnpm', ['run', 'build:orcad'])
 runStep('pnpm', ['--dir', 'frontend', 'install'])
 runStep('pnpm', ['--dir', 'frontend', 'run', 'build'])
+runStep(process.execPath, ['config/scripts/cubito-stage-web-client.mjs'])
 console.log('[cubito-install] done. Run `pnpm cubito:start` next.')
 
 function runPreflight() {
