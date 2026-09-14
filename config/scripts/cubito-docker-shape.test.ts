@@ -32,8 +32,12 @@ describe('compose.yaml', () => {
     expect(cubito.build).toBe('.')
   })
 
-  it('publishes the orcad and frontend ports', () => {
-    expect(cubito.ports).toEqual(expect.arrayContaining(['6799:6799', '5180:5180']))
+  it('publishes only the orcad port — the frontend is served through it', () => {
+    expect(cubito.ports).toEqual(['6799:6799'])
+  })
+
+  it('pins the pairing address to the one published port', () => {
+    expect(cubito.environment?.CUBITO_PAIRING_ADDRESS).toBe('127.0.0.1:6799')
   })
 
   it('mounts the three named volumes', () => {
@@ -65,20 +69,49 @@ describe('compose.yaml', () => {
 
 describe('Dockerfile', () => {
   const dockerfile = readFileSync(join(REPO_ROOT, 'Dockerfile'), 'utf8')
+  const fromLines = dockerfile.match(/^FROM .+$/gm) ?? []
+  const runtimeStageIndex = dockerfile.indexOf('FROM node:24-bookworm-slim')
+  const runtimeStage = dockerfile.slice(runtimeStageIndex)
   const REQUIRED_LINES = [
-    'FROM node:24-bookworm',
+    'FROM node:24-bookworm AS builder',
+    'FROM node:24-bookworm-slim',
     'ELECTRON_SKIP_BINARY_DOWNLOAD',
     'pnpm install --ignore-scripts',
     'ensure-native-runtime.mjs --runtime=node',
     'build:cli',
     'build:orcad',
     'pnpm --dir frontend run build',
+    'cubito-stage-web-client.mjs',
+    'COPY --from=builder',
+    'EXPOSE 6799',
     '@anthropic-ai/claude-code'
   ]
 
   it('carries every required build step', () => {
     const missing = REQUIRED_LINES.filter((line) => !dockerfile.includes(line))
     expect(missing).toEqual([])
+  })
+
+  it('is a two-stage build: a builder and a slim runtime', () => {
+    expect(fromLines).toEqual(['FROM node:24-bookworm AS builder', 'FROM node:24-bookworm-slim'])
+    expect(runtimeStageIndex).toBeGreaterThan(-1)
+  })
+
+  it('smoke-tests the staged native closure and the CLI entrypoint at build time', () => {
+    expect(dockerfile).toContain("require('/stage/node_modules/node-pty')")
+    expect(dockerfile).toContain("require('/stage/node_modules/@parcel/watcher')")
+    expect(dockerfile).toMatch(
+      /NODE_PATH=\/stage\/node_modules node -e "require\('\/app\/out\/cli\/index\.js'\)"/
+    )
+  })
+
+  it('does not publish or reference the dropped frontend port', () => {
+    expect(dockerfile).not.toContain('5180')
+  })
+
+  it('keeps the runtime stage free of the Chromium/GTK build toolchain', () => {
+    expect(runtimeStage).not.toContain('build-essential')
+    expect(runtimeStage).not.toContain('libgtk-3-0')
   })
 })
 

@@ -3,7 +3,6 @@ services:
     build: .
     ports:
       - '6799:6799'
-      - '5180:5180'
     environment:
       ORCA_USER_DATA: /data
       CUBITO_WORKTREE_ROOT: /workspaces
