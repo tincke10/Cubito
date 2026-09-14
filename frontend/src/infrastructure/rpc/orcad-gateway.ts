@@ -211,6 +211,15 @@ export function createOrcadGateway(
       })
       return toDiffFileContent(response.result as Parameters<typeof toDiffFileContent>[0])
     },
+    async gitWorkingTreeDiff(worktree: string, filePath: string) {
+      const response = await connection.call('git.diff', {
+        worktree,
+        filePath,
+        staged: false,
+        compareAgainstHead: true
+      })
+      return toDiffFileContent(response.result as Parameters<typeof toDiffFileContent>[0])
+    },
     async systemSnapshot(worktree: string) {
       const response = await connection.call('system.snapshot', { worktree })
       return toSystemGraphSnapshot(response.result as Parameters<typeof toSystemGraphSnapshot>[0])

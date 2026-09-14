@@ -97,7 +97,10 @@ function createFakeGateway(): FakeGateway {
       }
       return content
     },
-    gitStatus: async () => ({ entries: [], branch: '', branchLineTotal: 0 })
+    gitStatus: async () => ({ entries: [], branch: '', branchLineTotal: 0 }),
+    gitWorkingTreeDiff: async () => {
+      throw new Error('gitWorkingTreeDiff not implemented in this fake')
+    }
   }
   return gw
 }

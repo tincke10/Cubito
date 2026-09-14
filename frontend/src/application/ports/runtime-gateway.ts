@@ -253,6 +253,9 @@ export type RuntimeGateway = {
     filePath: string,
     oldPath?: string
   ): Promise<DiffFileContent>
+  /** HEAD→worktree diff via `git.diff {staged:false, compareAgainstHead:true}` — for a path with
+   *  no branch-vs-base change, only an uncommitted one (Change: diff-working-tree). */
+  gitWorkingTreeDiff(worktree: string, filePath: string): Promise<DiffFileContent>
   systemSnapshot(worktree: string): Promise<SystemGraphSnapshot>
   orchestrationRunCreate(input: LeaseRunCreateInput): Promise<LeaseRunCreateResult>
   orchestrationTaskCreate(input: LeaseTaskCreateInput): Promise<LeaseTaskCreateResult>

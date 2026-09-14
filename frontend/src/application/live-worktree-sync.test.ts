@@ -85,6 +85,9 @@ function createFakeConnection(overrides?: {
       gitBranchDiff: async () => {
         throw new Error('gitBranchDiff not implemented in this fake')
       },
+      gitWorkingTreeDiff: async () => {
+        throw new Error('gitWorkingTreeDiff not implemented in this fake')
+      },
       systemSnapshot: async () => ({ nodes: [], edges: [] }),
       orchestrationRunCreate: async () => {
         throw new Error('orchestrationRunCreate not implemented in this fake')

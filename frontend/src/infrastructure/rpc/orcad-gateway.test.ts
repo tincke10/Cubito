@@ -91,6 +91,7 @@ describe('createOrcadGateway', () => {
       'gitStatus',
       'gitBranchCompare',
       'gitBranchDiff',
+      'gitWorkingTreeDiff',
       'systemSnapshot',
       'agentActivity'
     ])
@@ -345,6 +346,55 @@ describe('createOrcadGateway', () => {
       compare,
       filePath: 'src/b.ts',
       oldPath: 'src/old-b.ts'
+    })
+  })
+
+  it('gitWorkingTreeDiff calls git.diff with staged:false and compareAgainstHead:true', async () => {
+    const call: RpcCaller = vi.fn(async () => ({
+      id: 'x',
+      ok: true as const,
+      result: {
+        kind: 'text',
+        originalContent: 'head\n',
+        modifiedContent: 'worktree\n',
+        originalIsBinary: false,
+        modifiedIsBinary: false
+      },
+      _meta: { runtimeId: 'rt' }
+    }))
+    const gateway = createOrcadGateway({ call })
+    await expect(gateway.gitWorkingTreeDiff('/wt/beta', 'src/a.ts')).resolves.toEqual({
+      kind: 'text',
+      originalContent: 'head\n',
+      modifiedContent: 'worktree\n',
+      truncated: false
+    })
+    expect(call).toHaveBeenCalledWith('git.diff', {
+      worktree: '/wt/beta',
+      filePath: 'src/a.ts',
+      staged: false,
+      compareAgainstHead: true
+    })
+  })
+
+  it('gitWorkingTreeDiff maps a binary result', async () => {
+    const call: RpcCaller = vi.fn(async () => ({
+      id: 'x',
+      ok: true as const,
+      result: {
+        kind: 'binary',
+        originalContent: '',
+        modifiedContent: '',
+        originalIsBinary: true,
+        modifiedIsBinary: true,
+        mimeType: 'image/png'
+      },
+      _meta: { runtimeId: 'rt' }
+    }))
+    const gateway = createOrcadGateway({ call })
+    await expect(gateway.gitWorkingTreeDiff('/wt/beta', 'assets/logo.png')).resolves.toEqual({
+      kind: 'binary',
+      mimeType: 'image/png'
     })
   })
 

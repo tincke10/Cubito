@@ -68,6 +68,7 @@ type FakeGateway = DiffLiveLoaderGatewayPort & {
     filePath: string
     oldPath?: string
   }>
+  workingTreeDiffCalls: Array<{ worktree: string; filePath: string }>
   gitBranchCompareImpl?: (worktree: string, baseRef: string) => Promise<BranchCompare>
   gitBranchDiffImpl?: (
     worktree: string,
@@ -76,6 +77,7 @@ type FakeGateway = DiffLiveLoaderGatewayPort & {
     oldPath?: string
   ) => Promise<DiffFileContent>
   gitStatusImpl?: (worktree: string) => Promise<GitStatus>
+  gitWorkingTreeDiffImpl?: (worktree: string, filePath: string) => Promise<DiffFileContent>
 }
 
 function createFakeGateway(): FakeGateway {
@@ -83,6 +85,7 @@ function createFakeGateway(): FakeGateway {
     compareCalls: [],
     statusCalls: [],
     diffCalls: [],
+    workingTreeDiffCalls: [],
     gitBranchCompare: async (worktree, baseRef) => {
       gw.compareCalls.push({ worktree, baseRef })
       if (gw.gitBranchCompareImpl) return gw.gitBranchCompareImpl(worktree, baseRef)
@@ -97,6 +100,16 @@ function createFakeGateway(): FakeGateway {
       })
       if (gw.gitBranchDiffImpl) return gw.gitBranchDiffImpl(worktree, compare, filePath, oldPath)
       return { kind: 'text', originalContent: 'a', modifiedContent: 'b', truncated: false }
+    },
+    gitWorkingTreeDiff: async (worktree, filePath) => {
+      gw.workingTreeDiffCalls.push({ worktree, filePath })
+      if (gw.gitWorkingTreeDiffImpl) return gw.gitWorkingTreeDiffImpl(worktree, filePath)
+      return {
+        kind: 'text',
+        originalContent: 'head',
+        modifiedContent: 'worktree',
+        truncated: false
+      }
     },
     gitStatus: async (worktree) => {
       gw.statusCalls.push(worktree)
@@ -400,6 +413,89 @@ describe('createDiffLiveLoader', () => {
         kind: 'text',
         originalContent: 'a',
         modifiedContent: 'b',
+        truncated: false
+      })
+    }
+    loader.stop()
+  })
+
+  it('selecting a working-tree-only file loads content via gitWorkingTreeDiff, not gitBranchDiff', async () => {
+    setupGraph()
+    const gateway = createFakeGateway()
+    gateway.gitBranchCompareImpl = async () => branchCompare({ entries: [] })
+    gateway.gitStatusImpl = async () =>
+      workingTreeStatus({
+        entries: [{ path: 'src/auth/auth.controller.ts', status: 'modified', added: 4, removed: 1 }]
+      })
+    const loader = createDiffLiveLoader({ store, gateway })
+
+    loader.start('repo::child')
+    await vi.waitFor(() => {
+      const slice = store.get().diffView
+      expect(slice.view === 'open' && slice.status).toBe('ready')
+    })
+    loader.select('src/auth/auth.controller.ts')
+    await vi.waitFor(() => {
+      const slice = store.get().diffView
+      expect(slice.view === 'open' && slice.panel.kind).toBe('text')
+    })
+    expect(gateway.workingTreeDiffCalls).toEqual([
+      { worktree: 'repo::child', filePath: 'src/auth/auth.controller.ts' }
+    ])
+    expect(gateway.diffCalls.length).toBe(0)
+    const slice = store.get().diffView
+    if (slice.view === 'open') {
+      expect(slice.panel).toEqual({
+        kind: 'text',
+        originalContent: 'head',
+        modifiedContent: 'worktree',
+        truncated: false
+      })
+    }
+    loader.stop()
+  })
+
+  it("selecting a 'both' file composes the mergeBase→worktree content", async () => {
+    setupGraph()
+    const gateway = createFakeGateway()
+    gateway.gitBranchCompareImpl = async () =>
+      branchCompare({ entries: [{ path: 'src/a.ts', status: 'modified', added: 3, removed: 1 }] })
+    gateway.gitStatusImpl = async () =>
+      workingTreeStatus({
+        entries: [{ path: 'src/a.ts', status: 'modified', added: 2, removed: 0 }]
+      })
+    gateway.gitBranchDiffImpl = async () => ({
+      kind: 'text',
+      originalContent: 'base\n',
+      modifiedContent: 'branch-head\n',
+      truncated: false
+    })
+    gateway.gitWorkingTreeDiffImpl = async () => ({
+      kind: 'text',
+      originalContent: 'head\n',
+      modifiedContent: 'worktree\n',
+      truncated: false
+    })
+    const loader = createDiffLiveLoader({ store, gateway })
+
+    loader.start('repo::child')
+    await vi.waitFor(() => {
+      const slice = store.get().diffView
+      expect(slice.view === 'open' && slice.status).toBe('ready')
+    })
+    loader.select('src/a.ts')
+    await vi.waitFor(() => {
+      const slice = store.get().diffView
+      expect(slice.view === 'open' && slice.panel.kind).toBe('text')
+    })
+    expect(gateway.diffCalls.length).toBe(1)
+    expect(gateway.workingTreeDiffCalls.length).toBe(1)
+    const slice = store.get().diffView
+    if (slice.view === 'open') {
+      expect(slice.panel).toEqual({
+        kind: 'text',
+        originalContent: 'base\n',
+        modifiedContent: 'worktree\n',
         truncated: false
       })
     }

@@ -2,14 +2,15 @@ import { resolveBaseRef } from '../domain/worktree-graph/resolve-base-ref'
 import type { WorktreeId } from '../domain/worktree-graph/types'
 import { fetchBranchCompareEntries } from './branch-compare-entries-fetch'
 import { fetchWorkingTreeEntries } from './working-tree-entries-fetch'
-import { mergeFileDiffEntriesWithOrigin } from './system-graph-file-diff'
-import type { RuntimeGateway } from './ports/runtime-gateway'
+import { mergeFileDiffEntriesWithOrigin, type FileDiffOrigin } from './system-graph-file-diff'
+import { composeBaseToWorkingTree } from './diff-panel-content-compose'
+import type { DiffFileContent, RuntimeGateway } from './ports/runtime-gateway'
 import type { SceneStore } from './scene-store'
 
 /** Only the methods diff mode needs — narrow like the other controller ports. */
 export type DiffLiveLoaderGatewayPort = Pick<
   RuntimeGateway,
-  'gitBranchCompare' | 'gitBranchDiff' | 'gitStatus'
+  'gitBranchCompare' | 'gitBranchDiff' | 'gitStatus' | 'gitWorkingTreeDiff'
 >
 
 export type DiffLiveLoaderDeps = {
@@ -78,14 +79,37 @@ export function createDiffLiveLoader(deps: DiffLiveLoaderDeps): DiffLiveLoader {
     }
   }
 
+  /** Routes by origin: 'branch' is today's path unchanged; 'working' has no branch delta to
+   *  diff against; 'both' composes mergeBase→worktree from the two existing RPCs. */
+  async function contentFor(
+    nodeId: WorktreeId,
+    path: string,
+    compare: DiffCompareRef,
+    oldPath: string | undefined,
+    origin: FileDiffOrigin | undefined
+  ): Promise<DiffFileContent> {
+    if (origin === 'working') {
+      return gateway.gitWorkingTreeDiff(nodeId, path)
+    }
+    if (origin === 'both') {
+      const [branchContent, workingContent] = await Promise.all([
+        gateway.gitBranchDiff(nodeId, compare, path, oldPath),
+        gateway.gitWorkingTreeDiff(nodeId, path)
+      ])
+      return composeBaseToWorkingTree(branchContent, workingContent)
+    }
+    return gateway.gitBranchDiff(nodeId, compare, path, oldPath)
+  }
+
   async function loadPanel(
     nodeId: WorktreeId,
     path: string,
     compare: DiffCompareRef,
-    oldPath: string | undefined
+    oldPath: string | undefined,
+    origin: FileDiffOrigin | undefined
   ): Promise<void> {
     try {
-      const content = await gateway.gitBranchDiff(nodeId, compare, path, oldPath)
+      const content = await contentFor(nodeId, path, compare, oldPath, origin)
       if (stopped) return
       const slice = deps.store.get().diffView
       if (slice.view !== 'open' || slice.focusedNodeId !== nodeId || slice.selectedPath !== path)
@@ -116,9 +140,9 @@ export function createDiffLiveLoader(deps: DiffLiveLoaderDeps): DiffLiveLoader {
       if (slice.view !== 'open' || slice.compare === null) return // rail not loaded — no-op
       const nodeId = slice.focusedNodeId
       const compare = slice.compare
-      const oldPath = slice.files.find((file) => file.path === path)?.oldPath
+      const file = slice.files.find((f) => f.path === path)
       dispatch({ type: 'select', path })
-      void loadPanel(nodeId, path, compare, oldPath)
+      void loadPanel(nodeId, path, compare, file?.oldPath, file?.origin)
     },
     stop() {
       stopped = true
