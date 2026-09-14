@@ -82,6 +82,7 @@ describe('Dockerfile', () => {
     'build:orcad',
     'pnpm --dir frontend run build',
     'cubito-stage-web-client.mjs',
+    'cubito-stage-runtime-deps.mjs',
     'COPY --from=builder',
     'EXPOSE 6799',
     '@anthropic-ai/claude-code'
@@ -107,6 +108,11 @@ describe('Dockerfile', () => {
 
   it('does not publish or reference the dropped frontend port', () => {
     expect(dockerfile).not.toContain('5180')
+  })
+
+  it('stages the runtime closure via script, not a hand-picked cp -RL list', () => {
+    expect(dockerfile).not.toContain('cp -RL')
+    expect(dockerfile).toContain('cubito-stage-runtime-deps.mjs')
   })
 
   it('keeps the runtime stage free of the Chromium/GTK build toolchain', () => {

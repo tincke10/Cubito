@@ -33,20 +33,13 @@ RUN node config/scripts/ensure-native-runtime.mjs --runtime=node \
   && pnpm --dir frontend run build \
   && node config/scripts/cubito-stage-web-client.mjs
 
-# Runtime's real external closure, measured from out/{cli,orcad,shared}'s require() graph — not
-# the darwin/win32-laden .pnpm store. `cp -RL` dereferences pnpm's symlinks and flattens each
-# package with its siblings (where pnpm keeps deps). The two `node -e` lines fail the build,
-# not a container at runtime, if the staged closure is incomplete.
-RUN mkdir -p /stage/node_modules \
-  && cp -RL /app/node_modules/.pnpm/node-pty@*/node_modules/. /stage/node_modules/ \
-  && cp -RL /app/node_modules/.pnpm/@parcel+watcher@*/node_modules/. /stage/node_modules/ \
-  && cp -RL /app/node_modules/.pnpm/zod@*/node_modules/. /stage/node_modules/ \
-  && cp -RL /app/node_modules/.pnpm/ws@*/node_modules/. /stage/node_modules/ \
-  && cp -RL /app/node_modules/.pnpm/tweetnacl@*/node_modules/. /stage/node_modules/ \
-  && cp -RL /app/node_modules/.pnpm/yaml@*/node_modules/. /stage/node_modules/ \
-  && rm -rf /stage/node_modules/node-pty/prebuilds /stage/node_modules/node-pty/src \
-            /stage/node_modules/node-pty/deps /stage/node_modules/node-pty/third_party \
-            /stage/node_modules/node-pty/build/Release/obj.target \
+# Runtime's real external closure, computed (not hand-copied) from these roots' full transitive
+# dependencies + optionalDependencies — a fixed sibling list brings a package's neighbors but not
+# the neighbors' own deps (e.g. is-glob without its is-extglob). The two `node -e` lines fail the
+# build, not a container at runtime, if the staged closure is incomplete.
+RUN node config/scripts/cubito-stage-runtime-deps.mjs \
+    --from /app --to /stage/node_modules \
+    --root node-pty --root @parcel/watcher --root zod --root ws --root tweetnacl --root yaml \
   && node -e "process.chdir('/app'); require('/stage/node_modules/node-pty'); require('/stage/node_modules/@parcel/watcher')" \
   && NODE_PATH=/stage/node_modules node -e "require('/app/out/cli/index.js')"
 
