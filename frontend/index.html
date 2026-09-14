@@ -20,15 +20,30 @@
         font-family: 'Fira Code', 'SF Mono', ui-monospace, 'Cascadia Code', monospace;
         overflow: hidden;
       }
+      /* Compare side panel (design compare-side-panel §4) — layout tokens only, never touched by
+         applyCssTheme(); 0 while closed keeps every calc() below valid. */
+      :root {
+        --cubito-compare-panel-width: 0px;
+        --cubito-compare-header-h: 84px; /* the 3-line compare HUD, matching .cubito-diff-panel's top */
+        --cubito-compare-child-rail-w: 200px;
+        --cubito-compare-file-rail-w: 200px;
+      }
+      body[data-compare-panel='open'] {
+        --cubito-compare-panel-width: clamp(520px, 52vw, 880px);
+      }
       #app {
         position: relative;
         height: 100%;
+        width: calc(100% - var(--cubito-compare-panel-width));
+        /* CSS2DRenderer never clips its children, so a node label near the right edge would
+           paint over the panel (and, before this, over the HUD). */
+        overflow: hidden;
       }
       /* Vignette (design §7.5): the mockup's vignette is a gradient, so CSS reproduces it
          pixel-exactly at zero scene cost. */
       #vignette {
         position: fixed;
-        inset: 0;
+        inset: 0 var(--cubito-compare-panel-width) 0 0;
         pointer-events: none;
         background: radial-gradient(
           ellipse at center,
@@ -862,17 +877,26 @@
       .cubito-diff-panel__error {
         color: var(--cubito-amber-ink);
       }
-      /* Compare (design camada, Change D) — own full-screen mode, mirrors #diff's rail+panel
-         shape but adds a third column: the NEW child rail (litter overview), then diff mode's
-         OWN file rail and panel, reused verbatim for the focused child. */
+      /* Compare (design compare-side-panel) — a RIGHT-DOCKED side panel over the live 3D scene
+         (design D1), not a full-screen mode: #app narrows instead of hiding. Mirrors #diff's
+         rail+panel shape but adds a third column: the NEW child rail (litter overview), then
+         diff mode's OWN file rail and panel, reused verbatim for the focused child. */
       #compare {
         position: fixed;
-        inset: 0;
+        inset: 0 0 0 auto;
+        width: var(--cubito-compare-panel-width);
+        overflow: hidden;
         pointer-events: none;
       }
+      body[data-compare-panel='open'] #compare {
+        pointer-events: auto; /* a stray click in the gutter must not reach OrbitControls */
+        background: var(--cubito-panel-surface);
+        border-left: 1px solid var(--cubito-panel-border);
+      }
+      /* The compare HUD is now the panel's own header, not a strip clearing two rails. */
       .cubito-compare-hud {
         position: absolute;
-        inset: 12px 16px auto 456px; /* clears both rails: children 220 + files 220 + 16 gutter */
+        inset: 12px 16px auto 16px;
         font-size: 12px;
         line-height: 1.6;
         pointer-events: none;
@@ -880,9 +904,9 @@
       .cubito-compare-rail {
         position: absolute;
         left: 0;
-        top: 0;
-        width: 220px;
-        height: 100%;
+        top: var(--cubito-compare-header-h);
+        width: var(--cubito-compare-child-rail-w);
+        height: calc(100% - var(--cubito-compare-header-h));
         overflow-y: auto;
         background: var(--cubito-panel-surface);
         border-right: 1px solid var(--cubito-panel-border);
@@ -935,21 +959,25 @@
       }
       /* Compare reuses diff mode's own file-rail/panel elements — override their fixed
          left/width (set for #diff's two-column layout) so they sit in compare's third and
-         fourth columns instead. */
+         fourth columns instead, below the panel's own header. */
       #compare .cubito-diff-rail {
-        left: 220px;
-        width: 220px;
+        left: var(--cubito-compare-child-rail-w);
+        width: var(--cubito-compare-file-rail-w);
+        top: var(--cubito-compare-header-h);
+        height: calc(100% - var(--cubito-compare-header-h));
       }
       #compare .cubito-diff-panel {
-        left: 440px;
-        width: calc(100% - 440px);
+        left: calc(var(--cubito-compare-child-rail-w) + var(--cubito-compare-file-rail-w));
+        width: calc(100% - var(--cubito-compare-child-rail-w) - var(--cubito-compare-file-rail-w));
+        /* .cubito-diff-panel sets overflow-y only; `white-space: pre` diff lines need x too. */
+        overflow: auto;
       }
       /* Winner-merge action (Change E) — sits over the file panel, bottom-right. */
       .cubito-compare-merge-action {
         position: absolute;
         right: 16px;
         bottom: 16px;
-        width: 320px;
+        width: min(320px, calc(100% - 32px));
         max-height: 40%;
         overflow-y: auto;
         pointer-events: auto;

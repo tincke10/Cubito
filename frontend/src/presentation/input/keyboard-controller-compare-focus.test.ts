@@ -53,6 +53,8 @@ function fakeHeights(): CameraHeightController {
   return {
     current: vi.fn((): CameraHeight => 'isla'),
     goTo: vi.fn(() => true),
+    goToCamada: vi.fn(() => true),
+    refitCamada: vi.fn(),
     pop: vi.fn(() => false),
     reanchorIsland: vi.fn(),
     animateToExtent: vi.fn(),

@@ -10,6 +10,7 @@ import {
   fanOutCounts,
   fanOutDecisionCounts,
   fanOutMemberIds,
+  fanOutParentId,
   fanOutObjectiveText,
   fanOutSubmitBlocker,
   isFailedDispatch,
@@ -766,6 +767,35 @@ describe('fanOutMemberIds', () => {
       runId: null
     }
     expect(fanOutMemberIds(running)).toEqual(['w1', 'w2', 'w4'])
+  })
+})
+
+describe('fanOutParentId', () => {
+  it('is null when closed', () => {
+    expect(fanOutParentId(emptyFanOutSlice())).toBeNull()
+  })
+
+  it('returns the parentId on form', () => {
+    const formSlice: FanOutSlice = {
+      view: 'form',
+      parentId: 'w1',
+      fields: { count: 3, agent: 'none', prompt: '' },
+      repoSelector: null
+    }
+    expect(fanOutParentId(formSlice)).toBe('w1')
+  })
+
+  it('returns the parentId on running', () => {
+    const running: FanOutSlice = {
+      view: 'running',
+      parentId: 'w1',
+      fields: { count: 3, agent: 'none', prompt: '' },
+      repoSelector: null,
+      batch: [],
+      memberStatus: {},
+      runId: null
+    }
+    expect(fanOutParentId(running)).toBe('w1')
   })
 })
 

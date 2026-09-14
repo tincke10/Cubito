@@ -2,7 +2,12 @@ import { describe, expect, it, vi } from 'vitest'
 import { createCameraHeightController } from './camera-height-controller'
 import type { ScenePositions } from './camera-height-controller'
 import { createSceneStore } from '../../application/scene-store'
-import { poseForExtent, poseForHeight } from '../camera/height-presets'
+import {
+  COMPARAR_VIEW_DIRECTION,
+  heightFov,
+  poseForExtent,
+  poseForHeight
+} from '../camera/height-presets'
 import { panPoseTo } from '../camera/camera-pose'
 import type { CameraPose } from '../camera/camera-pose'
 import { frameAll, frameIsland } from '../camera/camera-framing'
@@ -59,8 +64,10 @@ function fakeCameraRig(currentPose: CameraPose) {
   const rig = {
     animateTo: vi.fn(),
     currentPose: vi.fn((): CameraPose => rig.currentPoseValue),
+    currentAspect: vi.fn((): number => rig.currentAspectValue),
     isPointInView: vi.fn(() => true),
-    currentPoseValue: currentPose
+    currentPoseValue: currentPose,
+    currentAspectValue: 1
   }
   return rig
 }
@@ -284,5 +291,135 @@ describe('createCameraHeightController', () => {
     expect(heights.goTo('general')).toBe(false)
     expect(rig.animateTo).not.toHaveBeenCalled()
     expect(store.get().camera.height).toBe('isla')
+  })
+
+  describe('goToCamada (design D2/C6)', () => {
+    it("pushes the live pose and tweens to the camada's aspect-aware extent fit", () => {
+      const { store, rig, heights } = setup({ activeRepoId: 'r1' })
+      rig.currentAspectValue = 0.75
+
+      const pushed = heights.goToCamada(['r1-main', 'r1-other'])
+
+      expect(pushed).toBe(true)
+      expect(store.get().camera.height).toBe('comparar')
+      const framing = frameAll([CENTERS['r1-main']!, CENTERS['r1-other']!])
+      const expectedPose = poseForExtent(
+        framing,
+        heightFov('comparar'),
+        0.75,
+        COMPARAR_VIEW_DIRECTION
+      )
+      expect(rig.animateTo).toHaveBeenCalledWith(expectedPose, 600)
+    })
+
+    it('frames along the comparar direction, not the isla one', () => {
+      const { rig, heights } = setup({ activeRepoId: 'r1' })
+
+      heights.goToCamada(['r1-main'])
+
+      const [pose] = rig.animateTo.mock.calls[0]! as [CameraPose, number]
+      const offset = {
+        x: pose.position.x - pose.lookAt.x,
+        y: pose.position.y - pose.lookAt.y,
+        z: pose.position.z - pose.lookAt.z
+      }
+      const length = Math.sqrt(offset.x ** 2 + offset.y ** 2 + offset.z ** 2)
+      expect(offset.x / length).toBeCloseTo(COMPARAR_VIEW_DIRECTION.x, 9)
+      expect(offset.y / length).toBeCloseTo(COMPARAR_VIEW_DIRECTION.y, 9)
+      expect(offset.z / length).toBeCloseTo(COMPARAR_VIEW_DIRECTION.z, 9)
+    })
+
+    it("uses the rig's CURRENT aspect", () => {
+      const { rig, heights } = setup({ activeRepoId: 'r1' })
+      rig.currentAspectValue = 0.5
+
+      heights.goToCamada(['r1-main'])
+
+      const framing = frameAll([CENTERS['r1-main']!])
+      const expectedPose = poseForExtent(
+        framing,
+        heightFov('comparar'),
+        0.5,
+        COMPARAR_VIEW_DIRECTION
+      )
+      expect(rig.animateTo).toHaveBeenCalledWith(expectedPose, 600)
+    })
+
+    it('returns false and never pushes when no member center resolves (frameAll([]) -> origin trap)', () => {
+      const { store, rig, heights } = setup({ activeRepoId: 'r1' })
+
+      const pushed = heights.goToCamada(['unknown-1', 'unknown-2'])
+
+      expect(pushed).toBe(false)
+      expect(rig.animateTo).not.toHaveBeenCalled()
+      expect(store.get().camera.height).toBe('isla')
+    })
+
+    it('skips members whose center is unresolved', () => {
+      const { rig, heights } = setup({ activeRepoId: 'r1' })
+
+      heights.goToCamada(['r1-main', 'unknown'])
+
+      const framing = frameAll([CENTERS['r1-main']!])
+      const expectedPose = poseForExtent(framing, heightFov('comparar'), 1, COMPARAR_VIEW_DIRECTION)
+      expect(rig.animateTo).toHaveBeenCalledWith(expectedPose, 600)
+    })
+
+    it('pop after goToCamada restores the pre-compare pose exactly, including a hand-orbit', () => {
+      const { rig, heights } = setup({ activeRepoId: 'r1' })
+      const orbited: CameraPose = {
+        position: { x: 9, y: 8, z: 7 },
+        lookAt: { x: 6, y: 5, z: 4 },
+        fov: 33
+      }
+      rig.currentPoseValue = orbited
+
+      heights.goToCamada(['r1-main'])
+      rig.animateTo.mockClear()
+      heights.pop()
+
+      expect(rig.animateTo).toHaveBeenCalledWith(orbited, 420) // popped height was 'isla' -> 420ms
+    })
+  })
+
+  describe('refitCamada (design risk 6: never pushes)', () => {
+    it('re-fits with duration 0 and never pushes', () => {
+      const { rig, heights } = setup({ activeRepoId: 'r1' })
+      const orbited: CameraPose = {
+        position: { x: 9, y: 8, z: 7 },
+        lookAt: { x: 6, y: 5, z: 4 },
+        fov: 33
+      }
+      rig.currentPoseValue = orbited
+      heights.goToCamada(['r1-main'])
+      rig.animateTo.mockClear()
+      rig.currentAspectValue = 0.6
+
+      heights.refitCamada(['r1-main'])
+
+      const framing = frameAll([CENTERS['r1-main']!])
+      const expectedPose = poseForExtent(
+        framing,
+        heightFov('comparar'),
+        0.6,
+        COMPARAR_VIEW_DIRECTION
+      )
+      expect(rig.animateTo).toHaveBeenCalledWith(expectedPose, 0)
+
+      // never pushes: a single pop() still restores the pose captured by the ORIGINAL goToCamada,
+      // not a second (refit) stack entry.
+      rig.animateTo.mockClear()
+      heights.pop()
+      expect(rig.animateTo).toHaveBeenCalledWith(orbited, 420)
+    })
+
+    it("leaves the store's camera height at comparar", () => {
+      const { store, heights } = setup({ activeRepoId: 'r1' })
+      heights.goToCamada(['r1-main'])
+
+      heights.refitCamada(['r1-main'])
+
+      expect(store.get().camera.height).toBe('comparar')
+    })
   })
 })

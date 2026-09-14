@@ -37,7 +37,9 @@ import { createKeyboardController } from './presentation/input/keyboard-controll
 import { createCameraRig } from './presentation/scene/camera-rig'
 import { createScene } from './presentation/scene/create-scene'
 import { createGraphView } from './presentation/scene/graph-view'
-import { didSceneModeClose } from './presentation/scene/scene-mode-close-edge'
+import { needsRemeasure } from './presentation/scene/canvas-box-remeasure'
+import type { CanvasBox } from './presentation/scene/canvas-box-remeasure'
+import { sceneSelectedId } from './application/compare-view-model'
 import { applyCssTheme } from './presentation/theme/css-theme'
 import { FOCUS_DURATION_MS } from './presentation/theme/scene-metrics'
 import { paletteFor } from './presentation/theme/scene-palette'
@@ -265,12 +267,6 @@ const compareViewBinder = createCompareViewBinder({
   heights
 })
 
-// Worktree HUD/keyboard-bar/3D scene chrome, hidden while EITHER scene-replacing mode (sistema
-// en vivo or diff) owns the screen. Single source of truth (main.ts, not each binder's own
-// onEnter/onExit) so opening one mode right after the other can't race and strand chrome hidden
-// or restore it early — see CRITICAL 1 in the diff-mode integration-seam fixes.
-const worktreeChrome = [container, hud, keyboardBar.root]
-
 // Shared by the keyboard controller and the eager command-palette controller below — both talk
 // to the terminal panel through the same closure-backed proxy (built before it exists).
 const terminalCommands = {
@@ -320,18 +316,33 @@ cubitoScene.onResize((width, height) => {
   cameraRig.setAspect(width / height)
   graphView.setResolution(width, height)
   viewportSize = { width, height }
+  compareViewBinder.onViewportResize()
 })
 
 // The first non-empty graph gets an initial fit; afterwards the camera is the user's.
 let framed = false
-// Re-measures the renderer when a scene mode (sistema/diff/compare) closes (Change W13): while
-// open, #app is `hidden` (0×0 clientWidth/Height), so a resize during that window is missed.
-let previousSceneModeOpen = false
+// Re-measures the renderer when the canvas becomes visible again, or the compare side panel
+// opens/closes (design compare-side-panel D8): while a scene-replacing mode is open, #app is
+// `hidden` (0×0 clientWidth/Height), so a resize during that window is missed; while the panel
+// is open, #app is narrowed, so the aspect must be recomputed at the new width.
+let previousBox: CanvasBox = { hidden: false, narrowed: false }
 
 store.subscribe((state) => {
+  // Canvas box FIRST: bind-compare-view computes its camada pose from rig.currentAspect(), so
+  // the panel must already be laid out and the renderer remeasured before it syncs.
+  const sceneReplacingOpen = state.systemView.view === 'open' || state.diffView.view === 'open'
+  const compareOpen = state.compareView.view === 'open'
+  container.hidden = sceneReplacingOpen
+  hudElement.hidden = keyboardBar.root.hidden = sceneReplacingOpen || compareOpen
+  document.body.dataset.comparePanel = compareOpen ? 'open' : 'closed'
+  const box: CanvasBox = { hidden: sceneReplacingOpen, narrowed: compareOpen }
+  // clientWidth inside remeasure() flushes style+layout, so the attribute above is already live.
+  if (needsRemeasure(previousBox, box)) cubitoScene.remeasure()
+  previousBox = box
+
   graphView.update({
     graph: state.graph,
-    selectedId: state.selection.selectedId,
+    selectedId: sceneSelectedId(state.compareView, state.selection.selectedId),
     palette,
     activeRepoId: state.repos.activeRepoId,
     cameraHeight: state.camera.height
@@ -346,13 +357,6 @@ store.subscribe((state) => {
   systemViewBinder.sync()
   diffViewBinder.sync()
   compareViewBinder.sync()
-  const sceneModeOpen =
-    state.systemView.view === 'open' ||
-    state.diffView.view === 'open' ||
-    state.compareView.view === 'open'
-  for (const el of worktreeChrome) el.hidden = sceneModeOpen
-  if (didSceneModeClose(previousSceneModeOpen, sceneModeOpen)) cubitoScene.remeasure()
-  previousSceneModeOpen = sceneModeOpen
   commandPaletteController.sync(state.commandPalette, state)
   if (!framed && state.graph.nodes.size > 0) {
     framed = true

@@ -17,7 +17,8 @@ import {
   GIT_MERGE_WINNER_CAPABILITY,
   GIT_MERGE_WINNER_SYNC_CAPABILITY
 } from './application/runtime-capability-keys'
-import type { SceneStore } from './application/scene-store'
+import { fanOutParentId } from './application/fan-out-model'
+import type { SceneState, SceneStore } from './application/scene-store'
 import type { CameraHeightController } from './presentation/input/camera-height-controller'
 import type { WorktreeId } from './domain/worktree-graph/types'
 
@@ -28,7 +29,7 @@ export type BindCompareViewDeps = {
   compareSlot: { appendChild(element: unknown): void }
   keyboardBarSlot: { appendChild(element: unknown): void }
   demoGateway: CompareGatewayPort
-  heights: Pick<CameraHeightController, 'goTo' | 'pop'>
+  heights: Pick<CameraHeightController, 'goToCamada' | 'refitCamada' | 'pop'>
   /** DOM element factory overrides — tests substitute fakes, production uses the defaults. */
   createChildRail?: () => CompareRailHandle
   createFileRail?: () => DiffRailHandle
@@ -39,7 +40,20 @@ export type BindCompareViewDeps = {
 
 export type CompareViewBinder = {
   sync(): void
+  /** Window or panel resize while open: re-fit the camada to the new aspect. Guarded on BOTH
+   *  `pushedHeight` and the slice still being open, because main.ts remeasures BEFORE this
+   *  binder syncs — on the open edge a refit would move the camera before goToCamada captures
+   *  rig.currentPose(), and Esc would then restore the refit pose instead of the user's. */
+  onViewportResize(): void
   rebindGateway(gateway: CompareGatewayPort, capabilities: readonly string[]): void
+}
+
+/** The camada's members for camera framing: the fan-out parent first (if one exists), then the
+ *  compare litter — matches C6's worked "parent + children" fixture. */
+const camadaIds = (state: SceneState): readonly WorktreeId[] => {
+  const parentId = fanOutParentId(state.fanOut)
+  const members = state.compareView.view === 'open' ? state.compareView.members : []
+  return parentId === null ? members : [parentId, ...members]
 }
 
 /**
@@ -101,7 +115,7 @@ export function createCompareViewBinder(deps: BindCompareViewDeps): CompareViewB
       wasOpen = isOpen
       if (transitionToOpen && compareView.view === 'open') {
         loader.start(compareView.members)
-        pushedHeight = deps.heights.goTo('comparar')
+        pushedHeight = deps.heights.goToCamada(camadaIds(state))
       }
       if (transitionToClosed) {
         loader.stop()
@@ -118,6 +132,12 @@ export function createCompareViewBinder(deps: BindCompareViewDeps): CompareViewB
         capabilities.includes(GIT_MERGE_WINNER_CAPABILITY),
         capabilities.includes(GIT_MERGE_WINNER_SYNC_CAPABILITY)
       )
+    },
+    onViewportResize(): void {
+      if (!pushedHeight) return
+      const state = deps.store.get()
+      if (state.compareView.view !== 'open') return
+      deps.heights.refitCamada(camadaIds(state))
     },
     rebindGateway(gateway: CompareGatewayPort, nextCapabilities: readonly string[]): void {
       loader.rebindGateway(gateway)

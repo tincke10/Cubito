@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createCompareViewBinder } from './bind-compare-view'
 import type { BindCompareViewDeps } from './bind-compare-view'
 import { createSceneStore } from './application/scene-store'
-import type { CameraHeight } from './presentation/camera/camera-pose'
+import type { WorktreeId } from './domain/worktree-graph/types'
 import type { CompareRailHandle } from './presentation/compare/compare-rail-element'
 import type { CompareHudHandle } from './presentation/compare/compare-hud-element'
 import type { CompareMergeActionHandle } from './presentation/compare/compare-merge-action-element'
@@ -45,20 +45,26 @@ const fakeMergeAction = (): CompareMergeActionHandle => ({
 })
 
 type FakeHeights = {
-  goToCalls: CameraHeight[]
+  goToCamadaCalls: (readonly WorktreeId[])[]
+  refitCamadaCalls: (readonly WorktreeId[])[]
   popCalls: number
-  goToReturns: boolean
-  goTo(height: CameraHeight): boolean
+  goToCamadaReturns: boolean
+  goToCamada(memberIds: readonly WorktreeId[]): boolean
+  refitCamada(memberIds: readonly WorktreeId[]): void
   pop(): boolean
 }
 
-const createFakeHeights = (goToReturns = true): FakeHeights => ({
-  goToCalls: [],
+const createFakeHeights = (goToCamadaReturns = true): FakeHeights => ({
+  goToCamadaCalls: [],
+  refitCamadaCalls: [],
   popCalls: 0,
-  goToReturns,
-  goTo(height) {
-    this.goToCalls.push(height)
-    return this.goToReturns
+  goToCamadaReturns,
+  goToCamada(memberIds) {
+    this.goToCamadaCalls.push(memberIds)
+    return this.goToCamadaReturns
+  },
+  refitCamada(memberIds) {
+    this.refitCamadaCalls.push(memberIds)
   },
   pop() {
     this.popCalls++
@@ -94,22 +100,39 @@ function setup(heights: FakeHeights) {
   return { store, binder }
 }
 
+/** Drives fan-out-model's real reducer to a 'running' slice with a real parentId, then opens
+ *  compare on the given members — camadaIds prepends this parent (design D2/C6). */
+function withRunningCamadaAndOpenCompare(
+  store: ReturnType<typeof createSceneStore>,
+  parentId: string,
+  members: readonly string[]
+): void {
+  store.dispatchFanOut({ type: 'open-for-node', nodeId: parentId })
+  store.dispatchFanOut({ type: 'set-repo-selector', repoSelector: 'id:repo-a' })
+  const mutationIds = members.map((_, i) => `m${i}`)
+  store.dispatchFanOut({ type: 'submit', mutationIds })
+  mutationIds.forEach((mutationId, i) => {
+    store.dispatchFanOut({ type: 'child-created', mutationId, worktreeId: members[i]! })
+  })
+  store.dispatchCompareView({ type: 'open', members })
+}
+
 describe('createCompareViewBinder — camera height push/pop', () => {
-  it('the open transition starts the loader and pushes the comparar height', () => {
+  it('the open transition starts the loader and frames the camada, parent first', () => {
     const heights = createFakeHeights()
     const { store, binder } = setup(heights)
 
-    store.dispatchCompareView({ type: 'open', members: [] })
+    withRunningCamadaAndOpenCompare(store, 'root', ['w1', 'w2'])
     binder.sync()
 
-    expect(heights.goToCalls).toEqual(['comparar'])
+    expect(heights.goToCamadaCalls).toEqual([['root', 'w1', 'w2']])
   })
 
-  it('the close transition stops the loader and pops it', () => {
+  it('the close transition stops the loader and pops', () => {
     const heights = createFakeHeights()
     const { store, binder } = setup(heights)
 
-    store.dispatchCompareView({ type: 'open', members: [] })
+    withRunningCamadaAndOpenCompare(store, 'root', ['w1'])
     binder.sync()
     store.dispatchCompareView({ type: 'close' })
     binder.sync()
@@ -121,7 +144,7 @@ describe('createCompareViewBinder — camera height push/pop', () => {
     const heights = createFakeHeights(false)
     const { store, binder } = setup(heights)
 
-    store.dispatchCompareView({ type: 'open', members: [] })
+    withRunningCamadaAndOpenCompare(store, 'root', ['w1'])
     binder.sync()
     store.dispatchCompareView({ type: 'close' })
     binder.sync()
@@ -129,15 +152,52 @@ describe('createCompareViewBinder — camera height push/pop', () => {
     expect(heights.popCalls).toBe(0)
   })
 
-  it('repeated syncs while open push exactly once', () => {
+  it('repeated syncs while open frame exactly once', () => {
     const heights = createFakeHeights()
     const { store, binder } = setup(heights)
 
-    store.dispatchCompareView({ type: 'open', members: [] })
+    withRunningCamadaAndOpenCompare(store, 'root', ['w1'])
     binder.sync()
     binder.sync()
     binder.sync()
 
-    expect(heights.goToCalls).toEqual(['comparar'])
+    expect(heights.goToCamadaCalls).toHaveLength(1)
+  })
+})
+
+describe('createCompareViewBinder — onViewportResize (design D8/risk 6)', () => {
+  it('refits while open after a push', () => {
+    const heights = createFakeHeights()
+    const { store, binder } = setup(heights)
+    withRunningCamadaAndOpenCompare(store, 'root', ['w1', 'w2'])
+    binder.sync()
+
+    binder.onViewportResize()
+
+    expect(heights.refitCamadaCalls).toEqual([['root', 'w1', 'w2']])
+  })
+
+  it('is a no-op before the push (the open-edge refit trap, risk 6)', () => {
+    const heights = createFakeHeights()
+    const { store, binder } = setup(heights)
+    withRunningCamadaAndOpenCompare(store, 'root', ['w1'])
+    // binder.sync() deliberately NOT called yet — goToCamada has not captured the pre-compare pose
+
+    binder.onViewportResize()
+
+    expect(heights.refitCamadaCalls).toHaveLength(0)
+  })
+
+  it('is a no-op once the slice is closed', () => {
+    const heights = createFakeHeights()
+    const { store, binder } = setup(heights)
+    withRunningCamadaAndOpenCompare(store, 'root', ['w1'])
+    binder.sync()
+    store.dispatchCompareView({ type: 'close' })
+    binder.sync()
+
+    binder.onViewportResize()
+
+    expect(heights.refitCamadaCalls).toHaveLength(0)
   })
 })

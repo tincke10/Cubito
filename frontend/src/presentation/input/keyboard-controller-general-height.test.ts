@@ -54,6 +54,8 @@ function fakeHeights(height: CameraHeight = 'general'): CameraHeightController &
     currentHeight: height,
     current: vi.fn((): CameraHeight => heights.currentHeight),
     goTo: vi.fn(() => true),
+    goToCamada: vi.fn(() => true),
+    refitCamada: vi.fn(),
     pop: vi.fn(() => false),
     reanchorIsland: vi.fn(),
     animateToExtent: vi.fn(),

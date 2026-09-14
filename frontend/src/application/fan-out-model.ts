@@ -313,6 +313,12 @@ export function fanOutMemberIds(slice: FanOutSlice): readonly WorktreeId[] {
   return [slice.parentId, ...created]
 }
 
+/** The camada's parent — the comparar label anchor and the first member of its framing.
+ *  Null while the fan-out slice is closed. */
+export function fanOutParentId(slice: FanOutSlice): WorktreeId | null {
+  return slice.view === 'closed' ? null : slice.parentId
+}
+
 export type FanOutCounts = {
   total: number
   naciendo: number
