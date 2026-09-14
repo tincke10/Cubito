@@ -222,9 +222,9 @@ The agent-status write workload (`--agent-status-batches`,
 
 ## Baseline on `main`
 
-Measured on `main` at `077f5a11cd4` (macOS, arm64, 16 CPUs), Electron built with
-`electron-vite --mode e2e`, headless, 100 worktrees at lineage depth 99 with 100
-seeded agent rows, 10 s warmup and a 30 s sampling window.
+Measured on `main` at `077f5a11cd4` (macOS, arm64, 16 CPUs) against a headless
+Electron E2E build (build chain since removed), 100 worktrees at lineage depth 99
+with 100 seeded agent rows, 10 s warmup and a 30 s sampling window.
 
 Fixture scale is confirmed by the census rather than assumed: 100 store
 worktrees, 100 mounted cards, 100 mounted agent rows, and **9,279 store

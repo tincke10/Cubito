@@ -66,7 +66,7 @@ Validated so far:
 - The final Cloud change passed PR run `31564069382` and merged-`main` run `31564235724`, including
   the full monorepo build, lint, typecheck, tests, Terraform format, and Terraform validation.
 - The opt-in desktop staging harness now publishes a bearer share without retired audience fields;
-  Node typecheck and Playwright test discovery pass without starting Orca or a browser login flow.
+  Node typecheck passes without starting Orca or a browser login flow.
 - Local Node and web typechecks, changed-code quality gates, 94 skill-domain files with 770 tests
   passed and 3 skipped, 134 Orca Cloud API tests with one opt-in integration skip, the full Cloud
   monorepo test/typecheck/lint/build gates, and isolated Terraform formatting and validation.

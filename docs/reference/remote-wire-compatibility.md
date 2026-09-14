@@ -77,7 +77,7 @@ runtime capability the same way Rule 2 gates an opcode.
 
 ## Enforcement
 
-`tests/e2e/cross-version-wire/cross-version-terminal-wire.unit.test.ts` runs the real
+`tests/cross-version-wire/cross-version-terminal-wire.test.ts` runs the real
 host RPC methods and the real renderer multiplexer from two builds against each
 other — current working tree against the newest release tag, in both skew
 directions — over one scripted terminal journey (subscribe, input, hide/reveal
@@ -86,7 +86,7 @@ snapshot, drop, reconnect).
 Run it with:
 
 ```bash
-pnpm exec vitest run --config config/vitest.config.ts tests/e2e/cross-version-wire/cross-version-terminal-wire.unit.test.ts
+pnpm exec vitest run --config config/vitest.config.ts tests/cross-version-wire/cross-version-terminal-wire.test.ts
 ```
 
 It fails when a frame is refused by the receiving build's decoder (Rule 2), when the
@@ -95,7 +95,7 @@ negotiated capabilities differ from the contract. Adding an optional field keeps
 green (Rule 1); making a client depend on that field turns the new-client/old-host
 pairing red.
 
-`tests/e2e/cross-version-wire/cross-version-agent-session-wire.unit.test.ts` pairs the
+`tests/cross-version-wire/cross-version-agent-session-wire.test.ts` pairs the
 same two builds over the structured `agentSession.*` surface. Because a released build
 cannot name a capability string its own source never contains, the old side's advertised
 list and registered method names are read from the extracted checkout rather than
@@ -111,7 +111,7 @@ hand-written. It covers the three skews that surface can fail on:
 Run it with:
 
 ```bash
-pnpm exec vitest run --config config/vitest.config.ts tests/e2e/cross-version-wire/cross-version-agent-session-wire.unit.test.ts
+pnpm exec vitest run --config config/vitest.config.ts tests/cross-version-wire/cross-version-agent-session-wire.test.ts
 ```
 
 The harness covers the terminal stream and the structured agent-session surface. It does
