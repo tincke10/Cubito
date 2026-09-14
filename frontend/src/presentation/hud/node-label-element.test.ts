@@ -92,6 +92,14 @@ describe('createNodeLabel', () => {
     expect(calloutHintOf(handle).textContent).toBe('revisá el agente para continuar')
   })
 
+  it('centres the object on its own node, dropped LABEL_OFFSET_Y_PX below it (no -50% drift)', () => {
+    const handle = createNodeLabel(createFakeDocument())
+
+    expect(handle.object.center.x).toBe(0.5)
+    expect(handle.object.center.y).toBe(0)
+    expect(innerOf(handle).style.transform).toBe('translate(0, 26px)')
+  })
+
   it('dispose() removes the root', () => {
     const handle = createNodeLabel(createFakeDocument())
     let removed = false

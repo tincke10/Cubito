@@ -1,4 +1,5 @@
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
+import { LABEL_OFFSET_Y_PX } from './label-collision-model'
 import type { LabelTone, NodeLabelModel } from './node-label-model'
 
 /** Semantic tone → CSS custom property (kebab convention from theme/css-theme.ts's cssVarsFor). */
@@ -44,7 +45,7 @@ export function createNodeLabel(doc: Document = document): NodeLabelHandle {
   // object on screen, so the mockup's fixed +26px-below-shadow offset lives on an
   // inner wrapper instead — setting it on `root` would be clobbered each frame.
   const inner = doc.createElement('div')
-  inner.style.transform = 'translate(-50%, 26px)'
+  inner.style.transform = `translate(0, ${LABEL_OFFSET_Y_PX}px)`
   root.appendChild(inner)
 
   const primary = doc.createElement('div')
@@ -59,6 +60,10 @@ export function createNodeLabel(doc: Document = document): NodeLabelHandle {
   inner.appendChild(callout)
 
   const object = new CSS2DObject(root)
+  // Anchor top-centre, not the CSS2DObject default centre — the root already lands
+  // horizontally centred via translate(-50%, ...); centring again in `inner` was a
+  // double translate that drifted every label a full width to the left (design D1/F3).
+  object.center.set(0.5, 0)
 
   return {
     object,
