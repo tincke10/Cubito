@@ -112,6 +112,15 @@ describe('createDiffRail', () => {
     expect(selected).toEqual(['b.ts'])
   })
 
+  it('renders the origin badge span when originText is set', () => {
+    const rail = createDiffRail(createFakeDocument())
+    rail.apply([row({ path: 'a.ts', originText: 'sin commitear' }), row({ path: 'b.ts' })])
+    const [withOrigin, withoutOrigin] = rootOf(rail).children
+    expect(withOrigin!.children).toHaveLength(4)
+    expect(withOrigin!.children[3]!.textContent).toBe('sin commitear')
+    expect(withoutOrigin!.children).toHaveLength(3)
+  })
+
   it('renders the old-path hint for a renamed row, and nothing extra otherwise', () => {
     const rail = createDiffRail(createFakeDocument())
     rail.apply([

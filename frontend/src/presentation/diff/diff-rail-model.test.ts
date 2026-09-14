@@ -67,4 +67,42 @@ describe('diffRailViewModel', () => {
     const rows = diffRailViewModel([file({ path: 'a.ts' })], null)
     expect(rows[0]).not.toHaveProperty('oldPathText')
   })
+
+  it('tags a working-tree modified row "sin commitear"', () => {
+    const rows = diffRailViewModel(
+      [file({ path: 'a.ts', status: 'modified', origin: 'working' })],
+      null
+    )
+    expect(rows[0]!.originText).toBe('sin commitear')
+  })
+
+  it('tags an untracked row "naciendo"', () => {
+    const rows = diffRailViewModel(
+      [file({ path: 'a.ts', status: 'untracked', origin: 'working' })],
+      null
+    )
+    expect(rows[0]!.originText).toBe('naciendo')
+  })
+
+  it('leaves a branch-only row without an origin badge', () => {
+    const rows = diffRailViewModel(
+      [file({ path: 'a.ts', status: 'modified', origin: 'branch' })],
+      null
+    )
+    expect(rows[0]).not.toHaveProperty('originText')
+  })
+
+  it('adds diff-rail__row--wt to rows with a working-tree component, not to branch-only rows', () => {
+    const rows = diffRailViewModel(
+      [
+        file({ path: 'a.ts', status: 'modified', origin: 'working' }),
+        file({ path: 'b.ts', status: 'modified', origin: 'both' }),
+        file({ path: 'c.ts', status: 'modified', origin: 'branch' })
+      ],
+      null
+    )
+    expect(rows[0]!.cssClass).toContain('diff-rail__row--wt')
+    expect(rows[1]!.cssClass).toContain('diff-rail__row--wt')
+    expect(rows[2]!.cssClass).not.toContain('diff-rail__row--wt')
+  })
 })

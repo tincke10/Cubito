@@ -25,6 +25,12 @@ const buildRow = (
   rowElement.appendChild(path)
   rowElement.appendChild(added)
   rowElement.appendChild(removed)
+  if (row.originText !== undefined) {
+    const origin = doc.createElement('span')
+    origin.className = 'diff-rail__origin'
+    origin.textContent = row.originText
+    rowElement.appendChild(origin)
+  }
   if (row.oldPathText !== undefined) {
     const oldPath = doc.createElement('span')
     oldPath.className = 'diff-rail__old-path'
