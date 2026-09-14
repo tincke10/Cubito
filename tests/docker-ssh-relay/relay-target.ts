@@ -3,9 +3,10 @@ import { randomUUID } from 'node:crypto'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { getDockerSshRelayImage } from './docker-ssh-relay-image'
+import { getDockerSshRelayImage } from './relay-image'
 
-import type { TestInfo } from '@stablyai/playwright-test'
+// Only .workerIndex is used — a local stand-in for Playwright's TestInfo, which left with the suite.
+export type DockerRelayWorkerSlot = { workerIndex: number }
 
 export const DOCKER_SSH_RELAY_REMOTE_REPO_PATH = '/tmp/orca-docker-relay-perf-repo'
 export const DOCKER_SSH_PROXY_JUMP_REMOTE_REPO_PATH = '/tmp/orca-docker-proxy-jump-repo'
@@ -211,7 +212,7 @@ export function writeDockerSshRelayTargetFile(
   )
 }
 
-export function startDockerSshRelayTarget(testInfo: TestInfo): DockerSshRelayTarget {
+export function startDockerSshRelayTarget(testInfo: DockerRelayWorkerSlot): DockerSshRelayTarget {
   const host = process.env.ORCA_E2E_SSH_TARGET_HOST?.trim() || '127.0.0.1'
   if (host === 'localhost' || host === '::1' || host.startsWith('127.')) {
     if (process.env.ORCA_E2E_SSH_TARGET_HOST) {

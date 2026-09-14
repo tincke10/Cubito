@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { OrcaRuntimeService } from '../../src/main/runtime/orca-runtime'
+import { OrcaRuntimeService } from './orca-runtime'
 import type {
   RuntimeMobileSessionTabsResult,
   RuntimeMobileSessionTabsSnapshot
-} from '../../src/shared/runtime-types'
+} from '../../shared/runtime-types'
 
 const PTY_ID = 'pty-0'
 const WORKTREE_ID = 'workspace-0'

@@ -3,17 +3,17 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { Client } from 'ssh2'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import type { TestInfo } from '@stablyai/playwright-test'
 import type { SshConnection } from '../../src/main/ssh/ssh-connection'
 import type { SshProviderEpoch } from '../../src/shared/ssh-types'
-import { ensureDockerSshRelayImage } from './helpers/docker-ssh-relay-image'
+import { ensureDockerSshRelayImage } from './relay-image'
 import {
   cleanupDockerSshRelayTarget,
   execDockerSshRelayTargetCommand,
   shellQuote,
   startDockerSshRelayTarget,
+  type DockerRelayWorkerSlot,
   type DockerSshRelayTarget
-} from './helpers/docker-ssh-relay-target'
+} from './relay-target'
 import { resolveSshBrowserNetworkExecutionRoute } from '../../src/main/browser/ssh-browser-network-execution-route'
 
 const runDocker = process.env.ORCA_RUN_DOCKER_SSH_BROWSER_E2E === '1'
@@ -30,7 +30,7 @@ describe.runIf(runDocker)('SSH browser network execution route Docker journey', 
 
   beforeAll(async () => {
     ensureDockerSshRelayImage(process.cwd())
-    target = startDockerSshRelayTarget({ workerIndex: 0 } as TestInfo)
+    target = startDockerSshRelayTarget({ workerIndex: 0 } as DockerRelayWorkerSlot)
     execDockerSshRelayTargetCommand(
       target,
       "grep -q 'remote-only.internal' /etc/hosts || printf '127.0.0.1 remote-only.internal\\n' >> /etc/hosts"

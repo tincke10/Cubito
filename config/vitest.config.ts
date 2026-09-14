@@ -29,7 +29,9 @@ export default defineConfig({
       'config/scripts/**/*.test.ts',
       'config/scripts/**/*.test.mjs',
       'tests/tools/**/*.test.mjs',
-      'tests/e2e/**/*.unit.test.ts'
+      'tests/cross-version-wire/**/*.test.ts',
+      'tests/docker-ssh-relay/**/*.test.ts',
+      'tests/computer-use/**/*.test.ts'
     ],
     // Why: the full suite runs heavy TS transforms plus real git/http fixtures;
     // the Vitest 5s defaults are too tight for the slowest integration cases.

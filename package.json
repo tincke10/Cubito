@@ -80,7 +80,7 @@
     "rebuild:node": "pnpm rebuild node-pty",
     "build:icons": "bash resources/icon-source/generate.sh",
     "smoke:windows-pty-native-capability": "node tests/tools/windows-pty-native-capability-smoke/run.mjs",
-    "test:e2e:computer": "vitest run --config tests/e2e/vitest.config.ts",
+    "test:computer-use": "vitest run --config tests/computer-use/vitest.config.ts",
     "bench:macos-computer-helper-owner-loss": "node config/scripts/macos-computer-helper-owner-loss-benchmark.mjs",
     "bench:wsl-hook-relay-reattach": "pnpm run build:relay && node config/scripts/wsl-hook-relay-reattach-benchmark.mjs",
     "bench:wsl-git-shell": "node config/scripts/wsl-git-shell-benchmark.mjs",

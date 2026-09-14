@@ -8,8 +8,13 @@ import {
   scavengeReleaseCheckoutStaging
 } from './release-checkout-tree.ts'
 
-export const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..')
-const DEFAULT_CACHE_ROOT = join(REPO_ROOT, 'tests', 'e2e', '.cross-version-checkouts')
+export const REPO_ROOT = resolve(import.meta.dirname, '..', '..')
+const DEFAULT_CACHE_ROOT = join(
+  REPO_ROOT,
+  'tests',
+  'cross-version-wire',
+  '.cross-version-checkouts'
+)
 
 // Bump when extraction or the alias rewrite changes so cached trees are rebuilt.
 const CHECKOUT_FORMAT = 3

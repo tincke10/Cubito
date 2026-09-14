@@ -2,8 +2,8 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import {
   BROWSER_CLIENT_HOST_RUNTIME_CAPABILITY,
   BROWSER_NETWORK_TUNNEL_RUNTIME_CAPABILITY
-} from '../../../src/shared/protocol-version'
-import { BrowserTabCreateParams } from '../../../src/main/runtime/rpc/methods/browser-tab-create-schema'
+} from '../../src/shared/protocol-version'
+import { BrowserTabCreateParams } from '../../src/main/runtime/rpc/methods/browser-tab-create-schema'
 import {
   importReleaseCheckoutModule,
   materializeReleaseCheckout,

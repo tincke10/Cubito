@@ -12,11 +12,11 @@ import {
   killTextEdit,
   parseJsonOutput,
   runOrcaCli
-} from './helpers/computer-driver'
+} from './computer-driver'
 import {
   clickCapturedTextEditOpenDialog,
   doubleClickTextEditWord
-} from './helpers/computer-coordinate-click-driver'
+} from './computer-coordinate-click-driver'
 
 const isMac = process.platform === 'darwin'
 const e2eOptIn = process.env.ORCA_COMPUTER_E2E === '1'

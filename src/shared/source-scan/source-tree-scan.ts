@@ -7,7 +7,7 @@ import { join, relative } from 'node:path'
  * Why one copy: four guards had grown their own `collectSourceFiles` /
  * `isTestFile` / allowlist reader, and they had already drifted -- one skipped
  * dot-directories and three did not, which is how the WSL separator guard came
- * to scan `tests/e2e/.cross-version-checkouts/` and report 21 offenders that
+ * to scan `tests/cross-version-wire/.cross-version-checkouts/` and report 21 offenders that
  * were copies of shipped releases. A guard that can be wrong about what it
  * scanned is worse than no guard, because its count is the goalpost.
  */

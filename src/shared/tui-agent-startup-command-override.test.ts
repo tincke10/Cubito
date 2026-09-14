@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { WINDOWS_GIT_BASH_SHELL } from '../../../src/shared/windows-terminal-shell'
-import { buildFakeAgentCommandOverride } from './fake-agent-command-override'
+import { WINDOWS_GIT_BASH_SHELL } from './windows-terminal-shell'
+import { buildFakeAgentCommandOverride } from './tui-agent-startup-command-override'
 
 describe('buildFakeAgentCommandOverride', () => {
   it('invokes a quoted Windows command path through PowerShell', () => {

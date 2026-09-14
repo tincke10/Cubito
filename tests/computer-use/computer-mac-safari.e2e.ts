@@ -12,7 +12,7 @@ import {
   parseJsonOutput,
   runOrcaCli,
   type SafariDraftFixture
-} from './helpers/computer-driver'
+} from './computer-driver'
 
 const isMac = process.platform === 'darwin'
 const e2eOptIn = process.env.ORCA_COMPUTER_E2E === '1'

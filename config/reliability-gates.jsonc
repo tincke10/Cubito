@@ -3219,7 +3219,7 @@
         "pnpm exec vitest run --config config/vitest.config.ts src/main/browser/browser-client-network-route-registry.test.ts src/main/browser/paired-runtime-browser-client-host-composition.test.ts src/main/browser/paired-runtime-browser-client-host-registry.test.ts src/main/browser/paired-runtime-browser-client-host-runtime.test.ts src/main/browser/browser-client-page-command-executor.test.ts src/main/browser/browser-session-startup.test.ts src/main/ipc/runtime-environments-subscription-teardown.test.ts",
         "pnpm exec vitest run --config config/vitest.config.ts src/main/runtime/browser-host-command-ledger.test.ts src/main/runtime/browser-host-command-ledger-capacity.test.ts src/main/runtime/browser-host-lease-registry.test.ts src/main/runtime/rpc/methods/browser-client-host.test.ts",
         "pnpm exec vitest run --config config/vitest.config.ts src/main/runtime/browser-host-lease-registry.test.ts src/main/browser/browser-network-deferred-socket.test.ts src/main/browser/browser-network-execution-route.test.ts src/main/browser/paired-runtime-browser-network-route.test.ts src/main/runtime/rpc/methods/browser-network-tunnel.test.ts src/main/browser/ssh-browser-network-execution-route.test.ts src/main/browser/system-ssh-socks-client-socket.test.ts src/main/ssh/system-ssh-dynamic-forward-process.test.ts src/shared/browser-client-host-protocol.test.ts src/shared/browser-network-capabilities.test.ts src/main/ssh/system-ssh-forward-process.test.ts src/main/ssh/ssh-system-fallback.test.ts src/main/ssh/ssh-port-forward.test.ts",
-        "ORCA_RUN_DOCKER_SSH_BROWSER_E2E=1 pnpm exec vitest run --config config/vitest.config.ts tests/e2e/ssh-browser-network-execution-route.docker.unit.test.ts"
+        "ORCA_RUN_DOCKER_SSH_BROWSER_E2E=1 pnpm exec vitest run --config config/vitest.config.ts tests/docker-ssh-relay/ssh-browser-network-execution-route.test.ts"
       ],
       "testFiles": [
         "src/main/browser/browser-route-webcontents-registry.test.ts",
@@ -3283,7 +3283,7 @@
         "src/shared/remote-runtime-client.test.ts",
         "src/shared/remote-runtime-subscription-request.test.ts",
         "src/shared/ws-outbound-backpressure-queue.test.ts",
-        "tests/e2e/ssh-browser-network-execution-route.docker.unit.test.ts"
+        "tests/docker-ssh-relay/ssh-browser-network-execution-route.test.ts"
       ],
       "assertionRefs": [
         {
@@ -3773,7 +3773,7 @@
           ]
         },
         {
-          "file": "tests/e2e/ssh-browser-network-execution-route.docker.unit.test.ts",
+          "file": "tests/docker-ssh-relay/ssh-browser-network-execution-route.test.ts",
           "assertions": [
             "an ephemeral sshd resolves a container-only domain and returns a unique HTTP marker",
             "the real ssh2 forwardOut receives that exact domain and provider loss fences the route",
@@ -3939,7 +3939,7 @@
           "date": "2026-08-14",
           "runner": "local",
           "platform": "macos",
-          "command": "ORCA_RUN_DOCKER_SSH_BROWSER_E2E=1 pnpm exec vitest run --config config/vitest.config.ts tests/e2e/ssh-browser-network-execution-route.docker.unit.test.ts",
+          "command": "ORCA_RUN_DOCKER_SSH_BROWSER_E2E=1 pnpm exec vitest run --config config/vitest.config.ts tests/docker-ssh-relay/ssh-browser-network-execution-route.test.ts",
           "result": "passed",
           "durationSeconds": 1.3,
           "summary": "Two tests passed: an ephemeral Linux sshd resolved remote-only.internal and returned the sta-4150-remote-only HTTP marker over real ssh2 forwardOut and one real system-OpenSSH dynamic forward; the ssh2 route also fenced on authority invalidation."
@@ -4493,11 +4493,11 @@
         "pnpm exec playwright test tests/e2e/paired-client-hosted-browser.spec.ts --config tests/playwright.config.ts --project electron-headless --workers=1",
         "pnpm exec vitest run --config config/vitest.config.ts src/main/runtime/orca-runtime-browser-client-hosted.test.ts src/main/runtime/runtime-browser-client-page-creation.test.ts src/main/runtime/browser-host-page-reconciliation-orchestration.test.ts src/main/runtime/browser-host-command-ledger.test.ts",
         "pnpm exec vitest run --config config/vitest.config.ts src/shared/browser-client-host-protocol.test.ts src/shared/remote-runtime-client.test.ts src/main/runtime/browser-host-capability-selection.test.ts src/main/runtime/rpc/methods/browser-tab-create-schema.test.ts src/main/ipc/runtime-environment-browser-client-host-handler.test.ts",
-        "pnpm exec vitest run --config config/vitest.config.ts tests/e2e/cross-version-wire/cross-version-browser-placement.unit.test.ts",
+        "pnpm exec vitest run --config config/vitest.config.ts tests/cross-version-wire/cross-version-browser-placement.test.ts",
         "SKIP_BUILD=1 ORCA_CROSS_VERSION_PACKAGED_EXECUTABLE=/Applications/Orca.app/Contents/MacOS/Orca pnpm exec playwright test tests/e2e/packaged-mixed-version-browser-placement.spec.ts --config tests/playwright.config.ts --project electron-headless --workers=1",
         "pnpm exec vitest run --config config/vitest.config.ts src/main/runtime/browser-network-tunnel-paired-runtime.integration.test.ts src/main/browser/paired-runtime-browser-network-route.test.ts src/main/browser/browser-network-execution-route.test.ts src/main/browser/wsl-browser-network-execution-route.test.ts src/main/browser/wsl-browser-network-relay-launch.test.ts src/main/runtime/runtime-browser-network-execution-host.test.ts",
         "pnpm exec vitest run --config config/vitest.config.ts src/main/browser/browser-screencast-lifecycle.test.ts src/main/browser/browser-screencast-stream.test.ts src/main/runtime/orca-runtime-browser-screencast-fanout.test.ts",
-        "ORCA_RUN_DOCKER_SSH_BROWSER_E2E=1 pnpm exec vitest run --config config/vitest.config.ts tests/e2e/ssh-browser-network-execution-route.docker.unit.test.ts",
+        "ORCA_RUN_DOCKER_SSH_BROWSER_E2E=1 pnpm exec vitest run --config config/vitest.config.ts tests/docker-ssh-relay/ssh-browser-network-execution-route.test.ts",
         "Manual iOS 26.5 simulator: pair current mobile code to packaged Orca 1.4.184; create Browser; navigate to https://example.com; require one visible Example Domain tab on the server-hosted surface"
       ],
       "testFiles": [
@@ -4511,7 +4511,7 @@
         "src/main/runtime/browser-host-capability-selection.test.ts",
         "src/main/runtime/rpc/methods/browser-tab-create-schema.test.ts",
         "src/main/ipc/runtime-environment-browser-client-host-handler.test.ts",
-        "tests/e2e/cross-version-wire/cross-version-browser-placement.unit.test.ts",
+        "tests/cross-version-wire/cross-version-browser-placement.test.ts",
         "tests/e2e/packaged-mixed-version-browser-placement.spec.ts",
         "src/main/runtime/browser-network-tunnel-paired-runtime.integration.test.ts",
         "src/main/browser/paired-runtime-browser-network-route.test.ts",
@@ -4522,7 +4522,7 @@
         "src/main/browser/browser-screencast-lifecycle.test.ts",
         "src/main/browser/browser-screencast-stream.test.ts",
         "src/main/runtime/orca-runtime-browser-screencast-fanout.test.ts",
-        "tests/e2e/ssh-browser-network-execution-route.docker.unit.test.ts"
+        "tests/docker-ssh-relay/ssh-browser-network-execution-route.test.ts"
       ],
       "assertionRefs": [
         {
@@ -4534,7 +4534,7 @@
           ]
         },
         {
-          "file": "tests/e2e/cross-version-wire/cross-version-browser-placement.unit.test.ts",
+          "file": "tests/cross-version-wire/cross-version-browser-placement.test.ts",
           "assertions": [
             "a real stable release has no client-host or browser-tunnel capability constants",
             "the old server schema strips additive placement without changing legacy fields",
@@ -4557,7 +4557,7 @@
           ]
         },
         {
-          "file": "tests/e2e/ssh-browser-network-execution-route.docker.unit.test.ts",
+          "file": "tests/docker-ssh-relay/ssh-browser-network-execution-route.test.ts",
           "assertions": [
             "ssh2 and system OpenSSH resolve a container-only domain and localhost on the execution host"
           ]
@@ -4584,7 +4584,7 @@
           "date": "2026-08-16",
           "runner": "local",
           "platform": "macos",
-          "command": "pnpm exec vitest run --config config/vitest.config.ts tests/e2e/cross-version-wire/cross-version-browser-placement.unit.test.ts",
+          "command": "pnpm exec vitest run --config config/vitest.config.ts tests/cross-version-wire/cross-version-browser-placement.test.ts",
           "result": "passed",
           "durationSeconds": 0.23,
           "summary": "Three assertions passed against published v1.4.182 and the current tree: the release lacks the negotiated capabilities, strips additive placement without changing legacy fields, and the current server preserves an old request with omitted placement."
@@ -4602,7 +4602,7 @@
           "date": "2026-08-16",
           "runner": "local",
           "platform": "macos",
-          "command": "ORCA_RUN_DOCKER_SSH_BROWSER_E2E=1 pnpm exec vitest run --config config/vitest.config.ts tests/e2e/ssh-browser-network-execution-route.docker.unit.test.ts",
+          "command": "ORCA_RUN_DOCKER_SSH_BROWSER_E2E=1 pnpm exec vitest run --config config/vitest.config.ts tests/docker-ssh-relay/ssh-browser-network-execution-route.test.ts",
           "result": "passed",
           "durationSeconds": 3.31,
           "summary": "Two real Docker/OpenSSH routes resolved and loaded a container-only HTTP target through ssh2 and system SSH."
@@ -4997,7 +4997,7 @@
       "oracle": "Run one fixed child-TUI journey for normal exit and cleanup-free SIGKILL. Assert renderer and host normal-buffer/non-mouse state, host snapshot terminalOwner metadata, exact PTY writes with no post-exit mouse report, unrelated-pane survival, post-boundary prompt output preserved (normal exit), ordered proof invalidation, bounded settlement and bail-out flush, one inspection per unclean episode with zero scans for ordinary output, split-escape safety at every chunk boundary, and old/new client-host fallback parity.",
       "commands": [
         "pnpm exec vitest run --config config/vitest.config.ts src/main/daemon/terminal-shell-lifecycle-scanner.test.ts src/main/daemon/terminal-shell-recovery-barrier.test.ts src/main/daemon/session-shell-recovery.test.ts src/main/daemon/session.test.ts src/main/daemon/terminal-host-concurrent-create.test.ts src/main/daemon/daemon-pty-adapter.test.ts src/main/daemon/daemon-restore-scrollback-depth.test.ts src/main/daemon/terminal-checkpoint-serializer.test.ts src/main/providers/agent-foreground-process.test.ts src/main/runtime/orca-runtime.test.ts src/main/runtime/mobile-subscribe-integration.test.ts src/main/runtime/rpc/terminal-multiplex-escape-tail.test.ts --reporter=dot",
-        "pnpm exec vitest run --config config/vitest.config.ts tests/e2e/cross-version-wire/cross-version-terminal-wire.unit.test.ts --reporter=dot",
+        "pnpm exec vitest run --config config/vitest.config.ts tests/cross-version-wire/cross-version-terminal-wire.test.ts --reporter=dot",
         "pnpm exec electron-vite build --mode e2e",
         "SKIP_BUILD=1 pnpm exec playwright test tests/e2e/terminal-hidden-child-tui-kill-mode-reset.spec.ts --config tests/playwright.config.ts --project electron-headless --workers=1"
       ],
@@ -5014,7 +5014,7 @@
         "src/main/runtime/orca-runtime.test.ts",
         "src/main/runtime/mobile-subscribe-integration.test.ts",
         "src/main/runtime/rpc/terminal-multiplex-escape-tail.test.ts",
-        "tests/e2e/cross-version-wire/cross-version-terminal-wire.unit.test.ts",
+        "tests/cross-version-wire/cross-version-terminal-wire.test.ts",
         "tests/e2e/terminal-hidden-child-tui-kill-mode-reset.spec.ts"
       ],
       "assertionRefs": [
@@ -7732,7 +7732,7 @@
       "invariant": "A host advertising terminal.paired-parking.v1 keeps the PTY and bounded authoritative history alive while an ordinary hidden-view park destroys the client xterm and releases its raw per-PTY stream. Reveal must restore up to the requested 5,000 rows, parked-time side effects/output, the same PTY identity, and continued input/output. Parked watcher synchronization compares parking semantics rather than fresh object identity, owns setup and cleanup across StrictMode replay, reconciles real PTY/layout changes, and performs no terminal-state scan when nothing is parked. After a host main-process relaunch, unknown local delivery-sync state must not be treated as proof that a surviving daemon PTY is already foregrounded. An empty headed session-tab inventory is authoritative only after the current renderer graph generation publishes a complete inventory and every execution host answers the PTY census; unpublished, resync-pending, transport-failed, and partially scoped inventories remain unverifiable, while genuinely authoritative empty and non-empty inventories settle and a scope-less legacy empty keeps its pre-authority best-effort settle so outdated hosts retain agent auto-resume. The unpublished-empty regression must keep the resume dispatch parked with exactly one daemon process/writer; restoring unconditional empty hydration must release one dispatch and create two live writers. If subscription precedes provider readiness, authoritative inventory must reconsider that existing subscriber without spawning, resizing, or changing reconnect state. A snapshot without an output high-water must keep it unknown rather than borrowing a layout version that can suppress newer live output. Hosts without the capability must gate hidden raw output before xterm scheduling and repaint from the authoritative snapshot on reveal while retaining the existing limit/TTL force-parking fallback. After the first semantic title state, decorative spinner frequency must add zero paired client-event frames and zero full session-tabs work between status-freshness leases regardless of hidden worktree count. Continuous working or permission evidence may refresh each affected worktree once per 15 minutes through one globally spaced FIFO so current and legacy viewers do not decay before 30 minutes; sibling PTYs share that worktree refresh, while local title animation, raw output, and semantic title, status, bell, completion, and query facts remain intact. A paired terminal stream whose delivery credits stop progressing must replace only that stream; command silence first probes authoritative state and replaces the stream if the probe times out or proves the PTY advanced beyond the client's delivered output sequence. When no comparable delivery high-water exists, the first sequenced probe establishes a baseline and only later advancement proves staleness. A same-sequence snapshot remains valid proof of a responsive silent command. A successful status probe may replace a pre-ready shared-control socket without rejecting or duplicating calls already waiting for that transport. Manual disconnect must retain pairing while preventing queued or passive calls and subscriptions from recreating transport until explicit Connect.",
       "oracle": "Run one byte-identical six-terminal oracle against an isolated headed desktop host and an isolated headless `orca serve` host. Stage at least 1,000,000 xterm cells, hide all six warm managers, emit an initial working title followed by 30 timed real-PTY spinner frames and a final idle title per worktree, and observe a second real session-tabs subscription plus the production renderer store. Require exactly two transport envelopes and two title mutations per worktree, no decorative title crossing either boundary, and positive decoded-envelope bytes. Enable ordinary parking with the lossy retention budget disabled, require exactly one mounted manager and five parked tabs, at most 45% retained cells, no more than 16 MiB heap growth, and under 500 ms timer drift. In headed mode, require the host renderer to remain on its original workspace with zero target terminal managers mounted throughout client park, reveal, and live I/O. While a tab is parked, require authoritative terminal.read to observe new PTY output; reveal it and require the original PTY, a marker within the requested 5,000-row history, the parked marker, and post-reveal input/output. Drive 24 real PTY title trackers in distinct worktrees through 40 decorative spinner frames each, then 40 spinner frames alternating with Cursor's bare native identity redraw, using fake clocks. Require all 2,880 raw chunks exactly and zero host session-tabs publications, serialized bytes, renderer apply calls, and renderer store mutations. Continue decorative evidence beyond 30 minutes, require exactly one refresh per worktree per 15-minute lease through a FIFO spaced by at least 50 ms, and require all 24 viewer statuses to remain working and fresh; then require one exact semantic idle transition and one visible-output chunk per PTY. Require ordinary and interior-Braille title changes to publish. Drive 64 host PTYs through ten 80 ms synthetic title frames, require zero paired client events after the first frame per PTY while all 640 local frames remain observable, attach a late client and require one current frame per PTY, then require semantic bell and idle transitions on both clients. Reconstruct a legacy subscribed stream with no outputPause capability, hide a chatty pane, require no hidden xterm writes, reveal it, and require one authoritative snapshot plus continued live output. Drop and acknowledge output only for one original paired-client stream, prove the fixture process consumed input while the host model advanced and the client stayed stale, then require the command snapshot probe to replace that stream, repaint exact fixture output, preserve authoritative PTY identity and target-tab cardinality, and resume live I/O. For a client without a delivered sequence, require the first numeric probe to establish a baseline without replacement, a same-sequence probe to remain attached, and a later advanced probe to replace only that stream. Withhold the first encrypted shared-control ready frame, start one RPC, trigger a status-probe refresh, and require two connections, one host delivery, successful response, and zero retained request bytes. Admit 128 active streams, reject the 129th as retryable, release one stream, then require the retry to attach and publish a snapshot without multiplying retained subscribers. Disable terminal.paired-parking.v1 and require the same oracle to fail before parking, while the legacy limit-one fallback separately passes. Also preserve truncated first paint, ACK-starved same-PTY recovery, responsive silent-command snapshot probes, dead-stream probe timeout recovery, and queued manual-disconnect fencing.",
       "commands": [
-        "pnpm exec vitest run --config config/vitest.config.ts src/main/runtime/mobile-session-tabs-agent-status-heartbeat.test.ts src/main/runtime/orca-runtime-hook-agent-status-projection.test.ts tests/e2e/session-tabs-rich-status-boundaries.unit.test.ts --maxWorkers=1",
+        "pnpm exec vitest run --config config/vitest.config.ts src/main/runtime/mobile-session-tabs-agent-status-heartbeat.test.ts src/main/runtime/orca-runtime-hook-agent-status-projection.test.ts src/main/runtime/session-tabs-rich-status-boundaries.test.ts --maxWorkers=1",
         "pnpm exec vitest run --config config/vitest.config.ts --maxWorkers=1",
         "pnpm exec vitest run --config config/vitest.config.ts src/main/runtime/orca-runtime.test.ts src/main/runtime/rpc/terminal-multiplex-initial-snapshot-buffering.test.ts src/main/runtime/rpc/terminal-multiplex-snapshot-serialization.test.ts src/main/runtime/rpc/terminal-multiplex-pty-wait-capacity.test.ts src/main/runtime/rpc/terminal-subscribe-buffer.test.ts src/main/ipc/runtime-environments-pairing.test.ts",
         "pnpm exec vitest run --config config/vitest.config.ts src/main/runtime/terminal-subscriber-driven-daemon-attach.test.ts",
@@ -7755,7 +7755,7 @@
       "testFiles": [
         "src/main/runtime/mobile-session-tabs-agent-status-heartbeat.test.ts",
         "src/main/runtime/orca-runtime-hook-agent-status-projection.test.ts",
-        "tests/e2e/session-tabs-rich-status-boundaries.unit.test.ts",
+        "src/main/runtime/session-tabs-rich-status-boundaries.test.ts",
         "src/main/runtime/orca-runtime.test.ts",
         "src/main/ipc/runtime-environments-pairing.test.ts",
         "src/main/runtime/rpc/terminal-multiplex-initial-snapshot-buffering.test.ts",
@@ -7796,7 +7796,7 @@
           ]
         },
         {
-          "file": "tests/e2e/session-tabs-rich-status-boundaries.unit.test.ts",
+          "file": "src/main/runtime/session-tabs-rich-status-boundaries.test.ts",
           "assertions": [
             "pending renderer, retained OSC, and live-hook questions survive the shell title that currently obscures them",
             "a new working interval, provider generation, or identity owner strips the prior question"
@@ -7951,7 +7951,7 @@
           "date": "2026-08-10",
           "runner": "local",
           "platform": "macos",
-          "command": "pnpm exec vitest run --config config/vitest.config.ts src/main/runtime/mobile-session-tabs-agent-status-heartbeat.test.ts src/main/runtime/orca-runtime-hook-agent-status-projection.test.ts tests/e2e/session-tabs-rich-status-boundaries.unit.test.ts --maxWorkers=1",
+          "command": "pnpm exec vitest run --config config/vitest.config.ts src/main/runtime/mobile-session-tabs-agent-status-heartbeat.test.ts src/main/runtime/orca-runtime-hook-agent-status-projection.test.ts src/main/runtime/session-tabs-rich-status-boundaries.test.ts --maxWorkers=1",
           "result": "passed",
           "durationSeconds": 5.62,
           "summary": "Forty-two deterministic contracts passed. The real-PTY cross-boundary contract delivered all 2,880 decorative spinner and bare-native redraw chunks with zero hot-path host publications, serialized bytes, renderer applies, or store mutations; continued past 30 minutes with one globally spaced freshness refresh per worktree every 15 minutes; kept all 24 mirrored statuses working; and preserved stable stateStartedAt. Exact-identical Pi and rotating normalized Pi/Grok frames renewed renderer-authored and retained-hook status without changing acknowledgement semantics. Rich status could not cross task completion, permission, provider-generation, or identity-owner boundaries, while neutral titles preserved same-task prompt and acknowledgement identity until authoritative shell evidence. Fresh renderer, retained OSC, and live-hook questions remained visible under the current shell title, but a later working interval, identity-only owner title, or provider generation stripped them; inherited tools and stale, resume-only, restored, or prior-interval questions stayed suppressed. After each rich source's original lease expired, title evidence kept only coarse working state and provider identity fresh while dropping unverifiable prompts. Unknown foreground ownership held publications at zero until resolution, then resumed the bounded heartbeat; tracked terminal state reset removed its delayed marker. The focused heartbeat contracts proved worktree deduplication, FIFO fairness, semantic bypass, PTY-source teardown, and timer cleanup. Causal-disable controls made ownership, teardown, retained source-switch, renderer rich-TTL, completion-transition, boundary-ordering, and live-question oracles fail; restoring the production corrections returned green."
@@ -14593,14 +14593,14 @@
       "invariant": "A client and a server built from different releases must complete subscribe, input delivery to the process, hide/reveal buffer snapshot, transport drop, and resubscribe with no frame refused by the receiving build's decoder, the same negotiated capabilities, and the same published snapshot content — so a new optional field stays safe, a new opcode is only sent after negotiation, and a change in what the host publishes is visible before release.",
       "oracle": "Run one fixed journey per pairing (old client/new server, new client/old server, and current/current as control) and assert the recorded step list, the exact named frame sequence, both subscribed events with their negotiated capabilities, the exact input texts the host wrote to the PTY before and after reconnect, the rendered snapshot and live-output content, and an empty set of decoder-rejected frames in either direction. Missing host runtime methods are reported by name so a harness gap can never be read as a wire incompatibility.",
       "commands": [
-        "pnpm exec vitest run --config config/vitest.config.ts tests/e2e/cross-version-wire/cross-version-terminal-wire.unit.test.ts"
+        "pnpm exec vitest run --config config/vitest.config.ts tests/cross-version-wire/cross-version-terminal-wire.test.ts"
       ],
       "testFiles": [
-        "tests/e2e/cross-version-wire/cross-version-terminal-wire.unit.test.ts"
+        "tests/cross-version-wire/cross-version-terminal-wire.test.ts"
       ],
       "assertionRefs": [
         {
-          "file": "tests/e2e/cross-version-wire/cross-version-terminal-wire.unit.test.ts",
+          "file": "tests/cross-version-wire/cross-version-terminal-wire.test.ts",
           "assertions": [
             "expect(record.completed).toEqual([...JOURNEY_STEPS])",
             "expect(record.frameSequence).toEqual(EXPECTED_JOURNEY_FRAMES)",
@@ -14616,7 +14616,7 @@
           "runner": "local",
           "platform": "macos",
           "result": "passed",
-          "command": "pnpm exec vitest run --config config/vitest.config.ts tests/e2e/cross-version-wire/cross-version-terminal-wire.unit.test.ts",
+          "command": "pnpm exec vitest run --config config/vitest.config.ts tests/cross-version-wire/cross-version-terminal-wire.test.ts",
           "durationSeconds": 6,
           "summary": "v1.4.169 against working tree c4d5a535f2; all three pairings produced the identical 16-frame journey with zero rejected frames."
         }

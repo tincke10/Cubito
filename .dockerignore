@@ -3,5 +3,5 @@ frontend/node_modules
 out
 frontend/dist
 .git
-tests/e2e/.cross-version-checkouts
+tests/cross-version-wire/.cross-version-checkouts
 *.log

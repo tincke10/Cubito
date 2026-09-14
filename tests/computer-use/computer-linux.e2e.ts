@@ -7,7 +7,7 @@ import {
   killGedit,
   parseJsonOutput,
   runOrcaCli
-} from './helpers/computer-driver'
+} from './computer-driver'
 
 const isLinux = process.platform === 'linux'
 const e2eOptIn = process.env.ORCA_COMPUTER_E2E === '1'

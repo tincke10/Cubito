@@ -14,8 +14,8 @@ import { tmpdir } from 'node:os'
 import { join, relative } from 'node:path'
 import { lock } from 'proper-lockfile'
 import { afterEach, describe, expect, it } from 'vitest'
-import { forceTerminateProcessTree } from '../../../src/shared/child-process/process-tree-termination'
-import { spawnProcess } from '../../../src/shared/child-process/run-process'
+import { forceTerminateProcessTree } from '../../src/shared/child-process/process-tree-termination'
+import { spawnProcess } from '../../src/shared/child-process/run-process'
 import {
   importReleaseCheckoutModule,
   materializeReleaseCheckout,

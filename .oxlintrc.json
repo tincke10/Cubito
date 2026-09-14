@@ -164,7 +164,7 @@
     "**/node_modules",
     "**/dist",
     "**/out",
-    "tests/e2e/.cross-version-checkouts",
+    "tests/cross-version-wire/.cross-version-checkouts",
     "config/docker/cubito/demo-repo"
   ]
 }

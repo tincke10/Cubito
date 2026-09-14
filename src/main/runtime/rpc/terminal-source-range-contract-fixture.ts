@@ -1,5 +1,5 @@
-import type { TerminalOutputSourceRange } from '../../../src/shared/terminal-output-source-range'
-import { TerminalSourceRangeLedger } from '../../../src/main/runtime/rpc/terminal-source-range-ledger'
+import type { TerminalOutputSourceRange } from '../../../shared/terminal-output-source-range'
+import { TerminalSourceRangeLedger } from './terminal-source-range-ledger'
 
 export type RemoteTerminalContractTopology = 'headed-desktop-server' | 'headless-serve'
 

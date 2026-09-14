@@ -30,7 +30,7 @@ function hashDockerFixtureDirectory(fixtureDir: string): string {
 }
 
 function fixtureImage(root: string): string {
-  const fixtureDir = path.join(root, 'tests', 'e2e', 'fixtures', 'docker-ssh-relay')
+  const fixtureDir = path.join(root, 'tests', 'docker-ssh-relay')
   const digest = hashDockerFixtureDirectory(fixtureDir)
   return `orca-e2e-ssh-relay:${digest}`
 }
@@ -43,7 +43,7 @@ export function prepareDockerSshRelayImage(root: string): void {
   if (process.env.ORCA_E2E_SSH_DOCKER_IMAGE) {
     return
   }
-  const fixtureDir = path.join(root, 'tests', 'e2e', 'fixtures', 'docker-ssh-relay')
+  const fixtureDir = path.join(root, 'tests', 'docker-ssh-relay')
   const image = fixtureImage(root)
   execFileSync(
     'docker',

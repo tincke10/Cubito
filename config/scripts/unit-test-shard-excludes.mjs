@@ -54,7 +54,7 @@ export const UNIT_TEST_SHARD_EXCLUDES = [
     why: 'depends on the host PATH/shell environment'
   },
   {
-    path: 'tests/e2e/cross-version-wire/**',
+    path: 'tests/cross-version-wire/**',
     why: 'long-running cross-version checkout fixtures, run separately'
   }
 ]

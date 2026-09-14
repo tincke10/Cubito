@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import type { TerminalOutputSourceRange } from '../../../src/shared/terminal-output-source-range'
+import type { TerminalOutputSourceRange } from '../../../shared/terminal-output-source-range'
 import {
   createRemoteTerminalSourceRangeContractFixture,
   type RemoteTerminalContractTopology
-} from './remote-terminal-source-range-contract-fixture'
+} from './terminal-source-range-contract-fixture'
 
 function sourceRange(): TerminalOutputSourceRange {
   return {

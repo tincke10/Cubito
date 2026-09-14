@@ -6,7 +6,7 @@ import {
   parseJsonOutput,
   runOrcaCli,
   stopOrcaRuntime
-} from './helpers/computer-driver'
+} from './computer-driver'
 
 const isWindows = process.platform === 'win32'
 const e2eOptIn = process.env.ORCA_COMPUTER_E2E === '1'
