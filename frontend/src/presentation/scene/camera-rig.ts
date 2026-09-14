@@ -12,6 +12,7 @@ export type CameraRig = {
   currentPose(): CameraPose
   tick(elapsedSeconds: number): void
   setAspect(aspect: number): void
+  currentAspect(): number
   isPointInView(point: Vec3, margin: number): boolean
   dispose(): void
 }
@@ -100,6 +101,7 @@ export function createCameraRig(
       camera.aspect = aspect
       camera.updateProjectionMatrix()
     },
+    currentAspect: () => camera.aspect,
     isPointInView(target, margin) {
       camera.updateMatrixWorld()
       projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)

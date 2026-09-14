@@ -196,4 +196,15 @@ describe('createCameraRig', () => {
     expect(rig.isPointInView(justOutside, 0)).toBe(false)
     expect(rig.isPointInView(justOutside, 2)).toBe(true)
   })
+
+  it('currentAspect() returns the camera aspect and follows setAspect()', () => {
+    const { camera, controls } = setupRig()
+    const rig = createCameraRig(camera, controls)
+
+    expect(rig.currentAspect()).toBe(camera.aspect)
+
+    rig.setAspect(1.77)
+
+    expect(rig.currentAspect()).toBe(1.77)
+  })
 })

@@ -14,9 +14,19 @@ export type HeightPreset = { position: Vec3; lookAt: Vec3; fov: number; duration
 const PRESETS: Record<CameraHeight, HeightPreset> = CAMERA_HEIGHT_PRESETS
 
 export const heightDurationMs = (height: CameraHeight): number => PRESETS[height].durationMs
+/** A preset's vertical fov — so COMPARAR_FOV is never a literal 44 outside this table. */
+export const heightFov = (height: CameraHeight): number => PRESETS[height].fov
 
 const toGround = (point: Vec3): Vec3 => ({ x: point.x, y: 0, z: point.z })
 const add = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z })
+const sub = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z })
+const normalize = (v: Vec3): Vec3 => {
+  const length = Math.sqrt(v.x ** 2 + v.y ** 2 + v.z ** 2)
+  return { x: v.x / length, y: v.y / length, z: v.z / length }
+}
+/** Viewing direction of a preset, derived from itself so a retune stays self-consistent. */
+const viewDirectionOf = (preset: HeightPreset): Vec3 =>
+  normalize(sub(preset.position, preset.lookAt))
 
 /** foco uses `selection ?? anchor` (D6) — a working/waiting elevation bump must not move the
  *  camera, so the anchor's y is always forced to 0 before the preset offset is added. */
@@ -32,30 +42,31 @@ export const poseForHeight = (
 
 /** Viewing direction shared by every extent-derived pose (design D3): derived from the isla
  *  preset itself, so a retune of isla stays self-consistent. */
-export const ISLA_VIEW_DIRECTION: Vec3 = (() => {
-  const offset: Vec3 = {
-    x: PRESETS.isla.position.x - PRESETS.isla.lookAt.x,
-    y: PRESETS.isla.position.y - PRESETS.isla.lookAt.y,
-    z: PRESETS.isla.position.z - PRESETS.isla.lookAt.z
-  }
-  const length = Math.sqrt(offset.x ** 2 + offset.y ** 2 + offset.z ** 2)
-  return { x: offset.x / length, y: offset.y / length, z: offset.z / length }
-})()
+export const ISLA_VIEW_DIRECTION: Vec3 = viewDirectionOf(PRESETS.isla)
+/** normalize(position − lookAt) = (0, 0.2001, 0.9798), polar 78.45° (design C6/D2) — the
+ *  comparar preset's OWN direction, kept unchanged while its distance becomes extent-derived. */
+export const COMPARAR_VIEW_DIRECTION: Vec3 = viewDirectionOf(PRESETS.comparar)
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value))
 
-export const poseForExtent = (framing: CameraFraming, fov: number): CameraPose => {
-  const distance = clamp(
-    framing.radius / Math.sin((fov / 2) * DEG_TO_RAD),
-    MIN_DOLLY_DISTANCE,
-    MAX_DOLLY_DISTANCE
-  )
+/** `aspect` < 1 makes the HORIZONTAL field the binding one, so fitting on the vertical fov
+ *  alone under-fits a narrowed canvas (design C7). `aspect = 1` reproduces today's math
+ *  exactly, so the three existing call sites are untouched. */
+export const poseForExtent = (
+  framing: CameraFraming,
+  fov: number,
+  aspect = 1,
+  direction: Vec3 = ISLA_VIEW_DIRECTION
+): CameraPose => {
+  const halfV = (fov / 2) * DEG_TO_RAD
+  const half = aspect >= 1 ? halfV : Math.atan(Math.tan(halfV) * aspect)
+  const distance = clamp(framing.radius / Math.sin(half), MIN_DOLLY_DISTANCE, MAX_DOLLY_DISTANCE)
   return {
     position: {
-      x: framing.target.x + distance * ISLA_VIEW_DIRECTION.x,
-      y: framing.target.y + distance * ISLA_VIEW_DIRECTION.y,
-      z: framing.target.z + distance * ISLA_VIEW_DIRECTION.z
+      x: framing.target.x + distance * direction.x,
+      y: framing.target.y + distance * direction.y,
+      z: framing.target.z + distance * direction.z
     },
     lookAt: framing.target,
     fov
