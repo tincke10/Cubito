@@ -292,6 +292,56 @@ describe('syncWorktreeGraph', () => {
     })
   })
 
+  describe('island-focus regression (run-2: ⌘P add then refetch)', () => {
+    it('lands the ring on the new island main once the added repo reaches the graph (proven RED)', async () => {
+      const store = createSceneStore()
+      const demo: RawWorktreeRecord[] = [
+        {
+          id: 'demo::/master',
+          branch: 'refs/heads/master',
+          parentWorktreeId: null,
+          childWorktreeIds: [],
+          workspaceStatus: 'in-progress',
+          git: { path: '/master', isMainWorktree: true }
+        }
+      ]
+      await syncWorktreeGraph(
+        fakeGateway(
+          async () => demo,
+          async () => [{ id: 'demo', path: '/demo', displayName: 'demo', kind: 'git' }]
+        ),
+        store,
+        () => 1
+      )
+      expect(store.get().selection.selectedId).toBe('demo::/master')
+
+      store.dispatchRepos({ type: 'set-active', repoId: 'play' })
+      expect(store.get().selection.selectedId).not.toBe('demo::/master')
+
+      const playMain: RawWorktreeRecord = {
+        id: 'play::/main',
+        branch: 'refs/heads/main',
+        parentWorktreeId: null,
+        childWorktreeIds: [],
+        workspaceStatus: 'in-progress',
+        git: { path: '/main', isMainWorktree: true }
+      }
+      await syncWorktreeGraph(
+        fakeGateway(
+          async () => [...demo, playMain],
+          async () => [
+            { id: 'demo', path: '/demo', displayName: 'demo', kind: 'git' },
+            { id: 'play', path: '/play', displayName: 'play', kind: 'git' }
+          ]
+        ),
+        store,
+        () => 2
+      )
+      expect(store.get().repos.activeRepoId).toBe('play')
+      expect(store.get().selection.selectedId).toBe('play::/main')
+    })
+  })
+
   describe('fan-out overlay (composeFanOutGraph on every poll)', () => {
     it('drops a placeholder once its entry resolves to a real worktree id, and keeps the still-pending one', async () => {
       const store = createSceneStore()

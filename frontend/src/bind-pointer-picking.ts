@@ -52,7 +52,7 @@ export function bindPointerPicking(deps: BindPointerPickingDeps): () => void {
     const nodeId = pick(event)
     const up = { x: event.clientX, y: event.clientY }
     if (nodeId === down.nodeId && isClickNotDrag(down, up, PICK_DRAG_SLOP_PX)) {
-      store.update({ selection: { selectedId: nodeId } })
+      store.select(nodeId)
       heights.onSelectionChanged(nodeId)
     }
     down = null
@@ -62,7 +62,7 @@ export function bindPointerPicking(deps: BindPointerPickingDeps): () => void {
     if (sceneModeOpen()) return
     const nodeId = pick(event)
     if (nodeId === null) return
-    store.update({ selection: { selectedId: nodeId } })
+    store.select(nodeId)
     heights.goTo('foco')
   }
 

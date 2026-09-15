@@ -29,6 +29,7 @@ const state = (overrides: Partial<SceneState> = {}): SceneState => ({
   diffView: emptyDiffViewSlice(),
   compareView: emptyCompareViewSlice(),
   camera: { height: DEFAULT_CAMERA_HEIGHT },
+  islandSelections: new Map(),
   ...overrides
 })
 

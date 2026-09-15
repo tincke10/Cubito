@@ -86,14 +86,13 @@ function setup(
   } = {}
 ) {
   const store = createSceneStore()
-  store.update({
-    graph: buildTwoRepoGraph(),
-    selection: { selectedId: overrides.selectedId ?? null }
-  })
+  store.update({ graph: buildTwoRepoGraph() })
   store.dispatchRepos({ type: 'set-list', list: [REPO_1, REPO_2] })
   if (overrides.activeRepoId !== undefined) {
     store.update({ repos: { ...store.get().repos, activeRepoId: overrides.activeRepoId } })
   }
+  // Applied AFTER set-list — set-list's own island-focus activation would otherwise clobber it.
+  store.update({ selection: { selectedId: overrides.selectedId ?? null } })
   const rig = fakeCameraRig(DEFAULT_POSE)
   const scenePositions = overrides.scenePositions ?? fakeScenePositions()
   const heights = createCameraHeightController({ store, rig, scenePositions })

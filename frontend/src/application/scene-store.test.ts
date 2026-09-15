@@ -510,6 +510,68 @@ describe('createSceneStore', () => {
     })
   })
 
+  describe('island-focus (activeRepoId change moves the selection)', () => {
+    const REPO_A = { id: 'a', path: '/a', displayName: 'A', kind: 'git' as const }
+    const REPO_B = { id: 'b', path: '/b', displayName: 'B', kind: 'git' as const }
+    const twoIslandGraph = (): WorktreeGraph =>
+      graphOf([
+        node({ id: 'a-main', repoId: 'a', isMain: true }),
+        node({ id: 'a-x', repoId: 'a', isMain: false }),
+        node({ id: 'b-main', repoId: 'b', isMain: true })
+      ])
+
+    it('set-active moves the selection to the new island main', () => {
+      const store = createSceneStore()
+      store.update({ graph: twoIslandGraph() })
+      store.dispatchRepos({ type: 'set-list', list: [REPO_A, REPO_B] })
+      store.dispatchRepos({ type: 'set-active', repoId: 'b' })
+      expect(store.get().selection.selectedId).toBe('b-main')
+    })
+
+    it('Tab away and back restores the remembered pick (proven RED)', () => {
+      const store = createSceneStore()
+      store.update({ graph: twoIslandGraph() })
+      store.dispatchRepos({ type: 'set-list', list: [REPO_A, REPO_B] })
+      store.update({ selection: { selectedId: 'a-x' } })
+      store.dispatchRepos({ type: 'set-active', repoId: 'b' })
+      expect(store.get().selection.selectedId).toBe('b-main')
+      store.dispatchRepos({ type: 'set-active', repoId: 'a' })
+      expect(store.get().selection.selectedId).toBe('a-x')
+    })
+
+    it('first boot: set-list moves a cross-island initial pick into list[0] (proven RED)', () => {
+      const store = createSceneStore()
+      const graph = graphOf([
+        node({ id: 'b-main', repoId: 'b', isMain: true }),
+        node({ id: 'a-main', repoId: 'a', isMain: true })
+      ])
+      store.update({ graph, selection: { selectedId: 'b-main' } })
+      store.dispatchRepos({ type: 'set-list', list: [REPO_A, REPO_B] })
+      expect(store.get().selection.selectedId).toBe('a-main')
+    })
+
+    it('set-active to the same repo keeps the selection', () => {
+      const store = createSceneStore()
+      store.update({ graph: twoIslandGraph() })
+      store.dispatchRepos({ type: 'set-list', list: [REPO_A, REPO_B] })
+      store.update({ selection: { selectedId: 'a-x' } })
+      store.dispatchRepos({ type: 'set-active', repoId: 'a' })
+      expect(store.get().selection.selectedId).toBe('a-x')
+    })
+
+    it("select() of another island's node activates it in one notify", () => {
+      const store = createSceneStore()
+      store.update({ graph: twoIslandGraph() })
+      store.dispatchRepos({ type: 'set-list', list: [REPO_A, REPO_B] })
+      const listener = vi.fn()
+      store.subscribe(listener)
+      store.select('b-main')
+      expect(listener).toHaveBeenCalledTimes(1)
+      expect(store.get().repos.activeRepoId).toBe('b')
+      expect(store.get().selection.selectedId).toBe('b-main')
+    })
+  })
+
   describe('camera height slice', () => {
     it('starts at the default camera height', () => {
       const store = createSceneStore()

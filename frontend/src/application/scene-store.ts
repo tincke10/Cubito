@@ -1,3 +1,5 @@
+import { activateIsland, selectNode } from './island-focus'
+import type { IslandFocus, IslandSelections } from './island-focus'
 import { emptyWorktreeGraph } from '../domain/worktree-graph/types'
 import type { WorktreeGraph, WorktreeId } from '../domain/worktree-graph/types'
 import { DEFAULT_CAMERA_HEIGHT } from '../presentation/camera/camera-pose'
@@ -48,6 +50,8 @@ export type SceneState = {
   diffView: DiffViewSlice
   compareView: CompareViewSlice
   camera: { height: CameraHeight }
+  /** Last pick per island, restored when it's re-activated (island-focus). */
+  islandSelections: IslandSelections
 }
 
 export type SceneStore = {
@@ -72,6 +76,8 @@ export type SceneStore = {
   dispatchDiffView(action: DiffViewAction): void
   /** Drives the compareView slice through compare-view-model's reducer, one notify. Doesn't touch `graph`. */
   dispatchCompareView(action: CompareViewAction): void
+  /** User pick; activates the pick's island when it lives elsewhere (island-focus). */
+  select(selectedId: WorktreeId | null): void
   subscribe(listener: (state: SceneState) => void): () => void
 }
 
@@ -89,7 +95,20 @@ const initialSceneState = (): SceneState => ({
   systemView: emptySystemViewSlice(),
   diffView: emptyDiffViewSlice(),
   compareView: emptyCompareViewSlice(),
-  camera: { height: DEFAULT_CAMERA_HEIGHT }
+  camera: { height: DEFAULT_CAMERA_HEIGHT },
+  islandSelections: new Map()
+})
+
+const focusOf = (s: SceneState): IslandFocus => ({
+  activeRepoId: s.repos.activeRepoId,
+  selectedId: s.selection.selectedId,
+  islandSelections: s.islandSelections
+})
+const withFocus = (s: SceneState, f: IslandFocus): SceneState => ({
+  ...s,
+  repos: { ...s.repos, activeRepoId: f.activeRepoId },
+  selection: { selectedId: f.selectedId },
+  islandSelections: f.islandSelections
 })
 
 /** Minimal observable store; swap for a richer signal system when the UI grows. */
@@ -120,7 +139,18 @@ export function createSceneStore(): SceneStore {
       notify()
     },
     dispatchRepos(action) {
-      state = { ...state, repos: reduceRepos(state.repos, action) }
+      const repos = reduceRepos(state.repos, action)
+      state =
+        repos.activeRepoId === state.repos.activeRepoId
+          ? { ...state, repos }
+          : withFocus(
+              { ...state, repos },
+              activateIsland(state.graph, focusOf(state), repos.activeRepoId)
+            )
+      notify()
+    },
+    select(selectedId) {
+      state = withFocus(state, selectNode(state.graph, focusOf(state), selectedId))
       notify()
     },
     dispatchProjectSelector(action) {

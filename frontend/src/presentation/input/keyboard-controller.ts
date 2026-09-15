@@ -1,6 +1,7 @@
 import type { SceneStore } from '../../application/scene-store'
 import { isTextEntryTarget, resolveNavCommand } from '../navigation/keymap'
 import { islandEntrySelection, moveSelection } from '../navigation/selection-model'
+import { islandLanding } from '../../application/island-focus'
 import { cycleIsland, nextIsland } from '../../application/repos-model'
 import { fanOutMemberIds } from '../../application/fan-out-model'
 import { stepCompareFocus } from '../../application/compare-view-model'
@@ -129,10 +130,11 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
       }
       const graph = store.get().graph
       const current = store.get().selection.selectedId
-      const next = moveSelection(graph, current, command.direction)
-      if (next !== current) {
-        store.update({ selection: { selectedId: next } })
-      }
+      const next =
+        current === null
+          ? islandEntrySelection(graph, store.get().repos.activeRepoId)
+          : moveSelection(graph, current, command.direction)
+      if (next !== current) store.select(next)
       heights.onSelectionChanged(next)
       return true
     }
@@ -144,11 +146,13 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
       // Enter only descends FROM general (KEY-04) — outside it, unbound.
       if (heights.current() !== 'general') return false
       const repoId = store.get().repos.activeRepoId
-      const mainId = islandEntrySelection(store.get().graph, repoId)
+      const { graph, selection, islandSelections } = store.get()
+      const landing =
+        repoId === null
+          ? islandEntrySelection(graph, null)
+          : islandLanding(graph, repoId, selection.selectedId, islandSelections)
       heights.goTo('isla')
-      if (mainId !== null) {
-        store.update({ selection: { selectedId: mainId } })
-      }
+      if (landing !== null) store.select(landing)
       return true
     }
     if (command.kind === 'open-terminal') {

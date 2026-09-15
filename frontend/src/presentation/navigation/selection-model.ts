@@ -76,11 +76,12 @@ function survivingParentOf(graph: WorktreeGraph, id: WorktreeId): WorktreeId | n
  */
 export function reconcileSelection(
   graph: WorktreeGraph,
-  currentId: WorktreeId | null
+  currentId: WorktreeId | null,
+  activeRepoId: string | null = null
 ): WorktreeId | null {
   if (currentId !== null && graph.nodes.has(currentId)) {
     return currentId
   }
   const ancestorId = currentId !== null ? survivingParentOf(graph, currentId) : null
-  return ancestorId ?? initialSelection(graph)
+  return ancestorId ?? islandEntrySelection(graph, activeRepoId)
 }

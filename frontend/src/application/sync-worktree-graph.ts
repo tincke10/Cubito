@@ -24,7 +24,11 @@ export async function syncWorktreeGraph(
 
   if (worktreesResult.status === 'fulfilled') {
     const graph = composeFanOutGraph(buildWorktreeGraph(worktreesResult.value), store.get().fanOut)
-    const selectedId = reconcileSelection(graph, store.get().selection.selectedId)
+    const selectedId = reconcileSelection(
+      graph,
+      store.get().selection.selectedId,
+      store.get().repos.activeRepoId
+    )
     store.update({ graph, sync: { state: 'synced', at: now() }, selection: { selectedId } })
   } else {
     const error = worktreesResult.reason

@@ -9,6 +9,7 @@ import type { CameraHeightController } from './presentation/input/camera-height-
 import type { WorktreeId } from './domain/worktree-graph/types'
 import { NODE_SURFACE_NAME } from './presentation/scene/node-mesh'
 import { PICK_DRAG_SLOP_PX } from './presentation/theme/scene-metrics'
+import { inertActivity } from './domain/worktree-graph/node-activity'
 
 type PickRect = { left: number; top: number; width: number; height: number }
 const RECT: PickRect = { left: 0, top: 0, width: 400, height: 300 }
@@ -231,6 +232,65 @@ describe('bindPointerPicking — ignored while a scene mode is open', () => {
       expect(heights.goToCalls).toEqual([])
     }
   )
+})
+
+describe('bindPointerPicking — cross-island click', () => {
+  it('clicking a node in another repo activates that island (HUD follows the pick)', () => {
+    const { canvas, store, nodeB, pointOf } = setup()
+    store.update({
+      graph: {
+        nodes: new Map([
+          [
+            'wt-a',
+            {
+              id: 'wt-a',
+              repoId: 'repo-a',
+              branch: 'main',
+              path: '/a',
+              status: 'clean' as const,
+              isMain: true,
+              kind: 'root' as const,
+              parentId: null,
+              childIds: [],
+              activity: inertActivity()
+            }
+          ],
+          [
+            'wt-b',
+            {
+              id: 'wt-b',
+              repoId: 'repo-b',
+              branch: 'main',
+              path: '/b',
+              status: 'clean' as const,
+              isMain: true,
+              kind: 'root' as const,
+              parentId: null,
+              childIds: [],
+              activity: inertActivity()
+            }
+          ]
+        ]),
+        edges: [],
+        rootIds: ['wt-a', 'wt-b']
+      }
+    })
+    store.dispatchRepos({
+      type: 'set-list',
+      list: [
+        { id: 'repo-a', path: '/a', displayName: 'A', kind: 'git' },
+        { id: 'repo-b', path: '/b', displayName: 'B', kind: 'git' }
+      ]
+    })
+    expect(store.get().repos.activeRepoId).toBe('repo-a')
+
+    const point = pointOf(nodeB)
+    fire(canvas, 'pointerdown', point)
+    fire(canvas, 'pointerup', point)
+
+    expect(store.get().selection.selectedId).toBe('wt-b')
+    expect(store.get().repos.activeRepoId).toBe('repo-b')
+  })
 })
 
 describe('bindPointerPicking — detach', () => {

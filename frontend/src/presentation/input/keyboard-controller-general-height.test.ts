@@ -150,13 +150,55 @@ describe('general-mode island cycling and Enter descent (KEY-04, KEY-07, KEY-08)
   it('Enter outside general is unhandled', () => {
     for (const height of ['isla', 'foco', 'comparar'] as const) {
       const { store, heights, controller } = setup(height)
+      const before = store.get().selection.selectedId
 
       const handled = controller.handleKeyDown(baseEvent({ key: 'Enter' }))
 
       expect(handled).toBe(false)
       expect(heights.goTo).not.toHaveBeenCalled()
-      expect(store.get().selection.selectedId).toBeNull()
+      expect(store.get().selection.selectedId).toBe(before)
     }
+  })
+
+  it('l in general also moves the selection into the new active island (ring follows HUD)', () => {
+    const { store, controller } = setup('general')
+    controller.handleKeyDown(baseEvent({ key: 'l' }))
+    expect(store.get().repos.activeRepoId).toBe('r2')
+    expect(store.get().selection.selectedId).toBe('r2-main')
+  })
+
+  it('cycling in general remembers a pick and Enter restores it once the island is revisited', () => {
+    const store = createSceneStore()
+    store.update({
+      graph: {
+        nodes: new Map([
+          ['r1-main', node('r1-main', 'r1', true)],
+          ['r1-x', node('r1-x', 'r1')],
+          ['r2-main', node('r2-main', 'r2', true)]
+        ]),
+        edges: [],
+        rootIds: ['r1-main', 'r1-x', 'r2-main']
+      }
+    })
+    store.dispatchRepos({ type: 'set-list', list: [REPO_1, REPO_2] })
+    const heights = fakeHeights('general')
+    const terminal = { focusActivePanel: vi.fn(), closeActiveSession: vi.fn() }
+    const controller = createKeyboardController({
+      store,
+      heights,
+      terminal,
+      platform: { isMac: false }
+    })
+
+    controller.handleKeyDown(baseEvent({ key: 'Enter' })) // general -> isla, lands r1-main
+    store.select('r1-x')
+    controller.handleKeyDown(baseEvent({ key: 'l' })) // general-mode cycle to r2
+    expect(store.get().repos.activeRepoId).toBe('r2')
+
+    controller.handleKeyDown(baseEvent({ key: 'h' })) // cycle back to r1
+    expect(store.get().repos.activeRepoId).toBe('r1')
+    controller.handleKeyDown(baseEvent({ key: 'Enter' }))
+    expect(store.get().selection.selectedId).toBe('r1-x')
   })
 
   it('set-height (f/v) is swallowed while the system, diff or compare view is open', () => {
