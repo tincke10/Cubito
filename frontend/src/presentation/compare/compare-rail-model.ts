@@ -2,10 +2,13 @@ import type { WorktreeId } from '../../domain/worktree-graph/types'
 import type { CompareChildLoad } from '../../application/compare-child-load'
 import { hudCountsOfFiles } from '../../application/diff-view-model'
 import type { DiffRailStatus } from '../../application/diff-view-model'
+import { shortBranchName } from '../hud/node-label-model'
 
 export type CompareRailRow = {
   childId: WorktreeId
   label: string
+  /** Full ref, for the label's title tooltip — label itself is stripped of refs/heads/. */
+  title: string
   statText: string
   status: DiffRailStatus
   focused: boolean
@@ -41,9 +44,11 @@ export function compareRailViewModel(input: CompareRailInput): readonly CompareR
     const status = load?.status ?? 'loading'
     const focused = childId === input.focusedChildId
     const isWinner = childId === input.winnerId
+    const full = input.branchLabelFor(childId)
     return {
       childId,
-      label: input.branchLabelFor(childId),
+      label: shortBranchName(full),
+      title: full,
       statText: `${counts.files} archivos · +${counts.added} −${counts.removed}`,
       status,
       focused,

@@ -40,6 +40,18 @@ describe('compareRailViewModel', () => {
     expect(rows.map((r) => r.label)).toEqual(['cubito-child-1', 'cubito-child-2'])
   })
 
+  it('strips refs/heads/ from the label but keeps the full ref as title', () => {
+    const rows = compareRailViewModel(baseInput({ branchLabelFor: () => 'refs/heads/camada-x-1' }))
+    expect(rows[0]!.label).toBe('camada-x-1')
+    expect(rows[0]!.title).toBe('refs/heads/camada-x-1')
+  })
+
+  it('leaves a non-ref label unchanged in both label and title', () => {
+    const rows = compareRailViewModel(baseInput({ branchLabelFor: () => 'camada-x-1' }))
+    expect(rows[0]!.label).toBe('camada-x-1')
+    expect(rows[0]!.title).toBe('camada-x-1')
+  })
+
   it('formats the stat text from the child load files via hudCountsOfFiles', () => {
     const rows = compareRailViewModel(
       baseInput({

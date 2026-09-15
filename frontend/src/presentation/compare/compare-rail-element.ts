@@ -14,6 +14,7 @@ const buildRow = (
   const label = doc.createElement('span')
   label.className = 'compare-rail__label'
   label.textContent = row.label
+  label.title = row.title
 
   const stat = doc.createElement('span')
   stat.className = 'compare-rail__stat'

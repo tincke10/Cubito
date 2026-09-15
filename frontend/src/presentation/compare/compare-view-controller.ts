@@ -4,6 +4,7 @@ import type { WorktreeId } from '../../domain/worktree-graph/types'
 import { compareRailViewModel } from './compare-rail-model'
 import { diffRailViewModel } from '../diff/diff-rail-model'
 import { diffPanelViewModel } from '../diff/diff-panel-model'
+import { shortBranchName } from '../hud/node-label-model'
 import type { CompareRailHandle } from './compare-rail-element'
 import type { CompareHudHandle } from './compare-hud-element'
 import type { CompareMergeActionHandle } from './compare-merge-action-element'
@@ -137,7 +138,10 @@ export function createCompareViewController(
       entry.hud.apply({
         connection,
         membersCount: compareView.members.length,
-        winnerLabel: compareView.winnerId !== null ? branchLabelFor(compareView.winnerId) : null
+        winnerLabel:
+          compareView.winnerId !== null
+            ? shortBranchName(branchLabelFor(compareView.winnerId))
+            : null
       })
 
       entry.mergeAction.apply({

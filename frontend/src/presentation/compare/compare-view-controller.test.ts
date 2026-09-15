@@ -258,6 +258,14 @@ describe('createCompareViewController', () => {
     })
   })
 
+  it('strips refs/heads/ from the winner label', () => {
+    const { controller, huds } = setup()
+    let slice = openSlice(['child-1', 'child-2'])
+    slice = reduceCompareView(slice, { type: 'set-winner', winnerId: 'child-2' })
+    controller.sync(slice, CONNECTED, () => 'refs/heads/camada-x-1', false)
+    expect(huds[0]!.applyCalls[0]).toMatchObject({ winnerLabel: 'camada-x-1' })
+  })
+
   it('forwards child-rail focus/winner clicks and file-rail select clicks', () => {
     const { controller, childRails, fileRails, onFocusChild, onSetWinner, onSelectFile } = setup()
     controller.sync(openSlice(), CONNECTED, branchLabelFor, false)

@@ -10,6 +10,7 @@ type FakeElement = {
   readonly children: FakeElement[]
   className: string
   textContent: string
+  title: string
   blurCount: number
   appendChild(child: FakeElement): FakeElement
   replaceChildren(): void
@@ -27,6 +28,7 @@ const createFakeElement = (tag: string): FakeElement => {
     children: [],
     className: '',
     textContent: '',
+    title: '',
     blurCount: 0,
     appendChild(child) {
       el.children.push(child)
@@ -59,6 +61,7 @@ const row = (
   overrides: Partial<CompareRailRow> & Pick<CompareRailRow, 'childId'>
 ): CompareRailRow => ({
   label: `cubito-${overrides.childId}`,
+  title: `refs/heads/cubito-${overrides.childId}`,
   statText: '0 archivos · +0 −0',
   status: 'ready',
   focused: false,
@@ -100,6 +103,13 @@ describe('createCompareRail', () => {
     expect(rowEl.children[0]!.textContent).toBe('cubito-alpha')
     expect(rowEl.children[1]!.textContent).toBe('3 archivos · +10 −2')
     expect(rowEl.children[2]!.textContent).toBe('ganador')
+  })
+
+  it("sets the label span's title to row.title (full ref tooltip)", () => {
+    const rail = createCompareRail(createFakeDocument())
+    rail.apply([row({ childId: 'a', label: 'camada-x-1', title: 'refs/heads/camada-x-1' })])
+    const rowEl = rootOf(rail).children[0]!
+    expect(rowEl.children[0]!.title).toBe('refs/heads/camada-x-1')
   })
 
   it('calls onFocusChild with the clicked row childId', () => {
