@@ -72,6 +72,7 @@ export function createFanOutController(deps: FanOutControllerDeps): FanOutContro
   let currentSlice: FanOutSlice = emptyFanOutSlice()
   let previousView: FanOutSlice['view'] = 'closed'
   let repoFetchInFlight = false
+  let syncGeneration = 0
 
   const generateMutationId = deps.generateMutationId ?? (() => crypto.randomUUID())
   const activeRepoId = deps.activeRepoId ?? (() => null)
@@ -207,8 +208,11 @@ export function createFanOutController(deps: FanOutControllerDeps): FanOutContro
 
   return {
     sync(fanOut: FanOutSlice, graph: WorktreeGraph): void {
+      const generation = ++syncGeneration
       currentSlice = fanOut
       maybeFetchRepoSelector(fanOut, graph)
+      // A re-entrant dispatch above already re-synced with the newer slice.
+      if (generation !== syncGeneration) return
       if (fanOut.view === 'closed') {
         unmount()
         deps.memberPoll.stop()
