@@ -54,6 +54,40 @@ export function calleeParts(
   return { objectName: expr.expression.text, methodName: expr.name.text }
 }
 
+/** `new <identifierName>()` — framework-neutral, reusable by any `new X()`-based framework. */
+export function isNewExpressionOf(node: ts.Expression, identifierName: string): boolean {
+  return (
+    ts.isNewExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    node.expression.text === identifierName
+  )
+}
+
+/** Peels a fluent chain (`root.a().b().c()`) into its calls in left-to-right order, stopping
+ * once the receiver satisfies isRoot. Returns null (not []) when the chain never bottoms out
+ * at a recognized root, so callers can tell "empty chain on a real root" from "not a chain". */
+export function unwrapFluentChain(
+  expr: ts.Expression,
+  isRoot: (e: ts.Expression) => boolean
+): { methodName: string; args: ts.NodeArray<ts.Expression> }[] | null {
+  const calls: { methodName: string; args: ts.NodeArray<ts.Expression> }[] = []
+  let current = expr
+  for (;;) {
+    if (isRoot(current)) {
+      return calls
+    }
+    if (!ts.isCallExpression(current) || !ts.isPropertyAccessExpression(current.expression)) {
+      return null
+    }
+    const callee = current.expression
+    if (!ts.isIdentifier(callee.name)) {
+      return null
+    }
+    calls.unshift({ methodName: callee.name.text, args: current.arguments })
+    current = callee.expression
+  }
+}
+
 /** Extracts every local name an import clause binds, and the name it was imported as. */
 function collectImportBindings(clause: ts.ImportClause | undefined): ParsedImportBinding[] {
   if (!clause) {
