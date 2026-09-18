@@ -56,8 +56,8 @@ al cerrar cada tramo, con el commit que lo cierra.
 
 - Cuarto framework del system graph (Koa es el siguiente candidato natural: necesita dos formas
   de resolución nuevas, `.routes()` como target de mount y `.prefix()` autoaplicado).
-- `check:code-quality:changed` falla cuando pnpm imprime "Unsupported engine" en el stream JSON;
-  hoy se esquiva con `pnpm --silent`.
+- `release-channel.ts` conserva helpers de nombres de instaladores sin ningún llamador
+  (`findInstallerAssetName`, `hasInstallableArtifactForPlatform`): código muerto del escritorio.
 
 ## Cómo se trabaja un tramo
 
