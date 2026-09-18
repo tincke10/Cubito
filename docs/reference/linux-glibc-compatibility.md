@@ -54,7 +54,7 @@ The shim is guarded by `#if defined(__linux__)`; macOS and Windows are untouched
 
 **2. Gate packaging (the regression guard).**
 [`config/scripts/verify-linux-glibc-floor.cjs`](../../config/scripts/verify-linux-glibc-floor.cjs)
-runs in the electron-builder `afterPack` hook for Linux. It reads every bundled
+runs from [`build:orcad-prebuilds`](../../config/scripts/build-orcad-prebuilds.mjs) after building Linux native modules. It reads every bundled
 native binary's version needs (`objdump -p` "Version References" — the
 authoritative load-time list, which also captures symbol-less markers like
 `GLIBC_ABI_DT_RELR`) and fails the build if any strong `GLIBC_`/`GLIBCXX_`/

@@ -33,6 +33,38 @@ describe('Playwright/Electron E2E suite absence', () => {
     }
   })
 
+  it('leaves no trace of electron-builder config, scripts, or their tests on disk', () => {
+    const removed = [
+      'config/electron-builder.config.cjs',
+      'config/scripts/electron-builder-native-rebuild.cjs',
+      'config/scripts/electron-builder-native-rebuild.test.mjs',
+      'config/scripts/electron-builder-mac-channel-config.test.mjs',
+      'config/scripts/verify-packaged-daemon-entry.cjs',
+      'config/scripts/verify-packaged-daemon-entry.test.mjs',
+      'config/scripts/verify-packaged-plugin-resources.cjs',
+      'config/scripts/verify-packaged-plugin-resources.test.mjs',
+      'config/scripts/verify-packaged-node-pty-job-ownership.cjs',
+      'config/scripts/verify-packaged-node-pty-job-ownership.test.mjs',
+      'config/scripts/verify-dev-channel-packaging.mjs',
+      'config/scripts/verify-dev-channel-packaging.test.mjs',
+      'config/scripts/mac-build-compatibility.cjs',
+      'config/scripts/mac-build-compatibility.test.mjs',
+      'config/scripts/resolve-7za-path.mjs',
+      'config/scripts/resolve-7za-path.test.mjs',
+      'config/scripts/generate-windows-blockmap.mjs',
+      'config/scripts/build-mac-local.mjs',
+      'config/scripts/build-mac-local.test.mjs',
+      'src/main/cli/packaged-cli-assets.test.ts',
+      // Dead renderer-web-client projection: `out/renderer` hasn't existed since bb24b404b;
+      // its only assertion tying it to this change read electron-builder.config.cjs directly.
+      'config/scripts/project-renderer-web-client.mjs',
+      'config/scripts/project-renderer-web-client.test.mjs'
+    ]
+    for (const rel of removed) {
+      expect(existsSync(join(REPO_ROOT, rel))).toBe(false)
+    }
+  })
+
   it('declares no @playwright/test dependency in package.json', () => {
     const packageJson = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8')) as {
       dependencies?: Record<string, string>
