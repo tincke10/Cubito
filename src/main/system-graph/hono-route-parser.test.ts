@@ -122,3 +122,38 @@ describe('parseHonoRoutes: malformed source', () => {
     expect(Array.isArray(result.imports)).toBe(true)
   })
 })
+
+describe('parseHonoRoutes: same-file mounts and unsupported chain calls', () => {
+  it('collects endpoints behind .basePath() without applying its prefix', () => {
+    const source = `
+      const app = new Hono().basePath('/api').get('/users', h)
+    `
+    const result = parseHonoRoutes(source, FILE)
+    expect(result.endpoints).toEqual([{ method: 'GET', path: '/users', routerLocalName: 'app' }])
+  })
+
+  it('records a same-file .route(prefix, sub) mount with its parent', () => {
+    const source = `
+      const app = new Hono()
+      const users = new Hono()
+      users.get('/', h)
+      app.route('/users', users)
+    `
+    const result = parseHonoRoutes(source, FILE)
+    expect(result.mounts).toEqual([
+      { prefix: '/users', routerLocalName: 'users', parentLocalName: 'app' }
+    ])
+  })
+
+  it('renders a non-literal mount prefix as <dynamic> instead of dropping the mount', () => {
+    const source = `
+      const app = new Hono()
+      const users = new Hono()
+      app.route(computePrefix(), users)
+    `
+    const result = parseHonoRoutes(source, FILE)
+    expect(result.mounts).toEqual([
+      { prefix: '<dynamic>', routerLocalName: 'users', parentLocalName: 'app' }
+    ])
+  })
+})
