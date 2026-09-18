@@ -1,5 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import path from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
@@ -111,8 +112,10 @@ export function collectAddedLineRanges(root, requestedBase) {
   return { base, comparisonBase, rangesByFile }
 }
 
-function parseOxlintOutput(stdout, label) {
-  const start = stdout.indexOf('{')
+export function parseOxlintOutput(stdout, label) {
+  // Why line-anchored: a nested pnpm prints its engine warning (which contains `{`) to stdout
+  // ahead of the document; Oxlint's JSON is the first line that opens with a brace.
+  const start = stdout.search(/^\s*\{/m)
   const end = stdout.lastIndexOf('}')
   if (start === -1 || end === -1) {
     throw new Error(`${label} did not return Oxlint JSON output.`)
@@ -264,12 +267,24 @@ function printDiagnostic(diagnostic, root) {
 }
 
 function runOxlintScan(root, scan, files) {
-  const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
-  const result = spawnSync(pnpm, ['exec', 'oxlint', ...scan.args, '--format', 'json', ...files], {
-    cwd: root,
-    encoding: 'utf8',
-    maxBuffer: 128 * 1024 * 1024
-  })
+  // Why the bin through node: no pnpm layer (whose engine warning pollutes stdout) and no
+  // `.cmd` shim, which modern Node refuses to spawn without a shell on Windows.
+  const oxlintPackage = createRequire(pathToFileURL(path.join(root, 'package.json'))).resolve(
+    'oxlint/package.json'
+  )
+  const oxlintBin = path.join(
+    path.dirname(oxlintPackage),
+    JSON.parse(readFileSync(oxlintPackage, 'utf8')).bin.oxlint
+  )
+  const result = spawnSync(
+    process.execPath,
+    [oxlintBin, ...scan.args, '--format', 'json', ...files],
+    {
+      cwd: root,
+      encoding: 'utf8',
+      maxBuffer: 128 * 1024 * 1024
+    }
+  )
   if (result.error) {
     throw result.error
   }

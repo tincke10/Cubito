@@ -4,7 +4,8 @@ import {
   diagnosticTouchesAddedLines,
   isMovedCode,
   overlapsAddedLines,
-  parseAddedLineRanges
+  parseAddedLineRanges,
+  parseOxlintOutput
 } from './check-changed-code-quality.mjs'
 
 describe('changed-code quality line matching', () => {
@@ -102,5 +103,24 @@ describe('moved-code exemption', () => {
 
   it('never exempts an empty highlight', () => {
     expect(isMovedCode(['', '   '], [['a()']])).toBe(false)
+  })
+})
+
+describe('oxlint output parsing', () => {
+  it('skips a leading pnpm engine warning whose braces precede the JSON document', () => {
+    const stdout = [
+      ' WARN  Unsupported engine: wanted: {"node":"24"} (current: {"node":"v26.7.0","pnpm":"10.24.0"})',
+      '{ "diagnostics": [{ "message": "x" }],',
+      '  "number_of_files": 1 }',
+      ''
+    ].join('\n')
+
+    expect(parseOxlintOutput(stdout, 'scan').diagnostics).toEqual([{ message: 'x' }])
+  })
+
+  it('still rejects output with no JSON document at all', () => {
+    expect(() => parseOxlintOutput(' WARN  nothing here\n', 'scan')).toThrow(
+      'scan did not return Oxlint JSON output.'
+    )
   })
 })
