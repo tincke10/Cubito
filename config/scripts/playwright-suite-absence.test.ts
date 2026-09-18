@@ -20,7 +20,6 @@ const BANNED_PACKAGES = [
 // explain historical behavior, never a real straggler import. Never used to silence one.
 const ALLOWLIST: readonly string[] = [
   'config/scripts/build-notification-status-macos.mjs',
-  'config/scripts/verify-telemetry-constants.mjs',
   'config/scripts/build-windows-cli-launcher.mjs',
   'config/scripts/rebuild-native-deps.mjs',
   'src/main/ssh/ssh-relay-deploy.ts',
@@ -72,7 +71,11 @@ describe('Playwright/Electron E2E suite absence', () => {
       // Dead renderer-web-client projection: `out/renderer` hasn't existed since bb24b404b;
       // its only assertion tying it to this change read electron-builder.config.cjs directly.
       'config/scripts/project-renderer-web-client.mjs',
-      'config/scripts/project-renderer-web-client.test.mjs'
+      'config/scripts/project-renderer-web-client.test.mjs',
+      // Read the packaged app.asar through @electron/asar, which only ever arrived via electron-builder.
+      'config/scripts/verify-telemetry-constants.mjs',
+      'config/scripts/telemetry-bundle-constant-patterns.mjs',
+      'config/scripts/telemetry-bundle-constant-patterns.test.mjs'
     ]
     for (const rel of removed) {
       expect(existsSync(join(REPO_ROOT, rel))).toBe(false)
