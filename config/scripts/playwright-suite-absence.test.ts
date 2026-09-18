@@ -83,7 +83,7 @@ describe('Playwright/Electron E2E suite absence', () => {
     }
   })
 
-  it('declares no @playwright/test dependency in package.json', () => {
+  it('declares none of the removed packaging/E2E dependencies in package.json', () => {
     const packageJson = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8')) as {
       dependencies?: Record<string, string>
       devDependencies?: Record<string, string>
@@ -94,7 +94,13 @@ describe('Playwright/Electron E2E suite absence', () => {
       ...Object.keys(packageJson.devDependencies ?? {}),
       ...Object.keys(packageJson.optionalDependencies ?? {})
     ]
-    expect(names).not.toContain('@playwright/test')
+    for (const banned of [
+      '@playwright/test',
+      'electron-builder',
+      'electron-builder-squirrel-windows'
+    ]) {
+      expect(names).not.toContain(banned)
+    }
   })
 
   it('mentions no playwright, tests/e2e, or electron-vite in any package.json script', () => {
