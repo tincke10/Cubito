@@ -1,11 +1,12 @@
 import type { WorktreeSourceReader } from './worktree-source-reader'
 
-export type EngineFramework = 'express' | 'fastify' | 'nest'
+export type EngineFramework = 'express' | 'fastify' | 'nest' | 'hono'
 
 const NEST_DEP_NAMES = ['@nestjs/core', '@nestjs/common']
 const EXPRESS_DEP_NAMES = ['express', '@types/express']
 const FASTIFY_DEP_NAMES = ['fastify']
 const FASTIFY_SCOPE_PREFIX = '@fastify/'
+const HONO_DEP_NAMES = ['hono']
 const TYPESCRIPT_DEP_NAMES = ['typescript']
 
 function hasAnyDependency(deps: unknown, names: readonly string[]): boolean {
@@ -81,6 +82,10 @@ export async function detectFramework(
     hasDependencyPrefixEither(packageJson, FASTIFY_SCOPE_PREFIX)
   ) {
     return (await hasTsSignal(reader, packageJson)) ? 'fastify' : null
+  }
+
+  if (hasDependencyEither(packageJson, HONO_DEP_NAMES)) {
+    return (await hasTsSignal(reader, packageJson)) ? 'hono' : null
   }
 
   return null

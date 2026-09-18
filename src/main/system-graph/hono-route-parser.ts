@@ -1,5 +1,10 @@
 import ts from 'typescript-compiler-api'
-import type { ParsedEndpoint, ParsedExport, ParsedRouteFile } from './framework-route-model'
+import type {
+  FrameworkRouteParser,
+  ParsedEndpoint,
+  ParsedExport,
+  ParsedRouteFile
+} from './framework-route-model'
 import { collectInstanceEndpointsAndMounts } from './instance-route-mount-collector'
 import {
   HTTP_ROUTE_METHODS,
@@ -125,6 +130,7 @@ export function parseHonoRoutes(source: string, filePath: string): ParsedRouteFi
   }
 }
 
-// `honoRouteParser: FrameworkRouteParser` is exported from framework-route-parser-registry.ts's
-// wave instead of here — EngineFramework doesn't include 'hono' until that wave lands, and a
-// `framework: 'hono'` literal here would fail typecheck in the meantime (see apply-progress notes).
+export const honoRouteParser: FrameworkRouteParser = {
+  framework: 'hono',
+  parse: parseHonoRoutes
+}

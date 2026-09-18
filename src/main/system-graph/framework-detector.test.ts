@@ -84,6 +84,23 @@ describe('detectFramework', () => {
     await expect(detectFramework(reader)).resolves.toBeNull()
   })
 
+  it('detects hono via the hono dependency plus a typescript dep', async () => {
+    const reader = fakeReader({
+      readPackageJson: async () => ({
+        dependencies: { hono: '^4.0.0' },
+        devDependencies: { typescript: '^5.5.0' }
+      })
+    })
+    await expect(detectFramework(reader)).resolves.toBe('hono')
+  })
+
+  it('returns null when hono is present but no TS signal exists', async () => {
+    const reader = fakeReader({
+      readPackageJson: async () => ({ dependencies: { hono: '^4.0.0' } })
+    })
+    await expect(detectFramework(reader)).resolves.toBeNull()
+  })
+
   it('prefers express when both express and fastify dependencies are present', async () => {
     const reader = fakeReader({
       readPackageJson: async () => ({
