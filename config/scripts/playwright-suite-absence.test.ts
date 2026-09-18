@@ -72,6 +72,17 @@ describe('Playwright/Electron E2E suite absence', () => {
     }
   })
 
+  it('leaves no trace of the daemon-relocation-spike and its runtime-module helper on disk', () => {
+    const removed = [
+      'tests/tools/daemon-relocation-spike',
+      'config/packaged-runtime-node-modules.cjs',
+      'config/scripts/packaged-node-pty-prebuild-prune.test.mjs'
+    ]
+    for (const rel of removed) {
+      expect(existsSync(join(REPO_ROOT, rel))).toBe(false)
+    }
+  })
+
   it('declares no @playwright/test dependency in package.json', () => {
     const packageJson = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8')) as {
       dependencies?: Record<string, string>
