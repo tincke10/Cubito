@@ -6,11 +6,11 @@ This design is adopted for the renderer's high-frequency agent-status path. It
 keeps the existing event semantics while bounding the amount of synchronous
 store fanout performed for one IPC burst.
 
-It lands in slices. This document and the `bench:idle-cpu` harness land first so
-the store changes can be reviewed against a baseline someone else measured. Until
+It lands in slices. This document and its baseline benchmark land first so the
+store changes can be reviewed against a baseline someone else measured. Until
 the store slice lands, the `setAgentStatuses` / `transactAgentStatuses` actions
 and the agent-status write workload described below are not yet on `main`; the
-harness measures scale, listener census, and raw publication fanout only.
+baseline measures scale, listener census, and raw publication fanout only.
 
 ## Context
 
@@ -193,33 +193,6 @@ build mode. CPU samples from macOS and Linux are comparable within that
 constraint; Windows process CPU collection currently cannot support this
 comparison.
 
-## Harness
-
-`pnpm run bench:idle-cpu` drives `config/scripts/run-idle-cpu-benchmark.mjs`,
-which composes four modules:
-
-| Module                                | Responsibility                                                                                    |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `idle-cpu-renderer-scale-fixture.mjs` | Seeds the lineage, agent rows, and sidebar view state; takes the mounted-card and listener census |
-| `idle-cpu-renderer-timing-probe.mjs`  | In-page timer drift and long-task probe; runs the no-op publication workload                      |
-| `idle-cpu-process-sampling.mjs`       | Classifies the Electron process tree and samples per-role CPU/RSS                                 |
-| `idle-cpu-synthetic-spinners.mjs`     | Measurement-only visible spinners                                                                 |
-
-The sampling window extends past `--sample-ms` until the workload settles, and
-fails the run rather than reporting a truncated window if the workload overruns
-the guard. That is why a 2,000-publication run reports a measured window longer
-than the requested one.
-
-`--zustand-publications` publishes an empty partial through the real store, so
-each publication costs exactly one full subscriber visit and nothing else. It
-isolates the `listeners x selector work` half of the burst-cost model from
-agent-status payload work, and it is store-API independent — it measures the
-same thing before and after the batching slice.
-
-The agent-status write workload (`--agent-status-batches`,
-`--agent-status-write-mode`) is not in this harness yet. It depends on
-`setAgentStatuses`, so it lands with the store slice.
-
 ## Baseline on `main`
 
 Measured on `main` at `077f5a11cd4` (macOS, arm64, 16 CPUs) against a headless
@@ -253,15 +226,6 @@ renderer mean CPU, 17.11% p95, and 1.6 ms p95 timer drift. Roughly 11.6 points
 of mean renderer CPU are therefore attributable to publication fanout rather than
 to the mounted fixture itself. 200 spinner animations run in both cases, so the
 control also bounds the animation cost out of the comparison.
-
-Reproduce with:
-
-```bash
-pnpm run bench:idle-cpu -- --worktrees 100 --lineage-depth 99 \
-  --agents-per-worktree 1 --warmup-ms 10000 --sample-ms 30000 \
-  --zustand-publications 2000 --zustand-publication-interval-ms 1 \
-  --output /tmp/idle-cpu-baseline.json
-```
 
 ## Results
 

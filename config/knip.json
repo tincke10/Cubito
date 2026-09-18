@@ -1,7 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "entry": [
-    "src/main/index.ts",
     "src/main/daemon/daemon-entry.ts",
     "src/main/plugins/plugin-host-entry.ts",
     "src/main/computer/sidecar-entry.ts",
@@ -14,10 +13,6 @@
     "src/main/hang-watchdog/main-thread-hang-watchdog-entry.ts",
     "src/main/agent-hooks/managed-agent-hook-controls.ts",
     "src/main/claude-accounts/keychain.ts",
-    "src/renderer/src/main.tsx",
-    "src/renderer/src/popout.tsx",
-    "src/renderer/src/web/main.tsx",
-    "src/renderer/src/**/*.worker.ts",
     "src/cli/index.ts",
     "src/relay/relay.ts",
     "src/relay/wsl-agent-hook-relay.ts",
@@ -35,7 +30,7 @@
     "config/scripts/**/*.{mjs,cjs,js,ts}",
     "config/build-plugins/**/*.ts"
   ],
-  "ignore": ["mobile/**", "out/**", "dist/**", "node_modules/**", "resources/**"],
+  "ignore": ["out/**", "dist/**", "node_modules/**", "resources/**"],
   "ignoreDependencies": ["electron", "@types/*"],
   "ignoreExportsUsedInFile": true,
   "includeEntryExports": false

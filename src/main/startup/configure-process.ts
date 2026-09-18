@@ -266,7 +266,6 @@ export function installDevParentSignalQuit(isDev: boolean): void {
   }
 
   const onSignal = (): void => {
-    // Why: run-electron-vite-dev forwards terminal shutdown signals here, so don't preserve the detached daemon for warm reattach.
     requestDevParentShutdown()
   }
 
