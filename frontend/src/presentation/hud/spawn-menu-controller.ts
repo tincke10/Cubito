@@ -46,6 +46,7 @@ export function createSpawnMenuController(deps: SpawnMenuControllerDeps): SpawnM
   let currentNodeId: WorktreeId | null = null
   let currentSlice: SpawnMenuSlice = { view: 'closed', repoSelector: null }
   let repoFetchInFlight = false
+  let syncGeneration = 0
 
   const generateMutationId = deps.generateMutationId ?? (() => crypto.randomUUID())
   const activeRepoId = deps.activeRepoId ?? (() => null)
@@ -137,8 +138,11 @@ export function createSpawnMenuController(deps: SpawnMenuControllerDeps): SpawnM
 
   return {
     sync(spawnMenu: SpawnMenuSlice, graph: WorktreeGraph): void {
+      const generation = ++syncGeneration
       currentSlice = spawnMenu
       maybeFetchRepoSelector(spawnMenu, graph)
+      // A re-entrant dispatch above already re-synced with the newer slice.
+      if (generation !== syncGeneration) return
       const model = spawnViewModel(spawnMenu, graph)
       if (model === null) {
         unmountMenu()
