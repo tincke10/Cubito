@@ -65,6 +65,13 @@ describe('Playwright/Electron E2E suite absence', () => {
     }
   })
 
+  it('leaves no trace of desktop packaging resources on disk', () => {
+    const removed = ['config/nsis', 'resources/linux/packaging', 'resources/linux/bin/orca-ide']
+    for (const rel of removed) {
+      expect(existsSync(join(REPO_ROOT, rel))).toBe(false)
+    }
+  })
+
   it('declares no @playwright/test dependency in package.json', () => {
     const packageJson = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8')) as {
       dependencies?: Record<string, string>
