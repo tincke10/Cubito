@@ -3,7 +3,7 @@
 Estado real del fork, verificado contra `git log` y el CI. Fuente única: este archivo. Se actualiza
 al cerrar cada tramo, con el commit que lo cierra.
 
-Última revisión: 2026-09-18 · `origin/main` = `9e8231436` · cubito-ci verde.
+Última revisión: 2026-09-18 · después del ciclo v7 (ver commits por fila) · cubito-ci verde en `167087e59`.
 
 ## Cerrado
 
@@ -26,6 +26,9 @@ al cerrar cada tramo, con el commit que lo cierra.
 | v6-2 | Instalación macOS + Docker, imagen slim, un solo puerto, demo repo auto-registrado | 2026-09-14 · `a6fc28e36` |
 | Follow-up v6 | Compare como panel lateral a la altura comparar, `h`/`l` mueven el hijo enfocado | 2026-09-14 · `c67ed15c7` |
 | Post v6 | Prueba "usuario nuevo" en Docker: diff del working tree, selección dentro de la isla, nombre en el rail, primer submit del fan-out | 2026-09-15 · `9e8231436` |
+| Deuda chica | Guard de re-entrada en el spawn menu, split de `service-db-heuristic.ts`, referencias stale del cleanup, roadmap en el repo | 2026-09-18 · `167087e59` |
+| v7-1 | Hono como tercer framework del system graph: collector compartido con Express, parser con cadenas fluidas y `export default`, detector y registry, golden end-to-end | 2026-09-18 · `08cea07e3` |
+| v7-2 | Limpieza de deps de Electron: electron-builder, NSIS y packaging Linux, spike de relocación del daemon, herramientas de automatización del renderer, `@stablyai/playwright-test`, check de telemetría del `app.asar` | 2026-09-18 · `c0f03d4d8` |
 
 ## Cerrado sin implementar
 
@@ -35,30 +38,26 @@ al cerrar cada tramo, con el commit que lo cierra.
   remoto retorna sin escribir. Tampoco hay RPC para agregar targets ni superficie SSH en el frontend.
   Si algún día Cubito quiere hosts remotos, es un cambio de engine (cablear SSH en `orcad-entry`),
   no un check de validación. Decidido el 2026-09-18.
+- **Incidente del fixture (`.git/HEAD` perdido el 2026-09-08 23:14).** No reproducible y sin
+  path de engine que lo explique: la remoción destructiva pasa siempre por
+  `isDangerousWorktreeRemovalPath`, y el único mecanismo que muta el working tree del parent es el
+  `git read-tree -u -m` del sync opt-in tras un winner merge, que nunca toca `HEAD`. El mejor
+  candidato es uso manual de git durante el manejo ad hoc del fixture en la sesión v3-4. Cerrado
+  el 2026-09-18; detalle en engram `sdd/fixture-head-incident/explore`.
 
 ## Pendiente
 
-Ordenado por costo, de más barato a más caro.
-
-1. **Guard de re-entrada en el spawn menu.** `spawn-menu-controller.ts` tiene el mismo `sync()` que
-   el fan-out antes de `9e8231436`: un dispatch sincrónico re-entra y el sync externo aplica el
-   modelo viejo. Hoy no se ve; es la misma bomba. Frontend, sin rebuild.
-2. **Partir `service-db-heuristic.ts`.** Está a 295 de 300 líneas. El próximo cambio ahí obliga a
-   partirlo; mejor hacerlo antes de necesitarlo. Engine, sin rebuild (solo unit tests).
-3. **Referencias stale del cleanup.** `renderer-agent-status-performance.md` apunta a
-   `bench:idle-cpu`, `configure-process.ts` menciona `run-electron-vite-dev`, `knip.json` tiene
-   entradas a paths borrados.
-4. **Workflows de agente en Docker.** La prueba de usuario nuevo cubrió todo salvo lanzar un agente
+1. **Workflows de agente en Docker.** La prueba de usuario nuevo cubrió todo salvo lanzar un agente
    real dentro del contenedor. Requiere `docker compose exec cubito claude login` a mano.
-5. **Deps de Electron que siguen a propósito.** `@stablyai/playwright-test` queda por
-   `tests/tools/win-update-e2e/app-driver.mjs` (lo documenta `playwright-suite-absence.test.ts`) y
-   `electron-builder` sigue cableado en packaging, scripts y tests. Sacarlos es un tramo propio de
-   cleanup, no un descuido.
+2. **Validación en vivo de Hono.** Los goldens cubren el parser; falta ver `[x]` sistema sobre un
+   repo Hono real con un orcad reconstruido (excepción de build por instancia).
 
 ## Ideas sin decidir
 
-- Tercer framework del system graph después de Express, Fastify y Nest.
-- Auditar el incidente del fixture (`.git/HEAD` perdido el 2026-09-08, causa desconocida).
+- Cuarto framework del system graph (Koa es el siguiente candidato natural: necesita dos formas
+  de resolución nuevas, `.routes()` como target de mount y `.prefix()` autoaplicado).
+- `check:code-quality:changed` falla cuando pnpm imprime "Unsupported engine" en el stream JSON;
+  hoy se esquiva con `pnpm --silent`.
 
 ## Cómo se trabaja un tramo
 
