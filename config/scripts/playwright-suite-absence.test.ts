@@ -3,16 +3,30 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-// Ban guard: the Electron/Playwright E2E suite and toolchain are gone (v5-3-e2e-cleanup).
-// Fails loud if any part of it, or a stray import of its packages, creeps back.
+// Ban guard: the Electron/Playwright E2E suite (v5-3-e2e-cleanup), electron-builder's
+// packaging toolchain, and the Electron-renderer-window automation cluster (win-update-e2e,
+// win-crash-survival-e2e, terminal-garble-*, workspace-switch-paint-latency — Cubito has had
+// no Electron renderer since bb24b404b) are all gone. Fails loud if any part of them, or a
+// stray import of their packages, creeps back.
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..')
-// @stablyai/playwright-test itself is NOT banned: tests/tools/win-update-e2e/app-driver.mjs
-// (a live, kept Windows update-survival repro harness, unrelated to the removed browser
-// E2E suite) genuinely launches Electron through its `_electron` driver. Only the deleted
-// suite's own package, @playwright/test, and every tests/e2e/* path are banned outright.
-const BANNED_PACKAGES = ['@playwright/test']
-// This guard's own source names the banned package literally; exclude it from its own scan.
+const BANNED_PACKAGES = [
+  '@playwright/test',
+  'electron-builder',
+  'electron-builder-squirrel-windows',
+  '@stablyai/playwright-test'
+]
+// Genuine false positives only — comment-only mentions of a banned package's name that
+// explain historical behavior, never a real straggler import. Never used to silence one.
+const ALLOWLIST: readonly string[] = [
+  'config/scripts/build-notification-status-macos.mjs',
+  'config/scripts/verify-telemetry-constants.mjs',
+  'config/scripts/build-windows-cli-launcher.mjs',
+  'config/scripts/rebuild-native-deps.mjs',
+  'src/main/ssh/ssh-relay-deploy.ts',
+  'src/shared/release-channel.ts'
+]
+// This guard's own source names the banned packages literally; exclude it from its own scan.
 const SELF_FILE = 'config/scripts/playwright-suite-absence.test.ts'
 
 function trackedFiles(): string[] {
@@ -83,6 +97,27 @@ describe('Playwright/Electron E2E suite absence', () => {
     }
   })
 
+  it('leaves no trace of the Electron-renderer automation tool cluster on disk', () => {
+    const removed = [
+      'tests/tools/win-update-e2e',
+      'tests/tools/win-crash-survival-e2e',
+      'tests/tools/terminal-garble-production-repro.mjs',
+      'tests/tools/terminal-garble-frame-analysis.mjs',
+      'tests/tools/terminal-garble-react-terminal-recovery.mjs',
+      'tests/tools/terminal-garble-session-replay.mjs',
+      'tests/tools/benchmarks/workspace-switch-paint-latency.mjs'
+    ]
+    for (const rel of removed) {
+      expect(existsSync(join(REPO_ROOT, rel))).toBe(false)
+    }
+  })
+
+  it('leaves no windows-main-crash-survival gate in reliability-gates.jsonc', () => {
+    const gates = readFileSync(join(REPO_ROOT, 'config/reliability-gates.jsonc'), 'utf8')
+    expect(gates).not.toContain('terminal-session.windows-main-crash-survival')
+    expect(gates).not.toContain('win-crash-survival')
+  })
+
   it('declares none of the removed packaging/E2E dependencies in package.json', () => {
     const packageJson = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8')) as {
       dependencies?: Record<string, string>
@@ -94,11 +129,7 @@ describe('Playwright/Electron E2E suite absence', () => {
       ...Object.keys(packageJson.devDependencies ?? {}),
       ...Object.keys(packageJson.optionalDependencies ?? {})
     ]
-    for (const banned of [
-      '@playwright/test',
-      'electron-builder',
-      'electron-builder-squirrel-windows'
-    ]) {
+    for (const banned of BANNED_PACKAGES) {
       expect(names).not.toContain(banned)
     }
   })
@@ -113,9 +144,7 @@ describe('Playwright/Electron E2E suite absence', () => {
     expect(offenders).toEqual([])
   })
 
-  it('imports no Playwright package from any tracked source file', () => {
-    // Genuine false positives only; never to silence a real straggler import.
-    const ALLOWLIST: readonly string[] = []
+  it('imports no removed packaging/E2E package from any tracked source file', () => {
     const offenders: string[] = []
     for (const rel of trackedFiles()) {
       if (ALLOWLIST.includes(rel)) {
@@ -134,19 +163,5 @@ describe('Playwright/Electron E2E suite absence', () => {
   it('has no tests/e2e entry in the vitest include list', () => {
     const config = readFileSync(join(REPO_ROOT, 'config/vitest.config.ts'), 'utf8')
     expect(config).not.toMatch(/tests\/e2e/)
-  })
-
-  it('never imports @stablyai/playwright-test from the relocated survivor suites', () => {
-    const survivorDirs = [
-      'tests/cross-version-wire',
-      'tests/docker-ssh-relay',
-      'tests/computer-use'
-    ]
-    const offenders = trackedFiles()
-      .filter((rel) => survivorDirs.some((dir) => rel.startsWith(`${dir}/`)))
-      .filter((rel) =>
-        readFileSync(join(REPO_ROOT, rel), 'utf8').includes('@stablyai/playwright-test')
-      )
-    expect(offenders).toEqual([])
   })
 })
