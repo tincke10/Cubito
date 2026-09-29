@@ -21,6 +21,9 @@ export function resolveLaunchPlan({ argv, env, homedir, platform, repoRoot }) {
   if (env.CUBITO_PAIRING_ADDRESS) {
     orcadArgs.push('--pairing-address', env.CUBITO_PAIRING_ADDRESS)
   }
+  if (flags.agentPermissions) {
+    orcadArgs.push('--agent-permissions', flags.agentPermissions)
+  }
   const openInBrowser = platform === 'darwin' && !flags.noOpen && !env.CUBITO_NO_OPEN
   const registerRepoPaths = [...flags.registerRepoPaths, ...parseRegisterReposEnv(env)]
   return {
@@ -61,7 +64,8 @@ function parseFlags(argv) {
     orcadPort: null,
     frontendPort: null,
     noOpen: false,
-    registerRepoPaths: []
+    registerRepoPaths: [],
+    agentPermissions: null
   }
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]
@@ -77,6 +81,14 @@ function parseFlags(argv) {
       flags.noOpen = true
     } else if (arg === '--register-repo') {
       flags.registerRepoPaths.push(argv[++i])
+    } else if (arg === '--agent-permissions') {
+      const value = argv[++i]
+      if (value !== 'manual' && value !== 'yolo') {
+        throw new Error(
+          `--agent-permissions expects manual or yolo${value ? `, got ${value}` : ''}`
+        )
+      }
+      flags.agentPermissions = value
     }
   }
   return flags

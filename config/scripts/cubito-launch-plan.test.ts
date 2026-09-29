@@ -144,6 +144,32 @@ describe('resolveLaunchPlan', () => {
   })
 })
 
+describe('resolveLaunchPlan --agent-permissions', () => {
+  it('forwards the mode to the orcad argv', () => {
+    const plan = resolveLaunchPlan({ ...BASE, argv: ['--agent-permissions', 'manual'] })
+    expect(plan.orcadArgs.slice(-2)).toEqual(['--agent-permissions', 'manual'])
+  })
+
+  it('leaves the orcad argv untouched without the flag', () => {
+    expect(resolveLaunchPlan(BASE).orcadArgs).toEqual([
+      '--port',
+      '6799',
+      '--json',
+      '--web-client-root',
+      '/repo/out/orcad/web-client'
+    ])
+  })
+
+  it('rejects a missing or unknown mode', () => {
+    expect(() => resolveLaunchPlan({ ...BASE, argv: ['--agent-permissions'] })).toThrow(
+      '--agent-permissions expects manual or yolo'
+    )
+    expect(() => resolveLaunchPlan({ ...BASE, argv: ['--agent-permissions', 'nope'] })).toThrow(
+      'got nope'
+    )
+  })
+})
+
 describe('settingsSeedPath', () => {
   it('points at the local-default profile data file under the data dir', () => {
     expect(settingsSeedPath('/Users/dev/.cubito')).toBe(
