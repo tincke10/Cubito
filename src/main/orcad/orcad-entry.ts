@@ -173,7 +173,11 @@ async function startOrcadRuntime(
   // registerPtyHandlers so the IPC layer routes through the daemon from the first call.
   await startOrcadDaemon()
 
+  const { agentHookServer } = await import('../agent-hooks/server')
+  const { createOrcadAgentStatusDeps } = await import('./orcad-agent-status-deps')
   const runtime = new OrcaRuntimeService(store, undefined, {
+    // Why: worktree.ps and session.tabs read hook status through these; the server starts below.
+    ...createOrcadAgentStatusDeps(agentHookServer),
     // Why lazy: a daemon swap replaces the provider after construction, so an eager
     // reference would freeze the pre-daemon one.
     getLocalProvider: () => getLocalPtyProvider(),
@@ -205,7 +209,6 @@ async function startOrcadRuntime(
   // window, and until it listens every PTY spawns without ORCA_AGENT_HOOK_PORT, so agent
   // hooks (status, activity feed) silently go nowhere. Namespaced so a desktop sharing this
   // userData keeps its own endpoint file.
-  const { agentHookServer } = await import('../agent-hooks/server')
   await agentHookServer.start({ userDataPath: runtimeUserDataPath, endpointNamespace: 'orcad' })
 
   // Why eager: a user who lets an agent work for 30s and only then opens the activity
