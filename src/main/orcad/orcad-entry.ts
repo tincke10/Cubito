@@ -213,6 +213,10 @@ async function startOrcadRuntime(
   const { ensureAgentActivityRecording } = await import('../agent-hooks/agent-activity-recording')
   ensureAgentActivityRecording()
 
+  // Why not awaited: CLI presence probing must not delay the RPC bind; failures are logged inside.
+  const { installOrcadAgentHooks } = await import('./orcad-agent-hook-install')
+  void installOrcadAgentHooks(store.getSettings())
+
   // Why: same post-registration reconciliation `--serve` performs. Skipping it leaves
   // restored orchestration rows claiming an authority this host never took over.
   // Why before the RPC server binds: a client host attaching first would find no pages to recover.
