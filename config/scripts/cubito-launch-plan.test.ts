@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  agentPathEnv,
+  cliShimPlan,
   composeFrontendUrl,
   dataDirSocketPathProblem,
   parseReadinessLine,
@@ -273,5 +275,47 @@ describe('composeFrontendUrl', () => {
     expect(url).toContain(encodeURIComponent('='))
     expect(url).toContain(encodeURIComponent('+'))
     expect(url).toContain(encodeURIComponent('/'))
+  })
+})
+
+describe('cliShimPlan', () => {
+  it('places the shim under <dataDir>/bin', () => {
+    expect(cliShimPlan('/data', '/repo', 'linux', '/usr/bin/node').binDir).toBe('/data/bin')
+  })
+
+  it('writes a posix sh `orca` that execs the CLI entry with the launching node, paths quoted', () => {
+    const { files } = cliShimPlan('/data', "/my repo/it's", 'linux', '/opt/node bin/node')
+    expect(files).toHaveLength(1)
+    expect(files[0].name).toBe('orca')
+    expect(files[0].content).toBe(
+      "#!/bin/sh\nexec '/opt/node bin/node' '/my repo/it'\\''s/out/cli/index.js' \"$@\"\n"
+    )
+  })
+
+  it('writes an orca.cmd on win32 with quoted paths and %* passthrough', () => {
+    const { files } = cliShimPlan('C:\\data', 'C:\\my repo', 'win32', 'C:\\node\\node.exe')
+    expect(files).toHaveLength(1)
+    expect(files[0].name).toBe('orca.cmd')
+    expect(files[0].content).toContain('@echo off')
+    expect(files[0].content).toContain('"C:\\node\\node.exe" "')
+    expect(files[0].content).toContain('index.js" %*')
+  })
+})
+
+describe('agentPathEnv', () => {
+  it('prepends the bin dir and keeps the existing PATH', () => {
+    expect(agentPathEnv({ PATH: '/usr/bin:/bin' }, '/data/bin', 'linux')).toEqual({
+      PATH: '/data/bin:/usr/bin:/bin'
+    })
+  })
+
+  it('yields just the bin dir when PATH is unset', () => {
+    expect(agentPathEnv({}, '/data/bin', 'linux')).toEqual({ PATH: '/data/bin' })
+  })
+
+  it('reuses the existing case of the PATH key on win32 and uses `;`', () => {
+    expect(agentPathEnv({ Path: 'C:\\Windows' }, 'C:\\data\\bin', 'win32')).toEqual({
+      Path: 'C:\\data\\bin;C:\\Windows'
+    })
   })
 })

@@ -1,4 +1,4 @@
-import { join } from 'node:path'
+import { join, posix, win32 } from 'node:path'
 
 const DEFAULT_ORCAD_PORT = 6799
 const DEFAULT_FRONTEND_PORT = 5180
@@ -148,4 +148,43 @@ export function composeFrontendUrl(frontendPort, pairingUrl) {
 /** Argv for `orca repo add`, run against the in-container unix socket — same path as ⌘K. */
 export function repoAddArgs(cliEntry, path) {
   return [cliEntry, 'repo', 'add', '--path', path, '--json']
+}
+
+const shellQuote = (value) => `'${value.replaceAll("'", "'\\''")}'`
+
+/** The `orca` CLI is only on PATH via Orca.app; this shim gives agents one that talks to this data dir's orcad. */
+export function cliShimPlan(dataDir, repoRoot, platform, nodePath) {
+  const pathApi = platform === 'win32' ? win32 : posix
+  const cliEntry = pathApi.join(repoRoot, 'out', 'cli', 'index.js')
+  const binDir = pathApi.join(dataDir, 'bin')
+  if (platform === 'win32') {
+    return {
+      binDir,
+      files: [
+        {
+          name: 'orca.cmd',
+          content: `@echo off\r\n"${nodePath}" "${cliEntry}" %*\r\n`
+        }
+      ]
+    }
+  }
+  return {
+    binDir,
+    files: [
+      {
+        name: 'orca',
+        content: `#!/bin/sh\nexec ${shellQuote(nodePath)} ${shellQuote(cliEntry)} "$@"\n`
+      }
+    ]
+  }
+}
+
+/** Single-key env patch that prepends `binDir`; reuses win32's differently-cased `Path` key. */
+export function agentPathEnv(env, binDir, platform) {
+  const key =
+    platform === 'win32'
+      ? (Object.keys(env).find((k) => k.toLowerCase() === 'path') ?? 'Path')
+      : 'PATH'
+  const delimiter = platform === 'win32' ? ';' : ':'
+  return { [key]: env[key] ? `${binDir}${delimiter}${env[key]}` : binDir }
 }

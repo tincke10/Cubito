@@ -5,12 +5,14 @@
 // spawn/fs glue.
 
 import { spawn, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { createInterface } from 'node:readline'
 import {
+  agentPathEnv,
+  cliShimPlan,
   composeFrontendUrl,
   dataDirSocketPathProblem,
   parseReadinessLine,
@@ -50,6 +52,7 @@ if (!existsSync(webIndexPath)) {
 }
 
 seedIsolatedProfile(plan)
+const shimBinDir = installCliShim(plan)
 
 let orcadChild = null
 let stopAttempts = 0
@@ -60,7 +63,11 @@ async function main() {
   orcadChild = spawn(process.execPath, [orcadEntry, ...plan.orcadArgs], {
     cwd: repoRoot,
     detached: process.platform !== 'win32',
-    env: { ...process.env, ORCA_USER_DATA: plan.dataDir },
+    env: {
+      ...process.env,
+      ...agentPathEnv(process.env, shimBinDir, process.platform),
+      ORCA_USER_DATA: plan.dataDir
+    },
     stdio: ['ignore', 'pipe', 'pipe']
   })
   registerSignalForwarding()
@@ -87,6 +94,18 @@ function registerRepos(plan) {
       console.error(`[cubito] failed to register repo ${path} (exit ${result.status ?? 'error'})`)
     }
   }
+}
+
+/** Rewritten every start so a moved repo or node upgrade never leaves a stale shim. */
+function installCliShim(launchPlan) {
+  const shim = cliShimPlan(launchPlan.dataDir, repoRoot, process.platform, process.execPath)
+  mkdirSync(shim.binDir, { recursive: true, mode: 0o700 })
+  for (const file of shim.files) {
+    const filePath = join(shim.binDir, file.name)
+    writeFileSync(filePath, file.content)
+    chmodSync(filePath, 0o755)
+  }
+  return shim.binDir
 }
 
 /** Seeds the local-default profile's workspaceDir only when absent — never overwrite a user choice. */
