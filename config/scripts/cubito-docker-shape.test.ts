@@ -137,6 +137,13 @@ describe('Dockerfile', () => {
   it('ships curl in the runtime stage so agent status hooks can reach orcad', () => {
     expect(runtimeStage).toMatch(/apt-get install[^&]*\bcurl\b/)
   })
+
+  // Why: the terminal wrapper sources /etc/profile, which on Debian resets PATH and drops the
+  // shim dir cubito-start prepends; /usr/local/bin survives that reset.
+  it('installs the orca CLI on the default PATH for interactive terminals', () => {
+    expect(runtimeStage).toMatch(/\/usr\/local\/bin\/orca/)
+    expect(runtimeStage).toContain('/app/out/cli/index.js')
+  })
 })
 
 describe('.dockerignore', () => {
