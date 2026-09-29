@@ -25,5 +25,13 @@ if [ "${CUBITO_AGENT_BYPASS:-}" = "accept" ]; then
 fi
 setpriv --reuid=node --regid=node --init-groups env HOME=/home/node node config/scripts/cubito-claude-config-seed.mjs $seed_args
 
+# Why: agents commit as the node user, which has no git identity of its own.
+if [ -n "${CUBITO_GIT_NAME:-}" ] && [ -n "${CUBITO_GIT_EMAIL:-}" ]; then
+  setpriv --reuid=node --regid=node --init-groups env HOME=/home/node git config --global user.name "$CUBITO_GIT_NAME"
+  setpriv --reuid=node --regid=node --init-groups env HOME=/home/node git config --global user.email "$CUBITO_GIT_EMAIL"
+else
+  echo "[cubito] warning: set CUBITO_GIT_NAME and CUBITO_GIT_EMAIL so agents can commit" >&2
+fi
+
 # Why not root: agents launched with bypass permissions are refused by Claude Code as root.
 exec setpriv --reuid=node --regid=node --init-groups env HOME=/home/node USER=node node config/scripts/cubito-start.mjs $register_args --agent-permissions "$agent_mode"

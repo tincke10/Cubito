@@ -139,7 +139,16 @@ docker compose up --build
 
 `compose.yaml` only passes the variable through from your shell; the token is never written to the repo. For a quick session instead, `docker compose exec -u node cubito claude login` works too, but that login lives in the container and is lost when it is recreated.
 
-By default agents ask for approval before running tools; answer in Cubito's `[t]` terminal. To let agents run tools without asking, opt in from the host shell:
+Agents commit as the container's own user, so give it your git identity:
+
+```bash
+export CUBITO_GIT_NAME="$(git config user.name)"
+export CUBITO_GIT_EMAIL="$(git config user.email)"
+```
+
+Without them the container logs a warning at startup and agent commits fail with "Author identity unknown".
+
+By default agents keep Claude's own permission prompts: they stop to ask before an action Claude considers risky; answer in Cubito's `[t]` terminal. To let agents run every tool without asking, opt in from the host shell:
 
 ```bash
 export CUBITO_AGENT_BYPASS=accept

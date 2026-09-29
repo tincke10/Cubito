@@ -195,3 +195,36 @@ describe('container user', () => {
     expect(readme).toContain('docker compose exec -u node cubito')
   })
 })
+
+describe('agent git identity', () => {
+  const compose = parse(readFileSync(join(REPO_ROOT, 'compose.yaml'), 'utf8')) as ComposeFile
+  const env = compose.services.cubito.environment ?? {}
+  const entrypoint = readFileSync(join(REPO_ROOT, 'config/docker/cubito/entrypoint.sh'), 'utf8')
+  const readme = readFileSync(join(REPO_ROOT, 'README.md'), 'utf8')
+
+  it('passes the commit identity through from the host without storing a value', () => {
+    expect(env.CUBITO_GIT_NAME).toBeNull()
+    expect(env.CUBITO_GIT_EMAIL).toBeNull()
+    expect(Object.hasOwn(env, 'CUBITO_GIT_NAME')).toBe(true)
+    expect(Object.hasOwn(env, 'CUBITO_GIT_EMAIL')).toBe(true)
+  })
+
+  it("writes the identity into the node user's global git config before orcad starts", () => {
+    expect(entrypoint).toMatch(
+      /setpriv --reuid=node .*git config --global user\.name "\$CUBITO_GIT_NAME"/
+    )
+    expect(entrypoint).toMatch(
+      /setpriv --reuid=node .*git config --global user\.email "\$CUBITO_GIT_EMAIL"/
+    )
+    expect(entrypoint.indexOf('user.name')).toBeLessThan(entrypoint.indexOf('exec setpriv'))
+  })
+
+  it('warns at startup when no identity is given, instead of failing silently at commit time', () => {
+    expect(entrypoint).toMatch(/CUBITO_GIT_NAME and CUBITO_GIT_EMAIL.*>&2/)
+  })
+
+  it('documents taking the identity from the host git config', () => {
+    expect(readme).toContain('export CUBITO_GIT_NAME="$(git config user.name)"')
+    expect(readme).toContain('export CUBITO_GIT_EMAIL="$(git config user.email)"')
+  })
+})

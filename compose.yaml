@@ -12,6 +12,9 @@ services:
       CLAUDE_CODE_OAUTH_TOKEN:
       # `accept` in the host shell lets agents bypass permission prompts; unset means they ask.
       CUBITO_AGENT_BYPASS:
+      # The identity agents commit with; the container's own user has none.
+      CUBITO_GIT_NAME:
+      CUBITO_GIT_EMAIL:
     volumes:
       - cubito-data:/data
       - cubito-workspaces:/workspaces
