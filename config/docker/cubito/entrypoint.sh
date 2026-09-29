@@ -16,5 +16,14 @@ fi
 # Why: volumes created by earlier root-run images, and the seed above, are root-owned.
 find /data /workspaces /repos ! -user node -exec chown -h node:node {} +
 
-# Why not root: agents launch with bypass permissions, which Claude Code refuses as root.
-exec setpriv --reuid=node --regid=node --init-groups env HOME=/home/node USER=node node config/scripts/cubito-start.mjs $register_args
+# Why: a spawned Claude blocks on first-run onboarding (and the bypass warning, default "exit") otherwise.
+agent_mode=manual
+seed_args=""
+if [ "${CUBITO_AGENT_BYPASS:-}" = "accept" ]; then
+  agent_mode=yolo
+  seed_args="--accept-bypass"
+fi
+setpriv --reuid=node --regid=node --init-groups env HOME=/home/node node config/scripts/cubito-claude-config-seed.mjs $seed_args
+
+# Why not root: agents launched with bypass permissions are refused by Claude Code as root.
+exec setpriv --reuid=node --regid=node --init-groups env HOME=/home/node USER=node node config/scripts/cubito-start.mjs $register_args --agent-permissions "$agent_mode"

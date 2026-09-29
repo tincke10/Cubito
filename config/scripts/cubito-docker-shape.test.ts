@@ -72,6 +72,12 @@ describe('compose.yaml', () => {
     // Why null: a valueless key is read from the host shell and left unset when absent.
     expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBeNull()
   })
+
+  it('passes the agent bypass opt-in through from the host without storing a value', () => {
+    const env = cubito.environment ?? {}
+    expect(Object.hasOwn(env, 'CUBITO_AGENT_BYPASS')).toBe(true)
+    expect(env.CUBITO_AGENT_BYPASS).toBeNull()
+  })
 })
 
 describe('Dockerfile', () => {
@@ -152,6 +158,36 @@ describe('container user', () => {
   it('hands every volume to the node user before dropping privileges', () => {
     expect(entrypoint).toMatch(/\/data \/workspaces \/repos .*chown -h node:node/)
     expect(entrypoint.indexOf('chown')).toBeLessThan(entrypoint.indexOf('exec setpriv'))
+  })
+
+  // Why: without seeding, a spawned Claude blocks on onboarding and the bypass warning (default "exit").
+  it('seeds the Claude config as node before dropping into cubito-start', () => {
+    expect(entrypoint).toMatch(
+      /setpriv --reuid=node --regid=node --init-groups env HOME=\/home\/node node config\/scripts\/cubito-claude-config-seed\.mjs/
+    )
+    expect(entrypoint.indexOf('cubito-claude-config-seed.mjs')).toBeLessThan(
+      entrypoint.indexOf('exec setpriv')
+    )
+    expect(entrypoint.indexOf('chown')).toBeLessThan(
+      entrypoint.indexOf('cubito-claude-config-seed')
+    )
+  })
+
+  it('maps CUBITO_AGENT_BYPASS=accept to yolo plus --accept-bypass, anything else to manual', () => {
+    expect(entrypoint).toMatch(/"\$\{CUBITO_AGENT_BYPASS:-\}" = "accept"/)
+    expect(entrypoint).toMatch(/agent_mode=yolo/)
+    expect(entrypoint).toMatch(/agent_mode=manual/)
+    expect(entrypoint).toContain('--accept-bypass')
+  })
+
+  it('hands the chosen mode to cubito-start on the exec line', () => {
+    expect(entrypoint).toMatch(
+      /exec setpriv .*cubito-start\.mjs .*--agent-permissions "?\$agent_mode"?/
+    )
+  })
+
+  it('documents the bypass opt-in in the Docker README', () => {
+    expect(readme).toContain('export CUBITO_AGENT_BYPASS=accept')
   })
 
   it('documents exec commands as the node user so logins and clones land where agents run', () => {

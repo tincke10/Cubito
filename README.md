@@ -139,6 +139,15 @@ docker compose up --build
 
 `compose.yaml` only passes the variable through from your shell; the token is never written to the repo. For a quick session instead, `docker compose exec -u node cubito claude login` works too, but that login lives in the container and is lost when it is recreated.
 
+By default agents ask for approval before running tools; answer in Cubito's `[t]` terminal. To let agents run tools without asking, opt in from the host shell:
+
+```bash
+export CUBITO_AGENT_BYPASS=accept
+docker compose up --build
+```
+
+Setting it also accepts Claude's "Bypass Permissions mode" warning on your behalf. Only do this because the container is the sandbox: agents can then act freely on everything mounted in it.
+
 Repos to work on live under `/repos` inside the container. Clone one in, then add it from the command palette (`⌘K` / `Ctrl+K`):
 
 ```bash

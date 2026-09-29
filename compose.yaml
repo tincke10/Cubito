@@ -10,6 +10,8 @@ services:
       CUBITO_PAIRING_ADDRESS: 127.0.0.1:6799
       # Read from the host shell when set (from `claude setup-token`); never written here.
       CLAUDE_CODE_OAUTH_TOKEN:
+      # `accept` in the host shell lets agents bypass permission prompts; unset means they ask.
+      CUBITO_AGENT_BYPASS:
     volumes:
       - cubito-data:/data
       - cubito-workspaces:/workspaces
