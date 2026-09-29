@@ -14,7 +14,7 @@ type ComposeFile = {
     {
       build?: string
       ports?: string[]
-      environment?: Record<string, string>
+      environment?: Record<string, string | null>
       volumes?: string[]
       stdin_open?: boolean
       tty?: boolean
@@ -64,6 +64,13 @@ describe('compose.yaml', () => {
   it('keeps the terminal interactive for docker compose exec', () => {
     expect(cubito.stdin_open).toBe(true)
     expect(cubito.tty).toBe(true)
+  })
+
+  it('passes the Claude OAuth token through from the host without ever storing a value', () => {
+    const env = cubito.environment ?? {}
+    expect(Object.hasOwn(env, 'CLAUDE_CODE_OAUTH_TOKEN')).toBe(true)
+    // Why null: a valueless key is read from the host shell and left unset when absent.
+    expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBeNull()
   })
 })
 

@@ -129,11 +129,15 @@ docker compose up --build   # or: pnpm cubito:docker
 
 This builds the image and starts a `cubito` container publishing only `6799` — orcad serves the frontend on that same port — with data in the `cubito-data`, `cubito-workspaces` and `cubito-repos` named volumes. Watch the logs for the printed pairing URL and open it on the host at `http://localhost:6799/...`.
 
-Coding agents run inside the container, so log them in there:
+Coding agents run inside the container, so they need their own Claude login. The login that survives rebuilds is a long-lived token: generate it once on the host and export it before starting the stack.
 
 ```bash
-docker compose exec cubito claude login
+claude setup-token                       # opens the browser once, prints the token
+export CLAUDE_CODE_OAUTH_TOKEN=<token>
+docker compose up --build
 ```
+
+`compose.yaml` only passes the variable through from your shell; the token is never written to the repo. For a quick session instead, `docker compose exec cubito claude login` works too, but that login lives in the container and is lost when it is recreated.
 
 Repos to work on live under `/repos` inside the container. Clone one in, then add it from the command palette (`⌘K` / `Ctrl+K`):
 

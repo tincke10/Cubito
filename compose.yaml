@@ -8,6 +8,8 @@ services:
       CUBITO_WORKTREE_ROOT: /workspaces
       CUBITO_ORCAD_BIND: 0.0.0.0
       CUBITO_PAIRING_ADDRESS: 127.0.0.1:6799
+      # Read from the host shell when set (from `claude setup-token`); never written here.
+      CLAUDE_CODE_OAUTH_TOKEN:
     volumes:
       - cubito-data:/data
       - cubito-workspaces:/workspaces
