@@ -47,6 +47,25 @@ describe('parseArgs', () => {
   })
 })
 
+describe('parseArgs --agent-permissions', () => {
+  it('accepts manual and yolo', () => {
+    expect(parseArgs(['--agent-permissions', 'manual'])).toEqual({ agentPermissions: 'manual' })
+    expect(parseArgs(['--json', '--agent-permissions', 'yolo'])).toEqual({
+      json: true,
+      agentPermissions: 'yolo'
+    })
+  })
+
+  it('rejects a missing or unknown value rather than guessing a permission mode', () => {
+    expect(() => parseArgs(['--agent-permissions'])).toThrow(
+      '--agent-permissions expects manual or yolo'
+    )
+    expect(() => parseArgs(['--agent-permissions', 'mixed'])).toThrow(
+      '--agent-permissions expects manual or yolo, got mixed'
+    )
+  })
+})
+
 describe('resolveOrcadExitCode', () => {
   it('separates a configuration fault from a generic failure', () => {
     // A supervisor must be able to stop restarting on faults that restarting cannot fix:

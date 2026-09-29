@@ -16,6 +16,7 @@ import { setAppEnvironment, type AppEnvironment } from '../../shared/app-environ
 import { setSecretStore, type SecretStore } from '../../shared/secret-store'
 import type { ServeReadiness } from '../server/serve-readiness'
 import { setRuntimeBrowserCommandsFactory } from '../runtime/runtime-browser-commands-factory'
+import { applyOrcadAgentPermissions, type OrcadAgentPermissions } from './orcad-agent-permissions'
 import { resolveOrcadBrowserProvider, type OrcadBrowserProvider } from './orcad-browser-provider'
 import { resolveOrcadInstallRoot, resolveOrcadPath, resolveUserDataPath } from './orcad-app-paths'
 import {
@@ -94,6 +95,8 @@ export type OrcadOptions = {
   bind?: string
   /** Static web client root; when set, one listener serves both the page and the WS. */
   webClientRoot?: string
+  /** Rewrites every agent's default bypass args/env at startup; unset keeps the store as-is. */
+  agentPermissions?: OrcadAgentPermissions
 }
 
 export type OrcadHandle = {
@@ -158,6 +161,9 @@ async function startOrcadRuntime(
   // Why: orcad IS the runtime authority — loading as 'desktop' would classify its
   // own runtime-scheduled automations as ambiguous mirrors and orphan them.
   const store = new Store({ dataFile: profile.dataFile, storageAuthority: 'runtime' })
+  if (options.agentPermissions) {
+    applyOrcadAgentPermissions(store, options.agentPermissions)
+  }
   // Why: every SSH connect consults this sidecar. Left unbound it reports nothing trusted,
   // which is safe but silently discards accept records on every launch.
   initSshHostKeyStoreFile(profile.dataFile)
@@ -331,6 +337,15 @@ export function parseArgs(argv: string[]): OrcadOptions {
         throw new Error('--web-client-root expects a value')
       }
       options.webClientRoot = value
+      i += 1
+    } else if (arg === '--agent-permissions') {
+      const value = argv[i + 1]
+      if (value !== 'manual' && value !== 'yolo') {
+        throw new Error(
+          `--agent-permissions expects manual or yolo${value ? `, got ${value}` : ''}`
+        )
+      }
+      options.agentPermissions = value
       i += 1
     } else {
       throw new Error(`Unknown argument: ${arg}`)
