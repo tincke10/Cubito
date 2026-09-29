@@ -136,3 +136,26 @@ describe('.dockerignore', () => {
     expect(ignore).toContain('.git')
   })
 })
+
+describe('container user', () => {
+  const entrypoint = readFileSync(join(REPO_ROOT, 'config/docker/cubito/entrypoint.sh'), 'utf8')
+  const readme = readFileSync(join(REPO_ROOT, 'README.md'), 'utf8')
+
+  // Why: agents launch with bypass permissions, and Claude Code refuses that flag as root.
+  it('starts orcad as the unprivileged node user, never as root', () => {
+    expect(entrypoint).toMatch(
+      /exec setpriv --reuid=node --regid=node --init-groups .*node config\/scripts\/cubito-start\.mjs/
+    )
+    expect(entrypoint).toContain('HOME=/home/node')
+  })
+
+  it('hands every volume to the node user before dropping privileges', () => {
+    expect(entrypoint).toMatch(/\/data \/workspaces \/repos .*chown -h node:node/)
+    expect(entrypoint.indexOf('chown')).toBeLessThan(entrypoint.indexOf('exec setpriv'))
+  })
+
+  it('documents exec commands as the node user so logins and clones land where agents run', () => {
+    expect(readme).not.toMatch(/docker compose exec cubito /)
+    expect(readme).toContain('docker compose exec -u node cubito')
+  })
+})

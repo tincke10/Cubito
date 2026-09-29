@@ -137,12 +137,12 @@ export CLAUDE_CODE_OAUTH_TOKEN=<token>
 docker compose up --build
 ```
 
-`compose.yaml` only passes the variable through from your shell; the token is never written to the repo. For a quick session instead, `docker compose exec cubito claude login` works too, but that login lives in the container and is lost when it is recreated.
+`compose.yaml` only passes the variable through from your shell; the token is never written to the repo. For a quick session instead, `docker compose exec -u node cubito claude login` works too, but that login lives in the container and is lost when it is recreated.
 
 Repos to work on live under `/repos` inside the container. Clone one in, then add it from the command palette (`⌘K` / `Ctrl+K`):
 
 ```bash
-docker compose exec cubito git clone <url> /repos/<name>
+docker compose exec -u node cubito git clone <url> /repos/<name>
 ```
 
 A demo NestJS repo (`/repos/demo-nest`) is seeded and registered on first boot, so it's already visible in the UI — no `⌘K` needed for it.

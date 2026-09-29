@@ -13,4 +13,8 @@ if [ ! -d /repos/demo-nest ]; then
   register_args="--register-repo /repos/demo-nest"
 fi
 
-exec node config/scripts/cubito-start.mjs $register_args
+# Why: volumes created by earlier root-run images, and the seed above, are root-owned.
+find /data /workspaces /repos ! -user node -exec chown -h node:node {} +
+
+# Why not root: agents launch with bypass permissions, which Claude Code refuses as root.
+exec setpriv --reuid=node --regid=node --init-groups env HOME=/home/node USER=node node config/scripts/cubito-start.mjs $register_args
