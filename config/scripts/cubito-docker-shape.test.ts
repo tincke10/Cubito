@@ -132,6 +132,11 @@ describe('Dockerfile', () => {
     expect(runtimeStage).not.toContain('build-essential')
     expect(runtimeStage).not.toContain('libgtk-3-0')
   })
+
+  // Why: the installed agent status hooks POST each event to orcad with curl.
+  it('ships curl in the runtime stage so agent status hooks can reach orcad', () => {
+    expect(runtimeStage).toMatch(/apt-get install[^&]*\bcurl\b/)
+  })
 })
 
 describe('.dockerignore', () => {

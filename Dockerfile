@@ -48,9 +48,11 @@ FROM node:24-bookworm-slim
 ENV DEBIAN_FRONTEND=noninteractive
 
 # git: worktree operations. ca-certificates: HTTPS clones, npm/claude-code installs.
+# curl: the agent status hooks POST every event to orcad with it.
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     ca-certificates \
+    curl \
     git \
   && rm -rf /var/lib/apt/lists/*
 
