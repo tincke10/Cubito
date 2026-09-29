@@ -1,7 +1,7 @@
 import { posix } from 'node:path'
 import type { ParsedRouteFile, ParsedRouterMount } from './framework-route-model'
+import { moduleFileCandidates } from './module-specifier-normalization'
 
-const RESOLUTION_SUFFIXES = ['', '.ts', '.tsx', '.js', '/index.ts', '/index.js']
 const KEY_SEPARATOR = '\u0000'
 
 type FileKey = string
@@ -28,13 +28,7 @@ export function resolveRelativeModule(
     return null
   }
   const joined = posix.normalize(posix.join(posix.dirname(fromFilePath), spec))
-  for (const suffix of RESOLUTION_SUFFIXES) {
-    const candidate = joined + suffix
-    if (knownFilePaths.has(candidate)) {
-      return candidate
-    }
-  }
-  return null
+  return moduleFileCandidates(joined).find((candidate) => knownFilePaths.has(candidate)) ?? null
 }
 
 function findImportBinding(

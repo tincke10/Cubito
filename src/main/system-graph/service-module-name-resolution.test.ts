@@ -17,6 +17,14 @@ describe('moduleNameFromSpecifier', () => {
   it('collapses a trailing index segment to the parent directory name', () => {
     expect(moduleNameFromSpecifier('./services/user/index')).toBe('user')
   })
+
+  it.each(['.ts', '.js', '.mjs', '.tsx'])('strips an explicit %s extension', (ext) => {
+    expect(moduleNameFromSpecifier(`./services/book-service${ext}`)).toBe('book-service')
+  })
+
+  it('collapses index.js to the parent directory name', () => {
+    expect(moduleNameFromSpecifier('./services/user/index.js')).toBe('user')
+  })
 })
 
 describe('collectServiceModuleNames: grouping from relative imports', () => {
@@ -158,5 +166,34 @@ describe('collectServiceModuleNames: excludes a module-descriptor file reached o
     })
 
     expect(collectServiceModuleNames([controller, adminModule])).toEqual([])
+  })
+})
+
+describe('collectServiceModuleNames: explicit extensions', () => {
+  it('merges an extensionless and an extension-suffixed import of the same module', () => {
+    const files = [
+      routeFile({
+        filePath: 'src/routes/users.ts',
+        imports: [
+          { moduleSpecifier: './services/x', isRelative: true },
+          { moduleSpecifier: './services/x.js', isRelative: true }
+        ]
+      })
+    ]
+    expect(collectServiceModuleNames(files)).toEqual(['x'])
+  })
+
+  it('does not treat a router imported as ./routes/books.js as a service', () => {
+    const files = [
+      routeFile({
+        filePath: 'src/index.ts',
+        imports: [{ moduleSpecifier: './routes/books.js', isRelative: true }]
+      }),
+      routeFile({
+        filePath: 'src/routes/books.ts',
+        endpoints: [{ method: 'GET', path: '/', routerLocalName: 'router' }]
+      })
+    ]
+    expect(collectServiceModuleNames(files)).toEqual([])
   })
 })

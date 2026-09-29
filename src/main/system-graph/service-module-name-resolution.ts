@@ -1,11 +1,14 @@
 import type { ParsedImport, ParsedRouteFile } from './framework-route-model'
+import { stripModuleExtension } from './module-specifier-normalization'
 import { resolveRelativeModule } from './route-mount-composition'
 
 const SERVICE_NODE_CAP = 24
 
-/** Immediate module name for grouping: last path segment, collapsing a bare 'index' to its dir. */
+/** Immediate module name for grouping: last path segment sans extension, collapsing 'index' to its dir. */
 export function moduleNameFromSpecifier(spec: string): string {
-  const segments = spec.split('/').filter((seg) => seg.length > 0 && seg !== '.' && seg !== '..')
+  const segments = stripModuleExtension(spec)
+    .split('/')
+    .filter((seg) => seg.length > 0 && seg !== '.' && seg !== '..')
   if (segments.length === 0) {
     return spec
   }

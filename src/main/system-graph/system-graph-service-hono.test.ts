@@ -167,3 +167,49 @@ describe('SystemGraphService: hono worktree golden', () => {
     })
   })
 })
+
+// ESM/NodeNext style: relative imports carry explicit '.js'/'.ts' extensions.
+const HONO_ESM_WORKTREE: FakeWorktree = {
+  rootPath: '/repo/hono-esm',
+  connectionId: 'ssh-hono-esm',
+  files: {
+    'package.json': JSON.stringify({
+      dependencies: { hono: '^4.0.0' },
+      devDependencies: { typescript: '^5.5.0' }
+    }),
+    'src/index.ts': [
+      "import { Hono } from 'hono'",
+      "import { books } from './routes/books.js'",
+      'const app = new Hono()',
+      "app.route('/books', books)"
+    ].join('\n'),
+    'src/routes/books.ts': [
+      "import { bookService } from '../services/book-service.ts'",
+      "import { authorService } from '../services/author-service.js'",
+      "export const books = new Hono().get('/', h)"
+    ].join('\n'),
+    'src/services/book-service.ts': 'export const bookService = { list: () => [] }',
+    'src/services/author-service.ts': 'export const authorService = { list: () => [] }'
+  }
+}
+
+describe('SystemGraphService: hono worktree with explicit import extensions', () => {
+  it('composes the .js-imported router and names services without their extension', async () => {
+    const service = new SystemGraphService(fakeHost({ w1: HONO_ESM_WORKTREE }))
+
+    await service.buildGraph('w1')
+    const graph = service.getGraph('w1')!
+    const nodes = [...graph.nodes.values()]
+
+    expect(nodes.filter((n) => n.kind === 'endpoint').map((n) => n.label)).toContain('GET /books/')
+
+    const serviceLabels = nodes.filter((n) => n.kind === 'service').map((n) => n.label)
+    expect(serviceLabels).toEqual(['book-service', 'author-service'])
+    expect(serviceLabels.some((label) => label.includes('.'))).toBe(false)
+    expect(graph.edges).toContainEqual({
+      from: 'router:src/routes/books.ts',
+      to: 'service:book-service',
+      kind: 'flow'
+    })
+  })
+})

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ParsedRouteFile } from './framework-route-model'
-import { composeMountPrefixes } from './route-mount-composition'
+import { composeMountPrefixes, resolveRelativeModule } from './route-mount-composition'
 
 function routeFile(overrides: Partial<ParsedRouteFile> & { filePath: string }): ParsedRouteFile {
   return { endpoints: [], mounts: [], imports: [], exports: [], ...overrides }
@@ -219,5 +219,28 @@ describe('composeMountPrefixes: edge cases', () => {
 
     expect(composed.size).toBe(0)
     expect(composed.get('src/routes/users.ts')).toBeUndefined()
+  })
+})
+
+describe('resolveRelativeModule: explicit extensions', () => {
+  it('maps a .js specifier to its .ts source', () => {
+    const known = new Set(['src/routes/books.ts'])
+    expect(resolveRelativeModule('src/index.ts', './routes/books.js', known)).toBe(
+      'src/routes/books.ts'
+    )
+  })
+
+  it('maps .mjs to .mts', () => {
+    const known = new Set(['src/routes/books.mts'])
+    expect(resolveRelativeModule('src/index.mts', './routes/books.mjs', known)).toBe(
+      'src/routes/books.mts'
+    )
+  })
+
+  it('resolves a directory index imported with .js', () => {
+    const known = new Set(['src/routes/index.ts'])
+    expect(resolveRelativeModule('src/index.ts', './routes/index.js', known)).toBe(
+      'src/routes/index.ts'
+    )
   })
 })
