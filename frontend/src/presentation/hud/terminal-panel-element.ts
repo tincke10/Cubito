@@ -4,6 +4,7 @@ import '@xterm/xterm/css/xterm.css' // base styles: hides the helper textarea, l
 import { FitAddon } from '@xterm/addon-fit'
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
 import type { TerminalPanelModel } from './terminal-panel-model'
+import { createConnectedFocus } from './connected-focus-scheduler'
 
 /** Chrome tone -> CSS custom property (kebab convention, same table shape as node-label-element.ts). */
 const CHROME_VAR = {
@@ -88,6 +89,13 @@ export function createTerminalPanel(onExit: () => void): TerminalPanelHandle {
   term.open(body)
   term.attachCustomKeyEventHandler((event) => terminalCustomKeyEventHandler(event, onExit))
 
+  const connectedFocus = createConnectedFocus({
+    isConnected: () => root.isConnected,
+    focus: () => term.focus(),
+    schedule: (callback) => requestAnimationFrame(callback),
+    cancel: (handle) => cancelAnimationFrame(handle)
+  })
+
   const object = new CSS2DObject(root)
 
   return {
@@ -119,12 +127,14 @@ export function createTerminalPanel(onExit: () => void): TerminalPanelHandle {
       return () => subscription.dispose()
     },
     focus() {
-      term.focus()
+      connectedFocus.request()
     },
     blur() {
+      connectedFocus.cancel()
       term.blur()
     },
     dispose() {
+      connectedFocus.cancel()
       term.dispose()
       root.remove()
     }
