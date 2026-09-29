@@ -17,7 +17,7 @@ const SKIP_DIRS = new Set([
   '.output',
   'tmp'
 ])
-const SOURCE_EXTENSIONS = ['.ts', '.mts', '.cts', '.js', '.mjs', '.cjs']
+const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs']
 const PREFERRED_SOURCE_DIRS = new Set(['src', 'app', 'routes', 'api', 'server', 'lib'])
 const DEFAULT_MAX_DEPTH = 8
 const DEFAULT_MAX_FILES = 2000

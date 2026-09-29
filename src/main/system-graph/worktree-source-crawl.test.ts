@@ -14,6 +14,18 @@ function fakeReader(tree: Record<string, FakeEntry[]>): WorktreeSourceReader {
 }
 
 describe('crawlSourceFiles', () => {
+  it('includes .tsx and .jsx files', async () => {
+    const reader = fakeReader({
+      '.': [{ name: 'src', isDirectory: true }],
+      src: [
+        { name: 'route.tsx', isDirectory: false },
+        { name: 'route.jsx', isDirectory: false }
+      ]
+    })
+
+    await expect(crawlSourceFiles(reader)).resolves.toEqual(['src/route.tsx', 'src/route.jsx'])
+  })
+
   it('skips ignored directories (node_modules, .git, dist, build)', async () => {
     const reader = fakeReader({
       '.': [
