@@ -119,6 +119,21 @@ describe('Dockerfile', () => {
     )
   })
 
+  // Why: out/cli is unbundled tsc output, so every package it imports must be staged.
+  it('stages the orcad externals and every package the CLI imports at runtime', () => {
+    for (const root of [
+      'node-pty',
+      '@parcel/watcher',
+      'zod',
+      'ws',
+      'tweetnacl',
+      'yaml',
+      'jsonc-parser'
+    ]) {
+      expect(dockerfile).toContain(`--root ${root} `)
+    }
+  })
+
   it('does not publish or reference the dropped frontend port', () => {
     expect(dockerfile).not.toContain('5180')
   })

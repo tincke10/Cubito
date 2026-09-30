@@ -37,9 +37,11 @@ RUN node config/scripts/ensure-native-runtime.mjs --runtime=node \
 # dependencies + optionalDependencies — a fixed sibling list brings a package's neighbors but not
 # the neighbors' own deps (e.g. is-glob without its is-extglob). The two `node -e` lines fail the
 # build, not a container at runtime, if the staged closure is incomplete.
+# Roots: orcad's esbuild externals (node-pty, @parcel/watcher) + the unbundled tsc CLI's imports.
 RUN node config/scripts/cubito-stage-runtime-deps.mjs \
     --from /app --to /stage/node_modules \
     --root node-pty --root @parcel/watcher --root zod --root ws --root tweetnacl --root yaml \
+    --root jsonc-parser \
   && node -e "process.chdir('/app'); require('/stage/node_modules/node-pty'); require('/stage/node_modules/@parcel/watcher')" \
   && NODE_PATH=/stage/node_modules node -e "require('/app/out/cli/index.js')"
 
