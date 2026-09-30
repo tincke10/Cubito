@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createProjectSelectorController } from './project-selector-controller'
+import { repoSetupSaved } from '../../application/repo-setup-saved'
 import type { ProjectSelectorControllerDeps } from './project-selector-controller'
 import {
   emptyProjectSelectorSlice,
@@ -236,6 +237,17 @@ describe('createProjectSelectorController — repo setup', () => {
       sharedCommand: null,
       message: 'guardado'
     })
+  })
+
+  it('signals a saved setup so open forms drop their stale hint', async () => {
+    const emit = vi.spyOn(repoSetupSaved, 'emit')
+    const { controller, selectors } = setup()
+    controller.sync(openSlice(), activeA)
+    await flush()
+    selectors[0]!.emitSetupSave('pnpm install')
+    await flush()
+    expect(emit).toHaveBeenCalledOnce()
+    emit.mockRestore()
   })
 
   it('reports a save failure in the setup section', async () => {

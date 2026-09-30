@@ -1,3 +1,5 @@
+import type { RepoSetupSavedSignal } from './repo-setup-saved'
+
 export const NO_SETUP_HINT = 'sin setup: el worktree nace sin dependencias (configuralo en ⌘P)'
 
 export type SetupHintTracker = {
@@ -12,10 +14,19 @@ export type SetupHintTracker = {
 export function createSetupHintTracker(deps: {
   probe: (repoSelector: string) => Promise<string | null>
   onChange: () => void
+  /** When it fires, every verdict is dropped and `onChange` runs so an open form re-probes. */
+  invalidations?: Pick<RepoSetupSavedSignal, 'subscribe'>
 }): SetupHintTracker {
   const missing = new Map<string, boolean>()
   const inflight = new Set<string>()
   let epoch = 0
+  const invalidate = (): void => {
+    epoch++
+    missing.clear()
+    inflight.clear()
+    deps.onChange()
+  }
+  deps.invalidations?.subscribe(invalidate)
   return {
     hint(repoSelector) {
       return repoSelector !== null && missing.get(repoSelector) === true ? NO_SETUP_HINT : null

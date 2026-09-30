@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { createRepoSetupSavedSignal } from './repo-setup-saved'
 import { NO_SETUP_HINT, createSetupHintTracker } from './repo-setup-hint'
 
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
@@ -61,5 +62,26 @@ describe('createSetupHintTracker', () => {
     tracker.reset()
     tracker.ensure('id:r1')
     expect(probe).toHaveBeenCalledTimes(2)
+  })
+
+  it('re-probes and notifies when a setup save is signalled, clearing a stale hint', async () => {
+    const onChange = vi.fn()
+    const signal = createRepoSetupSavedSignal()
+    let command: string | null = null
+    const tracker = createSetupHintTracker({
+      probe: async () => command,
+      onChange,
+      invalidations: signal
+    })
+    tracker.ensure('id:r1')
+    await flush()
+    expect(tracker.hint('id:r1')).toBe(NO_SETUP_HINT)
+    command = 'pnpm install'
+    signal.emit()
+    expect(tracker.hint('id:r1')).toBeNull()
+    expect(onChange).toHaveBeenCalledTimes(2)
+    tracker.ensure('id:r1')
+    await flush()
+    expect(tracker.hint('id:r1')).toBeNull()
   })
 })

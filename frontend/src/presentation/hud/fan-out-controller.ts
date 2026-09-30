@@ -14,6 +14,7 @@ import type { CamadaMemberPoll } from '../../application/camada-member-poll'
 import { runCamadaLeaseSubmit } from '../../application/fan-out-lease-submit'
 import type { FanOutFormHandle } from './fan-out-element'
 import { createSetupHintTracker } from '../../application/repo-setup-hint'
+import { repoSetupSaved } from '../../application/repo-setup-saved'
 import { fanOutViewModel } from './fan-out-view-model'
 
 /** listRepos/createWorktree/listWorktreePs for the v1 loop and the member poll it owns, plus
@@ -79,6 +80,7 @@ export function createFanOutController(deps: FanOutControllerDeps): FanOutContro
 
   const setupHints = createSetupHintTracker({
     probe: (repoSelector) => gateway.repoSetupCommand(repoSelector),
+    invalidations: repoSetupSaved,
     onChange: () => {
       if (currentGraph) controller.sync(currentSlice, currentGraph)
     }

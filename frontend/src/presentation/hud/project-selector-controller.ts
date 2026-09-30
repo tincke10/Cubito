@@ -2,6 +2,7 @@ import type {
   ProjectSelectorAction,
   ProjectSelectorSlice
 } from '../../application/project-selector-model'
+import { repoSetupSaved } from '../../application/repo-setup-saved'
 import type { ReposAction, ReposSlice } from '../../application/repos-model'
 import type { RuntimeGateway } from '../../application/ports/runtime-gateway'
 import type { ProjectSelectorHandle } from './project-selector-element'
@@ -92,6 +93,7 @@ export function createProjectSelectorController(
     try {
       await gateway.setRepoSetupCommand(`id:${target.id}`, trimmed)
       setupRepo = { ...target, command: trimmed === '' ? null : trimmed }
+      repoSetupSaved.emit()
       showSetup('guardado')
     } catch (error) {
       showSetup(`error: ${error instanceof Error ? error.message : 'no se pudo guardar'}`)
@@ -111,6 +113,7 @@ export function createProjectSelectorController(
       if (setup !== '') {
         try {
           await gateway.setRepoSetupCommand(`id:${repo.id}`, setup)
+          repoSetupSaved.emit()
         } catch (error) {
           setupError = error instanceof Error ? error.message : 'error'
         }

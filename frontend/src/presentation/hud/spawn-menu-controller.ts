@@ -7,6 +7,7 @@ import type { RuntimeGateway } from '../../application/ports/runtime-gateway'
 import type { SpawnMenuHandle } from './spawn-menu-element'
 import type { SpawnFormHandle } from './spawn-form-element'
 import { createSetupHintTracker } from '../../application/repo-setup-hint'
+import { repoSetupSaved } from '../../application/repo-setup-saved'
 import { spawnViewModel } from './spawn-view-model'
 
 /** Only the two methods spawn needs — narrow like the other controller ports in this dir. */
@@ -55,6 +56,7 @@ export function createSpawnMenuController(deps: SpawnMenuControllerDeps): SpawnM
 
   const setupHints = createSetupHintTracker({
     probe: (repoSelector) => gateway.repoSetupCommand(repoSelector),
+    invalidations: repoSetupSaved,
     onChange: () => {
       if (currentGraph) controller.sync(currentSlice, currentGraph)
     }
