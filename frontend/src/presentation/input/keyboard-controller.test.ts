@@ -587,6 +587,58 @@ describe('createKeyboardController', () => {
     )
   })
 
+  describe('attach() form-opening keys', () => {
+    function press(
+      key: string,
+      shiftKey: boolean,
+      target: { tagName: string; isContentEditable: boolean } | null
+    ) {
+      vi.stubGlobal('HTMLElement', function HTMLElementStub(this: unknown) {
+        Object.assign(this as object, target)
+      })
+      try {
+        const { controller } = setup('a', LINUX)
+        const fakeTarget = { addEventListener: vi.fn(), removeEventListener: vi.fn() }
+        controller.attach(fakeTarget)
+        const [, handler] = fakeTarget.addEventListener.mock.calls[0]!
+        const preventDefault = vi.fn()
+        const domTarget = target
+          ? new (globalThis.HTMLElement as never as new () => object)()
+          : null
+        handler({
+          key,
+          ctrlKey: false,
+          metaKey: false,
+          altKey: false,
+          shiftKey,
+          target: domTarget,
+          preventDefault
+        } as unknown as KeyboardEvent)
+        return preventDefault
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    }
+
+    it('preventDefaults the handled s that opens the spawn form (no leak into the focused field)', () => {
+      expect(press('s', false, null)).toHaveBeenCalledOnce()
+    })
+
+    it('preventDefaults the handled shift+f that opens the fan-out form', () => {
+      expect(press('F', true, null)).toHaveBeenCalledOnce()
+    })
+
+    it('never preventDefaults an s typed into a text field (not handled)', () => {
+      expect(
+        press('s', false, { tagName: 'INPUT', isContentEditable: false })
+      ).not.toHaveBeenCalled()
+    })
+
+    it('never preventDefaults an unhandled key', () => {
+      expect(press('z', false, null)).not.toHaveBeenCalled()
+    })
+  })
+
   describe('shift+f fan-out chord', () => {
     it('dispatches the fan-out open action for the selected node', () => {
       const { store, controller } = setup('a')

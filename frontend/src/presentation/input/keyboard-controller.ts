@@ -297,7 +297,13 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
       // the browser/address-bar search (Chrome/Safari) or Firefox's quick-find.
       const isBrowserChord =
         (domEvent.ctrlKey || domEvent.metaKey) && (domEvent.key === 'p' || domEvent.key === 'k')
-      if (handled && (domEvent.key === 'Tab' || isBrowserChord)) {
+      // Why: the handled s/shift+f open a form that focuses its first field synchronously, so
+      // the key's own input would otherwise land in it.
+      const opensFormField =
+        !domEvent.ctrlKey &&
+        !domEvent.metaKey &&
+        (domEvent.key === 's' || (domEvent.shiftKey && domEvent.key.toLowerCase() === 'f'))
+      if (handled && (domEvent.key === 'Tab' || isBrowserChord || opensFormField)) {
         domEvent.preventDefault()
       }
     }
