@@ -3,7 +3,7 @@
 Estado real del fork, verificado contra `git log` y el CI. Fuente única: este archivo. Se actualiza
 al cerrar cada tramo, con el commit que lo cierra.
 
-Última revisión: 2026-09-18 · después del ciclo v7 (ver commits por fila) · cubito-ci verde en `167087e59`.
+Última revisión: 2026-09-30 · después de los UX fixes (ver commits por fila).
 
 ## Cerrado
 
@@ -31,6 +31,7 @@ al cerrar cada tramo, con el commit que lo cierra.
 | v7-2 | Limpieza de deps de Electron: electron-builder, NSIS y packaging Linux, spike de relocación del daemon, herramientas de automatización del renderer, `@stablyai/playwright-test`, check de telemetría del `app.asar` | 2026-09-18 · `c0f03d4d8` |
 | Agentes en Docker | Token de `claude setup-token`, contenedor sin root, bypass opt-in (`CUBITO_AGENT_BYPASS`), onboarding de Claude sembrado, identidad de git (`CUBITO_GIT_NAME`/`EMAIL`), hooks de estado instalados por orcad, `curl` en la imagen | 2026-09-29 · `089d2c4e9` |
 | Dogfood fixes | Foco de la terminal al abrirla, CLI `orca` en el PATH de los agentes (el fan-out reporta), estado de agentes para spawns comunes (`worktree.ps` headless + overlay en el frontend), nombres de servicio con extensión en `[x]`, crawl de `.tsx`/`.jsx`; Hono validado en vivo | 2026-09-29 · `82b2a64b2` |
+| UX fixes | Comando de setup por repo (worktrees nuevos con deps, `corepack` en la imagen) y re-setup del padre tras un merge que toca manifests; pairing que sobrevive la recarga + banner de modo demo; `j`/`k` en el rail de `[d]`; `d`↔`x` directo; la `s` del spawn ya no se filtra; panel `[t]` dentro del viewport y bajo el HUD; título del fan-out con el nodo padre; ayuda en la ruta de "agregar repo". Validado en vivo salvo el re-setup del padre (solo unit tests) | 2026-09-30 · `7deebb5ec` |
 
 ## Cerrado sin implementar
 
@@ -49,18 +50,15 @@ al cerrar cada tramo, con el commit que lo cierra.
 
 ## Pendiente
 
-Problemas de UX encontrados usando Cubito como dev (2026-09-29):
+Detalles vistos al validar los UX fixes (2026-09-30):
 
-1. **El diff solo se maneja con mouse.** El rail de `[d]` no responde a `j`/`k`.
-2. **`x` no cambia de modo con `[d]` abierto.** Hay que cerrar con `g` primero.
-3. **La tecla que abre el spawn se filtra.** La segunda `s` queda escrita en el campo nombre.
-4. **El panel `[t]` se corta y tapa.** Sale de pantalla con nodos cerca del borde izquierdo y tapa
-   el botón de crear worktree.
-5. **Recargar sin pairing cae al modo demo sin avisar,** con agentes falsos.
-6. **"Agregar repo" no dice qué ruta espera.** El campo no tiene etiqueta (host o contenedor).
-7. **El fan-out no dice desde qué nodo sale la camada.**
-8. **Worktrees y padre sin dependencias.** Solo las tiene el worktree donde un agente corrió
-   `npm install`; los tests del padre fallan después del merge.
+1. **Re-setup del padre sin validación en vivo.** Necesita un fan-out real con winner merge que
+   cambie `package.json`; hoy solo lo cubren los unit tests.
+2. **El hint "sin setup" no se refresca** en un form de spawn/fan-out ya abierto cuando se guarda
+   el comando; se recalcula al abrir el form.
+3. **El primer `j` en `[d]` selecciona la primera fila** en vez de moverse (no hay selección inicial).
+4. **Un nodo recién spawneado no queda seleccionado.**
+5. **Setup en padres remotos (SSH)** no corre: tendría que ejecutarse en el host remoto.
 
 ## Ideas sin decidir
 
