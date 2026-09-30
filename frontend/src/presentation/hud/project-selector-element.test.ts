@@ -117,12 +117,28 @@ const queryInputOf = (root: FakeElement) => root.children[0]!.children[0]!
 const rowsOf = (root: FakeElement) => root.children[0]!.children[1]!
 const addRowOf = (root: FakeElement) => root.children[0]!.children[2]!
 const pathInputOf = (root: FakeElement) => root.children[1]!.children[0]!
-const kindSelectOf = (root: FakeElement) => root.children[1]!.children[1]!
-const setupInputOf = (root: FakeElement) => root.children[1]!.children[2]!
-const errorLineOf = (root: FakeElement) => root.children[1]!.children[3]!
-const submitButtonOf = (root: FakeElement) => root.children[1]!.children[4]!
-const cancelButtonOf = (root: FakeElement) => root.children[1]!.children[5]!
+const pathHelpOf = (root: FakeElement) => root.children[1]!.children[1]!
+const kindSelectOf = (root: FakeElement) => root.children[1]!.children[2]!
+const setupInputOf = (root: FakeElement) => root.children[1]!.children[3]!
+const errorLineOf = (root: FakeElement) => root.children[1]!.children[4]!
+const submitButtonOf = (root: FakeElement) => root.children[1]!.children[5]!
+const cancelButtonOf = (root: FakeElement) => root.children[1]!.children[6]!
 const setupSectionOf = (root: FakeElement) => root.children[0]!.children[3]!
+
+describe('createProjectSelector — add-repo path guidance', () => {
+  it('the path field carries a placeholder that says which machine the path lives on', () => {
+    const selector = createProjectSelector(createFakeDocument())
+    expect(pathInputOf(rootOf(selector)).placeholder).toContain('/repos/')
+  })
+
+  it('a short help line covers both native and Docker orcad', () => {
+    const selector = createProjectSelector(createFakeDocument())
+    const help = pathHelpOf(rootOf(selector)).textContent
+    expect(help).toContain('orcad')
+    expect(help).toContain('Docker')
+    expect(help).toContain('/repos/')
+  })
+})
 
 describe('createProjectSelector — setup', () => {
   it('add-form setup input writes the model value and emits a setup field change', () => {

@@ -111,6 +111,13 @@ export function createProjectSelector(doc: Document = document): ProjectSelector
   const pathInput = doc.createElement('input')
   pathInput.className = 'cubito-project-selector__field cubito-project-selector__field--path'
 
+  pathInput.placeholder = 'ruta del repo en la máquina de orcad, ej. /repos/mi-repo'
+
+  const pathHelp = doc.createElement('div')
+  pathHelp.className = 'cubito-project-selector__notice'
+  pathHelp.textContent =
+    'La ruta se resuelve en la máquina donde corre orcad. En Docker, dentro del contenedor: /repos/…'
+
   const kindSelect = doc.createElement('select')
   kindSelect.className = 'cubito-project-selector__field cubito-project-selector__field--kind'
   for (const kind of KIND_OPTIONS) {
@@ -135,6 +142,7 @@ export function createProjectSelector(doc: Document = document): ProjectSelector
   errorLine.className = 'cubito-project-selector__error'
 
   formSection.appendChild(pathInput)
+  formSection.appendChild(pathHelp)
   formSection.appendChild(kindSelect)
   formSection.appendChild(setupInput)
   formSection.appendChild(errorLine)
