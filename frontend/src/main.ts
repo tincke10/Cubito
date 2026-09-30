@@ -4,6 +4,11 @@ import { syncWorktreeGraph } from './application/sync-worktree-graph'
 import { createLiveWorktreeSync } from './application/live-worktree-sync'
 import type { LiveSyncConnection } from './application/live-worktree-sync'
 import { decidePairingEntry } from './application/pairing-entry-decision'
+import {
+  clearStoredPairing,
+  resolvePairingSource,
+  tryGetSessionStorage
+} from './application/pairing-source'
 import { connectOrcad } from './infrastructure/rpc/connect-orcad'
 import { consumePairingFragment } from './infrastructure/rpc/pairing-fragment'
 import type { RuntimeGateway } from './application/ports/runtime-gateway'
@@ -17,6 +22,7 @@ import { demoSystemGraph } from './demo-system-graph'
 import { createDiffViewBinder } from './bind-diff-view'
 import { createCompareViewBinder } from './bind-compare-view'
 import { createHudOverlay } from './presentation/hud/hud-overlay'
+import { createDemoBanner } from './presentation/hud/demo-banner-element'
 import { hudModel } from './presentation/hud/hud-model'
 import { createKeyboardBar } from './presentation/hud/keyboard-bar'
 import { createTerminalConnector } from './presentation/hud/terminal-connector-element'
@@ -452,7 +458,10 @@ function bindProjects(connection: LiveSyncConnection): void {
   projectSelectorController.sync(store.get().projectSelector, store.get().repos)
 }
 
-const pairingEntry = decidePairingEntry(consumePairingFragment())
+const pairingStorage = tryGetSessionStorage()
+const pairingEntry = decidePairingEntry(
+  resolvePairingSource(consumePairingFragment(), pairingStorage)
+)
 if (pairingEntry.kind === 'connect') {
   createLiveWorktreeSync({
     connect: () => connectOrcad(pairingEntry.offer),
@@ -471,9 +480,11 @@ if (pairingEntry.kind === 'connect') {
       diffViewBinder.rebindGateway(connection.gateway)
       compareViewBinder.rebindGateway(connection.gateway, connection.capabilities)
     },
-    onDisconnected: () => store.dispatchTerminal({ type: 'connection-lost' })
+    onDisconnected: () => store.dispatchTerminal({ type: 'connection-lost' }),
+    onAuthRejected: () => clearStoredPairing(pairingStorage)
   }).start()
 } else {
   store.update({ connection: { state: 'down', reason: pairingEntry.reason } })
+  document.body.appendChild(createDemoBanner(document, pairingEntry.reason))
   void syncWorktreeGraph(demoGateway, store) // `pnpm dev` stays usable with no container
 }

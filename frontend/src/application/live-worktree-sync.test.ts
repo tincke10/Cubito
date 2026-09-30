@@ -368,6 +368,46 @@ describe('createLiveWorktreeSync', () => {
     sync.stop()
   })
 
+  it('fires onAuthRejected only for an unauthorized loss, not for a retryable one', async () => {
+    const onAuthRejected = vi.fn()
+    const connection = createFakeConnection({ runtimeId: 'rt-1' })
+    const sync = createLiveWorktreeSync({
+      ...baseDeps(async () => connection),
+      onAuthRejected
+    })
+    sync.start()
+    await vi.advanceTimersByTimeAsync(0)
+    connection.emitClose('connection_closed')
+    expect(onAuthRejected).not.toHaveBeenCalled()
+    sync.stop()
+
+    const rejected = createFakeConnection({ runtimeId: 'rt-1' })
+    const second = createLiveWorktreeSync({
+      ...baseDeps(async () => rejected),
+      onAuthRejected
+    })
+    second.start()
+    await vi.advanceTimersByTimeAsync(0)
+    rejected.emitClose('unauthorized')
+    expect(onAuthRejected).toHaveBeenCalledOnce()
+    second.stop()
+  })
+
+  it('fires onAuthRejected when the connect itself is rejected as unauthorized', async () => {
+    const onAuthRejected = vi.fn()
+    const sync = createLiveWorktreeSync({
+      ...baseDeps(async () => {
+        throw Object.assign(new Error('nope'), { code: 'unauthorized' })
+      }),
+      onAuthRejected
+    })
+    sync.start()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(onAuthRejected).toHaveBeenCalledOnce()
+    expect(store.get().connection).toEqual({ state: 'down', reason: 'orcad rechazó el token' })
+    sync.stop()
+  })
+
   it('CO-505: retry-budget exhaustion (every reconnect attempt itself fails) eventually lands on down{reason}', async () => {
     let connectCalls = 0
     const initialConnection: { current: ReturnType<typeof createFakeConnection> | null } = {

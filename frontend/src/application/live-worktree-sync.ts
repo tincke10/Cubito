@@ -41,6 +41,8 @@ export type LiveSyncDeps = {
   onConnected?(connection: LiveSyncConnection): void
   /** Fires once per connection loss, before any reconnect/backoff decision. */
   onDisconnected?(): void
+  /** Fires when orcad rejected the pairing token — the stored pairing is now useless. */
+  onAuthRejected?(): void
 }
 
 export type LiveWorktreeSync = { start(): void; stop(): void }
@@ -111,6 +113,7 @@ export function createLiveWorktreeSync(
     connection = null
     firstPollSucceeded = false
     deps.onDisconnected?.()
+    if (code === 'unauthorized') deps.onAuthRejected?.()
     if (stopped) return
     if (!isRetryableFailure(code) || reconnectAttempt >= RECONNECT_MAX_ATTEMPTS) {
       deps.store.update({ connection: { state: 'down', reason: connectionFailureReason(code) } })

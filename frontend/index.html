@@ -74,6 +74,23 @@
       [hidden] {
         display: none !important;
       }
+      .cubito-demo-banner {
+        position: fixed;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 3;
+        max-width: calc(100% - 32px);
+        padding: 6px 14px;
+        border: 1px solid var(--cubito-amber);
+        border-radius: 0 0 6px 6px;
+        background: var(--cubito-background);
+        color: var(--cubito-amber);
+        font-size: 12px;
+        font-weight: 600;
+        text-align: center;
+        pointer-events: none;
+      }
       #keyboard-bar {
         position: fixed;
         left: 16px;
