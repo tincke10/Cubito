@@ -103,6 +103,17 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
         const next = stepDiffSelection(diffView.files, diffView.selectedPath, step)
         if (next !== null) diff.select(next)
       }
+      // x/d switch between the two scene-replacing modes on the same node; the key of the mode
+      // already open stays a handled no-op.
+      const selectedId = store.get().selection.selectedId
+      if (command.kind === 'open-system' && diffOpen && selectedId !== null) {
+        store.dispatchDiffView({ type: 'close' })
+        store.dispatchSystemView({ type: 'open', nodeId: selectedId })
+      }
+      if (command.kind === 'open-diff' && systemOpen && selectedId !== null) {
+        store.dispatchSystemView({ type: 'close' })
+        store.dispatchDiffView({ type: 'open', nodeId: selectedId, baseRef: '' })
+      }
       if (command.kind === 'close-scene-mode') {
         if (systemOpen) store.dispatchSystemView({ type: 'close' })
         if (diffOpen) store.dispatchDiffView({ type: 'close' })

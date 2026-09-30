@@ -263,6 +263,23 @@ describe('createDiffViewBinder', () => {
     expect(store.get().diffView).toMatchObject({ selectedPath: 'src/a.ts' })
   })
 
+  it('a mode switch (close then reopen on the same node) restarts the loader', async () => {
+    const gateway = createFakeGateway()
+    const { store, binder } = setup(gateway)
+    setupGraph(store)
+
+    store.dispatchDiffView({ type: 'open', nodeId: 'repo::child', baseRef: '' })
+    binder.sync()
+    await flush()
+    store.dispatchDiffView({ type: 'close' })
+    binder.sync()
+    store.dispatchDiffView({ type: 'open', nodeId: 'repo::child', baseRef: '' })
+    binder.sync()
+    await flush()
+
+    expect(gateway.compareCalls).toHaveLength(2)
+  })
+
   it('hud apply is called with the connection, the selected node branch, and the diff counts', async () => {
     const gateway = createFakeGateway()
     const { store, binder, huds } = setup(gateway)

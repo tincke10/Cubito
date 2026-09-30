@@ -638,6 +638,49 @@ describe('createKeyboardController', () => {
     })
   })
 
+  describe('x/d switch between system and diff', () => {
+    it('x with diff open closes diff and opens system on the selected node', () => {
+      const { controller, store } = setup('a')
+      controller.handleKeyDown(baseEvent({ key: 'd' }))
+      expect(store.get().diffView.view).toBe('open')
+
+      expect(controller.handleKeyDown(baseEvent({ key: 'x' }))).toBe(true)
+
+      expect(store.get().diffView.view).toBe('closed')
+      expect(store.get().systemView).toMatchObject({ view: 'open', focusedNodeId: 'a' })
+    })
+
+    it('d with system open closes system and opens diff on the selected node', () => {
+      const { controller, store } = setup('a')
+      controller.handleKeyDown(baseEvent({ key: 'x' }))
+
+      expect(controller.handleKeyDown(baseEvent({ key: 'd' }))).toBe(true)
+
+      expect(store.get().systemView.view).toBe('closed')
+      expect(store.get().diffView).toMatchObject({ view: 'open', focusedNodeId: 'a' })
+    })
+
+    it('the key of the mode already open is a handled no-op', () => {
+      const { controller, store } = setup('a')
+      controller.handleKeyDown(baseEvent({ key: 'd' }))
+      const before = store.get().diffView
+
+      expect(controller.handleKeyDown(baseEvent({ key: 'd' }))).toBe(true)
+
+      expect(store.get().diffView).toBe(before)
+      expect(store.get().systemView.view).toBe('closed')
+    })
+
+    it('never opens both modes at once', () => {
+      const { controller, store } = setup('a')
+      controller.handleKeyDown(baseEvent({ key: 'd' }))
+      controller.handleKeyDown(baseEvent({ key: 'x' }))
+      controller.handleKeyDown(baseEvent({ key: 'd' }))
+      const { systemView, diffView } = store.get()
+      expect([systemView.view, diffView.view].filter((v) => v === 'open')).toHaveLength(1)
+    })
+  })
+
   describe('attach() form-opening keys', () => {
     function press(
       key: string,
@@ -947,22 +990,6 @@ describe('createKeyboardController', () => {
 
       expect(controller.handleKeyDown(baseEvent({ key: 'p', metaKey: true }))).toBe(true)
       expect(store.get().projectSelector.view).toBe('open')
-    })
-
-    it('x is a suppressed no-op while diff is open — system view never opens underneath it', () => {
-      const { store, controller } = setup('a')
-      controller.handleKeyDown(baseEvent({ key: 'd' }))
-      controller.handleKeyDown(baseEvent({ key: 'x' }))
-      expect(store.get().systemView.view).toBe('closed')
-      expect(store.get().diffView.view).toBe('open')
-    })
-
-    it('d is a suppressed no-op while system is open — diff view never opens underneath it', () => {
-      const { store, controller } = setup('a')
-      controller.handleKeyDown(baseEvent({ key: 'x' }))
-      controller.handleKeyDown(baseEvent({ key: 'd' }))
-      expect(store.get().diffView.view).toBe('closed')
-      expect(store.get().systemView.view).toBe('open')
     })
   })
 
