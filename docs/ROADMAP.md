@@ -29,6 +29,8 @@ al cerrar cada tramo, con el commit que lo cierra.
 | Deuda chica | Guard de re-entrada en el spawn menu, split de `service-db-heuristic.ts`, referencias stale del cleanup, roadmap en el repo | 2026-09-18 · `167087e59` |
 | v7-1 | Hono como tercer framework del system graph: collector compartido con Express, parser con cadenas fluidas y `export default`, detector y registry, golden end-to-end | 2026-09-18 · `08cea07e3` |
 | v7-2 | Limpieza de deps de Electron: electron-builder, NSIS y packaging Linux, spike de relocación del daemon, herramientas de automatización del renderer, `@stablyai/playwright-test`, check de telemetría del `app.asar` | 2026-09-18 · `c0f03d4d8` |
+| Agentes en Docker | Token de `claude setup-token`, contenedor sin root, bypass opt-in (`CUBITO_AGENT_BYPASS`), onboarding de Claude sembrado, identidad de git (`CUBITO_GIT_NAME`/`EMAIL`), hooks de estado instalados por orcad, `curl` en la imagen | 2026-09-29 · `089d2c4e9` |
+| Dogfood fixes | Foco de la terminal al abrirla, CLI `orca` en el PATH de los agentes (el fan-out reporta), estado de agentes para spawns comunes (`worktree.ps` headless + overlay en el frontend), nombres de servicio con extensión en `[x]`, crawl de `.tsx`/`.jsx`; Hono validado en vivo | 2026-09-29 · `82b2a64b2` |
 
 ## Cerrado sin implementar
 
@@ -47,10 +49,18 @@ al cerrar cada tramo, con el commit que lo cierra.
 
 ## Pendiente
 
-1. **Workflows de agente en Docker.** La prueba de usuario nuevo cubrió todo salvo lanzar un agente
-   real dentro del contenedor. Requiere `docker compose exec cubito claude login` a mano.
-2. **Validación en vivo de Hono.** Los goldens cubren el parser; falta ver `[x]` sistema sobre un
-   repo Hono real con un orcad reconstruido (excepción de build por instancia).
+Problemas de UX encontrados usando Cubito como dev (2026-09-29):
+
+1. **El diff solo se maneja con mouse.** El rail de `[d]` no responde a `j`/`k`.
+2. **`x` no cambia de modo con `[d]` abierto.** Hay que cerrar con `g` primero.
+3. **La tecla que abre el spawn se filtra.** La segunda `s` queda escrita en el campo nombre.
+4. **El panel `[t]` se corta y tapa.** Sale de pantalla con nodos cerca del borde izquierdo y tapa
+   el botón de crear worktree.
+5. **Recargar sin pairing cae al modo demo sin avisar,** con agentes falsos.
+6. **"Agregar repo" no dice qué ruta espera.** El campo no tiene etiqueta (host o contenedor).
+7. **El fan-out no dice desde qué nodo sale la camada.**
+8. **Worktrees y padre sin dependencias.** Solo las tiene el worktree donde un agente corrió
+   `npm install`; los tests del padre fallan después del merge.
 
 ## Ideas sin decidir
 
