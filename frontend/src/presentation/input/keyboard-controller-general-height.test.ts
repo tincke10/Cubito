@@ -74,6 +74,7 @@ function setup(height: CameraHeight = 'general') {
     store,
     heights,
     terminal,
+    diff: { select: vi.fn() },
     platform: { isMac: false }
   })
   return { store, heights, terminal, controller }
@@ -187,6 +188,7 @@ describe('general-mode island cycling and Enter descent (KEY-04, KEY-07, KEY-08)
       store,
       heights,
       terminal,
+      diff: { select: vi.fn() },
       platform: { isMac: false }
     })
 

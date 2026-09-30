@@ -71,7 +71,10 @@ export function createDiffRail(doc: Document = document): DiffRailHandle {
         return
       }
       for (const row of rows) {
-        root.appendChild(buildRow(doc, row, (path) => selectCallback?.(path)))
+        const rowElement = buildRow(doc, row, (path) => selectCallback?.(path))
+        root.appendChild(rowElement)
+        // Why: keyboard j/k can select rows below the rail's fold.
+        if (row.selected) rowElement.scrollIntoView({ block: 'nearest' })
       }
     },
     onSelect(cb) {

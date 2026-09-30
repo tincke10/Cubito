@@ -13,6 +13,8 @@ type FakeElement = {
   replaceChildren(): void
   remove(): void
   dispatchClick(): void
+  scrollIntoView(options: unknown): void
+  scrolled: unknown[]
   addEventListener(type: string, handler: () => void): void
 }
 
@@ -25,6 +27,10 @@ const createFakeElement = (tag: string): FakeElement => {
     className: '',
     textContent: '',
     onclick: null,
+    scrolled: [],
+    scrollIntoView(options) {
+      el.scrolled.push(options)
+    },
     appendChild(child) {
       el.children.push(child)
       return child
@@ -101,6 +107,14 @@ describe('createDiffRail', () => {
     const [rowA, rowB] = rootOf(rail).children
     expect(rowA!.className).not.toContain('--selected')
     expect(rowB!.className).toContain('diff-rail__row--selected')
+  })
+
+  it('scrolls only the selected row into view', () => {
+    const rail = createDiffRail(createFakeDocument())
+    rail.apply([row({ path: 'a.ts' }), row({ path: 'b.ts', selected: true })])
+    const [rowA, rowB] = rootOf(rail).children
+    expect(rowA!.scrolled).toEqual([])
+    expect(rowB!.scrolled).toEqual([{ block: 'nearest' }])
   })
 
   it('calls onSelect with the clicked row path', () => {

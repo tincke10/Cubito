@@ -95,13 +95,9 @@ function setup(selectedId: string | null = 'b', platform = LINUX) {
   store.update({ graph: buildFanGraph(), selection: { selectedId } })
   const heights = fakeHeights()
   const terminal = fakeTerminalCommandPort()
-  const controller = createKeyboardController({
-    store,
-    heights,
-    terminal,
-    platform
-  })
-  return { store, heights, terminal, controller }
+  const diff = { select: vi.fn() }
+  const controller = createKeyboardController({ store, heights, terminal, diff, platform })
+  return { store, heights, terminal, diff, controller }
 }
 
 /** Two-island graph (repos 'r1'/'r2') for Tab island-cycling (PROJ-008). */
@@ -131,6 +127,7 @@ function setupWithRepos() {
     store,
     heights,
     terminal,
+    diff: { select: vi.fn() },
     platform: LINUX
   })
   return { store, heights, terminal, controller }
@@ -585,6 +582,60 @@ describe('createKeyboardController', () => {
         }
       }
     )
+  })
+
+  describe('diff rail j/k', () => {
+    const files = ['a.ts', 'b.ts', 'c.ts'].map((path) => ({
+      path,
+      status: 'modified',
+      added: 1,
+      removed: 0
+    }))
+
+    function openDiff(selectedPath: string | null) {
+      const ctx = setup('a')
+      ctx.store.dispatchDiffView({ type: 'open', nodeId: 'a', baseRef: 'main' })
+      ctx.store.dispatchDiffView({
+        type: 'rail-loaded',
+        compare: { headOid: 'h', mergeBase: 'm' },
+        files
+      })
+      if (selectedPath !== null) ctx.store.dispatchDiffView({ type: 'select', path: selectedPath })
+      return ctx
+    }
+
+    it('j selects the next file through the diff port and k the previous one', () => {
+      const { controller, diff } = openDiff('b.ts')
+      expect(controller.handleKeyDown(baseEvent({ key: 'j' }))).toBe(true)
+      expect(diff.select).toHaveBeenLastCalledWith('c.ts')
+      controller.handleKeyDown(baseEvent({ key: 'k' }))
+      expect(diff.select).toHaveBeenLastCalledWith('a.ts')
+    })
+
+    it('j with nothing selected enters at the first file', () => {
+      const { controller, diff } = openDiff(null)
+      controller.handleKeyDown(baseEvent({ key: 'j' }))
+      expect(diff.select).toHaveBeenCalledWith('a.ts')
+    })
+
+    it('does not move the graph selection while diff is open', () => {
+      const { controller, store } = openDiff('a.ts')
+      controller.handleKeyDown(baseEvent({ key: 'j' }))
+      expect(store.get().selection.selectedId).toBe('a')
+    })
+
+    it('is a handled no-op with an empty rail', () => {
+      const { controller, store, diff } = setup('a')
+      store.dispatchDiffView({ type: 'open', nodeId: 'a', baseRef: 'main' })
+      expect(controller.handleKeyDown(baseEvent({ key: 'j' }))).toBe(true)
+      expect(diff.select).not.toHaveBeenCalled()
+    })
+
+    it('never touches the diff port when diff is closed', () => {
+      const { controller, diff } = setup('a')
+      controller.handleKeyDown(baseEvent({ key: 'j' }))
+      expect(diff.select).not.toHaveBeenCalled()
+    })
   })
 
   describe('attach() form-opening keys', () => {

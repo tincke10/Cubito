@@ -22,6 +22,8 @@ export type BindDiffViewDeps = {
 
 export type DiffViewBinder = {
   sync(): void
+  /** Selects a rail file through the live loader (fetches its panel). */
+  select(path: string): void
   rebindGateway(gateway: DiffLiveLoaderGatewayPort): void
 }
 
@@ -65,6 +67,9 @@ export function createDiffViewBinder(deps: BindDiffViewDeps): DiffViewBinder {
       const branchLabel =
         selectedId !== null ? (state.graph.nodes.get(selectedId)?.branch ?? '') : ''
       controller.sync(deps.store.get().diffView, state.connection, branchLabel)
+    },
+    select(path: string): void {
+      loader.select(path)
     },
     rebindGateway(gateway: DiffLiveLoaderGatewayPort): void {
       loader.rebindGateway(gateway)

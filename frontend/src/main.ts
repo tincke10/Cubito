@@ -292,6 +292,7 @@ const keyboardController = createKeyboardController({
   store,
   heights,
   terminal: terminalCommands,
+  diff: diffViewBinder,
   platform
 })
 keyboardController.attach(window)

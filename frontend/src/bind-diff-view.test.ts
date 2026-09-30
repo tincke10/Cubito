@@ -246,6 +246,23 @@ describe('createDiffViewBinder', () => {
     })
   })
 
+  it('binder.select(path) goes through the loader like a rail click (fetches the panel)', async () => {
+    const gateway = createFakeGateway()
+    const { store, binder } = setup(gateway)
+    setupGraph(store)
+
+    store.dispatchDiffView({ type: 'open', nodeId: 'repo::child', baseRef: 'refs/heads/main' })
+    binder.sync()
+    await flush()
+    binder.sync()
+
+    binder.select('src/a.ts')
+    await flush()
+
+    expect(gateway.diffCalls[0]).toMatchObject({ filePath: 'src/a.ts' })
+    expect(store.get().diffView).toMatchObject({ selectedPath: 'src/a.ts' })
+  })
+
   it('hud apply is called with the connection, the selected node branch, and the diff counts', async () => {
     const gateway = createFakeGateway()
     const { store, binder, huds } = setup(gateway)

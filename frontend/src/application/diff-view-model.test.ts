@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { diffHudCounts, emptyDiffViewSlice, reduceDiffView } from './diff-view-model'
+import {
+  diffHudCounts,
+  emptyDiffViewSlice,
+  reduceDiffView,
+  stepDiffSelection
+} from './diff-view-model'
 import type { DiffFileRow, DiffViewSlice } from './diff-view-model'
 import type { DiffFileContent } from './ports/runtime-gateway'
 
@@ -201,5 +206,32 @@ describe('diffHudCounts', () => {
       files: [fileRow({ added: 3, removed: 1 }), fileRow({ path: 'b.ts', added: 5, removed: 0 })]
     })
     expect(diffHudCounts(slice)).toEqual({ files: 2, added: 8, removed: 1 })
+  })
+})
+
+describe('stepDiffSelection', () => {
+  const files = [fileRow({ path: 'a.ts' }), fileRow({ path: 'b.ts' }), fileRow({ path: 'c.ts' })]
+
+  it('steps forward and backward in rail order', () => {
+    expect(stepDiffSelection(files, 'a.ts', 1)).toBe('b.ts')
+    expect(stepDiffSelection(files, 'c.ts', -1)).toBe('b.ts')
+  })
+
+  it('wraps at both ends', () => {
+    expect(stepDiffSelection(files, 'c.ts', 1)).toBe('a.ts')
+    expect(stepDiffSelection(files, 'a.ts', -1)).toBe('c.ts')
+  })
+
+  it('enters at the first file going forward and the last going backward with no selection', () => {
+    expect(stepDiffSelection(files, null, 1)).toBe('a.ts')
+    expect(stepDiffSelection(files, null, -1)).toBe('c.ts')
+  })
+
+  it('treats a selection no longer in the list like no selection', () => {
+    expect(stepDiffSelection(files, 'gone.ts', 1)).toBe('a.ts')
+  })
+
+  it('returns null when there are no files', () => {
+    expect(stepDiffSelection([], null, 1)).toBeNull()
   })
 })

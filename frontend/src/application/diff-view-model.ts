@@ -123,6 +123,19 @@ export function toPanelState(content: DiffFileContent): DiffPanelState {
       : { kind: 'binary', modifiedDeleted: content.modifiedDeleted }
 }
 
+/** ±1 over the rail's `files` order, wrapping (same shape as compare's stepCompareFocus). A null
+ *  or stale selection enters at the first file going forward, the last going backward. */
+export const stepDiffSelection = (
+  files: readonly DiffFileRow[],
+  selectedPath: string | null,
+  step: 1 | -1
+): string | null => {
+  if (files.length === 0) return null
+  const index = selectedPath === null ? -1 : files.findIndex((file) => file.path === selectedPath)
+  if (index === -1) return (step === 1 ? files[0]! : files[files.length - 1]!).path
+  return files[(index + step + files.length) % files.length]!.path
+}
+
 export type DiffHudCounts = { files: number; added: number; removed: number }
 
 const emptyDiffHudCounts = (): DiffHudCounts => ({ files: 0, added: 0, removed: 0 })

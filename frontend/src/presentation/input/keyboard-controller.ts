@@ -5,6 +5,7 @@ import { islandLanding } from '../../application/island-focus'
 import { cycleIsland, nextIsland } from '../../application/repos-model'
 import { fanOutMemberIds } from '../../application/fan-out-model'
 import { stepCompareFocus } from '../../application/compare-view-model'
+import { stepDiffSelection } from '../../application/diff-view-model'
 import type { CameraHeightController } from './camera-height-controller'
 
 /** Framework-agnostic input — a real KeyboardEvent is structurally adapted onto this by `attach`. */
@@ -24,10 +25,16 @@ export type TerminalCommandPort = {
   closeActiveSession(): void
 }
 
+/** The diff live loader's select — the rail selection must go through it so the panel fetches. */
+export type DiffSelectPort = {
+  select(path: string): void
+}
+
 export type KeyboardControllerDeps = {
   store: SceneStore
   heights: CameraHeightController
   terminal: TerminalCommandPort
+  diff: DiffSelectPort
   /** Mac vs. Linux/Windows — selects the ⌘P/Ctrl+P chord (PROJ-005). */
   platform: { isMac: boolean }
 }
@@ -51,7 +58,7 @@ type DomKeydownTarget = {
  * height. No camera math lives here — it all delegates to `heights`.
  */
 export function createKeyboardController(deps: KeyboardControllerDeps): KeyboardController {
-  const { store, heights, terminal, platform } = deps
+  const { store, heights, terminal, diff, platform } = deps
 
   const handleKeyDown = (event: KeyboardControllerEvent): boolean => {
     const command = resolveNavCommand(
@@ -88,7 +95,14 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
     const diffOpen = store.get().diffView.view === 'open'
     const compareView = store.get().compareView
     const compareOpen = compareView.view === 'open'
+    const diffView = store.get().diffView
     if ((systemOpen || diffOpen) && command.kind !== 'escape') {
+      // j/k walk the diff rail (l/j = next, h/k = previous, same mapping as compare's rail).
+      if (command.kind === 'move' && diffView.view === 'open') {
+        const step = command.direction === 'child' || command.direction === 'next-sibling' ? 1 : -1
+        const next = stepDiffSelection(diffView.files, diffView.selectedPath, step)
+        if (next !== null) diff.select(next)
+      }
       if (command.kind === 'close-scene-mode') {
         if (systemOpen) store.dispatchSystemView({ type: 'close' })
         if (diffOpen) store.dispatchDiffView({ type: 'close' })

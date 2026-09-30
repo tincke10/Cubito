@@ -87,6 +87,7 @@ function setup(selectedId: string | null = 'a') {
     store,
     heights,
     terminal,
+    diff: { select: vi.fn() },
     platform: { isMac: false }
   })
   return { store, heights, terminal, controller }
