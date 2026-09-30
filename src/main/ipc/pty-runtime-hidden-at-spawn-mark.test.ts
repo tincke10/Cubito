@@ -112,7 +112,8 @@ describe('runtime-controller spawn: hidden until a renderer view mounts', () => 
     const controller = installController(runtime)
 
     const spawnPromise = controller.spawn({ cols: 80, rows: 24, initiallyHidden: true })
-    await vi.waitFor(() => expect(mintedSessionId).toBeDefined())
+    // Why 10s: the first spawn cold-loads the lazy spawn graph, which can exceed waitFor's 1s default.
+    await vi.waitFor(() => expect(mintedSessionId).toBeDefined(), { timeout: 10_000 })
     // Byte zero (Muse's startup queries) must already be main's to answer.
     expect(isHiddenRendererPty(mintedSessionId!)).toBe(true)
 
