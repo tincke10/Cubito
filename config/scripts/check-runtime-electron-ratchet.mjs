@@ -23,6 +23,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import process from 'node:process'
+import { ORCAD_CHILD_ENTRY_POINTS, ORCAD_EXTERNAL_MODULES } from './orcad-entry-build.mjs'
 
 // Why absolute, not cwd-relative: `pnpm lint` runs from the repo root but CI steps and
 // editors do not always, and a cwd-relative miss surfaced as an unhandled ENOENT stack
@@ -32,13 +33,15 @@ const BASELINE_PATH = path.join(ROOT, 'config', 'runtime-electron-baseline.txt')
 
 // The two module graphs a Node backend would have to boot: the runtime service
 // itself and the RPC server that fronts it.
-const ENTRY_POINTS = [
+export const ENTRY_POINTS = [
   path.join(ROOT, 'src', 'main', 'runtime', 'orca-runtime.ts'),
   path.join(ROOT, 'src', 'main', 'runtime', 'runtime-rpc.ts'),
   // Why orcad too: it imports ipc/pty directly to install the PTY controller, so its
   // graph is strictly larger than the two runtime entries. Measuring only those let the
   // two numbers drift — the gate would read zero while the shipped artifact regressed.
-  path.join(ROOT, 'src', 'main', 'orcad', 'main.ts')
+  path.join(ROOT, 'src', 'main', 'orcad', 'main.ts'),
+  // Why the forked children: they ship beside orcad.js and run under the same plain Node.
+  ...Object.values(ORCAD_CHILD_ENTRY_POINTS).map((entry) => path.join(ROOT, entry))
 ]
 
 // Native addons and electron cannot be bundled; externalising them is what the
@@ -50,7 +53,8 @@ const EXTERNAL = [
   'better-sqlite3',
   'keytar',
   'fsevents',
-  'cpu-features'
+  'cpu-features',
+  ...ORCAD_EXTERNAL_MODULES
 ]
 
 /**

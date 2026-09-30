@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
+  ENTRY_POINTS,
   collectElectronImporters,
   diffAgainstBaseline,
   readBaseline
 } from './check-runtime-electron-ratchet.mjs'
+import { ORCAD_CHILD_ENTRY_POINTS } from './orcad-entry-build.mjs'
 
 describe('readBaseline', () => {
   it('drops comments and blank lines and sorts, so baseline formatting cannot cause a false diff', () => {
@@ -52,5 +55,14 @@ describe('the checked-in baseline', () => {
   it('stays empty, so nothing reachable from the runtime imports electron', () => {
     const baseline = readBaseline(readFileSync('config/runtime-electron-baseline.txt', 'utf8'))
     expect(baseline).toEqual([])
+  })
+})
+
+describe('ENTRY_POINTS', () => {
+  it('measures every child orcad forks, not just the server graph', () => {
+    const root = join(import.meta.dirname, '..', '..')
+    for (const entry of Object.values(ORCAD_CHILD_ENTRY_POINTS)) {
+      expect(ENTRY_POINTS).toContain(join(root, entry))
+    }
   })
 })
