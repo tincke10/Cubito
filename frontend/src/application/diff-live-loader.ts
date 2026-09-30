@@ -66,6 +66,8 @@ export function createDiffLiveLoader(deps: DiffLiveLoaderDeps): DiffLiveLoader {
             ...(entry.oldPath === undefined ? {} : { oldPath: entry.oldPath })
           }))
         })
+        // Why: without an initial selection the first j would land on row 0 instead of moving.
+        if (merged.length > 0) select(merged[0]!.path)
         return
       }
       case 'not-ready':
@@ -124,6 +126,16 @@ export function createDiffLiveLoader(deps: DiffLiveLoaderDeps): DiffLiveLoader {
     }
   }
 
+  function select(path: string): void {
+    const slice = deps.store.get().diffView
+    if (slice.view !== 'open' || slice.compare === null) return // rail not loaded — no-op
+    const nodeId = slice.focusedNodeId
+    const compare = slice.compare
+    const file = slice.files.find((f) => f.path === path)
+    dispatch({ type: 'select', path })
+    void loadPanel(nodeId, path, compare, file?.oldPath, file?.origin)
+  }
+
   return {
     start(nodeId) {
       stopped = false
@@ -135,15 +147,7 @@ export function createDiffLiveLoader(deps: DiffLiveLoaderDeps): DiffLiveLoader {
       dispatch({ type: 'open', nodeId, baseRef })
       void loadRail(nodeId)
     },
-    select(path) {
-      const slice = deps.store.get().diffView
-      if (slice.view !== 'open' || slice.compare === null) return // rail not loaded — no-op
-      const nodeId = slice.focusedNodeId
-      const compare = slice.compare
-      const file = slice.files.find((f) => f.path === path)
-      dispatch({ type: 'select', path })
-      void loadPanel(nodeId, path, compare, file?.oldPath, file?.origin)
-    },
+    select,
     stop() {
       stopped = true
     },

@@ -457,6 +457,7 @@ describe('createDiffLiveLoader', () => {
       const slice = store.get().diffView
       expect(slice.view === 'open' && slice.status).toBe('ready')
     })
+    loader.select('src/auth/auth.controller.ts')
     await vi.waitFor(() => {
       const slice = store.get().diffView
       expect(slice.view === 'open' && slice.panel.kind).toBe('text')
@@ -505,6 +506,7 @@ describe('createDiffLiveLoader', () => {
       const slice = store.get().diffView
       expect(slice.view === 'open' && slice.status).toBe('ready')
     })
+    loader.select('src/a.ts')
     await vi.waitFor(() => {
       const slice = store.get().diffView
       expect(slice.view === 'open' && slice.panel.kind).toBe('text')
@@ -537,6 +539,7 @@ describe('createDiffLiveLoader', () => {
       const slice = store.get().diffView
       expect(slice.view === 'open' && slice.status).toBe('ready')
     })
+    loader.select('b.ts')
     await vi.waitFor(() => expect(gateway.diffCalls.length).toBe(1))
     expect(gateway.diffCalls[0]).toEqual({
       worktree: 'repo::child',
@@ -624,6 +627,7 @@ describe('createDiffLiveLoader', () => {
       const slice = store.get().diffView
       expect(slice.view === 'open' && slice.status).toBe('ready')
     })
+    loader.select('src/a.ts')
     await vi.waitFor(() => expect(gateway.diffCalls.length).toBe(1))
     // select a different path before the first resolves
     store.dispatchDiffView({ type: 'select', path: 'src/b.ts' })
@@ -672,12 +676,10 @@ describe('createDiffLiveLoader', () => {
       expect(slice.view === 'open' && slice.status).toBe('ready')
     })
 
-    await vi.waitFor(() => expect(gatewayA.diffCalls.length).toBe(1)) // initial auto-select
-
     loader.rebindGateway(gatewayB)
     loader.select('src/a.ts')
     await vi.waitFor(() => expect(gatewayB.diffCalls.length).toBe(1))
-    expect(gatewayA.diffCalls.length).toBe(1)
+    expect(gatewayA.diffCalls.length).toBe(0)
     loader.stop()
   })
 })
