@@ -435,6 +435,9 @@ function bindSpawn(connection: LiveSyncConnection): void {
     dispatch: (action) => store.dispatchSpawn(action),
     nodeCenter: (id) => graphView.nodeCenter(id),
     refetch: () => syncWorktreeGraph(spawnGateway, store),
+    selectCreated: (worktreeId) => {
+      if (store.get().graph.nodes.has(worktreeId)) store.select(worktreeId)
+    },
     activeRepoId: () => store.get().repos.activeRepoId
   })
   spawnController.sync(store.get().spawnMenu, store.get().graph)

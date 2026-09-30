@@ -318,6 +318,30 @@ describe('createSpawnMenuController', () => {
     expect(refetch).toHaveBeenCalledOnce()
   })
 
+  it('selects the created worktree after the refetch, and not when the create fails', async () => {
+    const order: string[] = []
+    const select = vi.fn((id: string) => void order.push(`select:${id}`))
+    const { controller, gateway, forms, deps } = setup()
+    deps.refetch = vi.fn(async () => void order.push('refetch'))
+    deps.selectCreated = select
+    const withSelect = createSpawnMenuController(deps)
+    const slice = reduceSpawnMenu(
+      { ...rootlessFormSlice(), repoSelector: 'id:repo-1' },
+      { type: 'update-field', field: 'name', value: 'x' }
+    )
+    withSelect.sync(slice, emptyWorktreeGraph())
+    forms[forms.length - 1]!.emitSubmit()
+    await flush()
+    const created = await gateway.createWorktree.mock.results[0]!.value
+    expect(order).toEqual(['refetch', `select:${created.worktreeId}`])
+
+    gateway.createWorktree.mockRejectedValueOnce(new Error('boom'))
+    forms[forms.length - 1]!.emitSubmit()
+    await flush()
+    expect(select).toHaveBeenCalledOnce()
+    void controller
+  })
+
   it('submit failure: dispatches submit-error with a readable message, no refetch', async () => {
     const { controller, gateway, forms, dispatch, refetch } = setup()
     gateway.createWorktree.mockRejectedValueOnce(new Error('conexión perdida'))

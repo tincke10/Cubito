@@ -26,6 +26,8 @@ export type SpawnMenuControllerDeps = {
   nodeCenter: (nodeId: WorktreeId) => Vec3 | null
   /** Fired after a successful create — snappier than waiting for the 2s live-sync poll. */
   refetch: () => Promise<void>
+  /** Selects the new node once the post-create refetch has put it in the graph. */
+  selectCreated?: (worktreeId: WorktreeId) => void
   /** Injectable for deterministic tests; defaults to the real UUID generator. */
   generateMutationId?: () => string
   /** Repos slice's active repo (design Area 8) — preferred over `repos[0]` when resolving the selector. */
@@ -139,9 +141,10 @@ export function createSpawnMenuController(deps: SpawnMenuControllerDeps): SpawnM
       clientMutationId: generateMutationId()
     }
     try {
-      await gateway.createWorktree(input)
+      const { worktreeId } = await gateway.createWorktree(input)
       deps.dispatch({ type: 'submit-ok' })
       await deps.refetch()
+      deps.selectCreated?.(worktreeId)
     } catch (error) {
       deps.dispatch({
         type: 'submit-error',
