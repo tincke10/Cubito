@@ -59,6 +59,9 @@ Detalles vistos al validar los UX fixes (2026-09-30):
 3. **El primer `j` en `[d]` selecciona la primera fila** en vez de moverse (no hay selección inicial).
 4. **Un nodo recién spawneado no queda seleccionado.**
 5. **Setup en padres remotos (SSH)** no corre: tendría que ejecutarse en el host remoto.
+6. **Re-setup del padre solo con el comando local.** Por seguridad no se lee el `orca.yaml` post-merge
+   (lo puede escribir el ganador); repos con setup solo en `orca.yaml` no reinstalan. Leerlo de
+   `<commit>^1` lo resolvería, pero `runHook` lee de disco.
 
 ## Ideas sin decidir
 
