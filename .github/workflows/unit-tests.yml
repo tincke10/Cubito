@@ -37,4 +37,7 @@ jobs:
         run: node config/scripts/install-electron-package-binary.mjs
 
       - name: Test shard
+        # Same as upstream's unit job; vitest-launch-env-setup.ts pins it for local runs too.
+        env:
+          ORCA_BACKGROUND_LAUNCH: '1'
         run: pnpm test:ci-shard -- --shard=${{ matrix.shard }}/${{ matrix.shard_total }}
