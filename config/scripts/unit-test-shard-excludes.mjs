@@ -54,6 +54,10 @@ export const UNIT_TEST_SHARD_EXCLUDES = [
     why: 'depends on the host PATH/shell environment'
   },
   {
+    path: 'config/scripts/regenerate-xterm-patches.test.mjs',
+    why: "upstream's renderer xterm patch tooling reads pnpm 12 lockfiles and addon-image; Cubito pins pnpm 10 and ships no renderer"
+  },
+  {
     path: 'tests/cross-version-wire/**',
     why: 'long-running cross-version checkout fixtures, run separately'
   }
