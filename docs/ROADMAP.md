@@ -32,6 +32,7 @@ al cerrar cada tramo, con el commit que lo cierra.
 | Agentes en Docker | Token de `claude setup-token`, contenedor sin root, bypass opt-in (`CUBITO_AGENT_BYPASS`), onboarding de Claude sembrado, identidad de git (`CUBITO_GIT_NAME`/`EMAIL`), hooks de estado instalados por orcad, `curl` en la imagen | 2026-09-29 · `089d2c4e9` |
 | Dogfood fixes | Foco de la terminal al abrirla, CLI `orca` en el PATH de los agentes (el fan-out reporta), estado de agentes para spawns comunes (`worktree.ps` headless + overlay en el frontend), nombres de servicio con extensión en `[x]`, crawl de `.tsx`/`.jsx`; Hono validado en vivo | 2026-09-29 · `82b2a64b2` |
 | UX fixes | Comando de setup por repo (worktrees nuevos con deps, `corepack` en la imagen) y re-setup del padre tras un merge que toca manifests; pairing que sobrevive la recarga + banner de modo demo; `j`/`k` en el rail de `[d]`; `d`↔`x` directo; la `s` del spawn ya no se filtra; panel `[t]` dentro del viewport y bajo el HUD; título del fan-out con el nodo padre; ayuda en la ruta de "agregar repo". Validado en vivo salvo el re-setup del padre (solo unit tests) | 2026-09-30 · `7deebb5ec` |
+| UX follow-ups | Re-setup del padre con el `orca.yaml` pre-merge (`<commit>^1`, nunca el del ganador) validado en vivo; hint "sin setup" que se refresca en forms abiertos; `[d]` abre con el primer archivo seleccionado; el nodo recién spawneado queda seleccionado | 2026-09-30 · `f9791ccb5` |
 
 ## Cerrado sin implementar
 
@@ -50,18 +51,18 @@ al cerrar cada tramo, con el commit que lo cierra.
 
 ## Pendiente
 
-Detalles vistos al validar los UX fixes (2026-09-30):
-
-1. **Re-setup del padre sin validación en vivo.** Necesita un fan-out real con winner merge que
-   cambie `package.json`; hoy solo lo cubren los unit tests.
-2. **El hint "sin setup" no se refresca** en un form de spawn/fan-out ya abierto cuando se guarda
-   el comando; se recalcula al abrir el form.
-3. **El primer `j` en `[d]` selecciona la primera fila** en vez de moverse (no hay selección inicial).
-4. **Un nodo recién spawneado no queda seleccionado.**
-5. **Setup en padres remotos (SSH)** no corre: tendría que ejecutarse en el host remoto.
-6. **Re-setup del padre solo con el comando local.** Por seguridad no se lee el `orca.yaml` post-merge
-   (lo puede escribir el ganador); repos con setup solo en `orca.yaml` no reinstalan. Leerlo de
-   `<commit>^1` lo resolvería, pero `runHook` lee de disco.
+1. **Cubito atrasado respecto de Orca.** Upstream avanzó 2773 commits desde el fork (merge-base
+   `a1f198be0`, 2026-08-29): 1259 fixes, 499 perf, 232 feats, parches de seguridad de deps. Un merge
+   directo choca con lo borrado en `bb24b404b`; lo realista es un sync selectivo de `src/main`,
+   `src/shared` y `src/cli`. Detalle en engram `survey/upstream-drift`.
+2. **Wirings perdidos con el main de Electron** (relevamiento en engram `survey/orca-feature-coverage`):
+   notificaciones al terminar un agente, scheduler de automations, `StatsCollector`, cifrado de
+   secretos (tokens de Linear/Jira en texto plano).
+3. **Engine sin UI:** commit/push/PR desde un worktree, lectura/edición de archivos, borrar/archivar
+   worktrees (`worktree.rm`), elección de agente y cuentas, checks de PR e issue → worktree,
+   splits de terminal, puertos/preview.
+4. **Detalles:** el rail del compare no refresca las stats tras nuevos commits en los hijos hasta
+   reabrirlo; no hay forma de desregistrar un repo desde la UI ni el CLI.
 
 ## Ideas sin decidir
 
