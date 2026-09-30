@@ -1,10 +1,17 @@
+import {
+  closeTestStores,
+  testState,
+  createStore,
+  writeDataFile,
+  readDataFile
+} from './persistence-test-harness'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { writeFileSync, rmSync, mkdtempSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import type { PersistedState } from '../shared/persisted-state-types'
 import { isTerminalLeafId, makePaneKey } from '../shared/stable-pane-id'
-import { testState, createStore, writeDataFile, readDataFile } from './persistence-test-harness'
+
 import {
   TEST_LEAF_1,
   TEST_LEAF_2,
@@ -59,7 +66,8 @@ describe('Store', () => {
     getCohortAtEmitMock.mockReturnValue({ nth_repo_added: 2 })
   })
 
-  afterEach(() => {
+  afterEach(async () => {
+    await closeTestStores()
     rmSync(testState.dir, { recursive: true, force: true })
   })
   it('hydrates split-pane legacy numeric agent status rows onto the matching remapped leaves', async () => {
@@ -507,6 +515,7 @@ describe('Store', () => {
     )
   })
 
+  // ~9s locally; the 30s default timeout leaves too little headroom on a loaded CI shard.
   it('loads legacy pane aliases from very large persisted split layouts', async () => {
     const leafCount = 130_000
     writeDataFile({
@@ -561,7 +570,7 @@ describe('Store', () => {
         (entry) => entry.ptyId === 'large-pty' && entry.legacyPaneKey === `tab1:${leafCount}`
       )
     ).toBe(true)
-  })
+  }, 120_000)
 
   it('converts unambiguous dev migration rows into persisted aliases', async () => {
     const stablePaneKey = makePaneKey('tab1', TEST_LEAF_1)

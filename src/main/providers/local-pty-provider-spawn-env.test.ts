@@ -179,6 +179,18 @@ describe('LocalPtyProvider', () => {
       )
     })
 
+    it('passes explicit pane environment separately from inherited process values', async () => {
+      const buildSpawnEnv = vi.fn((_id: string, env: Record<string, string>) => env)
+      provider.configure({ buildSpawnEnv })
+      const env = { XDG_DATA_HOME: '/pane/data' }
+      await provider.spawn({ cols: 80, rows: 24, env })
+      expect(buildSpawnEnv).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Object),
+        expect.objectContaining({ explicitEnv: env })
+      )
+    })
+
     it('invokes buildSpawnEnv callback to customize environment', async () => {
       const buildSpawnEnv = vi.fn((_id: string, env: Record<string, string>) => {
         env.CUSTOM_VAR = 'custom-value'
@@ -189,6 +201,22 @@ describe('LocalPtyProvider', () => {
 
       const spawnCall = spawnMock.mock.calls.at(-1)!
       expect(spawnCall[2].env.CUSTOM_VAR).toBe('custom-value')
+    })
+
+    it('re-reads buildSpawnEnv after a reentrant configuration change', async () => {
+      const initialBuildSpawnEnv = vi.fn((_id: string, env: Record<string, string>) => env)
+      const configuredBuildSpawnEnv = vi.fn((_id: string, env: Record<string, string>) => env)
+      provider.configure({
+        get buildSpawnEnv() {
+          provider.configure({ buildSpawnEnv: configuredBuildSpawnEnv })
+          return initialBuildSpawnEnv
+        }
+      })
+
+      await provider.spawn({ cols: 80, rows: 24 })
+
+      expect(initialBuildSpawnEnv).not.toHaveBeenCalled()
+      expect(configuredBuildSpawnEnv).toHaveBeenCalledOnce()
     })
 
     it.each([

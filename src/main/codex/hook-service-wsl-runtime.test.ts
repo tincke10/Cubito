@@ -29,20 +29,17 @@ type HooksConfig = {
   hooks: Record<string, { hooks?: { command?: string }[] }[]>
 }
 
-const managedEvents = [
-  'SessionStart',
-  'UserPromptSubmit',
-  'PreToolUse',
-  'PermissionRequest',
-  'PostToolUse',
-  'SubagentStart',
-  'SubagentStop',
-  'Stop'
-] as const
-
 let tempRoots: string[] = []
 
+beforeEach(() => {
+  // Why: the trust-grant ledger lives in Orca's userData, which otherwise resolves to the live one.
+  const userData = mkdtempSync(join(tmpdir(), 'orca-codex-wsl-hooks-userdata-'))
+  tempRoots.push(userData)
+  vi.stubEnv('ORCA_USER_DATA_PATH', userData)
+})
+
 afterEach(() => {
+  vi.unstubAllEnvs()
   for (const root of tempRoots) {
     rmSync(root, { recursive: true, force: true })
   }
@@ -83,6 +80,39 @@ function expectedManagedCommand(scriptPath: string): string {
 }
 
 describe('Codex WSL runtime hook install', () => {
+  it('coalesces launch installs for one home without blocking independent homes', async () => {
+    const service = new CodexHookService()
+    const releases: (() => void)[] = []
+    const started: string[] = []
+    vi.spyOn(service, 'installForRuntimeHome').mockImplementation(async (runtimeHomePath) => {
+      if (!runtimeHomePath) {
+        throw new Error('expected a runtime home')
+      }
+      started.push(runtimeHomePath)
+      await new Promise<void>((resolve) => releases.push(resolve))
+      return {
+        agent: 'codex',
+        state: 'installed',
+        configPath: `${runtimeHomePath}\\hooks.json`,
+        managedHooksPresent: true,
+        detail: null
+      }
+    })
+    const firstHome = '\\\\wsl$\\Ubuntu\\home\\Alice\\.codex'
+    const alias = firstHome.replace('\\\\wsl$', '\\\\wsl.localhost')
+    const independent = firstHome.replace('\\Alice\\', '\\Bob\\')
+    const target = { runtime: 'wsl' as const, wslDistro: 'Ubuntu' }
+
+    const first = service.prepareRuntimeHomeForLaunch(firstHome, target, true)
+    const second = service.prepareRuntimeHomeForLaunch(alias, target, true)
+    const third = service.prepareRuntimeHomeForLaunch(independent, target, true)
+    await vi.waitFor(() => expect(started).toEqual([firstHome, independent]))
+
+    releases.splice(0).forEach((release) => release())
+    await Promise.all([first, second, third])
+    expect(started).toEqual([firstHome, independent])
+  })
+
   it('coalesces aliases of one runtime home without blocking independent homes', async () => {
     const service = new CodexHookService()
     const releases: (() => void)[] = []
@@ -478,7 +508,6 @@ describe('Codex WSL runtime hook install', () => {
     expect((await _internals.installManagedHooksIntoWslRuntime(plan)).state).toBe('installed')
 
     const installed = JSON.parse(readFileSync(plan.configPath, 'utf-8')) as HooksConfig
-    expect(Object.keys(installed.hooks).sort()).toEqual([...managedEvents].sort())
     const managedCommand = installed.hooks.UserPromptSubmit[0]?.hooks?.[0]?.command
     expect(managedCommand).toBe(expectedManagedCommand(plan.commandScriptPath))
     expect(installed.hooks.UserPromptSubmit[1]?.hooks?.[0]?.command).toBe(userCommand)

@@ -27,15 +27,16 @@ export type BuildPtyHostEnvOptions = {
   /** Distro for WSL spawns (null = Windows default distro); drives the WSL hook relay + endpoint repoint. Only read when isWsl. */
   wslDistro?: string | null
   agentStatusHooksEnabled: boolean
-  codexStatusHooksEnabled?: boolean
+  /** Per-agent opt-out; disabled agents must not receive managed extensions. */
+  disabledTuiAgents?: Iterable<unknown> | null
   networkProxySettings?: NetworkProxySettings
+  /** Headless paired runtimes hand browser launches to the client-hosted Orca browser. */
+  routeBrowserOpensToClient?: boolean
   /** Keep indexed Git config off the sparse daemon wire; the daemon appends guard entries after merging its inherited env. */
   deferGitConfigGuardToDaemon?: boolean
 }
 
 export type CodexHomeLaunchContext = {
-  workspacePath?: string
-  launchAgent?: TuiAgent
   unavailableManagedHomePath?: string
 }
 
@@ -52,7 +53,6 @@ export type PrepareCodexSessionResume = (args: {
   providerSession: AgentProviderSessionMetadata
   target: CodexAccountSelectionTarget
   launchEnv?: NodeJS.ProcessEnv
-  workspacePath?: string
 }) => Promise<CodexSessionResumePreparation | null>
 
 export type CodexHomePtySpawnedLifecycleArgs = {

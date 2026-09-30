@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events'
 import { realpathSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { PassThrough } from 'node:stream'
+import { providerDiagnosticOf } from '../../shared/agent-session-failure'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { spawnProcess } from '../../shared/child-process/run-process'
 import {
@@ -10,12 +11,17 @@ import {
   type CodexAppServerConnection,
   type CodexAppServerConnectionHandlers
 } from './codex-app-server-connection'
+import { PROVIDER_SUPERVISOR_MAX_STOP_MS } from './codex-app-server-posix-supervisor'
 import { isCodexAppServerUnsupportedError } from './codex-app-server-session'
+
+// close() waits out the supervisor's own stop before forcing the tree.
+const GRACEFUL_EXIT_MS = process.platform === 'win32' ? 1_500 : PROVIDER_SUPERVISOR_MAX_STOP_MS
 
 const originalCodexHome = process.env.CODEX_HOME
 
 afterEach(() => {
   vi.useRealTimers()
+  vi.restoreAllMocks()
   if (originalCodexHome === undefined) {
     delete process.env.CODEX_HOME
   } else {
@@ -128,6 +134,42 @@ function rejection(promise: Promise<unknown>): Promise<Error> {
   )
 }
 
+function commandCompletionFixture(
+  targetBytes: number,
+  itemId = 'item-large'
+): { line: string; output: string } {
+  const frame = {
+    method: 'item/completed',
+    params: {
+      turnId: 'turn-large',
+      item: { id: itemId, type: 'commandExecution', aggregated_output: '' }
+    }
+  }
+  const emptyBytes = Buffer.byteLength(JSON.stringify(frame), 'utf8')
+  const remaining = targetBytes - emptyBytes
+  if (remaining < 0) {
+    throw new Error(`target ${targetBytes} is smaller than fixture envelope ${emptyBytes}`)
+  }
+  const output = `${'\n'.repeat(Math.floor(remaining / 2))}${remaining % 2 ? 'x' : ''}`
+  frame.params.item.aggregated_output = output
+  const line = JSON.stringify(frame)
+  expect(Buffer.byteLength(line, 'utf8')).toBe(targetBytes)
+  return { line: `${line}\n`, output }
+}
+
+function commandCompletionLine(targetBytes: number): string {
+  return commandCompletionFixture(targetBytes).line
+}
+
+function responseLine(targetBytes: number, id: number): string {
+  const frame = { id, result: { data: '' } }
+  const emptyBytes = Buffer.byteLength(JSON.stringify(frame), 'utf8')
+  frame.result.data = 'x'.repeat(targetBytes - emptyBytes)
+  const line = JSON.stringify(frame)
+  expect(Buffer.byteLength(line, 'utf8')).toBe(targetBytes)
+  return `${line}\n`
+}
+
 describe('openCodexAppServerConnection', () => {
   it('advertises the experimental API required for rollout-path resume', async () => {
     const { child, spawnImpl, written } = stubChild()
@@ -144,6 +186,45 @@ describe('openCodexAppServerConnection', () => {
       params: { capabilities: { experimentalApi: true } }
     })
     await connection.close()
+  })
+
+  it('reports the spawned pid before it sends the handshake', async () => {
+    const { child, spawnImpl, written } = stubChild()
+    answerInitialize(child)
+    const writtenAtSpawn: number[] = []
+
+    const connection = await openCodexAppServerConnection(
+      { command: 'codex', args: ['app-server'] },
+      {
+        onSpawned: async (pid) => {
+          writtenAtSpawn.push(written.length)
+          expect(pid).toBe(child.pid)
+        }
+      },
+      spawnImpl
+    )
+
+    // The owner is durable before initialize, so a crash mid-handshake leaves it stoppable.
+    expect(writtenAtSpawn).toEqual([0])
+    expect(written[0]).toMatchObject({ method: 'initialize' })
+    await connection.close()
+  })
+
+  it('reaps the child and never handshakes when its spawn cannot be recorded', async () => {
+    const { spawnImpl, written } = stubChild()
+
+    await expect(
+      openCodexAppServerConnection(
+        { command: 'codex', args: ['app-server'] },
+        {
+          onSpawned: async () => {
+            throw new Error('agent_session_checkpoint_stale')
+          }
+        },
+        spawnImpl
+      )
+    ).rejects.toThrow('agent_session_checkpoint_stale')
+    expect(written).toEqual([])
   })
 
   it('completes the handshake and keeps the child alive across calls', async () => {
@@ -218,6 +299,9 @@ describe('openCodexAppServerConnection', () => {
 
     expect(isCodexAppServerRequestError(refusal)).toBe(true)
     expect((refusal as Error).message).toContain('bad params')
+    // Codex's own words, apart from Orca's prefix, for a person to read.
+    expect(providerDiagnosticOf(refusal)).toEqual({ text: 'bad params', audience: 'person' })
+    expect(providerDiagnosticOf(missing)).toBeUndefined()
     expect(isCodexAppServerUnsupportedError(missing)).toBe(true)
     expect(isCodexAppServerRequestError(missing)).toBe(false)
     await connection.close()
@@ -257,11 +341,40 @@ describe('openCodexAppServerConnection', () => {
     )
 
     child.stdout.write(`${JSON.stringify({ id: 'late-string-id', result: { value: 1 } })}\n`)
-    child.stdout.write(`${JSON.stringify({ id: 999, result: { value: 2 } })}\n`)
+    child.stdout.write(`${JSON.stringify({ id: null, error: { message: 'parse error' } })}\n`)
     await vi.waitFor(() => expect(frames).toHaveLength(2))
 
-    expect(frames.map((frame) => frame.kind)).toEqual(['frame:unclassified', 'response:unmatched'])
+    expect(frames.map((frame) => frame.kind)).toEqual(['frame:unclassified', 'frame:unclassified'])
     await connection.close()
+  })
+
+  it('logs a reply to a timed-out request instead of surfacing it as a frame', async () => {
+    vi.useFakeTimers()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { child, spawnImpl, written } = stubChild()
+    answerInitialize(child)
+    const frames: string[] = []
+    const connection = await openCodexAppServerConnection(
+      { command: 'codex', args: ['app-server'] },
+      { onUnhandledFrame: (kind) => frames.push(kind) },
+      spawnImpl
+    )
+
+    const slow = rejection(connection.request('turn/interrupt', undefined, { timeoutMs: 50 }))
+    await vi.advanceTimersByTimeAsync(60)
+    expect((await slow).name).toBe('CodexAppServerTimeoutError')
+    const id = Number(written.find((frame) => frame.method === 'turn/interrupt')?.id)
+    child.stdout.write(`${JSON.stringify({ id, result: {} })}\n`)
+    child.stdout.write(`${JSON.stringify({ id: 999, error: { message: 'no such request' } })}\n`)
+    await vi.waitFor(() => expect(warn).toHaveBeenCalledTimes(2))
+
+    expect(frames).toEqual([])
+    expect(warn.mock.calls.map((call) => call[0])).toEqual([
+      `[codex-app-server] late reply to turn/interrupt after timeout (id ${id})`,
+      '[codex-app-server] reply with no waiting request (id 999)'
+    ])
+    expect(warn.mock.calls[1][1]).toBe('no such request')
+    await vi.advanceTimersByTimeAsync(0)
   })
 
   it('fails in-flight requests and reports an unexpected exit once', async () => {
@@ -313,7 +426,7 @@ describe('openCodexAppServerConnection', () => {
       openCodexAppServerConnection({ command: 'codex', args: ['app-server'] }, {}, spawnImpl)
     )
 
-    await vi.advanceTimersByTimeAsync(5_000)
+    await vi.advanceTimersByTimeAsync(GRACEFUL_EXIT_MS + 3_500)
     const error = (await opening) as Error & { connection?: CodexAppServerConnection }
 
     expect(error.name).toBe('CodexAppServerHandshakeExitUnprovenError')
@@ -355,7 +468,7 @@ describe('openCodexAppServerConnection', () => {
     })
 
     const closing = connection.close()
-    await vi.advanceTimersByTimeAsync(2_000)
+    await vi.advanceTimersByTimeAsync(GRACEFUL_EXIT_MS + 500)
     await closing
 
     await vi.waitFor(() => expect(child.kill).toHaveBeenCalledWith('SIGKILL'))
@@ -389,7 +502,7 @@ describe('openCodexAppServerConnection', () => {
 
     const first = connection.close()
     const second = connection.close()
-    await vi.advanceTimersByTimeAsync(4_100)
+    await vi.advanceTimersByTimeAsync(GRACEFUL_EXIT_MS + 2_600)
 
     await expect(Promise.all([first, second])).resolves.toEqual([true, true])
     expect(child.kill.mock.calls.map(([signal]) => signal)).toEqual(['SIGSTOP', 'SIGKILL'])
@@ -406,32 +519,180 @@ describe('openCodexAppServerConnection', () => {
     )
 
     const first = connection.close()
-    await vi.advanceTimersByTimeAsync(5_000)
+    await vi.advanceTimersByTimeAsync(GRACEFUL_EXIT_MS + 3_500)
     await expect(first).resolves.toBe(false)
     child.emit('exit', 0, null)
 
     await expect(connection.close()).resolves.toBe(true)
   })
 
-  it('ends the connection rather than buffering an oversized line', async () => {
-    const { child, spawnImpl } = stubChild({ exitOnStdinEnd: false })
+  it.each([1_090_188, 2_900_090])(
+    'accepts a realistic %i-byte escaped command completion and keeps processing',
+    async (frameBytes) => {
+      const { child, spawnImpl } = stubChild()
+      answerInitialize(child)
+      const completed: unknown[] = []
+      const connection = await openCodexAppServerConnection(
+        { command: 'codex', args: ['app-server'] },
+        {
+          onNotification: (method, params) => {
+            if (method === 'item/completed') {
+              completed.push(params)
+            }
+          }
+        },
+        spawnImpl
+      )
+
+      const line = Buffer.from(commandCompletionLine(frameBytes), 'utf8')
+      const split = Math.floor(line.length / 3)
+      child.stdout.write(line.subarray(0, split))
+      child.stdout.write(line.subarray(split, split * 2))
+      child.stdout.write(line.subarray(split * 2))
+      child.stdout.write('{"method":"turn/completed","params":{"turn":{"id":"turn-large"}}}\n')
+      await vi.waitFor(() => expect(completed).toHaveLength(1))
+
+      expect(
+        (completed[0] as { item: { aggregated_output: string } }).item.aggregated_output.length
+      ).toBeGreaterThan(500_000)
+      expect(connection.closed).toBe(false)
+      await connection.close()
+    }
+  )
+
+  it('accepts two realistic large command completions without losing either payload', async () => {
+    const { child, spawnImpl } = stubChild()
     answerInitialize(child)
-    const exits: string[] = []
+    const completed: { item: { id: string; aggregated_output: string } }[] = []
     const connection = await openCodexAppServerConnection(
       { command: 'codex', args: ['app-server'] },
-      { onExit: (error) => exits.push(error.message) },
+      {
+        onNotification: (method, params) => {
+          if (method === 'item/completed') {
+            completed.push(params as { item: { id: string; aggregated_output: string } })
+          }
+        }
+      },
       spawnImpl
     )
-    child.kill.mockImplementation(() => {
-      child.emit('exit', null, 'SIGKILL')
-      return true
-    })
+    const fixtures = [
+      commandCompletionFixture(1_090_188, 'item-large-a'),
+      commandCompletionFixture(2_900_090, 'item-large-b')
+    ]
 
-    const inFlight = rejection(connection.request('turn/start'))
-    child.stdout.write('x'.repeat(1024 * 1024 + 1))
+    child.stdout.write(fixtures[0]!.line)
+    child.stdout.write(fixtures[1]!.line)
+    await vi.waitFor(() => expect(completed).toHaveLength(2))
 
-    expect((await inFlight).message).toContain('oversized')
-    expect(exits[0]).toContain('oversized')
+    expect(completed.map((entry) => entry.item.id)).toEqual(['item-large-a', 'item-large-b'])
+    expect(
+      completed.map((entry) => Buffer.byteLength(entry.item.aggregated_output, 'utf8'))
+    ).toEqual(fixtures.map((fixture) => Buffer.byteLength(fixture.output, 'utf8')))
+    expect(connection.closed).toBe(false)
+    await connection.close()
+  })
+
+  it('accepts a response beyond the daemon wire limit and keeps the provider alive', async () => {
+    const { child, spawnImpl } = stubChild()
+    answerInitialize(child)
+    const connection = await openCodexAppServerConnection(
+      { command: 'codex', args: ['app-server'] },
+      {},
+      spawnImpl
+    )
+
+    const large = connection.request('thread/resume')
+    child.stdout.write(responseLine(16 * 1024 * 1024 + 1, 2))
+    await expect(large).resolves.toMatchObject({ data: expect.any(String) })
+    expect(child.kill).not.toHaveBeenCalled()
+    expect(connection.closed).toBe(false)
+
+    const followup = connection.request('turn/start')
+    child.stdout.write('{"id":3,"result":{"turn":{"id":"turn-next"}}}\n')
+    await expect(followup).resolves.toEqual({ turn: { id: 'turn-next' } })
+    await connection.close()
+  })
+
+  it('delivers a notification beyond the daemon wire limit whole, never as an oversized frame', async () => {
+    const { child, spawnImpl } = stubChild()
+    answerInitialize(child)
+    const frames: string[] = []
+    const deltas: unknown[] = []
+    const connection = await openCodexAppServerConnection(
+      { command: 'codex', args: ['app-server'] },
+      {
+        onUnhandledFrame: (kind) => frames.push(kind),
+        onNotification: (method, params) => {
+          if (method === 'item/commandExecution/outputDelta') {
+            deltas.push(params)
+          }
+        }
+      },
+      spawnImpl
+    )
+
+    const params = { threadId: 'thread-1', itemId: 'exec-1', delta: '' }
+    params.delta = 'x'.repeat(16 * 1024 * 1024 + 1)
+    child.stdout.write(
+      `${JSON.stringify({ method: 'item/commandExecution/outputDelta', params })}\n`
+    )
+
+    await vi.waitFor(() => expect(deltas).toEqual([params]))
+    expect(frames).toEqual([])
+    expect(connection.closed).toBe(false)
+    await connection.close()
+  })
+
+  it('keeps malformed and non-object JSON non-fatal and processes the next record', async () => {
+    const { child, spawnImpl } = stubChild()
+    answerInitialize(child)
+    const frames: { kind: string; payload: unknown }[] = []
+    const notifications: string[] = []
+    const connection = await openCodexAppServerConnection(
+      { command: 'codex', args: ['app-server'] },
+      {
+        onUnhandledFrame: (kind, payload) => frames.push({ kind, payload }),
+        onNotification: (method) => notifications.push(method)
+      },
+      spawnImpl
+    )
+
+    child.stdout.write('not json\n[]\n{"method":"turn/completed","params":{}}\n')
+    await vi.waitFor(() => expect(notifications).toEqual(['turn/completed']))
+
+    expect(frames).toEqual([
+      { kind: 'frame:invalid-json', payload: 'not json' },
+      { kind: 'frame:invalid-json', payload: '[]' }
+    ])
+    expect(connection.closed).toBe(false)
+    await connection.close()
+  })
+
+  it('pauses between coalesced records and resumes the retained remainder', async () => {
+    const { child, spawnImpl } = stubChild()
+    answerInitialize(child)
+    const notifications: string[] = []
+    let connection: CodexAppServerConnection
+    connection = await openCodexAppServerConnection(
+      { command: 'codex', args: ['app-server'] },
+      {
+        onNotification: (method) => {
+          notifications.push(method)
+          if (notifications.length === 1) {
+            connection.pauseReading?.()
+          }
+        }
+      },
+      spawnImpl
+    )
+
+    child.stdout.write(
+      '{"method":"item/started","params":{}}\n{"method":"item/completed","params":{}}\n'
+    )
+    await vi.waitFor(() => expect(notifications).toEqual(['item/started']))
+    connection.resumeReading?.()
+    await vi.waitFor(() => expect(notifications).toEqual(['item/started', 'item/completed']))
+
     await connection.close()
   })
 
@@ -485,16 +746,42 @@ describe('openCodexAppServerConnection', () => {
       spawnImpl
     )
 
-    // The oversized line kills the child, so its own `close` lands afterwards.
-    child.stdout.write('x'.repeat(1024 * 1024 + 1))
-    child.stderr.write('killed\n')
+    child.emit('error', new Error('provider transport failed'))
+    child.stderr.write('provider died\n')
     await flushStreams()
     child.emit('exit', null, 'SIGKILL')
     child.emit('close', null, 'SIGKILL')
 
     expect(exits).toHaveLength(1)
     // The first cause survives; the generic exit that follows does not overwrite it.
-    expect(exits[0]).toContain('oversized')
+    expect(exits[0]).toContain('provider transport failed')
+    await connection.close()
+  })
+
+  it('does not report recovery for a handler failure until child exit is observed', async () => {
+    const { child, spawnImpl } = stubChild({ exitOnStdinEnd: false })
+    answerInitialize(child)
+    const exits: string[] = []
+    const connection = await openCodexAppServerConnection(
+      { command: 'codex', args: ['app-server'] },
+      {
+        onNotification: () => {
+          throw new Error('structured sink failed')
+        },
+        onExit: (error) => exits.push(error.message)
+      },
+      spawnImpl
+    )
+
+    const inFlight = rejection(connection.request('turn/start'))
+    child.stdout.write('{"method":"turn/started","params":{}}\n')
+    await flushStreams()
+
+    expect(exits).toHaveLength(0)
+    expect((await inFlight).message).toContain('structured sink failed')
+
+    child.emit('exit', null, 'SIGKILL')
+    expect(exits).toHaveLength(1)
     await connection.close()
   })
 

@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   CODEX_ATTESTATION_METHOD,
   CODEX_AUTH_TOKEN_REFRESH_METHOD,
-  CODEX_BLOCKING_SERVER_REQUEST_METHODS,
   CODEX_DYNAMIC_TOOL_CALL_METHOD,
   CODEX_LEGACY_APPLY_PATCH_APPROVAL_METHOD,
   CODEX_LEGACY_EXEC_APPROVAL_METHOD,
@@ -78,7 +77,7 @@ describe('Codex blocking server request dispositions', () => {
     )
   })
 
-  it('cancels a malformed interactive request instead of using method-not-found', () => {
+  it('refuses a malformed interactive request instead of inventing an answer', () => {
     const { registry, connection } = harness()
 
     disposeCodexServerRequest(registry, connection, {
@@ -87,23 +86,11 @@ describe('Codex blocking server request dispositions', () => {
       params: {}
     })
 
-    expect(connection.respond).toHaveBeenCalledWith(4, { decision: 'cancel' })
-  })
-
-  it('enumerates every server request in the negotiated stable schema', () => {
-    expect(new Set(CODEX_BLOCKING_SERVER_REQUEST_METHODS)).toEqual(
-      new Set([
-        CODEX_COMMAND_APPROVAL_METHOD,
-        CODEX_FILE_CHANGE_APPROVAL_METHOD,
-        CODEX_USER_INPUT_METHOD,
-        CODEX_MCP_ELICITATION_METHOD,
-        CODEX_PERMISSIONS_APPROVAL_METHOD,
-        CODEX_DYNAMIC_TOOL_CALL_METHOD,
-        CODEX_AUTH_TOKEN_REFRESH_METHOD,
-        CODEX_ATTESTATION_METHOD,
-        CODEX_LEGACY_APPLY_PATCH_APPROVAL_METHOD,
-        CODEX_LEGACY_EXEC_APPROVAL_METHOD
-      ])
+    expect(connection.respond).not.toHaveBeenCalled()
+    expect(connection.respondWithError).toHaveBeenCalledWith(
+      4,
+      -32001,
+      'Orca could not model item/commandExecution/requestApproval as a durable prompt'
     )
   })
 

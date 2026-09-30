@@ -6,9 +6,12 @@ import type {
   AgentSessionHistoryResult
 } from '../../../shared/agent-session-wire'
 import type { AgentSessionJournal } from '../agent-session-journal/journal-store'
-import { readAgentSessionHistory } from './agent-session-history-page'
+import {
+  readAgentSessionHistory,
+  type AgentSessionHistoryScope
+} from './agent-session-history-page'
 
-function providerSessionMetadata(
+export function structuredAgentSessionProviderSessionMetadata(
   record: AgentSessionRecord | null
 ): AgentProviderSessionMetadata | undefined {
   const head = record ? agentSessionProviderHandleChainHead(record.providerHandleChain) : null
@@ -24,10 +27,11 @@ export function readStructuredAgentSessionHistoryResult(input: {
   journal: AgentSessionJournal
   record: AgentSessionRecord | null
   request: AgentSessionHistoryRequest
+  scope?: AgentSessionHistoryScope
 }): AgentSessionHistoryResult {
-  const result = readAgentSessionHistory(input.journal, input.request)
+  const result = readAgentSessionHistory(input.journal, input.request, undefined, input.scope)
   const fence = input.record?.lease.runtimeFence
-  const providerSession = providerSessionMetadata(input.record)
+  const providerSession = structuredAgentSessionProviderSessionMetadata(input.record)
   if (fence === undefined) {
     return providerSession ? { ...result, providerSession } : result
   }

@@ -1,6 +1,4 @@
 import type { GlobalSettings } from './global-settings-types'
-import type { NotificationSettings } from './notification-settings-types'
-import type { OnboardingChecklistState, OnboardingState } from './onboarding-state-types'
 import type { RepoHookSettings } from './orca-yaml-hook-types'
 import type { PersistedState } from './persisted-state-types'
 import type { PersistedUIState } from './persisted-ui-state-types'
@@ -11,11 +9,19 @@ import { DEFAULT_STATUS_BAR_ITEMS } from './status-bar-defaults'
 import type { VoiceSettings } from './speech-types'
 import { cloneDefaultWorkspaceStatuses } from './workspace-statuses'
 import { DEFAULT_WORKTREE_CARD_PROPERTIES } from './worktree/card-properties'
+import { DEFAULT_AGENTS_GROUP_BY, DEFAULT_AGENTS_READ_FILTER } from './agents-view-thread-filters'
 import { DEFAULT_USAGE_PERCENTAGE_DISPLAY } from './usage-percentage-display'
 import { DEFAULT_STATUS_BAR_USAGE_MODE } from './status-bar-usage-mode'
 import { buildDefaultSettings } from './default-global-settings'
 import { DEFAULT_SETUP_AGENT_STARTUP_POLICY } from './setup-agent-startup-policy'
 import { DEFAULT_BROWSER_PAGE_ZOOM_LEVEL } from './browser-page-zoom'
+import { getDefaultNotificationSettings } from './notification-settings-defaults'
+import { getDefaultOnboardingState } from './onboarding-defaults'
+import {
+  defaultTerminalFontFamily,
+  getDefaultPrimarySelectionMiddleClickPaste,
+  getDefaultTerminalRightClickToPaste
+} from './terminal-platform-defaults'
 
 export { DEFAULT_STATUS_BAR_ITEMS } from './status-bar-defaults'
 export {
@@ -39,10 +45,6 @@ export function normalizeAgentActivityDisplayMode(value: unknown): AgentActivity
   return value === 'full' || value === 'compact' ? value : DEFAULT_AGENT_ACTIVITY_DISPLAY_MODE
 }
 
-// Why: onboarding wizard's last step index, centralized so backfill, clamps, and UI agree on the bound.
-export const ONBOARDING_FINAL_STEP = 5
-export const ONBOARDING_FLOW_VERSION = 4
-
 export const ORCA_BROWSER_PARTITION = 'persist:orca-browser'
 // Why: inert blank-tab URL shared by main/renderer so the attach policy can allow just this one data URL and reject others.
 export const ORCA_BROWSER_BLANK_URL = 'data:text/html,'
@@ -63,36 +65,13 @@ export const BROWSER_FAMILY_LABELS: Record<string, string> = {
   manual: 'File'
 }
 
-// Why: only the initial value shown in Settings; buildFontFamily() adds the real cross-platform fallback chain.
-function defaultTerminalFontFamily(): string {
-  const platform = typeof process !== 'undefined' ? process.platform : ''
-  if (platform === 'win32') {
-    return 'Cascadia Mono'
-  }
-  if (platform === 'linux') {
-    return 'DejaVu Sans Mono'
-  }
-  return 'SF Mono' // macOS default
-}
-
-export const getDefaultPrimarySelectionMiddleClickPaste = (
-  platform = typeof process !== 'undefined' ? process.platform : ''
-): boolean => platform === 'linux' || platform === 'darwin'
-
-export const getDefaultTerminalRightClickToPaste = (
-  platform = typeof process !== 'undefined' ? process.platform : ''
-): boolean => platform === 'win32'
-
-/** Why: ProseMirror renders the whole document — no virtualization — so opening
- *  one blocks the main thread for as long as it takes to build the DOM. Measured
- *  in a packaged build (M-series) on a doc with a code block every ~570 bytes,
- *  blocking mount / median keystroke: 300 KB 1.7 s / 59 ms · 600 KB 4.2 s / 201 ms
- *  · 900 KB 8.8 s / 431 ms. The same 300 KB as pure prose is 0.8 s / 16 ms, so
- *  node-view count drives the cost far more than byte size — but bytes are the
- *  only thing cheap enough to test before parsing. The blocking mount is what
- *  pins this ceiling; past it, fall back to source mode (Monaco) with a per-file
- *  "Open anyway" escape hatch. Real headroom needs #7056. */
-export const RICH_MARKDOWN_MAX_SIZE_BYTES = 300 * 1024
+/** Why: ProseMirror renders the whole document without virtualization. After the
+ *  parser/highlighter work in #17134/#17147/#17158, M-series Electron measurements
+ *  on distinct code blocks every ~600 bytes put visible mount / longest task at
+ *  300 KB 0.70 / 0.66 s · 450 KB 1.09 / 1.02 s · 600 KB 1.49 / 1.41 s, with
+ *  600 KB typing at 38 ms median / 39 ms p95. Bytes remain the only cheap
+ *  pre-parse guard; larger files use source mode with an "Open anyway" escape hatch. */
+export const RICH_MARKDOWN_MAX_SIZE_BYTES = 600 * 1024
 
 export const DEFAULT_EDITOR_AUTO_SAVE_DELAY_MS = 1000
 export const MIN_EDITOR_AUTO_SAVE_DELAY_MS = 250
@@ -120,41 +99,6 @@ export const REPO_COLORS = [
 
 export const DEFAULT_REPO_BADGE_COLOR = REPO_COLORS[0]
 
-export function getDefaultNotificationSettings(): NotificationSettings {
-  return {
-    enabled: true,
-    agentTaskComplete: true,
-    terminalBell: false,
-    suppressWhenFocused: true,
-    customSoundId: 'system',
-    customSoundPath: null,
-    customSoundVolume: 100
-  }
-}
-
-export function getDefaultOnboardingState(): OnboardingState {
-  return {
-    flowVersion: ONBOARDING_FLOW_VERSION,
-    closedAt: null,
-    outcome: null,
-    lastCompletedStep: -1,
-    checklist: {
-      addedRepo: false,
-      choseAgent: false,
-      ranFirstAgent: false,
-      ranSecondAgentOnSameTask: false,
-      triedCmdJ: false,
-      shapedSidebar: false,
-      reviewedDiff: false,
-      openedPr: false,
-      addedFolder: false,
-      openedFile: false,
-      ranAgentOnFile: false,
-      dismissed: false
-    } satisfies OnboardingChecklistState
-  }
-}
-
 /** The stock worktree root. Exported so callers can tell an untouched default apart
  *  from a workspace directory the user actually chose. */
 export function getDefaultWorkspaceDir(homeDir: string): string {
@@ -175,6 +119,7 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
     terminalInactivePaneOpacity: DEFAULT_TERMINAL_INACTIVE_PANE_OPACITY,
     terminalRightClickToPaste: getDefaultTerminalRightClickToPaste(),
     notifications: getDefaultNotificationSettings(),
+
     voice: getDefaultVoiceSettings()
   })
 }
@@ -241,6 +186,7 @@ export function getDefaultPersistedState(homedir: string): PersistedState {
   }
 }
 
+/** Creates fresh UI defaults with completed migration markers so new profiles are not treated as legacy installations. */
 export function getDefaultUIState(): PersistedUIState {
   return {
     lastActiveRepoId: null,
@@ -270,8 +216,17 @@ export function getDefaultUIState(): PersistedUIState {
     hideDetachedHeadWorkspaces: false,
     hideWorkspacesFromOtherDevices: false,
     alwaysShowDefaultBranchWorkspace: true,
+    _explorerDisplayRootMigrated: true,
+    explorerDisplayRootByWorktree: {},
     showDotfilesByWorktree: {},
     filterRepoIds: [],
+    agentsVisibleHostIds: null,
+    agentsFilterRepoIds: [],
+    agentsShowChildAgents: false,
+    agentsCompactMode: true,
+    agentsShowSearch: true,
+    agentsReadFilter: DEFAULT_AGENTS_READ_FILTER,
+    agentsGroupBy: DEFAULT_AGENTS_GROUP_BY,
     collapsedGroups: [],
     uiZoomLevel: 0,
     editorFontZoomLevel: 0,
@@ -291,10 +246,13 @@ export function getDefaultUIState(): PersistedUIState {
     usagePercentageDisplay: DEFAULT_USAGE_PERCENTAGE_DISPLAY,
     statusBarUsageMode: DEFAULT_STATUS_BAR_USAGE_MODE,
     dismissedUpdateVersion: null,
+    dismissedUnexpectedSignoutVersion: null,
     lastUpdateCheckAt: null,
     trustedOrcaHooks: {},
     setupScriptPromptDismissedRepoIds: [],
     acknowledgedAgentsByPaneKey: {},
+    activityClearedAtByPaneKey: {},
+    manuallyUnreadTurnsByPaneKey: {},
     setupGuideSidebarDismissed: false,
     setupGuideBrowserMilestoneMigrated: true,
     setupGuideBrowserMilestoneLegacyComplete: false,

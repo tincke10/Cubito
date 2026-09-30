@@ -1,7 +1,7 @@
 import type { GlobalSettings } from '../../../shared/global-settings-types'
 import type { OnboardingChecklistState } from '../../../shared/onboarding-state-types'
 import type { PersistedState } from '../../../shared/persisted-state-types'
-import { getDefaultOnboardingState } from '../../../shared/constants'
+import { getDefaultOnboardingState } from '../../../shared/onboarding-defaults'
 import type { FeatureInteractionId } from '../../../shared/feature-interactions'
 import {
   updateSettings as updateSettingsOperation,
@@ -17,6 +17,7 @@ import {
 import type { StoreRuntimeState } from './store-runtime-state'
 import type { WriteSchedulingOperations } from './write-scheduling'
 import { scheduleSave } from './write-scheduling'
+import { bumpLocalWorktreeScanGeneration } from '../../local-worktree-scan-generation'
 
 type ProfilePreferencesRuntime = Pick<
   StoreRuntimeState,
@@ -155,9 +156,10 @@ export function getSettingsMutationOperations(
 ): SettingsMutationOperations {
   return {
     state: owner[profilePreferencesContext].runtime.state,
+    bumpLocalWorktreeScanGeneration,
     removeRetainedBlob: (slot) =>
       owner[profilePreferencesContext].runtime.protectedSecrets.removeRetainedBlob(slot),
-    scheduleSave: () => scheduleSave(owner[profilePreferencesContext].scheduling),
+    scheduleSave: () => scheduleSave(owner[profilePreferencesContext].scheduling, ['settings']),
     notifySettingsChanged: (updates, originWebContentsId) =>
       notifySettingsChanged(owner, updates, originWebContentsId)
   }
@@ -181,13 +183,16 @@ export function getFeatureInteractionOperations(
 ): FeatureInteractionOperations {
   return {
     state: owner[profilePreferencesContext].runtime.state,
-    scheduleSave: () => scheduleSave(owner[profilePreferencesContext].scheduling),
+    scheduleSave: (domains) => scheduleSave(owner[profilePreferencesContext].scheduling, domains),
     notifyUIChanged: () => notifyUIChanged(owner),
     getUI: () => owner.getUI()
   }
 }
 
-export function installProfilePreferencesContext(target: object, source: ProfilePreferences): void {
+export function installProfilePreferencesContext(
+  target: ProfilePreferences,
+  source: ProfilePreferences
+): void {
   Object.defineProperty(target, profilePreferencesContext, {
     value: source[profilePreferencesContext]
   })

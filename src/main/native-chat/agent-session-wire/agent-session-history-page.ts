@@ -7,116 +7,35 @@
 // read would silently skip that revision. Rows carry the revision, which is why
 // `after` is the only direction that can answer `cursor_compacted`.
 
-import {
-  agentJournalSubmissionKey,
-  boundJournalKeyComponent
-} from '../../../shared/agent-session-journal-item-key'
+import { agentJournalSubmissionKey } from '../../../shared/agent-session-journal-item-key'
+import { isRootAgentJournalItem } from '../../../shared/agent-session-journal-producer'
 import type {
   AgentJournalCursor,
   AgentJournalRenderItem,
-  AgentJournalSnapshot,
-  AgentJournalSubmission
+  AgentJournalSnapshot
 } from '../../../shared/agent-session-journal-types'
-import { REMOTE_RUNTIME_MAX_OUTBOUND_JSON_BYTES } from '../../../shared/remote-runtime-memory-limits'
 import {
   AGENT_SESSION_HISTORY_DEFAULT_LIMIT,
   AGENT_SESSION_HISTORY_MAX_LIMIT,
   type AgentSessionHistoryDirection,
   type AgentSessionHistoryPage,
   type AgentSessionHistoryRequest,
-  type AgentSessionHistoryResult
+  type AgentSessionHistoryResult,
+  type AgentSessionSubagentRosterEntry
 } from '../../../shared/agent-session-wire'
 import type { AgentSessionJournal } from '../agent-session-journal/journal-store'
 import { projectJournalBatch } from './agent-session-journal-batch'
+import {
+  boundHistoryItemsByBytes,
+  HISTORY_PAGE_CONTENT_BUDGET_BYTES,
+  historyEntryBytes,
+  newestWholeSequenceGroups,
+  oversizedHistoryItem,
+  submissionBytesByItemId
+} from './agent-session-history-page-bounds'
+import { offPageSubagentRoster } from './agent-session-history-subagent-roster'
 
-/** Byte budget for one history page. Half the outbound channel cap, so the RPC
- *  envelope and page framing always fit beside the items: row counts alone
- *  cannot protect the channel — forty legal 256 KiB messages serialize past the
- *  4 MiB outbound cap, and an overflow closes the client's socket on every
- *  reopen. Pages degrade to fewer rows instead; `hasOlder`/`hasNewer` keep the
- *  client paging. */
-export const AGENT_SESSION_HISTORY_MAX_PAGE_BYTES = REMOTE_RUNTIME_MAX_OUTBOUND_JSON_BYTES / 2
-
-/** Reserved for everything the page carries beyond its items and removal ids:
- *  cursors, session/epoch ids, and the RPC envelope. Charged up front so the
- *  content budget bounds the COMPLETE serialized result, not just the rows. */
-const HISTORY_PAGE_ENVELOPE_RESERVE_BYTES = 64 * 1024
-
-const HISTORY_PAGE_CONTENT_BUDGET_BYTES =
-  AGENT_SESSION_HISTORY_MAX_PAGE_BYTES - HISTORY_PAGE_ENVELOPE_RESERVE_BYTES
-
-/** Item bytes plus the submission the page would carry alongside it. */
-function historyEntryBytes(
-  item: AgentJournalRenderItem,
-  submissionBytes: ReadonlyMap<string, number>
-): number {
-  return Buffer.byteLength(JSON.stringify(item), 'utf8') + (submissionBytes.get(item.itemId) ?? 0)
-}
-
-function submissionBytesByItemId(
-  submissions: readonly AgentJournalSubmission[]
-): Map<string, number> {
-  return new Map(
-    submissions.map((submission) => [
-      agentJournalSubmissionKey(submission.clientMessageId),
-      Buffer.byteLength(JSON.stringify(submission), 'utf8')
-    ])
-  )
-}
-
-/** Visible stand-in for an item whose body alone exceeds the page budget. The
- *  full body stays in the journal — this bounds what ONE PAGE carries, it never
- *  rewrites the record. */
-function oversizedHistoryItem(
-  item: AgentJournalRenderItem,
-  byteLength: number
-): AgentJournalRenderItem {
-  return {
-    ...item,
-    // A pre-bounding id can exceed the budget by itself; the stand-in must not
-    // re-inflate the page it exists to bound. Bounding is deterministic, so
-    // re-reads keep deduplicating on the same key.
-    itemId: boundJournalKeyComponent(item.itemId),
-    body: {
-      kind: 'status',
-      text: `[Orca: item truncated — ${byteLength} bytes exceeds the history page budget]`
-    }
-  }
-}
-
-/**
- * Keep the edge of the window nearest the requested position within the byte
- * budget: `newest` for tail/backward pages, `oldest` for forward catch-up. The
- * page stays contiguous, so the dropped remainder is exactly what the next page
- * serves. Never empties a non-empty window — a single over-budget item degrades
- * to a visible marker so the client always makes progress.
- */
-function boundHistoryItemsByBytes(
-  items: AgentJournalRenderItem[],
-  keep: 'newest' | 'oldest',
-  submissionBytes: ReadonlyMap<string, number>,
-  maxBytes: number
-): { items: AgentJournalRenderItem[]; dropped: number } {
-  const ordered = keep === 'newest' ? items.toReversed() : items
-  const kept: AgentJournalRenderItem[] = []
-  let total = 0
-  for (const item of ordered) {
-    const bytes = historyEntryBytes(item, submissionBytes)
-    if (kept.length === 0 && bytes > maxBytes) {
-      kept.push(oversizedHistoryItem(item, bytes))
-      break
-    }
-    if (total + bytes > maxBytes) {
-      break
-    }
-    kept.push(item)
-    total += bytes
-  }
-  return {
-    items: keep === 'newest' ? kept.toReversed() : kept,
-    dropped: items.length - kept.length
-  }
-}
+export { AGENT_SESSION_HISTORY_MAX_PAGE_BYTES } from './agent-session-history-page-bounds'
 
 /** Clamped, never rejected: a client asking for more than the host will serve
  *  should get a smaller page and keep paging, not an error mid-scroll. */
@@ -127,11 +46,40 @@ export function resolveHistoryLimit(limit: number | undefined): number {
   return Math.min(AGENT_SESSION_HISTORY_MAX_LIMIT, Math.max(1, Math.floor(limit)))
 }
 
+/** Whose rows a backward read serves. Both window over the session's own rows; a
+ *  reader of the session's own agent alone gets only those. In-process only: no wire
+ *  request carries it. */
+export type AgentSessionHistoryScope = 'every-agent' | 'own-agent'
+
+/**
+ * The newest `limit` of the session's own rows, in whole sequence groups, and every
+ * row after the oldest of them: a subagent's rows ride along with the conversation
+ * they happened in, so its burst cannot crowd the conversation off the page. The page
+ * stays contiguous and starts at its first item, as the cursor means. Fewer own rows
+ * than `limit` reach back to the start. With no subagent rows this is the newest
+ * `limit` rows, as before.
+ */
+function conversationWindow(
+  items: readonly AgentJournalRenderItem[],
+  limit: number
+): AgentJournalRenderItem[] {
+  const own = items.filter(isRootAgentJournalItem)
+  if (own.length === items.length) {
+    return newestWholeSequenceGroups(items, limit)
+  }
+  const ownWindow = newestWholeSequenceGroups(own, limit)
+  const start = ownWindow.length < own.length ? ownWindow[0]?.sequence : undefined
+  return start === undefined ? [...items] : items.filter((item) => item.sequence >= start)
+}
+
 export function readAgentSessionHistory(
   journal: AgentSessionJournal,
-  request: AgentSessionHistoryRequest
+  request: AgentSessionHistoryRequest,
+  /** Reduced state to read against. A synchronous multi-page catch-up passes one
+   *  snapshot for the whole run so each page costs its own rows, not the timeline. */
+  snapshot: AgentJournalSnapshot = journal.snapshot(),
+  scope: AgentSessionHistoryScope = 'every-agent'
 ): AgentSessionHistoryResult {
-  const snapshot = journal.snapshot()
   if (journal.isReadOnly) {
     return historyReset(snapshot, 'schema_unreadable')
   }
@@ -148,10 +96,10 @@ export function readAgentSessionHistory(
       return historyReset(snapshot, 'cursor_ahead')
     }
   }
-  const older = cursor
-    ? snapshot.items.filter((item) => item.sequence < cursor.sequence)
-    : snapshot.items
-  const windowed = older.slice(Math.max(0, older.length - limit))
+  const scoped =
+    scope === 'own-agent' ? snapshot.items.filter(isRootAgentJournalItem) : snapshot.items
+  const older = cursor ? scoped.filter((item) => item.sequence < cursor.sequence) : scoped
+  const windowed = conversationWindow(older, limit)
   const { items, dropped } = boundHistoryItemsByBytes(
     windowed,
     'newest',
@@ -165,12 +113,31 @@ export function readAgentSessionHistory(
       direction: request.direction,
       items,
       hasOlder: older.length > windowed.length || dropped > 0,
-      hasNewer: older.length < snapshot.items.length,
+      hasNewer: older.length < scoped.length,
       fallbackCursor: cursor ?? { epoch: snapshot.cursor.epoch, sequence: 0 },
       nextCursor: items[0]
         ? { epoch: snapshot.cursor.epoch, sequence: items[0].sequence }
-        : undefined
+        : undefined,
+      subagentRoster: offPageSubagentRoster(scoped, items)
     })
+  }
+}
+
+/**
+ * A catch-up run over one journal. Pages share one reduced timeline, so the run
+ * costs its own rows instead of re-reducing every item per page; the cursor
+ * check re-reduces if anything did advance the journal between pages.
+ */
+export function createAgentSessionCatchUpReader(
+  journal: AgentSessionJournal
+): (request: AgentSessionHistoryRequest) => AgentSessionHistoryResult {
+  let snapshot = journal.snapshot()
+  return (request) => {
+    const live = journal.cursor()
+    if (live.epoch !== snapshot.cursor.epoch || live.sequence !== snapshot.cursor.sequence) {
+      snapshot = journal.snapshot()
+    }
+    return readAgentSessionHistory(journal, request, snapshot)
   }
 }
 
@@ -185,7 +152,7 @@ function buildHydrationPage(
   snapshot: AgentJournalSnapshot,
   fence?: number
 ): AgentSessionHistoryPage {
-  const items = snapshot.items.slice(-AGENT_SESSION_HISTORY_MAX_LIMIT)
+  const items = conversationWindow(snapshot.items, AGENT_SESSION_HISTORY_MAX_LIMIT)
   const bounded = boundHistoryItemsByBytes(
     items,
     'newest',
@@ -202,7 +169,8 @@ function buildHydrationPage(
     nextCursor: bounded.items[0]
       ? { epoch: snapshot.cursor.epoch, sequence: bounded.items[0].sequence }
       : undefined,
-    fence
+    fence,
+    subagentRoster: offPageSubagentRoster(snapshot.items, bounded.items)
   })
 }
 
@@ -229,7 +197,8 @@ function readForward(
     // a page it cannot place.
     return historyReset(snapshot, 'cursor_ahead')
   }
-  const since = journal.readSince(cursor)
+  // One lookahead preserves hasNewer without rereading the entire remaining journal per page.
+  const since = journal.readSince(cursor, limit + 1)
   if (!since.ok) {
     return historyReset(snapshot, since.reset)
   }
@@ -259,11 +228,8 @@ function readForward(
   if (!projected.ok) {
     return historyReset(snapshot, projected.reset)
   }
-  while (
-    rows.length > 1 &&
-    pageContentBytes(projected.batch.items, projected.batch.removedItemIds) >
-      HISTORY_PAGE_CONTENT_BUDGET_BYTES
-  ) {
+  let contentBytes = pageContentBytes(projected.batch.items, projected.batch.removedItemIds)
+  while (rows.length > 1 && contentBytes > HISTORY_PAGE_CONTENT_BUDGET_BYTES) {
     rows = rows.slice(0, Math.ceil(rows.length / 2))
     const shrunk = projectJournalBatch({
       rows,
@@ -275,19 +241,18 @@ function readForward(
       return historyReset(snapshot, shrunk.reset)
     }
     projected = shrunk
+    contentBytes = pageContentBytes(projected.batch.items, projected.batch.removedItemIds)
   }
   // One row can still touch an over-budget item; degrade it visibly.
-  const items =
-    pageContentBytes(projected.batch.items, projected.batch.removedItemIds) >
-    HISTORY_PAGE_CONTENT_BUDGET_BYTES
-      ? projected.batch.items.map((item) => {
-          const bytes = historyEntryBytes(item, submissionBytes)
-          return bytes > HISTORY_PAGE_CONTENT_BUDGET_BYTES
-            ? oversizedHistoryItem(item, bytes)
-            : item
-        })
-      : projected.batch.items
-  if (pageContentBytes(items, projected.batch.removedItemIds) > HISTORY_PAGE_CONTENT_BUDGET_BYTES) {
+  let items = projected.batch.items
+  if (contentBytes > HISTORY_PAGE_CONTENT_BUDGET_BYTES) {
+    items = items.map((item) => {
+      const bytes = historyEntryBytes(item, submissionBytes)
+      return bytes > HISTORY_PAGE_CONTENT_BUDGET_BYTES ? oversizedHistoryItem(item, bytes) : item
+    })
+    contentBytes = pageContentBytes(items, projected.batch.removedItemIds)
+  }
+  if (contentBytes > HISTORY_PAGE_CONTENT_BUDGET_BYTES) {
     // A single row's semantic payload — in practice a pre-bounding oversized
     // removal id — can never fit any page, and truncating a removal id would
     // break the client's keying. A bounded tail replaces the client's state
@@ -322,6 +287,7 @@ function buildPage(input: {
   fallbackCursor: AgentJournalCursor
   nextCursor: AgentJournalCursor | undefined
   fence?: number
+  subagentRoster?: AgentSessionSubagentRosterEntry[]
 }): AgentSessionHistoryPage {
   const epoch = input.snapshot.cursor.epoch
   const pageItemIds = new Set(input.items.map((item) => item.itemId))
@@ -344,6 +310,7 @@ function buildPage(input: {
     },
     liveCursor: input.snapshot.cursor,
     hasOlder: input.hasOlder,
-    hasNewer: input.hasNewer
+    hasNewer: input.hasNewer,
+    ...(input.subagentRoster === undefined ? {} : { subagentRoster: input.subagentRoster })
   }
 }

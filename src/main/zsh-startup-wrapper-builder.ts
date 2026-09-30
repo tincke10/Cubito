@@ -27,7 +27,8 @@
  * hook restores zsh option semantics for the body at call time.
  */
 import { getPosixOmpShellWrapper } from './pty/omp-shell-wrapper'
-import { getPosixCodexShellLaunchPreflight } from './pty/codex-shell-launch-preflight'
+import { WSL_MANAGED_CLI_PATH_RESTORE } from './wsl-managed-cli-path-restore'
+import { getPosixCodexShellLaunchPreflight } from '../shared/codex-shell-function'
 import {
   getZshShellReadyMarkerRegistrationBlock,
   SHELL_STARTUP_IDENTITY_MARKER_BLOCK,
@@ -38,14 +39,14 @@ import {
 
 /** Runtime values the hook re-exports after the user's own startup files ran. */
 export type ZshWrapperRestoreSpec = {
+  /** The managed WSL CLI dir onto PATH — local wrappers only; a no-op outside WSL. */
+  managedWslCli: boolean
   /** Orca's agent-teams shim dir back onto PATH. */
   agentTeamsPath: boolean
   /** Remote CLI bin dir onto PATH — relay hosts only. */
   remoteCliBinDir: boolean
   /** Orca's runtime CODEX_HOME. */
   codexHome: boolean
-  /** The `codex()` wrapper that runs Orca's launch preflight. */
-  codexLaunchPreflight: boolean
 }
 
 export type ZshStartupHookSpec = {
@@ -54,6 +55,8 @@ export type ZshStartupHookSpec = {
   readyMarkerEscaped: string
   /** OSC 133 command-lifecycle hooks (behind the `markers` feature). */
   osc133CommandMarkers: boolean
+  /** Local-only command delivery from the first zle line editor. */
+  startupCommandDelivery: boolean
   /** Comment heading the overlay restores inside the hook. */
   overlayRestoreComment: string
   restores: ZshWrapperRestoreSpec
@@ -122,8 +125,7 @@ function getOverlayRestoreBlocks(spec: ZshStartupHookSpec): (string | null)[] {
     MIMOCODE_HOME_RESTORE,
     spec.restores.remoteCliBinDir ? REMOTE_CLI_BIN_DIR_RESTORE : null,
     getPosixOmpShellWrapper(),
-    spec.restores.codexHome ? CODEX_HOME_RESTORE : null,
-    spec.restores.codexLaunchPreflight ? getPosixCodexShellLaunchPreflight() : null
+    spec.restores.codexHome ? CODEX_HOME_RESTORE : null
   ]
 }
 
@@ -147,6 +149,15 @@ function buildDeferredInit(spec: ZshStartupHookSpec): string {
     precmd_functions=(\${precmd_functions:#__orca_deferred_init})
   fi`
     : `  precmd_functions=(\${precmd_functions:#__orca_deferred_init})`
+  const lineInitRegistration = spec.startupCommandDelivery
+    ? `  if __orca_has_feature ready || __orca_has_feature startup; then
+    __orca_emit_ready_marker=""
+    __orca_has_feature ready && __orca_emit_ready_marker=1
+${indentBlock(getZshShellReadyMarkerRegistrationBlock(spec.readyMarkerEscaped, true), '    ')}
+  fi`
+    : featureGuard('ready', [
+        indentBlock(getZshShellReadyMarkerRegistrationBlock(spec.readyMarkerEscaped), '')
+      ])
 
   return `__orca_deferred_init() {
   # Why first: this body runs after the user's own config, so it would otherwise
@@ -159,15 +170,16 @@ function buildDeferredInit(spec: ZshStartupHookSpec): string {
   builtin typeset -g precmd_functions
 ${permanentPrecmd}
 ${joinBlocks([
+  spec.restores.managedWslCli ? indentBlock(WSL_MANAGED_CLI_PATH_RESTORE, '  ') : null,
   featureGuard('overlay', getOverlayRestoreBlocks(spec)),
+  // Why outside the overlay guard: a system-default Codex home carries no overlay key.
+  indentBlock(getPosixCodexShellLaunchPreflight(), '  ').replace(/\n$/, ''),
   // Why no /etc/zshrc repair branch: ZDOTDIR was handed back before that file
   // ran, so the value it derives is the user's own path. #11044 is unreachable.
   `  if [[ -n "\${_orca_histfile:-}" ]]; then
     HISTFILE="$_orca_histfile"
   fi`,
-  featureGuard('ready', [
-    indentBlock(getZshShellReadyMarkerRegistrationBlock(spec.readyMarkerEscaped), '')
-  ])
+  lineInitRegistration
 ])}
 ${
   spec.osc133CommandMarkers

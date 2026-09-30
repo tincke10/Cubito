@@ -12,6 +12,7 @@ describe('OrcaRuntimeRpcServer mobile allowlist: system.snapshot', () => {
   it('allows a mobile-scoped token to call system.snapshot', async () => {
     const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-rpc-system-graph-'))
     const runtime = {
+      configureNotificationDismissalStore: () => {},
       getRuntimeId: () => 'test-runtime',
       getRepoConnectionId: () => null,
       watchFileExplorer: async () => async () => {}

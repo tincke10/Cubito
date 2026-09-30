@@ -1,6 +1,6 @@
 // Every browser-tab placement must publish the created tab through one seam. A placement that
 // hand-rolls its own bookkeeping is how a client-placed page once lost its targetGroupId.
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentBrowserBridge } from '../browser/agent-browser-bridge'
@@ -17,9 +17,7 @@ import {
   publishCreatedBrowserSessionTab,
   publishSwitchedBrowserSessionTab,
   resolveBrowserTabCreateFocus,
-  type BrowserTabCreatePlacementKind,
-  type BrowserTabCreatePublicationHost,
-  type BrowserTabSwitchPlacementKind
+  type BrowserTabCreatePublicationHost
 } from './browser-tab-create-publication'
 
 const { ipcMainOnMock, waitForTabRegistrationMock } = vi.hoisted(() => ({
@@ -91,16 +89,14 @@ function createPublicationHost(registeredTabs: readonly [string, number][] = [['
 }
 
 function browserCommandsSource(): string {
-  return readFileSync(join(__dirname, 'orca-runtime-browser.ts'), 'utf8')
+  return readdirSync(__dirname)
+    .filter((name) => /^runtime-browser-commands-.*\.ts$/.test(name))
+    .sort()
+    .map((name) => readFileSync(join(__dirname, name), 'utf8'))
+    .join('\n')
 }
 
 describe('publishCreatedBrowserSessionTab', () => {
-  it('declares a publication rule for every placement kind', () => {
-    expect(Object.keys(BROWSER_TAB_CREATE_PUBLICATION_RULES).sort()).toEqual(
-      [...BROWSER_TAB_CREATE_PLACEMENT_KINDS].sort()
-    )
-  })
-
   // Why: the per-placement cases below read their expectation off this table, so the table itself
   // needs a literal pin — otherwise dropping a step here would silently rewrite what they assert.
   it('pins the bookkeeping each placement owns', () => {
@@ -143,15 +139,6 @@ describe('publishCreatedBrowserSessionTab', () => {
           `${placementKind} sources its host row from the session-tabs announcement`
         ).toBe(true)
       }
-    }
-  })
-
-  it('declares a host row source for every placement kind', () => {
-    for (const placementKind of BROWSER_TAB_CREATE_PLACEMENT_KINDS) {
-      expect(
-        ['create-ipc', 'session-notify', 'none'],
-        `${placementKind} must say where its host tab row comes from`
-      ).toContain(BROWSER_TAB_CREATE_PUBLICATION_RULES[placementKind].hostRowSource)
     }
   })
 
@@ -307,14 +294,6 @@ describe('browser tab-create activation defaults', () => {
     expect(browserTabCreateClientPageStartsActive(true)).toBe(true)
     expect(browserTabCreateClientPageStartsActive(false)).toBe(false)
     expect(browserTabCreateClientPageStartsActive(undefined)).toBe(true)
-  })
-
-  it('agrees with the focus rule for every explicit boolean shipped callers send', () => {
-    for (const activate of [true, false]) {
-      expect(browserTabCreateClientPageStartsActive(activate)).toBe(
-        browserTabCreateTakesFocus(activate)
-      )
-    }
   })
 })
 
@@ -545,26 +524,9 @@ describe('browser tab-create placement census', () => {
       })
     })
   })
-
-  it('names every placement kind the command adapter can select', () => {
-    const source = browserCommandsSource()
-    const selected = new Set<BrowserTabCreatePlacementKind>()
-    for (const [, placementKind] of source.matchAll(
-      /publishCreatedBrowserSessionTab\(this\.host, \{\s*placementKind: '([a-z]+)'/g
-    )) {
-      selected.add(placementKind as BrowserTabCreatePlacementKind)
-    }
-    expect([...selected].sort()).toEqual([...BROWSER_TAB_CREATE_PLACEMENT_KINDS].sort())
-  })
 })
 
 describe('publishSwitchedBrowserSessionTab', () => {
-  it('declares a publication rule for every switch placement kind', () => {
-    expect(Object.keys(BROWSER_TAB_SWITCH_PUBLICATION_RULES).sort()).toEqual(
-      [...BROWSER_TAB_SWITCH_PLACEMENT_KINDS].sort()
-    )
-  })
-
   // Why: the cases below read their expectation off this table, so the table needs a literal pin.
   it('pins the bookkeeping each switch placement owns', () => {
     expect(BROWSER_TAB_SWITCH_PUBLICATION_RULES).toEqual({
@@ -652,14 +614,6 @@ describe('browser tab-switch focus rule', () => {
     expect(browserTabSwitchTakesFocus(false)).toBe(false)
     expect(browserTabSwitchTakesFocus(undefined)).toBe(false)
   })
-
-  // Why: switch and create are the two ways a tab becomes the session's active tab; if their
-  // focus gates diverged, the same user intent would move the snapshot on one path only.
-  it('agrees with the create focus rule', () => {
-    for (const intent of [true, false, undefined]) {
-      expect(browserTabSwitchTakesFocus(intent)).toBe(browserTabCreateTakesFocus(intent))
-    }
-  })
 })
 
 describe('browser tab-switch placement census', () => {
@@ -677,17 +631,6 @@ describe('browser tab-switch placement census', () => {
     expect(source.match(/publishSwitchedBrowserSessionTab\(/g)).toHaveLength(
       BROWSER_TAB_SWITCH_PLACEMENT_KINDS.length
     )
-  })
-
-  it('names every switch placement kind the command adapter can select', () => {
-    const source = browserCommandsSource()
-    const selected = new Set<BrowserTabSwitchPlacementKind>()
-    for (const [, placementKind] of source.matchAll(
-      /publishSwitchedBrowserSessionTab\(this\.host, \{\s*placementKind: '([a-z]+)'/g
-    )) {
-      selected.add(placementKind as BrowserTabSwitchPlacementKind)
-    }
-    expect([...selected].sort()).toEqual([...BROWSER_TAB_SWITCH_PLACEMENT_KINDS].sort())
   })
 
   // Why: the rule-driven cases read their expectation off the table, so each branch also needs

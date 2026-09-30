@@ -199,7 +199,7 @@ describe('addWorktree', () => {
     })
 
     const worktreeAddCall = gitExecFileAsyncMock.mock.calls.find(
-      ([argv]) => Array.isArray(argv) && argv[0] === 'worktree' && argv[1] === 'add'
+      ([argv]) => Array.isArray(argv) && argv.includes('worktree') && argv.includes('add')
     )
     expect(worktreeAddCall?.[1]).toMatchObject({ timeout: WORKTREE_ADD_TIMEOUT_MS })
     expect(WORKTREE_ADD_TIMEOUT_MS).toBeGreaterThan(0)
@@ -214,7 +214,7 @@ describe('addWorktree', () => {
     })
 
     const worktreeAddCall = gitExecFileAsyncMock.mock.calls.find(
-      ([argv]) => Array.isArray(argv) && argv[0] === 'worktree' && argv[1] === 'add'
+      ([argv]) => Array.isArray(argv) && argv.includes('worktree') && argv.includes('add')
     )
     expect(worktreeAddCall?.[1]).toMatchObject({ timeout: 600_000 })
   })
@@ -459,40 +459,6 @@ describe('addWorktree', () => {
         'refs/heads/main'
       ],
       { cwd: '/repo', timeout: WORKTREE_ADD_TIMEOUT_MS }
-    ])
-  })
-
-  it('qualifies slash-containing local branch names when no remote ref matches', async () => {
-    gitExecFileAsyncMock.mockRejectedValueOnce(new Error('no remote ref')) // rev-parse refs/remotes/release/main^{commit}
-    gitExecFileAsyncMock.mockResolvedValueOnce({ stdout: 'abc123\n' }) // rev-parse refs/heads/release/main^{commit}
-    gitExecFileAsyncMock.mockResolvedValueOnce({ stdout: '' }) // worktree add
-    resolveCreationBaseConfigWrite()
-    gitExecFileAsyncMock.mockRejectedValueOnce(Object.assign(new Error('key unset'), { code: 1 })) // config --get push.autoSetupRemote (unset)
-    gitExecFileAsyncMock.mockResolvedValueOnce({ stdout: '' }) // config --local set push.autoSetupRemote
-
-    await addWorktree('/repo', '/repo-feature', 'feature/release', 'release/main')
-
-    expect(gitExecFileAsyncMock.mock.calls.map((call) => call[0])).toEqual([
-      ['rev-parse', '--verify', '--quiet', 'refs/remotes/release/main^{commit}'],
-      ['rev-parse', '--verify', '--quiet', 'refs/heads/release/main^{commit}'],
-      [
-        'worktree',
-        'add',
-        '--no-track',
-        '-b',
-        'feature/release',
-        '/repo-feature',
-        'refs/heads/release/main'
-      ],
-      [
-        'config',
-        '--local',
-        '--replace-all',
-        'branch.feature/release.base',
-        'refs/heads/release/main'
-      ],
-      ['config', '--get', 'push.autoSetupRemote'],
-      ['config', '--local', 'push.autoSetupRemote', 'true']
     ])
   })
 

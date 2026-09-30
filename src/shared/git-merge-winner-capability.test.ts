@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   GIT_MERGE_WINNER_RUNTIME_CAPABILITY,
-  GIT_MERGE_WINNER_SYNC_RUNTIME_CAPABILITY,
-  RUNTIME_CAPABILITIES
-} from './protocol-version'
+  GIT_MERGE_WINNER_SYNC_RUNTIME_CAPABILITY
+} from './cubito-runtime-capabilities'
+import { RUNTIME_CAPABILITIES } from './protocol-version'
 
 describe('git merge-winner capability', () => {
   it('is a versioned capability key advertised by the runtime', () => {

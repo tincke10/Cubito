@@ -28,7 +28,8 @@ vi.mock('../git/repo', () => ({
 }))
 
 vi.mock('./registered-worktree-roots-cache', () => ({
-  invalidateAuthorizedRootsCache: vi.fn()
+  invalidateAuthorizedRootsCache: vi.fn(),
+  invalidateAuthorizedRootsCacheForRepo: vi.fn()
 }))
 
 vi.mock('../providers/ssh-git-dispatch', () => ({
@@ -80,7 +81,7 @@ describe('repos folder pickers', () => {
     removeHandlerMock.mockReset()
     showOpenDialogMock.mockReset()
 
-    registerRepoHandlers(mockWindow as never, mockStore as never)
+    registerRepoHandlers(mockWindow as never, mockStore as never, {} as never)
   })
 
   it('registers the multi-folder picker with handler cleanup', () => {

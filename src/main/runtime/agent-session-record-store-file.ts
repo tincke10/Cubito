@@ -8,8 +8,8 @@
  */
 
 import { createHash } from 'node:crypto'
-import { chmod, mkdir, readFile, rm } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import {
   agentSessionOperationKey,
   isAgentSessionOperationRow,
@@ -17,17 +17,20 @@ import {
 } from '../../shared/agent-session-operation-ledger'
 import {
   AGENT_SESSION_RECORD_SCHEMA_VERSION,
-  isAgentSessionRecord,
+  isPersistedAgentSessionRecord,
   type AgentSessionRecord
 } from '../../shared/agent-session-record'
-import {
-  copyFileDurable,
-  durableWriteTempPath,
-  renameDurable,
-  writeTempFileDurable
-} from '../durable-file-write'
+import { normalizeLegacyHandoffRecord } from '../../shared/agent-session-legacy-handoff-lease'
+import { agentSessionStoreBackupPath as backupPath } from './agent-session-record-store-write'
+export { saveAgentSessionStore } from './agent-session-record-store-write'
+import { parseAgentSessionTabTable, type AgentSessionTabTable } from './agent-session-tab-table'
+import { serializeAgentSessionStoreState } from './agent-session-store-serialization'
 
 export const AGENT_SESSION_STORE_SCHEMA_VERSION = 2 as const
+
+/** In a host's state directory, beside the journal database: one file adjudicates every session's
+ *  lease. */
+export const AGENT_SESSION_STORE_DIR_NAME = 'agent-sessions'
 
 export const AGENT_SESSION_STORE_FILE_NAME = 'agent-sessions.json'
 
@@ -41,6 +44,8 @@ export type AgentSessionStoreState = {
   retiredClaimKeys: RetiredAgentSessionClaimKey[]
   /** Rows this build cannot validate, kept with a durable refusal reason. */
   unreadableRecords: Map<string, { reason: string; raw: unknown }>
+  /** Chat tab id → the conversation it shows; null until this store first records a tab. */
+  sessionTabs: AgentSessionTabTable | null
 }
 
 export type LoadedAgentSessionStore = {
@@ -52,14 +57,12 @@ export type LoadedAgentSessionStore = {
   recoveredFromBackup: boolean
   /** True when the normalized current-schema quarantine must be persisted. */
   needsRewrite: boolean
+  /** True when decode mapped a lease value only the removed terminal handoff wrote. */
+  legacyHandoffLeasesNormalized: boolean
 }
 
 export function agentSessionStorePath(directory: string): string {
   return join(directory, AGENT_SESSION_STORE_FILE_NAME)
-}
-
-function backupPath(filePath: string): string {
-  return `${filePath}.bak`
 }
 
 function emptyState(hostId: string): AgentSessionStoreState {
@@ -69,7 +72,8 @@ function emptyState(hostId: string): AgentSessionStoreState {
     records: new Map(),
     operations: new Map(),
     retiredClaimKeys: [],
-    unreadableRecords: new Map()
+    unreadableRecords: new Map(),
+    sessionTabs: null
   }
 }
 
@@ -77,14 +81,17 @@ export function agentSessionStoreRevision(state: AgentSessionStoreState): string
   return createHash('sha256')
     .update(String(state.schemaVersion))
     .update('\0')
-    .update(serializeState(state))
+    .update(serializeAgentSessionStoreState(state))
     .digest('hex')
 }
 
 function parseState(
   raw: string,
   hostId: string
-): { state: AgentSessionStoreState; needsRewrite: boolean } | null {
+): Pick<
+  LoadedAgentSessionStore,
+  'state' | 'needsRewrite' | 'legacyHandoffLeasesNormalized'
+> | null {
   let parsed: unknown
   try {
     parsed = JSON.parse(raw)
@@ -94,6 +101,7 @@ function parseState(
   if (typeof parsed !== 'object' || parsed === null) {
     return null
   }
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: every field is read back as `unknown` and validated below before use.
   const file = parsed as {
     schemaVersion?: unknown
     hostId?: unknown
@@ -101,6 +109,8 @@ function parseState(
     operations?: unknown
     retiredClaimKeys?: unknown
     unusableRecords?: unknown
+    sessionTabs?: unknown
+    visibleSessionIds?: unknown
   }
   if (
     !Number.isSafeInteger(file.schemaVersion) ||
@@ -135,11 +145,17 @@ function parseState(
   state.schemaVersion = schemaVersion
   state.hostId = file.hostId
   let needsRewrite = false
+  let legacyHandoffLeasesNormalized = false
   if (typeof file.records === 'object' && file.records !== null) {
     for (const [sessionId, value] of Object.entries(file.records)) {
-      const record = isAgentSessionRecord(value) ? value : null
+      const decoded = isPersistedAgentSessionRecord(value)
+        ? normalizeLegacyHandoffRecord(value)
+        : null
+      const record = decoded?.record ?? null
       if (record?.sessionId === sessionId) {
         state.records.set(sessionId, record)
+        // Why: mapped while parsing, so every revision is taken over the same normalized state.
+        legacyHandoffLeasesNormalized ||= decoded?.normalized === true
       } else {
         const valueSchemaVersion =
           typeof value === 'object' &&
@@ -208,7 +224,16 @@ function parseState(
       state.retiredClaimKeys.push({ keyId: key.keyId, retiredAt: key.retiredAt as number })
     }
   }
-  return { state, needsRewrite }
+  const sessionTabs = parseAgentSessionTabTable(
+    file,
+    state.records,
+    schemaVersion === AGENT_SESSION_STORE_SCHEMA_VERSION
+  )
+  if (!sessionTabs.valid) {
+    return null
+  }
+  state.sessionTabs = sessionTabs.table
+  return { state, needsRewrite, legacyHandoffLeasesNormalized }
 }
 
 /** A record the primary retained as unreadable may still have a valid copy in the previous
@@ -276,11 +301,10 @@ export async function loadAgentSessionStore(
       await salvageUnreadableRecordsFromBackup(parsed.state, backupPath(filePath), hostId)
     }
     return {
-      state: parsed.state,
+      ...parsed,
       storeFound: true,
       readOnly: parsed.state.schemaVersion > AGENT_SESSION_STORE_SCHEMA_VERSION,
-      recoveredFromBackup,
-      needsRewrite: parsed.needsRewrite
+      recoveredFromBackup
     }
   }
   if (unusableStoreFound) {
@@ -291,53 +315,7 @@ export async function loadAgentSessionStore(
     storeFound: false,
     readOnly: false,
     recoveredFromBackup: false,
-    needsRewrite: false
-  }
-}
-
-function serializeState(state: AgentSessionStoreState): string {
-  const records: Record<string, unknown> = Object.create(null)
-  for (const [sessionId, record] of state.records) {
-    records[sessionId] = record
-  }
-  return JSON.stringify({
-    schemaVersion: AGENT_SESSION_STORE_SCHEMA_VERSION,
-    hostId: state.hostId,
-    records,
-    operations: Object.fromEntries(state.operations),
-    retiredClaimKeys: state.retiredClaimKeys,
-    unusableRecords: Object.fromEntries(state.unreadableRecords)
-  })
-}
-
-/**
- * Commit the whole state. The live path is never absent: the new content is made durable in a temp
- * file first, a validated primary is COPIED to the backup, and only then does the rename publish it.
- * Backup recovery keeps the known-good backup in place while publishing the repaired primary.
- *
- * The old ordering renamed the live file aside before writing the new one, so a death in that
- * window left the profile with a backup and no primary — which is exactly the state that wedged a
- * real profile. Copy, don't move.
- */
-export async function saveAgentSessionStore(
-  filePath: string,
-  state: AgentSessionStoreState,
-  options: { primaryStatus: 'validated' | 'unusable-or-absent' }
-): Promise<void> {
-  const directory = dirname(filePath)
-  await mkdir(directory, { recursive: true, mode: 0o700 })
-  await chmod(directory, 0o700)
-  const tmpPath = durableWriteTempPath(filePath)
-  try {
-    await writeTempFileDurable(tmpPath, serializeState(state), 0o600)
-    // Only a primary parsed under the transaction lock may replace the backup. During recovery the
-    // primary is corrupt or absent, so the known-good backup must survive until publication.
-    if (options.primaryStatus === 'validated') {
-      await copyFileDurable(filePath, backupPath(filePath))
-    }
-    await renameDurable(tmpPath, filePath)
-  } catch (error) {
-    await rm(tmpPath, { force: true }).catch(() => {})
-    throw error
+    needsRewrite: false,
+    legacyHandoffLeasesNormalized: false
   }
 }

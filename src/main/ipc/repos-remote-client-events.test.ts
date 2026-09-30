@@ -35,7 +35,10 @@ vi.mock('../git/repo', () => ({
   filterBaseRefSearchOutput: vi.fn().mockReturnValue([])
 }))
 
-vi.mock('./registered-worktree-roots-cache', () => ({ invalidateAuthorizedRootsCache: vi.fn() }))
+vi.mock('./registered-worktree-roots-cache', () => ({
+  invalidateAuthorizedRootsCache: vi.fn(),
+  invalidateAuthorizedRootsCacheForRepo: vi.fn()
+}))
 vi.mock('../providers/ssh-git-dispatch', () => ({ getSshGitProvider: vi.fn() }))
 vi.mock('./ssh', () => ({ getActiveMultiplexer: vi.fn() }))
 
@@ -48,7 +51,7 @@ const mainWindow = { isDestroyed: () => false, webContents: { send: vi.fn() } }
 async function registerHandlersWithoutNotifier(): Promise<typeof ReposChangedNotificationModule> {
   vi.resetModules()
   const repos = await import('./repos')
-  repos.registerRepoHandlers(mainWindow as never, mockStore as never)
+  repos.registerRepoHandlers(mainWindow as never, mockStore as never, {} as never)
   return import('./repos/repos-changed-notification')
 }
 

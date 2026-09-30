@@ -39,6 +39,7 @@ export function buildManagedWorktreeCreateArgs(
     linkedTaskSourceContext: params.linkedTaskSourceContext,
     comment: params.comment,
     displayName: params.displayName,
+    displayNameKind: params.displayNameKind,
     telemetrySource: params.telemetrySource,
     workspaceStatus: params.workspaceStatus,
     manualOrder: params.manualOrder,
@@ -77,6 +78,7 @@ export function buildManagedWorktreeCreateArgs(
       : undefined,
     ...(params.startupAgent ? { startupAgent: params.startupAgent } : {}),
     ...(params.startupPrompt !== undefined ? { startupPrompt: params.startupPrompt } : {}),
+    ...(params.launchSource ? { startupLaunchSource: params.launchSource } : {}),
     startupDraft: params.startupDraft,
     lineage: {
       parentWorkspace: params.parentWorkspace,

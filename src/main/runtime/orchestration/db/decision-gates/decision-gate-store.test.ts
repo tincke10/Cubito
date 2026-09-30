@@ -13,7 +13,7 @@ describe('decision-gate-store: resolveGate pending guard', () => {
 
   it('resolves a pending gate', () => {
     const d = createDb()
-    const task = d.createTask({ spec: 'work' })
+    const task = d.createTask({ runId: 'run_legacy_local', spec: 'work' })
     const gate = d.createGate({ taskId: task.id, question: 'ok?' })
 
     const resolved = d.resolveGate(gate.id, 'yes')
@@ -24,7 +24,7 @@ describe('decision-gate-store: resolveGate pending guard', () => {
 
   it('throws gate_not_pending when resolving an already-resolved gate', () => {
     const d = createDb()
-    const task = d.createTask({ spec: 'work' })
+    const task = d.createTask({ runId: 'run_legacy_local', spec: 'work' })
     const gate = d.createGate({ taskId: task.id, question: 'ok?' })
     d.resolveGate(gate.id, 'yes')
 

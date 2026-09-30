@@ -5,19 +5,29 @@
 // UNREADABLE, not skippable: the caller must degrade to read-only rather than
 // render a partial timeline or compact past a row it cannot interpret.
 
+import type { AgentSessionFailureFact } from '../../../shared/agent-session-failure'
 import {
   AGENT_SESSION_JOURNAL_SCHEMA_VERSION,
   type AgentJournalDispatchState,
   type AgentJournalItemBody,
   type AgentJournalMessageItem,
+  type AgentJournalProducerLinkage,
+  type AgentJournalTurnScope,
   type AgentSessionProviderHandle
 } from '../../../shared/agent-session-journal-types'
 import {
   isAdmissibleAgentJournalItemBody,
   isAdmissibleAgentJournalMessageBody
 } from '../../../shared/agent-session-journal-schemas'
+import { isAdmissibleAgentSessionContextUsage } from '../../../shared/agent-session-context-usage-schema'
 
-type JournalRowBase = {
+/** Producer linkage rides the row BASE rather than the body: the two nested
+ *  prompt shapes are `.strict()`, so an unknown key on a body would make the
+ *  whole row parse as malformed. It is also deliberately not a `v` bump — an
+ *  unknown `v` makes a row unreadable and latches the host read-only, while an
+ *  unknown KEY is ignored below, so an older host reads a stamped row and
+ *  behaves exactly as it does today. */
+type JournalRowBase = AgentJournalProducerLinkage & {
   /** Schema version of THIS row. */
   v: number
   epoch: string
@@ -28,6 +38,10 @@ type JournalRowBase = {
   ts: number
   /** Set when crash reconciliation appended the row after the fact. */
   recovered?: true
+  /** Which turn the item this row creates belongs to. Rides the base, and is not a `v` bump,
+   *  for the reason linkage does. Absent on rows from hosts that predate it: the reducer
+   *  derives one for them on read. */
+  turnScope?: AgentJournalTurnScope
 }
 
 /** First row of every epoch: binds the epoch to a provider handle and records why it opened. */
@@ -69,16 +83,58 @@ export type JournalSubmissionRow = JournalRowBase & {
   payloadFingerprint: string
   providerHandle: AgentSessionProviderHandle
   body: AgentJournalMessageItem
+  /** Accepted to be handed over by a later `dispatch{pending}` row; absent on rows whose writer
+   *  dispatched in the same step. Older readers keep the key and ignore it. */
+  handoverRecorded?: true
+  /** The queued draft this submission hands off; absent for a direct send. Older readers keep
+   *  the key and ignore it. */
+  queuedMessageId?: string
+  /** Who asked for this turn: `client` for a person's send over the client send RPC (typed, or
+   *  a queued card they sent now); `host` for Orca's own — orchestration mail, a restart
+   *  continuation, a launch prompt, the queue's automatic drain. Absent on rows from before it
+   *  was recorded. Older readers keep the key and ignore it. */
+  origin?: JournalSubmissionOrigin
 }
+
+export type JournalSubmissionOrigin = 'client' | 'host'
 
 export type JournalDispatchRow = JournalRowBase & {
   kind: 'dispatch'
   clientMessageId: string
-  state: Exclude<AgentJournalDispatchState, 'pending'>
+  state: AgentJournalDispatchState
   /** Provider item identity adopted on accept. */
   providerItemId: string | null
   reason: string | null
+  /** On `pending`: the turn the message was handed into, which becomes its row's scope. */
+  turnScope?: AgentJournalTurnScope
+  /** On `rejected`: why, typed. Older readers keep the key and ignore it; a malformed one is
+   *  dropped when read, never the row. */
+  rejection?: AgentSessionFailureFact
 }
+
+/** An item mutation may name its own producer, because one batch can CREATE
+ *  rows several agents produced. Naming none keeps the row's existing producer.
+ *  Inline like the row base, and for the same reason no `v` bump: an older host
+ *  ignores the unknown keys and reads the mutation as root, as it always did. */
+export type JournalLifecycleMutation =
+  | (AgentJournalProducerLinkage & {
+      kind: 'item'
+      itemId: string
+      revision: number
+      body: AgentJournalItemBody
+      turnScope?: AgentJournalTurnScope
+    })
+  | { kind: 'tombstone'; itemId: string; revision: number }
+
+/** One durable append whose nested mutations share the outer ordering facts. */
+export type JournalLifecycleBatchRow = JournalRowBase & {
+  kind: 'lifecycle-batch'
+  settlementId: string
+  mutations: JournalLifecycleMutation[]
+}
+
+export const MAX_JOURNAL_LIFECYCLE_BATCH_BYTES = 1_500_000
+export const MAX_JOURNAL_LIFECYCLE_BATCH_MUTATIONS = 200
 
 export type JournalRow =
   | JournalEpochRow
@@ -86,6 +142,7 @@ export type JournalRow =
   | JournalTombstoneRow
   | JournalSubmissionRow
   | JournalDispatchRow
+  | JournalLifecycleBatchRow
 
 export type JournalRowParse =
   | { ok: true; row: JournalRow }
@@ -94,7 +151,14 @@ export type JournalRowParse =
   /** A future schema version. The host must not write or compact this journal. */
   | { ok: false; unreadable: true }
 
-const ROW_KINDS = new Set(['epoch', 'item', 'tombstone', 'submission', 'dispatch'])
+const ROW_KINDS = new Set([
+  'epoch',
+  'item',
+  'tombstone',
+  'submission',
+  'dispatch',
+  'lifecycle-batch'
+])
 
 export function serializeJournalRow(row: JournalRow): string {
   return JSON.stringify(row)
@@ -123,7 +187,79 @@ export function parseJournalRow(line: string): JournalRowParse {
     return { ok: false, unreadable: true }
   }
   const upcast = upcastRow(record, version)
+  dropUnusableProducerLinkage(upcast)
+  dropUnusableTurnScope(upcast)
+  if (upcast.kind === 'lifecycle-batch' && Array.isArray(upcast.mutations)) {
+    for (const mutation of upcast.mutations) {
+      if (isPlainObject(mutation)) {
+        dropUnusableProducerLinkage(mutation)
+        dropUnusableTurnScope(mutation)
+      }
+    }
+  }
+  dropUnusableContextUsage(upcast)
   return isJournalRow(upcast) ? { ok: true, row: upcast } : { ok: false, unreadable: false }
+}
+
+/** Linkage ids this build cannot trust, removed from a row it still keeps.
+ *
+ *  Deliberately NOT part of `isJournalRow`: rejecting a row there drops it from
+ *  the timeline, so a validator tightened against one bad field becomes a
+ *  whole-store kill switch. Dropping the field degrades the row to the
+ *  session's own agent — what every row said before linkage existed — while
+ *  keeping the content, which is always the safer direction. An `agentId` that
+ *  survives is a real one: the reader scopes on PRESENCE, so `''` or a
+ *  non-string left in place would hide the row from its own author for good. */
+function dropUnusableProducerLinkage(record: Record<string, unknown>): void {
+  for (const field of ['agentId', 'parentAgentId', 'providerParentRef', 'producerKind']) {
+    const value = record[field]
+    if (value !== undefined && (typeof value !== 'string' || value.length === 0)) {
+      delete record[field]
+    }
+  }
+  if (record.attempt !== undefined && !Number.isInteger(record.attempt)) {
+    delete record.attempt
+  }
+}
+
+/** A scope this build cannot place, removed like unusable linkage: the row then reads as one
+ *  written before scopes existed, and the reducer derives its scope. */
+function dropUnusableTurnScope(record: Record<string, unknown>): void {
+  const scope = record.turnScope
+  if (
+    scope !== undefined &&
+    !(
+      isPlainObject(scope) &&
+      (scope.kind === 'thread' ||
+        (scope.kind === 'turn' &&
+          typeof scope.turnItemId === 'string' &&
+          scope.turnItemId.length > 0))
+    )
+  ) {
+    delete record.turnScope
+  }
+}
+
+/** Context facts this build cannot read, removed from the turn row that carries
+ *  them. Same reasoning as linkage: they are an annotation on the turn, and
+ *  rejecting the row for them would truncate the journal from that row on. */
+function dropUnusableContextUsage(record: Record<string, unknown>): void {
+  const bodies = [
+    record.kind === 'item' ? record.body : undefined,
+    ...(record.kind === 'lifecycle-batch' && Array.isArray(record.mutations)
+      ? record.mutations.map((mutation) => (isPlainObject(mutation) ? mutation.body : undefined))
+      : [])
+  ]
+  for (const body of bodies) {
+    if (
+      isPlainObject(body) &&
+      body.kind === 'turn' &&
+      body.contextUsage !== undefined &&
+      !isAdmissibleAgentSessionContextUsage(body.contextUsage)
+    ) {
+      delete body.contextUsage
+    }
+  }
 }
 
 /** Read-time upcast chain. Each step raises a row exactly one version. */
@@ -191,7 +327,32 @@ function isJournalRow(record: Record<string, unknown>): record is JournalRow {
       (record.reason === null || typeof record.reason === 'string')
     )
   }
+  if (record.kind === 'lifecycle-batch') {
+    return (
+      typeof record.settlementId === 'string' &&
+      record.settlementId.length > 0 &&
+      Array.isArray(record.mutations) &&
+      record.mutations.length > 0 &&
+      record.mutations.length <= MAX_JOURNAL_LIFECYCLE_BATCH_MUTATIONS &&
+      Buffer.byteLength(JSON.stringify(record), 'utf8') + 1 <= MAX_JOURNAL_LIFECYCLE_BATCH_BYTES &&
+      record.mutations.every(isLifecycleMutation)
+    )
+  }
   return typeof record.reason === 'string' && isPlainObject(record.providerHandle)
+}
+
+function isLifecycleMutation(value: unknown): value is JournalLifecycleMutation {
+  if (!isPlainObject(value) || typeof value.itemId !== 'string') {
+    return false
+  }
+  if (value.kind === 'tombstone') {
+    return Number.isInteger(value.revision)
+  }
+  return (
+    value.kind === 'item' &&
+    Number.isInteger(value.revision) &&
+    isAdmissibleAgentJournalItemBody(value.body)
+  )
 }
 
 /** Approximate on-disk cost of a row, used for the per-session size bound. */

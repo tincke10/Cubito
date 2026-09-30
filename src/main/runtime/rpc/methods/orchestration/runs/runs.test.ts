@@ -1,0 +1,434 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { RpcContext } from '../../../core'
+import { createOrchestrationRpcHarness } from '../rpc-test-harness'
+import type { OrchestrationDb } from '../../../../orchestration/db'
+import type { OrcaRuntimeService } from '../../../../orca-runtime'
+
+describe('orchestration RPC methods', () => {
+  const h = createOrchestrationRpcHarness()
+  const { coordinatorPaneKey } = h
+  let db: OrchestrationDb
+  let runtime: OrcaRuntimeService
+  let ctx: RpcContext
+
+  function setup(withBoundRun = true): void {
+    ;({ db, runtime, ctx } = h.setup(withBoundRun))
+  }
+
+  afterEach(() => {
+    h.cleanup()
+  })
+
+  async function call(name: string, params: Record<string, unknown>) {
+    return h.call(name, params, ctx)
+  }
+
+  describe('lightweight Runs', () => {
+    it('creates and binds a Run to the runtime-resolved caller pane', async () => {
+      setup(false)
+      vi.spyOn(runtime, 'getTerminalPaneKey').mockReturnValue(
+        'tab_coord:11111111-1111-4111-8111-111111111111'
+      )
+
+      const created = (await call('orchestration.runCreate', {
+        objective: 'Coordinate reviews',
+        from: 'term_coord'
+      })) as { run: { id: string; consumer_generation: number } }
+      const current = (await call('orchestration.runCurrent', { from: 'term_coord' })) as {
+        run: { id: string } | null
+      }
+
+      expect(created.run.consumer_generation).toBe(1)
+      expect(current.run?.id).toBe(created.run.id)
+    })
+
+    it('publishes a run receipt without internal routing columns', async () => {
+      setup(false)
+      vi.spyOn(runtime, 'getTerminalPaneKey').mockReturnValue(
+        'tab_coord:11111111-1111-4111-8111-111111111111'
+      )
+
+      const created = (await call('orchestration.runCreate', {
+        objective: 'Coordinate reviews',
+        from: 'term_coord'
+      })) as { run: Record<string, unknown> }
+
+      expect(created.run).not.toHaveProperty('coordinator_pane_key')
+      expect(created.run).not.toHaveProperty('home_database')
+      expect(created.run.consumer_generation).toBe(1)
+    })
+
+    it('requires runtime-observed stable pane identity for binding', async () => {
+      setup(false)
+      vi.spyOn(runtime, 'getTerminalPaneKey').mockReturnValue(null)
+
+      await expect(
+        call('orchestration.runCreate', { objective: 'No pane', from: 'term_stale' })
+      ).rejects.toMatchObject({ code: 'stable_pane_required' })
+      expect(db.listRuns().runs.filter((run) => run.legacy === 0)).toHaveLength(0)
+    })
+
+    it('rebinds explicitly, lists Runs, and keeps the legacy Run inspect-only', async () => {
+      setup(false)
+      vi.spyOn(runtime, 'getTerminalPaneKey').mockImplementation((handle) =>
+        handle === 'term_old'
+          ? 'tab_old:11111111-1111-4111-8111-111111111111'
+          : 'tab_new:22222222-2222-4222-9222-222222222222'
+      )
+      const created = (await call('orchestration.runCreate', {
+        objective: 'Move me',
+        from: 'term_old'
+      })) as { run: { id: string } }
+      const rebound = (await call('orchestration.runUse', {
+        id: created.run.id,
+        from: 'term_new'
+      })) as { run: { consumer_generation: number } }
+      const listed = (await call('orchestration.runList', {})) as {
+        runs: { id: string; legacy: number }[]
+      }
+
+      expect(rebound.run.consumer_generation).toBe(2)
+      expect(listed.runs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: created.run.id, legacy: 0 }),
+          expect.objectContaining({ id: 'run_legacy_local', legacy: 1 })
+        ])
+      )
+      await expect(
+        call('orchestration.runUse', { id: 'run_legacy_local', from: 'term_new' })
+      ).rejects.toMatchObject({ code: 'run_not_found' })
+    })
+
+    it('requires an explicit binding before task mutation', async () => {
+      setup(false)
+      vi.spyOn(runtime, 'getTerminalPaneKey').mockReturnValue(coordinatorPaneKey)
+
+      await expect(
+        call('orchestration.taskCreate', {
+          spec: 'must not become global',
+          callerTerminalHandle: 'term_coord'
+        })
+      ).rejects.toMatchObject({
+        code: 'run_required',
+        data: {
+          effectsApplied: false,
+          nextCommandArgs: ['skills', 'get', 'orchestration', '--full']
+        }
+      })
+      expect(db.listTasks()).toHaveLength(0)
+    })
+
+    it('scopes task listing and fences the old coordinator after run-use', async () => {
+      setup(false)
+      const oldPane = 'tab_old:11111111-1111-4111-8111-111111111111'
+      const newPane = 'tab_new:22222222-2222-4222-9222-222222222222'
+      vi.spyOn(runtime, 'getTerminalPaneKey').mockImplementation((handle) =>
+        handle === 'term_old' ? oldPane : newPane
+      )
+      const runA = db.createRun({
+        objective: 'A',
+        coordinatorHandle: 'term_old',
+        coordinatorPaneKey: oldPane
+      })
+      const runB = db.createRun({
+        objective: 'B',
+        coordinatorHandle: 'term_other',
+        coordinatorPaneKey: newPane
+      })
+      const taskA = db.createTask({ spec: 'A work', runId: runA.id })
+      db.createTask({ spec: 'B work', runId: runB.id })
+
+      const listed = (await call('orchestration.taskList', { run: runA.id })) as {
+        tasks: { id: string }[]
+      }
+      expect(listed.tasks.map((task) => task.id)).toEqual([taskA.id])
+
+      db.bindRun({
+        runId: runA.id,
+        coordinatorHandle: 'term_new',
+        coordinatorPaneKey: newPane
+      })
+      await expect(
+        call('orchestration.taskCreate', {
+          spec: 'stale write',
+          run: runA.id,
+          callerTerminalHandle: 'term_old'
+        })
+      ).rejects.toMatchObject({ code: 'consumer_fenced' })
+    })
+
+    it('cancels and fences the old Run waiter when run-use rebinds', async () => {
+      setup(false)
+      const oldPane = 'tab_old:11111111-1111-4111-8111-111111111111'
+      const newPane = 'tab_new:22222222-2222-4222-9222-222222222222'
+      vi.spyOn(runtime, 'getTerminalPaneKey').mockImplementation((handle) =>
+        handle === 'term_old' ? oldPane : newPane
+      )
+      const created = (await call('orchestration.runCreate', {
+        objective: 'Wait fencing',
+        from: 'term_old'
+      })) as { run: { id: string } }
+      const oldWait = call('orchestration.check', {
+        terminal: 'term_old',
+        wait: true,
+        timeoutMs: 5_000
+      })
+      const fenced = expect(oldWait).rejects.toMatchObject({ code: 'consumer_fenced' })
+      await Promise.resolve()
+
+      await call('orchestration.runUse', {
+        id: created.run.id,
+        from: 'term_new'
+      })
+
+      await fenced
+    })
+
+    it('fences an unbound direct waiter when its pane creates a Run', async () => {
+      setup(false)
+      vi.spyOn(runtime, 'getTerminalPaneKey').mockReturnValue(coordinatorPaneKey)
+      const directWait = call('orchestration.check', {
+        terminal: 'term_coord',
+        wait: true,
+        timeoutMs: 5_000
+      })
+      const fenced = expect(directWait).rejects.toMatchObject({ code: 'consumer_fenced' })
+      await Promise.resolve()
+
+      await call('orchestration.runCreate', {
+        objective: 'Claim the direct mailbox',
+        from: 'term_coord'
+      })
+
+      await fenced
+    })
+  })
+
+  describe('lease Runs (paired GUI device, Wave 3)', () => {
+    function leaseCtx(deviceId: string): RpcContext {
+      return { runtime, pairedDeviceId: deviceId, clientKind: 'runtime' }
+    }
+
+    it('mints a lease Run with no terminal and no stable pane requirement', async () => {
+      setup(false)
+      const created = (await h.call(
+        'orchestration.runCreate',
+        { objective: 'GUI fan-out' },
+        leaseCtx('device_1')
+      )) as {
+        run: {
+          id: string
+          coordinator_handle: string
+          legacy: number
+        }
+      }
+
+      expect(created.run.coordinator_handle).toBe('lease:device_1')
+      // Why the row: the pane key is an internal column the Run receipt no longer exposes.
+      expect(db.getRun(created.run.id)?.coordinator_pane_key).toBe(
+        `lease:device_1:${created.run.id}`
+      )
+      expect(created.run.legacy).toBe(0)
+    })
+
+    it('keeps the terminal runCreate branch byte-identical when `from` is present', async () => {
+      setup(false)
+      vi.spyOn(runtime, 'getTerminalPaneKey').mockReturnValue(coordinatorPaneKey)
+
+      const created = (await call('orchestration.runCreate', {
+        objective: 'terminal still works',
+        from: 'term_coord'
+      })) as { run: { id: string; coordinator_handle: string; legacy: number } }
+
+      expect(created.run.coordinator_handle).toBe('term_coord')
+      expect(db.getRun(created.run.id)?.coordinator_pane_key).toBe(coordinatorPaneKey)
+      expect(created.run.legacy).toBe(0)
+    })
+
+    it('isolates two lease Runs minted by the same device', async () => {
+      setup(false)
+      const first = (await h.call(
+        'orchestration.runCreate',
+        { objective: 'first' },
+        leaseCtx('device_1')
+      )) as { run: { id: string; coordinator_pane_key: string } }
+      const second = (await h.call(
+        'orchestration.runCreate',
+        { objective: 'second' },
+        leaseCtx('device_1')
+      )) as { run: { id: string; coordinator_pane_key: string } }
+
+      expect(first.run.id).not.toBe(second.run.id)
+      expect(db.getRun(first.run.id)?.coordinator_pane_key).not.toBe(
+        db.getRun(second.run.id)?.coordinator_pane_key
+      )
+    })
+
+    it('lets the lease owner create tasks on its own Run', async () => {
+      setup(false)
+      const created = (await h.call(
+        'orchestration.runCreate',
+        { objective: 'lease tasks' },
+        leaseCtx('device_1')
+      )) as { run: { id: string } }
+
+      const taskResult = (await h.call(
+        'orchestration.taskCreate',
+        { spec: 'lease work', run: created.run.id },
+        leaseCtx('device_1')
+      )) as { task: { id: string; run_id: string } }
+
+      expect(taskResult.task.run_id).toBe(created.run.id)
+    })
+
+    it('fences a lease taskCreate against another device Run', async () => {
+      setup(false)
+      const created = (await h.call(
+        'orchestration.runCreate',
+        { objective: 'owned by device_1' },
+        leaseCtx('device_1')
+      )) as { run: { id: string } }
+
+      await expect(
+        h.call(
+          'orchestration.taskCreate',
+          { spec: 'not yours', run: created.run.id },
+          leaseCtx('device_2')
+        )
+      ).rejects.toMatchObject({ code: 'consumer_fenced' })
+    })
+  })
+
+  describe('lease reads scoping (Wave 5)', () => {
+    function leaseCtx(deviceId: string): RpcContext {
+      return { runtime, pairedDeviceId: deviceId, clientKind: 'runtime' }
+    }
+
+    it('lets the lease owner read its own Run via runShow', async () => {
+      setup(false)
+      const created = (await h.call(
+        'orchestration.runCreate',
+        { objective: 'read me' },
+        leaseCtx('device_1')
+      )) as { run: { id: string } }
+
+      const shown = (await h.call(
+        'orchestration.runShow',
+        { id: created.run.id },
+        leaseCtx('device_1')
+      )) as { run: { id: string } }
+
+      expect(shown.run.id).toBe(created.run.id)
+    })
+
+    it('fences a lease runShow against a Run owned by another device', async () => {
+      setup(false)
+      const created = (await h.call(
+        'orchestration.runCreate',
+        { objective: 'owned by device_1' },
+        leaseCtx('device_1')
+      )) as { run: { id: string } }
+
+      await expect(
+        h.call('orchestration.runShow', { id: created.run.id }, leaseCtx('device_2'))
+      ).rejects.toMatchObject({ code: 'consumer_fenced' })
+    })
+
+    it('keeps terminal runShow unscoped (no `from`, no paired device)', async () => {
+      setup(false)
+      vi.spyOn(runtime, 'getTerminalPaneKey').mockReturnValue(coordinatorPaneKey)
+      const created = (await call('orchestration.runCreate', {
+        objective: 'terminal Run',
+        from: 'term_coord'
+      })) as { run: { id: string } }
+
+      const shown = (await call('orchestration.runShow', { id: created.run.id })) as {
+        run: { id: string }
+      }
+
+      expect(shown.run.id).toBe(created.run.id)
+    })
+  })
+
+  describe('orchestration.reset', () => {
+    function seedResetState(): void {
+      db.insertMessage({ from: 'a', to: 'b', subject: 'test' })
+      db.createTask({ spec: 'work' })
+    }
+
+    it('resets all state', async () => {
+      setup()
+      seedResetState()
+      const stopRelay = vi.spyOn(runtime, 'stopOrchestrationFederationRelay')
+
+      const result = (await call('orchestration.reset', { all: true })) as { reset: string }
+      expect(result.reset).toBe('all')
+      expect(stopRelay).toHaveBeenCalledOnce()
+      expect(db.getInbox()).toHaveLength(0)
+      expect(db.listTasks()).toHaveLength(0)
+    })
+
+    it('resets tasks only', async () => {
+      setup()
+      seedResetState()
+      const stopRelay = vi.spyOn(runtime, 'stopOrchestrationFederationRelay')
+
+      await call('orchestration.reset', { tasks: true })
+      expect(stopRelay).toHaveBeenCalledOnce()
+      expect(db.getInbox()).toHaveLength(1)
+      expect(db.listTasks()).toHaveLength(0)
+    })
+
+    it('resets messages only', async () => {
+      setup()
+      seedResetState()
+      const stopRelay = vi.spyOn(runtime, 'stopOrchestrationFederationRelay')
+
+      await call('orchestration.reset', { messages: true })
+      expect(stopRelay).not.toHaveBeenCalled()
+      expect(db.getInbox()).toHaveLength(0)
+      expect(db.listTasks()).toHaveLength(1)
+    })
+
+    it.each([
+      ['empty params', {}],
+      ['false-only params', { all: false }],
+      ['multi-scope task and messages params', { tasks: true, messages: true }],
+      ['multi-scope all and tasks params', { all: true, tasks: true }],
+      ['non-boolean params', { all: 'true' }]
+    ])('rejects %s without mutating state', async (_name, params) => {
+      setup()
+      seedResetState()
+
+      await expect(call('orchestration.reset', params)).rejects.toThrow()
+      expect(db.getInbox()).toHaveLength(1)
+      expect(db.listTasks()).toHaveLength(1)
+    })
+
+    it('ignores false scopes when exactly one scope is true', async () => {
+      setup()
+      seedResetState()
+
+      const result = (await call('orchestration.reset', { all: false, tasks: true })) as {
+        reset: string
+      }
+
+      expect(result.reset).toBe('tasks')
+      expect(db.getInbox()).toHaveLength(1)
+      expect(db.listTasks()).toHaveLength(0)
+    })
+
+    it('ignores non-boolean scopes when exactly one real boolean scope is true', async () => {
+      setup()
+      seedResetState()
+
+      const result = (await call('orchestration.reset', { all: 'true', messages: true })) as {
+        reset: string
+      }
+
+      expect(result.reset).toBe('messages')
+      expect(db.getInbox()).toHaveLength(0)
+      expect(db.listTasks()).toHaveLength(1)
+    })
+  })
+})

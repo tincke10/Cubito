@@ -1,3 +1,8 @@
+import {
+  getRepoExecutionHostId,
+  getSshTargetIdForExecutionHost,
+  parseExecutionHostId
+} from '../../../../shared/execution-host'
 import { ipcMain } from 'electron'
 import type {
   ListKnownWorktreesForExecutionHostArgs,
@@ -5,7 +10,6 @@ import type {
   ForgetRemovedWorktreesForExecutionHostArgs,
   ForgetRemovedWorktreesForExecutionHostResult
 } from '../../../../shared/detected-worktree-provider-contract'
-import { parseExecutionHostId } from '../../../../shared/execution-host'
 import type { DetectedWorktree } from '../../../../shared/worktree/types'
 import { isFolderRepo } from '../../../../shared/repo-kind'
 import { projectResolvedWorktreeLineage } from '../../../../shared/resolved-worktree-lineage'
@@ -47,7 +51,10 @@ export function registerHostCatalogHandlers(context: WorktreeIpcContext): void {
       // Why: findExactRepoOwner repeats this same all-candidates-owned check, and getRepos() re-hydrates the
       // whole catalog, so a separate pass here is pure cost.
       const repo = findExactRepoOwner(store, requestedRepoId, requestedExecutionHostId)
-      if (!repo || repo.connectionId !== parsedHost.targetId) {
+      if (
+        !repo ||
+        getSshTargetIdForExecutionHost(getRepoExecutionHostId(repo)) !== parsedHost.targetId
+      ) {
         return rejected()
       }
       const complete = (worktrees: DetectedWorktree[]): HostQualifiedKnownWorktreeResult => ({
@@ -103,11 +110,21 @@ export function registerHostCatalogHandlers(context: WorktreeIpcContext): void {
       const requestedExecutionHostId = args?.executionHostId ?? 'ssh:'
       const worktreeIds = Array.isArray(args?.worktreeIds) ? args.worktreeIds : []
       const parsedHost = parseExecutionHostId(requestedExecutionHostId)
-      if (parsedHost?.kind !== 'ssh' || worktreeIds.length === 0) {
+      // Runtime hosts belong here for the same reason SSH ones do: their rows are exempt from
+      // gcStaleWorktreeMeta, so a scan-proven removal is the only thing that ever retires them.
+      if (
+        (parsedHost?.kind !== 'ssh' && parsedHost?.kind !== 'runtime') ||
+        worktreeIds.length === 0
+      ) {
         return nothingForgotten
       }
+      // No runtime arm in the check below: `findExactRepoOwner` already refuses a repo carrying both
+      // a runtime `executionHostId` and a `connectionId`, because `resolveRepoOwnershipEvidence`
+      // calls that pair contradictory and one non-owned candidate voids the whole lookup. A second
+      // check would be unreachable, and unreachable code on a destructive path reads as a guarantee
+      // it is not making.
       const repo = findExactRepoOwner(store, args?.repoId ?? '', requestedExecutionHostId)
-      if (!repo || repo.connectionId !== parsedHost.targetId) {
+      if (!repo || (parsedHost.kind === 'ssh' && repo.connectionId !== parsedHost.targetId)) {
         return nothingForgotten
       }
       // Why: a folder workspace's meta IS the workspace record, not a checkout row — gcStaleWorktreeMeta skips

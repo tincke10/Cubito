@@ -3,6 +3,7 @@ import type { GlobalSettings } from '../../shared/global-settings-types'
 import type * as MergeWinnerModule from '../git/merge-winner'
 import { RuntimeGitCommands, type ResolvedRuntimeGitWorktree } from './orca-runtime-git'
 import type { RuntimeGitTarget } from './runtime-git-command-target'
+import { toSshExecutionHostId } from '../../shared/execution-host'
 
 const mocks = vi.hoisted(() => ({
   mergeWinnerIntoParent: vi.fn(),
@@ -66,8 +67,15 @@ describe('RuntimeGitCommands.mergeRuntimeGitWinnerIntoParent', () => {
     mocks.startParentDependencySetupAfterMerge.mockResolvedValue({ status: 'started' })
     const repo = { id: 'repo-1', path: '/repo' } as unknown as RuntimeGitTarget['repo']
     const commands = makeCommands({
-      'id:parent': { worktree: makeWorktree('/repo/parent', 'parent-branch'), repo },
-      'id:winner': { worktree: makeWorktree('/repo/winner', 'winner-branch') }
+      'id:parent': {
+        worktree: makeWorktree('/repo/parent', 'parent-branch'),
+        repo,
+        executionHostId: 'local'
+      },
+      'id:winner': {
+        worktree: makeWorktree('/repo/winner', 'winner-branch'),
+        executionHostId: 'local'
+      }
     })
 
     const result = await commands.mergeRuntimeGitWinnerIntoParent(
@@ -93,8 +101,14 @@ describe('RuntimeGitCommands.mergeRuntimeGitWinnerIntoParent', () => {
     mocks.mergeWinnerIntoParent.mockResolvedValueOnce(clean)
     mocks.startParentDependencySetupAfterMerge.mockResolvedValue(undefined)
     const commands = makeCommands({
-      'id:parent': { worktree: makeWorktree('/repo/parent', 'parent-branch') },
-      'id:winner': { worktree: makeWorktree('/repo/winner', 'winner-branch') }
+      'id:parent': {
+        worktree: makeWorktree('/repo/parent', 'parent-branch'),
+        executionHostId: 'local'
+      },
+      'id:winner': {
+        worktree: makeWorktree('/repo/winner', 'winner-branch'),
+        executionHostId: 'local'
+      }
     })
     await expect(
       commands.mergeRuntimeGitWinnerIntoParent('id:parent', 'id:winner')
@@ -106,11 +120,17 @@ describe('RuntimeGitCommands.mergeRuntimeGitWinnerIntoParent', () => {
     expect(mocks.startParentDependencySetupAfterMerge).not.toHaveBeenCalled()
   })
 
-  it('merges locally when both targets share no SSH connection', async () => {
+  it('merges locally when both targets run on the local host', async () => {
     mocks.mergeWinnerIntoParent.mockResolvedValue({ outcome: 'clean', commitOid: 'c'.repeat(40) })
     const commands = makeCommands({
-      'id:parent': { worktree: makeWorktree('/repo/parent', 'parent-branch') },
-      'id:winner': { worktree: makeWorktree('/repo/winner', 'winner-branch') }
+      'id:parent': {
+        worktree: makeWorktree('/repo/parent', 'parent-branch'),
+        executionHostId: 'local'
+      },
+      'id:winner': {
+        worktree: makeWorktree('/repo/winner', 'winner-branch'),
+        executionHostId: 'local'
+      }
     })
 
     const result = await commands.mergeRuntimeGitWinnerIntoParent(
@@ -132,8 +152,14 @@ describe('RuntimeGitCommands.mergeRuntimeGitWinnerIntoParent', () => {
   it('defaults the commit message from the parent and winner branch names', async () => {
     mocks.mergeWinnerIntoParent.mockResolvedValue({ outcome: 'clean', commitOid: 'c'.repeat(40) })
     const commands = makeCommands({
-      'id:parent': { worktree: makeWorktree('/repo/parent', 'parent-branch') },
-      'id:winner': { worktree: makeWorktree('/repo/winner', 'winner-branch') }
+      'id:parent': {
+        worktree: makeWorktree('/repo/parent', 'parent-branch'),
+        executionHostId: 'local'
+      },
+      'id:winner': {
+        worktree: makeWorktree('/repo/winner', 'winner-branch'),
+        executionHostId: 'local'
+      }
     })
 
     await commands.mergeRuntimeGitWinnerIntoParent('id:parent', 'id:winner')
@@ -154,11 +180,11 @@ describe('RuntimeGitCommands.mergeRuntimeGitWinnerIntoParent', () => {
     const commands = makeCommands({
       'id:parent': {
         worktree: makeWorktree('/remote/parent', 'parent-branch'),
-        connectionId: 'conn-1'
+        executionHostId: toSshExecutionHostId('conn-1')
       },
       'id:winner': {
         worktree: makeWorktree('/remote/winner', 'winner-branch'),
-        connectionId: 'conn-1'
+        executionHostId: toSshExecutionHostId('conn-1')
       }
     })
 
@@ -178,11 +204,11 @@ describe('RuntimeGitCommands.mergeRuntimeGitWinnerIntoParent', () => {
     const commands = makeCommands({
       'id:parent': {
         worktree: makeWorktree('/remote/parent', 'parent-branch'),
-        connectionId: 'conn-1'
+        executionHostId: toSshExecutionHostId('conn-1')
       },
       'id:winner': {
         worktree: makeWorktree('/remote/winner', 'winner-branch'),
-        connectionId: 'conn-1'
+        executionHostId: toSshExecutionHostId('conn-1')
       }
     })
 
@@ -197,8 +223,14 @@ describe('RuntimeGitCommands.mergeRuntimeGitWinnerIntoParent', () => {
   it('forwards syncWorkingTree to the local merge when requested', async () => {
     mocks.mergeWinnerIntoParent.mockResolvedValue({ outcome: 'clean', commitOid: 'c'.repeat(40) })
     const commands = makeCommands({
-      'id:parent': { worktree: makeWorktree('/repo/parent', 'parent-branch') },
-      'id:winner': { worktree: makeWorktree('/repo/winner', 'winner-branch') }
+      'id:parent': {
+        worktree: makeWorktree('/repo/parent', 'parent-branch'),
+        executionHostId: 'local'
+      },
+      'id:winner': {
+        worktree: makeWorktree('/repo/winner', 'winner-branch'),
+        executionHostId: 'local'
+      }
     })
 
     await commands.mergeRuntimeGitWinnerIntoParent('id:parent', 'id:winner', 'custom message', true)
@@ -221,11 +253,11 @@ describe('RuntimeGitCommands.mergeRuntimeGitWinnerIntoParent', () => {
     const commands = makeCommands({
       'id:parent': {
         worktree: makeWorktree('/remote/parent', 'parent-branch'),
-        connectionId: 'conn-1'
+        executionHostId: toSshExecutionHostId('conn-1')
       },
       'id:winner': {
         worktree: makeWorktree('/remote/winner', 'winner-branch'),
-        connectionId: 'conn-1'
+        executionHostId: toSshExecutionHostId('conn-1')
       }
     })
 
@@ -243,9 +275,12 @@ describe('RuntimeGitCommands.mergeRuntimeGitWinnerIntoParent', () => {
     const commands = makeCommands({
       'id:parent': {
         worktree: makeWorktree('/remote/parent', 'parent-branch'),
-        connectionId: 'conn-1'
+        executionHostId: toSshExecutionHostId('conn-1')
       },
-      'id:winner': { worktree: makeWorktree('/local/winner', 'winner-branch') }
+      'id:winner': {
+        worktree: makeWorktree('/local/winner', 'winner-branch'),
+        executionHostId: 'local'
+      }
     })
 
     await expect(

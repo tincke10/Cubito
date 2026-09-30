@@ -22,6 +22,12 @@ const ALLOWLIST: readonly string[] = [
   'config/scripts/build-notification-status-macos.mjs',
   'config/scripts/build-windows-cli-launcher.mjs',
   'config/scripts/rebuild-native-deps.mjs',
+  // Why: upstream comments that name electron-builder's packaging behavior, not imports.
+  'config/bundled-ripgrep-resources.cjs',
+  'src/main/cli/cli-command-inspection.ts',
+  'src/main/daemon/daemon-host-relocation.ts',
+  'src/main/ipc/deferred-emoji-shortcode-dataset.ts',
+  'src/main/startup/os-opened-markdown-files.ts',
   'src/main/ssh/ssh-relay-deploy.ts',
   'src/shared/release-channel.ts'
 ]

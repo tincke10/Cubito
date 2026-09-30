@@ -1,65 +1,99 @@
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import {
-  type AgentTrustPreset,
-  markClaudeWorkspaceTrusted,
-  markCodexProjectTrusted,
-  markCopilotFolderTrusted,
-  markCursorWorkspaceTrusted
-} from './agent-trust-presets'
-import { markRemoteAgentWorkspaceTrusted } from './remote-agent-trust-presets'
-import { ClaudeRuntimePathResolver } from './claude-accounts/runtime-paths'
+  AGENT_TRUST_WRITE_DEADLINE_MS,
+  SHORT_AGENT_TRUST_WRITE_DEADLINE_MS
+} from './agent-trust-write-deadline'
+import type { AgentTrustPreset } from './agent-trust-presets'
+import { resolveLocalClaudeTrustConfig } from './claude/claude-folder-trust-file'
+import type { ClaudeRuntimeAuthPreparation } from './claude-accounts/runtime-auth/runtime-auth-types'
+import type { AgentWorkspaceTrustSpawnRequest } from '../shared/agent-workspace-trust-spawn-request'
+import { parseWslUncPath } from '../shared/wsl-paths'
+import { applyWorkspaceTrustOnThisHost, launchedAgentHome } from './execution-host-workspace-trust'
+import { getLocalCodexTrustConfigFiles } from './codex/codex-home-paths'
+import { getCachedWslHome } from './wsl-home-cache'
 
-export type AgentWorkspaceTrustHost = { kind: 'local' } | { kind: 'remote'; connectionId: string }
+/** What a trust writer needs to reach the file the launched agent will read. */
+export type AgentTrustLaunchContext = {
+  /** The final spawn env, before the host's own process env. */
+  env: Record<string, string | undefined> | undefined
+  /** Managed-account auth prep for a Claude launch; names a WSL guest's config dir. */
+  claudeAuth: ClaudeRuntimeAuthPreparation | null
+  wslDistro: string | null
+  /** SSH connection that runs the agent; null means this machine. */
+  connectionId: string | null
+}
+
+/** Spawn fields the dispatcher asks the caller to forward to the process owner. */
+export type AgentTrustSpawnFields = {
+  agentWorkspaceTrust?: AgentWorkspaceTrustSpawnRequest
+}
+
+// Why: an explicit CODEX_HOME (e.g. agentDefaultEnv.codex) is where the launched Codex reads trust.
+function withCodexHomeOverride(
+  configFiles: string[],
+  env: AgentTrustLaunchContext['env']
+): string[] {
+  const codexHome = env?.CODEX_HOME?.trim()
+  const overrideFile = codexHome ? join(codexHome, 'config.toml') : null
+  // Why: the writer nests one lock per file, so a repeated file would deadlock on itself.
+  return overrideFile && !configFiles.includes(overrideFile)
+    ? [...configFiles, overrideFile]
+    : configFiles
+}
+
+function isWslLaunch(workspacePath: string, context: AgentTrustLaunchContext): boolean {
+  return (
+    Boolean(context.wslDistro) ||
+    context.claudeAuth?.runtime === 'wsl' ||
+    parseWslUncPath(workspacePath) !== null
+  )
+}
+
+/** Homes an agent on this machine may read trust under; SSH hosts check their own. */
+function localHomePaths(workspacePath: string, context: AgentTrustLaunchContext) {
+  const wslWorkspace = parseWslUncPath(workspacePath)
+  // Why: a WSL guest agent reads trust under the guest's home; an uncached one means write nothing.
+  return wslWorkspace
+    ? [getCachedWslHome(wslWorkspace.distro)]
+    : [homedir(), context.env?.HOME, context.env?.USERPROFILE]
+}
 
 /**
- * Single dispatch point for pre-marking a workspace trusted for a TUI agent,
- * shared by every call site instead of a duplicated preset switch each.
+ * Pre-trusts `workspacePath` for the agent Orca is about to start, on the host that runs
+ * it. Never throws and never waits past the preset's deadline: a miss means the agent asks.
  */
-export async function markAgentWorkspaceTrusted(args: {
-  preset: AgentTrustPreset | undefined
-  workspacePath: string
-  host: AgentWorkspaceTrustHost
-  claudeConfigDir?: string
-  codexHome?: string
-}): Promise<void> {
-  if (!args.preset) {
-    return
+export async function applyAgentWorkspaceTrust(
+  preset: AgentTrustPreset,
+  workspacePath: string,
+  context: AgentTrustLaunchContext
+): Promise<AgentTrustSpawnFields> {
+  if (context.connectionId) {
+    // Why: the SSH host's relay writes on its own disk, under its own homes and the agent's final env.
+    return { agentWorkspaceTrust: { workspacePath } }
   }
-  try {
-    if (args.host.kind === 'remote') {
-      await markRemoteAgentWorkspaceTrusted({
-        preset: args.preset,
-        connectionId: args.host.connectionId,
-        workspacePath: args.workspacePath,
-        ...(args.claudeConfigDir ? { claudeConfigDir: args.claudeConfigDir } : {}),
-        ...(args.codexHome ? { codexHome: args.codexHome } : {})
-      })
-      return
-    }
-    switch (args.preset) {
-      case 'cursor':
-        markCursorWorkspaceTrusted(args.workspacePath)
-        return
-      case 'copilot':
-        markCopilotFolderTrusted(args.workspacePath)
-        return
-      case 'codex':
-        // Why: the Codex write queues behind any in-flight hook grant, so the agent must not
-        // launch until it has actually landed.
-        await (args.codexHome
-          ? markCodexProjectTrusted(args.workspacePath, args.codexHome)
-          : markCodexProjectTrusted(args.workspacePath))
-        return
-      case 'claude':
-        if (args.claudeConfigDir) {
-          markClaudeWorkspaceTrusted(
-            args.workspacePath,
-            new ClaudeRuntimePathResolver().getRuntimePaths(args.claudeConfigDir).configPath
-          )
-        } else {
-          markClaudeWorkspaceTrusted(args.workspacePath)
-        }
-    }
-  } catch {
-    // Why: best-effort — user can still accept the trust prompt manually.
+  // Why: the other writers target this host's home, which a WSL guest agent never reads.
+  if (preset !== 'claude' && isWslLaunch(workspacePath, context)) {
+    return {}
   }
+  await applyWorkspaceTrustOnThisHost(preset, workspacePath, () => {
+    const agentHome = launchedAgentHome(context.env)
+    return {
+      homes: localHomePaths(workspacePath, context),
+      agentHome,
+      claudeConfig: () =>
+        resolveLocalClaudeTrustConfig({
+          workspacePath,
+          env: { ...process.env, ...context.env },
+          claudeAuth: context.claudeAuth,
+          wslDistro: context.wslDistro
+        }),
+      codexConfigFiles: () =>
+        withCodexHomeOverride(getLocalCodexTrustConfigFiles(agentHome), context.env),
+      // Why: Codex queues behind a config lane it shares with Orca's hook installs.
+      deadlineMs:
+        preset === 'codex' ? AGENT_TRUST_WRITE_DEADLINE_MS : SHORT_AGENT_TRUST_WRITE_DEADLINE_MS
+    }
+  })
+  return {}
 }

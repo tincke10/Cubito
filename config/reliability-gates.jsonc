@@ -6473,15 +6473,15 @@
       "invariant": "Injected orchestration task prompts for recognized agent CLIs must send the prompt body inside one bracketed-paste frame, sanitize embedded ESC bytes, preserve chunk boundaries without losing the frame, and submit exactly once only after the agent can accept Enter. A successful orchestration.workerStart must durably record exactly one accepted and started turn; a swallowed Enter must fail with agent_prompt_stalled and never trigger a blind rescue Enter. Claude and Codex must emit a post-paste composer marker and then settle, or reach the bounded fallback first; every other agent retains the platform delay.",
       "oracle": "Runtime tests assert the exact PTY write sequence, failure cleanup, Claude/Codex marker-gated multi-frame renders, and the legacy platform delay for every other configured agent. The candidate resets settlement on later frames, gives a late marker a fresh bounded window, and still submits once at the hard deadline if output never settles. The worker-start contract drives the production RPC through a delayed fake Codex composer and independently checks exact turn/Enter counts plus reopened SQLite Task, Dispatch, worker receipt, and mutation receipt state for accepted and swallowed outcomes. Other orchestration tests assert dispatch/coordinator use the agent prompt path; the live CLI harness covers long Codex-like framing.",
       "commands": [
-        "pnpm exec vitest run --config config/vitest.config.ts src/shared/agent-prompt-injection.test.ts src/main/runtime/orca-runtime.test.ts src/main/runtime/rpc/methods/orchestration-tasks-dispatch.test.ts src/main/runtime/orchestration/coordinator.test.ts",
-        "pnpm exec vitest run --config config/vitest.config.ts src/main/runtime/rpc/methods/orchestration-worker-start-prompt-contract.test.ts --reporter=dot",
+        "pnpm exec vitest run --config config/vitest.config.ts src/shared/agent-prompt-injection.test.ts src/main/runtime/orca-runtime.test.ts src/main/runtime/rpc/methods/orchestration/runs/tasks-dispatch.test.ts src/main/runtime/orchestration/coordinator.test.ts",
+        "pnpm exec vitest run --config config/vitest.config.ts src/main/runtime/rpc/methods/orchestration/worker/worker-start-prompt-contract.test.ts --reporter=dot",
         "node tests/tools/repro-orchestration-long-prompt.mjs --cli out/bin/orca-dev --mode codex-like --size-kb 32 --timeout-ms 20000"
       ],
       "testFiles": [
         "src/shared/agent-prompt-injection.test.ts",
         "src/main/runtime/orca-runtime.test.ts",
-        "src/main/runtime/rpc/methods/orchestration-tasks-dispatch.test.ts",
-        "src/main/runtime/rpc/methods/orchestration-worker-start-prompt-contract.test.ts",
+        "src/main/runtime/rpc/methods/orchestration/runs/tasks-dispatch.test.ts",
+        "src/main/runtime/rpc/methods/orchestration/worker/worker-start-prompt-contract.test.ts",
         "src/main/runtime/orchestration/coordinator.test.ts",
         "tests/tools/repro-orchestration-long-prompt.mjs"
       ],
@@ -6509,7 +6509,7 @@
           ]
         },
         {
-          "file": "src/main/runtime/rpc/methods/orchestration-tasks-dispatch.test.ts",
+          "file": "src/main/runtime/rpc/methods/orchestration/runs/tasks-dispatch.test.ts",
           "assertions": [
             "orchestration.dispatch uses the agent prompt path for injected preambles",
             "raw terminal.send is not called for injected task prompts",
@@ -6517,7 +6517,7 @@
           ]
         },
         {
-          "file": "src/main/runtime/rpc/methods/orchestration-worker-start-prompt-contract.test.ts",
+          "file": "src/main/runtime/rpc/methods/orchestration/worker/worker-start-prompt-contract.test.ts",
           "assertions": [
             "delayed composer readiness produces exactly one submitted and started turn with no premature Enter and durable ready receipts",
             "a swallowed Enter records agent_prompt_stalled across Task, Dispatch, worker, and mutation receipts without a rescue Enter"
@@ -6544,7 +6544,7 @@
           "date": "2026-08-23",
           "runner": "local",
           "platform": "macos",
-          "command": "pnpm exec vitest run --config config/vitest.config.ts src/main/runtime/rpc/methods/orchestration-worker-start-prompt-contract.test.ts --reporter=dot",
+          "command": "pnpm exec vitest run --config config/vitest.config.ts src/main/runtime/rpc/methods/orchestration/worker/worker-start-prompt-contract.test.ts --reporter=dot",
           "result": "passed",
           "durationSeconds": 21.84,
           "summary": "Two deterministic worker-start RPC contracts passed with fake clocks and reopened SQLite receipts for one accepted turn and one swallowed-Enter stalled outcome."
@@ -6553,7 +6553,7 @@
           "date": "2026-08-14",
           "runner": "local",
           "platform": "macos",
-          "command": "pnpm exec vitest run --config config/vitest.config.ts src/shared/agent-prompt-injection.test.ts src/main/runtime/orca-runtime.test.ts src/main/runtime/rpc/methods/orchestration-tasks-dispatch.test.ts src/main/runtime/orchestration/coordinator.test.ts",
+          "command": "pnpm exec vitest run --config config/vitest.config.ts src/shared/agent-prompt-injection.test.ts src/main/runtime/orca-runtime.test.ts src/main/runtime/rpc/methods/orchestration/runs/tasks-dispatch.test.ts src/main/runtime/orchestration/coordinator.test.ts",
           "result": "passed",
           "durationSeconds": 11.32,
           "summary": "4 files and 1,303 tests passed with one skipped. Claude and Codex both wait for post-marker quiescence, and a Codex marker arriving at 7.9 seconds receives a fresh window through its final slow frame. Exact-build live Codex workers accepted injected prompts without manual Enter, replied, called worker_done, and settled successfully in the rendered Electron UI."
@@ -6562,7 +6562,7 @@
           "date": "2026-08-13",
           "runner": "local",
           "platform": "macos",
-          "command": "pnpm exec vitest run --config config/vitest.config.ts src/shared/agent-prompt-injection.test.ts src/main/runtime/orca-runtime.test.ts src/main/runtime/rpc/methods/orchestration-tasks-dispatch.test.ts src/main/runtime/orchestration/coordinator.test.ts",
+          "command": "pnpm exec vitest run --config config/vitest.config.ts src/shared/agent-prompt-injection.test.ts src/main/runtime/orca-runtime.test.ts src/main/runtime/rpc/methods/orchestration/runs/tasks-dispatch.test.ts src/main/runtime/orchestration/coordinator.test.ts",
           "result": "passed",
           "durationSeconds": 13.3,
           "summary": "4 files and 1,283 tests passed. The hardened multi-frame oracle failed on the first-marker candidate because it submitted at 751 ms during an intermediate Claude frame; the quiescence candidate waited through the final 1,000 ms frame and submitted once at 2,500 ms. Continuous render output remained bounded to one fallback submit at 8 seconds. An isolated Claude Code 2.1.231 Haiku probe saw the first marker at 400 ms, continued output through 1,500 ms, sent one Enter at 3,000 ms after 1.5 seconds quiet, and created the expected marker; no Fable or Opus probe was used."
@@ -6571,7 +6571,7 @@
           "date": "2026-08-13",
           "runner": "local",
           "platform": "macos",
-          "command": "pnpm exec vitest run --config config/vitest.config.ts src/shared/agent-prompt-injection.test.ts src/main/runtime/orca-runtime.test.ts src/main/runtime/rpc/methods/orchestration-tasks-dispatch.test.ts src/main/runtime/orchestration/coordinator.test.ts",
+          "command": "pnpm exec vitest run --config config/vitest.config.ts src/shared/agent-prompt-injection.test.ts src/main/runtime/orca-runtime.test.ts src/main/runtime/rpc/methods/orchestration/runs/tasks-dispatch.test.ts src/main/runtime/orchestration/coordinator.test.ts",
           "result": "passed",
           "durationSeconds": 16.9,
           "summary": "4 files and 1,282 tests passed. Unmodified main wrote Enter at 500 ms before the deterministic Claude composer rendered at 750 ms; the candidate waited for the split show-cursor marker and wrote one Enter. A live Claude Code 2.1.231 Haiku trace rendered the pasted marker and show-cursor in one 523-byte frame without submitting a model request."
@@ -6580,7 +6580,7 @@
           "date": "2026-07-07",
           "runner": "local",
           "platform": "macos",
-          "command": "pnpm exec vitest run --config config/vitest.config.ts src/shared/agent-prompt-injection.test.ts src/main/runtime/orca-runtime.test.ts src/main/runtime/rpc/methods/orchestration-tasks-dispatch.test.ts src/main/runtime/orchestration/coordinator.test.ts",
+          "command": "pnpm exec vitest run --config config/vitest.config.ts src/shared/agent-prompt-injection.test.ts src/main/runtime/orca-runtime.test.ts src/main/runtime/rpc/methods/orchestration/runs/tasks-dispatch.test.ts src/main/runtime/orchestration/coordinator.test.ts",
           "result": "passed",
           "durationSeconds": 7.4,
           "summary": "4 test files passed, 697 tests passed; covers framing, runtime PTY writes, orchestration RPC dispatch, and coordinator dispatch behavior."
@@ -6670,8 +6670,8 @@
       "commands": [
         "pnpm run build:cli && pnpm exec vitest run --config config/vitest.config.ts src/main/runtime/orchestration-message-delivery-identity.test.ts --reporter=dot --testTimeout=5000",
         "pnpm exec vitest run --config config/vitest.config.ts src/main/runtime/orchestration-mailbox-routing-races.test.ts src/main/runtime/orchestration-mailbox-notification-consistency.test.ts src/main/runtime/orchestration-mailbox-detached-routing.test.ts src/main/runtime/orchestration-mailbox-transport-settlement.test.ts src/main/runtime/orchestration/run-coordinator-handle-migration.test.ts src/main/runtime/orchestration/orchestration-run-delivery-db.test.ts src/main/runtime/orchestration/orchestration-worker-dispatch-db.test.ts src/main/runtime/orchestration/formatter.test.ts src/main/providers/ssh-pty-provider.test.ts src/main/providers/ssh-pty-write.test.ts src/main/daemon/client.test.ts src/main/daemon/daemon-pty-router.test.ts src/main/daemon/degraded-daemon-pty-provider.test.ts",
-        "pnpm exec vitest run --config config/vitest.config.ts src/main/runtime/orca-runtime.test.ts src/main/runtime/terminal-send-stale-leaf-liveness.test.ts src/main/runtime/rpc/methods/orchestration-runs.test.ts src/main/runtime/rpc/methods/orchestration-send.test.ts src/main/runtime/rpc/methods/orchestration-check.test.ts",
-        "pnpm exec vitest run --config config/vitest.config.ts src/main/runtime/orchestration/federation-sync.test.ts src/main/runtime/rpc/methods/orchestration-federation.test.ts src/main/runtime/rpc/methods/orchestration-federation-lifecycle-settlement.test.ts --reporter=dot"
+        "pnpm exec vitest run --config config/vitest.config.ts src/main/runtime/orca-runtime.test.ts src/main/runtime/terminal-send-stale-leaf-liveness.test.ts src/main/runtime/rpc/methods/orchestration/runs/runs.test.ts src/main/runtime/rpc/methods/orchestration/messaging/send.test.ts src/main/runtime/rpc/methods/orchestration/messaging/check.test.ts",
+        "pnpm exec vitest run --config config/vitest.config.ts src/main/runtime/orchestration/federation-sync.test.ts src/main/runtime/rpc/methods/orchestration/federation/federation.test.ts src/main/runtime/rpc/methods/orchestration/federation/federation-lifecycle-settlement.test.ts --reporter=dot"
       ],
       "testFiles": [
         "src/main/runtime/orchestration-message-delivery-identity.test.ts",
@@ -6690,12 +6690,12 @@
         "src/main/daemon/degraded-daemon-pty-provider.test.ts",
         "src/main/runtime/orca-runtime.test.ts",
         "src/main/runtime/terminal-send-stale-leaf-liveness.test.ts",
-        "src/main/runtime/rpc/methods/orchestration-runs.test.ts",
-        "src/main/runtime/rpc/methods/orchestration-send.test.ts",
-        "src/main/runtime/rpc/methods/orchestration-check.test.ts",
+        "src/main/runtime/rpc/methods/orchestration/runs/runs.test.ts",
+        "src/main/runtime/rpc/methods/orchestration/messaging/send.test.ts",
+        "src/main/runtime/rpc/methods/orchestration/messaging/check.test.ts",
         "src/main/runtime/orchestration/federation-sync.test.ts",
-        "src/main/runtime/rpc/methods/orchestration-federation.test.ts",
-        "src/main/runtime/rpc/methods/orchestration-federation-lifecycle-settlement.test.ts"
+        "src/main/runtime/rpc/methods/orchestration/federation/federation.test.ts",
+        "src/main/runtime/rpc/methods/orchestration/federation/federation-lifecycle-settlement.test.ts"
       ],
       "assertionRefs": [
         {
@@ -6759,14 +6759,14 @@
           ]
         },
         {
-          "file": "src/main/runtime/rpc/methods/orchestration-federation.test.ts",
+          "file": "src/main/runtime/rpc/methods/orchestration/federation/federation.test.ts",
           "assertions": [
             "a lost relay acknowledgment retries without duplicating the home message",
             "a reordered relay gap converges without loss or duplication"
           ]
         },
         {
-          "file": "src/main/runtime/rpc/methods/orchestration-federation-lifecycle-settlement.test.ts",
+          "file": "src/main/runtime/rpc/methods/orchestration/federation/federation-lifecycle-settlement.test.ts",
           "assertions": [
             "protocol v1 and v2 completion acknowledgments replay after Run-home restart",
             "terminal settlement remains replayable until the worker durably acknowledges it"
@@ -6819,7 +6819,7 @@
           "date": "2026-08-14",
           "runner": "local",
           "platform": "macos",
-          "command": "pnpm exec vitest run --config config/vitest.config.ts src/main/runtime/orchestration/federation-sync.test.ts src/main/runtime/rpc/methods/orchestration-federation.test.ts src/main/runtime/rpc/methods/orchestration-federation-lifecycle-settlement.test.ts --reporter=dot",
+          "command": "pnpm exec vitest run --config config/vitest.config.ts src/main/runtime/orchestration/federation-sync.test.ts src/main/runtime/rpc/methods/orchestration/federation/federation.test.ts src/main/runtime/rpc/methods/orchestration/federation/federation-lifecycle-settlement.test.ts --reporter=dot",
           "result": "passed",
           "durationSeconds": 8.99,
           "summary": "52 tests passed with real OrchestrationDb rows, a deliberately dropped federation acknowledgment, reconnect/restart, forward-only checkpoints, duplicate read-row wake suppression, and protocol v1/v2 lifecycle settlement replay. The broader final federation/cross-version set passed 77/77."
@@ -6837,7 +6837,7 @@
           "date": "2026-08-14",
           "runner": "local",
           "platform": "macos",
-          "command": "pnpm exec vitest run --config config/vitest.config.ts src/main/runtime/orca-runtime.test.ts src/main/runtime/terminal-send-stale-leaf-liveness.test.ts src/main/runtime/rpc/methods/orchestration-runs.test.ts src/main/runtime/rpc/methods/orchestration-send.test.ts src/main/runtime/rpc/methods/orchestration-check.test.ts",
+          "command": "pnpm exec vitest run --config config/vitest.config.ts src/main/runtime/orca-runtime.test.ts src/main/runtime/terminal-send-stale-leaf-liveness.test.ts src/main/runtime/rpc/methods/orchestration/runs/runs.test.ts src/main/runtime/rpc/methods/orchestration/messaging/send.test.ts src/main/runtime/rpc/methods/orchestration/messaging/check.test.ts",
           "result": "passed",
           "durationSeconds": 14.15,
           "summary": "1,293 tests passed and 1 was skipped across Run-bound pointer delivery, PTY retirement and respawn, stale-leaf liveness, direct-mail routing, filtered waiter ownership, canonical stored-recipient notification, and orchestration RPC behavior."

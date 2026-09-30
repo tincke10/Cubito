@@ -1,6 +1,7 @@
 import type { WorkspaceKey } from '../../../shared/folder-workspace-types'
 import type { WorkspaceLineage, WorktreeLineage } from '../../../shared/worktree/lineage-types'
 import type { WorktreeMeta } from '../../../shared/worktree/meta-types'
+import type { Repo } from '../../../shared/repo-types'
 import { LOCAL_EXECUTION_HOST_ID, type ExecutionHostId } from '../../../shared/execution-host'
 import { getRepoIdFromWorktreeId } from '../../../shared/worktree/id'
 import { hasWorktreeRemovalRepoOwnerOnOtherHost } from '../../worktree-removal-repo-owner'
@@ -12,6 +13,7 @@ import {
 import type { StoreRuntimeState } from './store-runtime-state'
 import type { WriteSchedulingOperations } from './write-scheduling'
 import type { SessionHostPartitionOperations } from './session-host-partitions'
+import { invalidateLocalWorktreeMetadataPruneInputs } from '../../local-worktree-metadata-prune-gate'
 import { scheduleSave } from './write-scheduling'
 import {
   hasPersistedWorkspaceSession,
@@ -25,9 +27,17 @@ import {
   getWorktreeMetaForHost as getWorktreeMetaForHostOperation,
   migrateWorktreeMetadataLocator,
   removeWorktreeMetadataForHost,
-  setWorktreeMetaForHost as setWorktreeMetaForHostOperation
+  setWorktreeMetaForHost as setWorktreeMetaForHostOperation,
+  WORKTREE_METADATA_DOMAINS
 } from './worktree-identity-metadata'
 import { mergeWorktreeMetaForWrite } from './worktree-meta-write-normalization'
+import {
+  captureNativeLocalWorktreeMetadataScanExpectation as captureNativeLocalWorktreeMetadataScanExpectationOperation,
+  pruneSessionlessMissingLocalWorktreeMetadataForRepo as pruneSessionlessMissingLocalWorktreeMetadataForRepoOperation,
+  selectProbeableLocalWorktreeMetadataCandidates as selectProbeableLocalWorktreeMetadataCandidatesOperation,
+  type LocalWorktreeMetadataPruneExpectation,
+  type NativeLocalWorktreeMetadataScanExpectation
+} from '../tracking-repos/missing-local-worktree-metadata-pruning'
 
 type MetadataLineageOperationsRuntime = Pick<StoreRuntimeState, 'state'>
 
@@ -89,6 +99,15 @@ export class MetadataLineageOperations {
     )
   }
 
+  captureNativeLocalWorktreeMetadataScanExpectation(
+    repo: Repo
+  ): NativeLocalWorktreeMetadataScanExpectation {
+    return captureNativeLocalWorktreeMetadataScanExpectationOperation(
+      this[metadataLineageOperationsContext].runtime.state,
+      repo
+    )
+  }
+
   setWorktreeMeta(worktreeId: string, meta: Partial<WorktreeMeta>): WorktreeMeta {
     const state = this[metadataLineageOperationsContext].runtime.state
     const stored = state.worktreeMeta[worktreeId]
@@ -104,7 +123,7 @@ export class MetadataLineageOperations {
     }
     const updated = mergeWorktreeMetaForWrite(stored, meta)
     state.worktreeMeta[worktreeId] = updated
-    scheduleSave(this[metadataLineageOperationsContext].scheduling)
+    scheduleSave(this[metadataLineageOperationsContext].scheduling, ['worktreeMeta'])
     return updated
   }
 
@@ -181,7 +200,34 @@ export class MetadataLineageOperations {
         }
       )
     }
+    // Why: dropping a row can free the identity key that was vetoing an unrelated row's removal, so
+    // the metadata prune needs to look again — it is otherwise waiting on evidence (#17775).
+    invalidateLocalWorktreeMetadataPruneInputs()
     scheduleSave(this[metadataLineageOperationsContext].scheduling)
+  }
+
+  selectProbeableLocalWorktreeMetadataCandidates(
+    scan: NativeLocalWorktreeMetadataScanExpectation
+  ): readonly LocalWorktreeMetadataPruneExpectation[] {
+    return selectProbeableLocalWorktreeMetadataCandidatesOperation(
+      this[metadataLineageOperationsContext].runtime.state,
+      scan
+    )
+  }
+
+  pruneSessionlessMissingLocalWorktreeMetadataForRepo(
+    scan: NativeLocalWorktreeMetadataScanExpectation,
+    missingMetadata: readonly LocalWorktreeMetadataPruneExpectation[]
+  ): string[] {
+    const removed = pruneSessionlessMissingLocalWorktreeMetadataForRepoOperation(
+      this[metadataLineageOperationsContext].runtime.state,
+      scan,
+      missingMetadata
+    )
+    if (removed.length > 0) {
+      scheduleSave(this[metadataLineageOperationsContext].scheduling)
+    }
+    return removed
   }
 
   getWorktreeLineage(worktreeId: string): WorktreeLineage | undefined {
@@ -224,7 +270,11 @@ export class MetadataLineageOperations {
       mover
     )
     if (legacyChanged || canonicalChanged) {
-      scheduleSave(this[metadataLineageOperationsContext].scheduling)
+      // Legacy identity moves also re-key sessions, lineage, mobile selections, and UI state.
+      scheduleSave(
+        this[metadataLineageOperationsContext].scheduling,
+        legacyChanged ? undefined : WORKTREE_METADATA_DOMAINS
+      )
     }
   }
 
@@ -271,7 +321,7 @@ export function removeWorkspaceLineageForFolderParent(
 }
 
 export function installMetadataLineageOperationsContext(
-  target: object,
+  target: MetadataLineageOperations,
   source: MetadataLineageOperations
 ): void {
   Object.defineProperty(target, metadataLineageOperationsContext, {

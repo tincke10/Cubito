@@ -2,7 +2,13 @@
 import * as net from 'node:net'
 import { Client as SshClient } from 'ssh2'
 import type { ChildProcess } from 'node:child_process'
-import type { ClientChannel, ConnectConfig, SFTPWrapper } from 'ssh2'
+import type {
+  ClientChannel,
+  ConnectConfig,
+  KeyboardInteractiveCallback,
+  Prompt,
+  SFTPWrapper
+} from 'ssh2'
 import type { SshTarget, SshConnectionState, SshConnectionStatus } from '../../shared/ssh-types'
 import {
   getOrcaControlSocketPath,
@@ -24,6 +30,7 @@ import {
   INITIAL_RETRY_DELAY_MS,
   RECONNECT_BACKOFF_MS,
   CONNECT_TIMEOUT_MS,
+  SSH_CREDENTIAL_TIMEOUT_MS,
   isTransientError,
   isAuthError,
   isAgentFallbackError,
@@ -35,8 +42,10 @@ import {
   wrapRemoteCommandForPosixShell,
   createSshOperationAbortError,
   type SshExecOptions,
-  type SshConnectionCallbacks
+  type SshConnectionCallbacks,
+  type SshCredentialKind
 } from './ssh-connection-utils'
+import { collectKeyboardInteractiveResponses } from './ssh-keyboard-interactive'
 import { resolveEffectiveProxy, spawnProxyCommand } from './ssh-proxy-command'
 import {
   createHostKeyVerifier,
@@ -66,6 +75,7 @@ import {
   isTransientReconnectError
 } from './ssh-reconnect-error-classification'
 import { SshReconnectLadder } from './ssh-reconnect-ladder'
+import { mayUserSshConfigClaimAlias } from './ssh-config-alias-claim'
 import { getPassphrasePrivateKeyPath } from './ssh-private-key-authentication'
 import {
   requiresSystemSshForSecurityKey,
@@ -100,6 +110,11 @@ type SshRemoteFileOptions = {
 
 /** Bounds the trust-source reads that run before the handshake, which nothing else times out. */
 const HOST_KEY_SOURCE_READ_TIMEOUT_MS = 5_000
+// Counts every INFO_REQUEST of the handshake, so it must cover each partial-success stage the auth
+// queue will answer (MAX_PARTIAL_SUCCESS_STAGES) times the rounds a PAM stack spends per stage.
+const SSH_KEYBOARD_INTERACTIVE_MAX_ROUNDS = 8
+const SSH_KEYBOARD_INTERACTIVE_READY_TIMEOUT_MS = SSH_CREDENTIAL_TIMEOUT_MS + 5_000
+const SSH_KEYBOARD_INTERACTIVE_MAX_PROMPTS = 8
 
 // Upper bound on waiting for an aborted channel's open/close to settle before rejecting anyway.
 const ABORTED_CHANNEL_CLOSE_GRACE_MS = 5_000
@@ -181,6 +196,8 @@ export class SshConnection {
   private systemSshControlMasterDisabledForSession = false
   private systemSshGssapiOnlyForSession = false
   private useSystemSshTransport = false
+  private credentialAbortController = new AbortController()
+  private readonly pendingSsh2Clients = new Set<SshClient>()
   private state: SshConnectionState
   private callbacks: SshConnectionCallbacks
   private target: SshTarget
@@ -189,6 +206,9 @@ export class SshConnection {
   private disposed = false
   private cachedPassphrase: string | null = null
   private cachedPassword: string | null = null
+  private keyboardInteractiveCancelled = false
+  // A rejected cached password must reach the user on the next round.
+  private keyboardInteractivePasswordState = { passwordAutoAnswered: false }
   private hostKeyFingerprint: string | undefined
   private connectGeneration = 0
 
@@ -206,6 +226,9 @@ export class SshConnection {
 
   getState(): SshConnectionState {
     return { ...this.state }
+  }
+  getConnectGeneration(): number {
+    return this.connectGeneration
   }
   getClient(): SshClient | null {
     return this.client
@@ -714,20 +737,75 @@ export class SshConnection {
    * racing the live attempt's own. Returning undefined drops each rung through to its throw.
    */
   private async requestCredential(
-    kind: 'passphrase' | 'password',
+    kind: SshCredentialKind,
     detail: string,
-    connectGeneration: number
+    connectGeneration: number,
+    echo?: boolean
   ): Promise<string | null | undefined> {
     if (this.disposed || connectGeneration !== this.connectGeneration) {
       return undefined
     }
-    return this.callbacks.onCredentialRequest?.(this.target.id, kind, detail)
+    return this.callbacks.onCredentialRequest?.(
+      this.target.id,
+      kind,
+      detail,
+      echo,
+      this.credentialAbortController.signal
+    )
+  }
+
+  private async answerKeyboardInteractive(
+    hostDetail: string,
+    name: string,
+    instructions: string,
+    prompts: Prompt[],
+    connectGeneration: number,
+    onPromptStart: () => void
+  ): Promise<string[] | null> {
+    if (prompts.length === 0 || prompts.length > SSH_KEYBOARD_INTERACTIVE_MAX_PROMPTS) {
+      return null
+    }
+    const heading = [name.trim(), instructions.trim()].filter(Boolean).join('\n')
+    const isCurrent = (): boolean => !this.disposed && connectGeneration === this.connectGeneration
+    const responses = await collectKeyboardInteractiveResponses(
+      {
+        targetId: this.target.id,
+        hostDetail,
+        // Preserve a missing prompter as a capability gap, not a cancellation.
+        requestCredential: this.callbacks.onCredentialRequest
+          ? async (_targetId, kind, detail, echo) =>
+              (await this.requestCredential(kind, detail, connectGeneration, echo)) ?? null
+          : undefined,
+        getCachedPassword: () => this.cachedPassword,
+        setCachedPassword: (value) => {
+          if (isCurrent()) {
+            this.cachedPassword = value
+          }
+        },
+        markCancelled: () => {
+          // A stale prompt must not cancel the current attempt.
+          if (isCurrent()) {
+            this.keyboardInteractiveCancelled = true
+          }
+        },
+        isCancelled: () => !isCurrent() || this.keyboardInteractiveCancelled,
+        state: this.keyboardInteractivePasswordState
+      },
+      heading,
+      prompts,
+      onPromptStart
+    )
+    return isCurrent() ? responses : null
   }
 
   private async attemptConnect(connectGeneration = ++this.connectGeneration): Promise<void> {
+    this.credentialAbortController.abort()
+    this.credentialAbortController = new AbortController()
     this.setState('connecting')
     this.proxyProcess?.kill()
     this.proxyProcess = null
+    this.keyboardInteractiveCancelled = false
+    this.keyboardInteractivePasswordState = { passwordAutoAnswered: false }
 
     const resolved = await resolveWithSshG(this.target.configHost || this.target.label).catch(
       () => null
@@ -815,6 +893,13 @@ export class SshConnection {
         throw err
       }
 
+      // Cancellation must stop the credential and transport fallback chain.
+      if (this.keyboardInteractiveCancelled) {
+        this.proxyProcess?.kill()
+        this.proxyProcess = null
+        throw err
+      }
+
       if (isSystemSshFallbackError(err)) {
         this.proxyProcess?.kill()
         this.proxyProcess = null
@@ -858,6 +943,12 @@ export class SshConnection {
             // Same reason as above: the retry re-runs the handshake, so it can be the attempt that
             // denies the key, and the passphrase prompt is directly below.
             if (!(keyErr instanceof Error) || isHostKeyVerificationError(keyErr)) {
+              this.proxyProcess?.kill()
+              this.proxyProcess = null
+              throw keyErr
+            }
+            // Key fallback must honor the same cancellation boundary.
+            if (this.keyboardInteractiveCancelled) {
               this.proxyProcess?.kill()
               this.proxyProcess = null
               throw keyErr
@@ -1246,6 +1337,11 @@ export class SshConnection {
     if (this.systemSshResolvedConfig) {
       options.resolvedConfig = this.systemSshResolvedConfig
     }
+    // Why here and not inside buildSshArgs: the verdict reads ~/.ssh/config, and an arg builder
+    // that consults the filesystem answers differently on every machine, tests included.
+    if (this.target.configHost && !mayUserSshConfigClaimAlias(this.target.configHost)) {
+      options.aliasClaimedByConfig = false
+    }
     if (this.systemSshControlMasterDisabledForSession) {
       options.disableControlMaster = true
     }
@@ -1360,7 +1456,24 @@ export class SshConnection {
       : undefined
     return new Promise<void>((resolve, reject) => {
       const client = new SshClient()
+      this.pendingSsh2Clients.add(client)
       let settled = false
+      let startupTimer: ReturnType<typeof setTimeout> | null = null
+      let keyboardInteractiveRounds = 0
+      const clearStartupTimer = (): void => {
+        if (startupTimer) {
+          clearTimeout(startupTimer)
+          startupTimer = null
+        }
+      }
+      const rearmStartupTimer = (timeoutMs: number): void => {
+        clearStartupTimer()
+        startupTimer = setTimeout(() => {
+          const error = new Error('Timed out while waiting for SSH authentication')
+          Object.assign(error, { level: 'client-timeout' })
+          onStartupError(error)
+        }, timeoutMs)
+      }
       // Local to this attempt: an instance field would let a superseded attempt's rejection replace
       // the live attempt's error, and substituting a new Error drops ssh2's `code`, so a transient
       // ECONNRESET would stop being classified as retryable.
@@ -1435,9 +1548,61 @@ export class SshConnection {
         }
       }
 
+      const onKeyboardInteractive = (
+        name: string,
+        instructions: string,
+        _instructionsLanguage: string,
+        prompts: Prompt[],
+        finish: KeyboardInteractiveCallback
+      ): void => {
+        keyboardInteractiveRounds += 1
+        if (keyboardInteractiveRounds > SSH_KEYBOARD_INTERACTIVE_MAX_ROUNDS) {
+          finish([])
+          return
+        }
+        rearmStartupTimer(SSH_KEYBOARD_INTERACTIVE_READY_TIMEOUT_MS)
+        void this.answerKeyboardInteractive(
+          config.host || this.target.label,
+          name,
+          instructions,
+          prompts,
+          connectGeneration,
+          () => rearmStartupTimer(SSH_KEYBOARD_INTERACTIVE_READY_TIMEOUT_MS)
+        ).then(
+          (responses) => {
+            // Settle cancellation immediately, but still answer ssh2’s pending callback.
+            if (
+              responses === null &&
+              (connectGeneration !== this.connectGeneration || this.keyboardInteractiveCancelled)
+            ) {
+              finish([])
+              if (!settled) {
+                // Preserve the auth-failed state for explicit cancellation.
+                const cancelledError = Object.assign(
+                  new Error(
+                    `Keyboard-interactive authentication cancelled for ${this.target.label}`
+                  ),
+                  { level: 'client-authentication' }
+                )
+                onStartupError(cancelledError)
+              }
+              return
+            }
+            const attemptIsCurrent =
+              !settled && !this.disposed && connectGeneration === this.connectGeneration
+            finish(attemptIsCurrent ? (responses ?? []) : [])
+          },
+          () => finish([])
+        )
+      }
+
       const cleanupStartupListeners = (): void => {
         client.off('ready', onReady)
         client.off('error', onStartupError)
+        client.off('keyboard-interactive', onKeyboardInteractive)
+        client.off('close', onStartupClose)
+        this.pendingSsh2Clients.delete(client)
+        clearStartupTimer()
       }
       const swallowLateStartupError = (): void => {
         // Why: ssh2 can emit another socket error while destroying a settled pre-handshake client.
@@ -1491,9 +1656,25 @@ export class SshConnection {
         reject(hostKeyRejection ?? err)
       }
 
+      const onStartupClose = (): void => {
+        if (settled) {
+          return
+        }
+        const error =
+          this.disposed || connectGeneration !== this.connectGeneration
+            ? this.createCancelledConnectAttemptError()
+            : Object.assign(new Error('SSH connection closed during authentication'), {
+                code: 'ECONNRESET'
+              })
+        onStartupError(error)
+      }
+
+      client.on('keyboard-interactive', onKeyboardInteractive)
       client.on('ready', onReady)
       client.on('error', onStartupError)
-      client.connect(config)
+      client.on('close', onStartupClose)
+      rearmStartupTimer(config.readyTimeout ?? CONNECT_TIMEOUT_MS)
+      client.connect({ ...config, readyTimeout: 0 })
     })
   }
 
@@ -1575,6 +1756,18 @@ export class SshConnection {
     }
   }
 
+  private closePendingSsh2Clients(): void {
+    for (const client of this.pendingSsh2Clients) {
+      try {
+        client.end()
+        client.destroy()
+      } catch {
+        // The startup socket may already be closing.
+      }
+    }
+    this.pendingSsh2Clients.clear()
+  }
+
   private closeTransportsForReconnect(): void {
     this.connectGeneration += 1
     const client = this.client
@@ -1585,6 +1778,9 @@ export class SshConnection {
     } catch {
       /* best-effort transport teardown */
     }
+    this.credentialAbortController.abort()
+    this.credentialAbortController = new AbortController()
+    this.closePendingSsh2Clients()
     this.proxyProcess?.kill()
     this.proxyProcess = null
     this.systemOperationAbortController.abort()
@@ -1665,6 +1861,8 @@ export class SshConnection {
     this.reconnectTimer = null
     this.cachedPassphrase = null
     this.cachedPassword = null
+    this.credentialAbortController.abort()
+    this.closePendingSsh2Clients()
     this.client?.end()
     this.client = null
     this.proxyProcess?.kill()

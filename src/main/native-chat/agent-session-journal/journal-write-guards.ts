@@ -1,21 +1,19 @@
 // Guards an append clears before it becomes durable.
 //
-// All four refuse loudly rather than degrade: a silent drop here is a message
+// Both refuse loudly rather than degrade: a silent drop here is a message
 // missing from the transcript with nothing to explain it.
-
-import type { JournalPayloadLimits } from './journal-payload-bounds'
-import { journalRowByteLength, type JournalRow } from './journal-row-schema'
 
 export class AgentSessionJournalError extends Error {
   constructor(
     readonly code:
       | 'journal_read_only'
       | 'journal_stale_fence'
-      | 'journal_bound_exceeded'
-      | 'journal_rate_exceeded',
-    message: string
+      | 'journal_closed'
+      | 'journal_submission_exists',
+    message: string,
+    options?: ErrorOptions
   ) {
-    super(message)
+    super(message, options)
     this.name = 'AgentSessionJournalError'
   }
 }
@@ -42,45 +40,16 @@ export function assertJournalFence(fence: number, highestFence: number): void {
   }
 }
 
-/** Total size and append rate for one session, bounding a runaway agent. */
-export class JournalAppendBudget {
-  private windowStart = 0
-  private appendsInWindow = 0
-
-  constructor(
-    private readonly sessionId: string,
-    private readonly limits: JournalPayloadLimits
-  ) {}
-
-  fork(): JournalAppendBudget {
-    return new JournalAppendBudget(this.sessionId, this.limits)
-  }
-
-  get maxSessionBytes(): number {
-    return this.limits.maxSessionBytes
-  }
-
-  wouldExceedSize(row: JournalRow, sizeBytes: number): boolean {
-    return sizeBytes + journalRowByteLength(row) > this.limits.maxSessionBytes
-  }
-
-  assert(row: JournalRow, ts: number, sizeBytes: number): void {
-    if (this.wouldExceedSize(row, sizeBytes)) {
-      throw new AgentSessionJournalError(
-        'journal_bound_exceeded',
-        `agent-session journal for ${this.sessionId} reached its ${this.limits.maxSessionBytes}-byte bound`
-      )
-    }
-    if (ts - this.windowStart >= this.limits.appendWindowMs) {
-      this.windowStart = ts
-      this.appendsInWindow = 0
-    }
-    this.appendsInWindow += 1
-    if (this.appendsInWindow > this.limits.maxAppendsPerWindow) {
-      throw new AgentSessionJournalError(
-        'journal_rate_exceeded',
-        `agent-session journal for ${this.sessionId} exceeded ${this.limits.maxAppendsPerWindow} appends per ${this.limits.appendWindowMs}ms`
-      )
-    }
+/** One id, one delivery: a second submission row under an id would reset its
+ *  settled answer to pending and hand the message over again. */
+export function assertSubmissionIdUnused(
+  submissions: ReadonlyMap<string, unknown>,
+  clientMessageId: string
+): void {
+  if (submissions.has(clientMessageId)) {
+    throw new AgentSessionJournalError(
+      'journal_submission_exists',
+      `a submission ${clientMessageId} is already recorded`
+    )
   }
 }

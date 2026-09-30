@@ -10,7 +10,10 @@ describe('queueWatcherEvents', () => {
   function events(count: number): WatcherEvent[] {
     return Array.from(
       { length: count },
-      (_, index): WatcherEvent => ({ type: 'update', path: `/repo/file-${index}.ts` })
+      (_, index): WatcherEvent => ({
+        type: 'update',
+        path: `/repo/file-${index}.ts`
+      })
     )
   }
 

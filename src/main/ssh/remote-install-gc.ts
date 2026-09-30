@@ -22,6 +22,7 @@ import {
   tryAcquireRelayGcClaim
 } from './ssh-relay-gc-claim'
 import { cleanupRelayGcTombstones } from './ssh-relay-gc-tombstone'
+import { gcRelayNativeDepsCache } from './ssh-relay-native-deps-cache-gc'
 import {
   listRemoteInstallBaseDirsCommand,
   MAX_RELAY_GC_LISTING_ENTRIES,
@@ -94,7 +95,10 @@ export async function gcOldRemoteInstallVersions(
       host,
       listRemoteInstallBaseDirsCommand(host, baseDir, model)
     )
-  } catch {
+  } catch (err) {
+    if (isUnconfirmedSshCommandTermination(err)) {
+      throw err
+    }
     return
   }
   const entries = listing
@@ -168,6 +172,9 @@ export async function gcOldRemoteInstallVersions(
       }
       removed.push(name)
     } catch (err) {
+      if (isUnconfirmedSshCommandTermination(err)) {
+        throw err
+      }
       console.warn(
         `[${model.id}] GC failed for ${dir}: ${err instanceof Error ? err.message : String(err)}`
       )
@@ -197,7 +204,10 @@ async function isCandidateSafeToRemove(
   let lockProbe: string
   try {
     lockProbe = await execHostCommand(conn, host, probeInstallLockExistsCommand(host, lockDir))
-  } catch {
+  } catch (err) {
+    if (isUnconfirmedSshCommandTermination(err)) {
+      throw err
+    }
     return false
   }
   const lockState = lockProbe.trim()
@@ -223,7 +233,12 @@ async function isCandidateSafeToRemove(
       conn,
       host,
       probeFileExistsCommand(host, completePath)
-    ).catch(() => 'PARTIAL')
+    ).catch((err) => {
+      if (isUnconfirmedSshCommandTermination(err)) {
+        throw err
+      }
+      return 'PARTIAL'
+    })
     if (completeProbe.trim() !== 'COMPLETE') {
       // Crashed-install partial; leave for the next deploy to recover.
       return false
@@ -245,12 +260,29 @@ export async function gcOldRelayVersions(
   options?: {
     windowsNodePath?: string
     windowsSockNames?: string[]
+    /**
+     * Cache entries this connection depends on, whether or not it links to them. Also the gate:
+     * a caller that could not compute a key is not using the shared-cache model on this host, and
+     * a pass only ever collects what its own model created (see `remote-install-model.ts`).
+     */
+    nativeDepsCacheKeys?: readonly string[]
   }
 ): Promise<void> {
   await gcOldRemoteInstallVersions(conn, RELAY_INSTALL_MODEL, remoteHome, currentDirAbsPath, host, {
     ...options,
     isDirLive: (dir) => hasLiveRelaySocket(conn, dir, host, options)
   })
+  // Why after and not before: version-dir removal is what turns a cache entry unreferenced, so
+  // running it second lets one pass reclaim both instead of leaving the tree for the next connect.
+  if (options?.nativeDepsCacheKeys?.length) {
+    await gcRelayNativeDepsCache(conn, host, remoteHome, {
+      pinnedKeys: options.nativeDepsCacheKeys
+    }).catch((err) => {
+      if (isUnconfirmedSshCommandTermination(err)) {
+        throw err
+      }
+    })
+  }
 }
 
 async function hasLiveRelaySocket(
@@ -280,7 +312,10 @@ async function hasLiveRelaySocket(
     )
     const state = out.trim()
     return state !== 'DEAD' && state !== 'WAITING'
-  } catch {
+  } catch (err) {
+    if (isUnconfirmedSshCommandTermination(err)) {
+      throw err
+    }
     // Why: an inconclusive liveness probe must never authorize deletion.
     return true
   }

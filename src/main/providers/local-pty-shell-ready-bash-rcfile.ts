@@ -5,8 +5,10 @@
  * startup-file chain, OSC 133 hooks, and the shell-ready marker all live here.
  */
 import { BASH_PROMPT_COMMAND_COMPOSITION_BLOCK } from '../bash-prompt-command-composition'
+import { WSL_MANAGED_CLI_PATH_RESTORE } from '../wsl-managed-cli-path-restore'
 import { getPosixOmpShellWrapper } from '../pty/omp-shell-wrapper'
-import { getPosixCodexShellLaunchPreflight } from '../pty/codex-shell-launch-preflight'
+import { getPosixCodexShellLaunchPreflight } from '../../shared/codex-shell-function'
+import { getBashStartupCommandPromptBlock } from '../pty/posix-shell-startup-command'
 import { BASH_FEATURE_CHANNEL_BLOCK, SHELL_STARTUP_IDENTITY_MARKER_BLOCK } from '../shell-templates'
 import { SHELL_READY_MARKER_ESCAPED } from './local-pty-shell-ready-marker'
 
@@ -44,6 +46,7 @@ __orca_restore_agent_teams_path() {
   export PATH="\${ORCA_AGENT_TEAMS_SHIM_DIR}:$PATH"
 }
 __orca_restore_agent_teams_path
+${WSL_MANAGED_CLI_PATH_RESTORE}
 # Why: user startup files may set the default OpenCode config after Orca's
 # spawn env; restore the Orca-managed config dir before the first prompt.
 [[ -n "\${ORCA_OPENCODE_CONFIG_DIR:-}" ]] && export OPENCODE_CONFIG_DIR="\${ORCA_OPENCODE_CONFIG_DIR}"
@@ -122,6 +125,7 @@ if [[ -n "$__orca_ready_marker" ]]; then
 fi
 __orca_append_prompt_command '__orca_in_debug_capture=1; __orca_prompt_had_functrace=""; if [[ -o functrace ]]; then __orca_prompt_had_functrace=1; set +T; fi; __orca_outer_debug_trap_spec="$(trap -p DEBUG)"; [[ -z "$__orca_prompt_had_functrace" ]] || set -T; unset __orca_prompt_had_functrace __orca_in_debug_capture'
 __orca_append_prompt_command "__orca_osc133_prompt_done"
+${getBashStartupCommandPromptBlock()}
 __orca_had_functrace=""
 [[ -o functrace ]] && __orca_had_functrace=1
 set +T

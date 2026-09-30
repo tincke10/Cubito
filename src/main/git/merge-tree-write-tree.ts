@@ -3,12 +3,10 @@ import {
   isUnsupportedMergeTreeWriteTreeError
 } from '../../shared/git-merge-tree-capability'
 import { withLocalGitCapabilityCacheForExecution } from './git-capability-state'
+import { gitOptionsForWorktree, type GitRuntimeOptions } from './git-runtime-options'
 import { gitExecFileAsync } from './runner'
 
-export type MergeTreeExecOptions = {
-  wslDistro?: string
-  signal?: AbortSignal
-}
+export type MergeTreeExecOptions = GitRuntimeOptions
 
 export type MergeTreeWriteTreeResult = {
   treeOid: string
@@ -76,11 +74,7 @@ async function runMergeTree(
   options: MergeTreeExecOptions
 ): Promise<MergeTreeWriteTreeResult> {
   try {
-    const result = await gitExecFileAsync(args, {
-      cwd: repoPath,
-      ...(options.wslDistro ? { wslDistro: options.wslDistro } : {}),
-      ...(options.signal ? { signal: options.signal } : {})
-    })
+    const result = await gitExecFileAsync(args, gitOptionsForWorktree(repoPath, options))
     return parseMergeTreeWriteTreeOutput(result.stdout)
   } catch (error) {
     if (isUnsupportedMergeTreeWriteTreeError(error)) {

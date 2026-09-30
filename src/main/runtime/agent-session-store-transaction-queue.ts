@@ -1,5 +1,5 @@
 import type { AgentSessionOperationRow } from '../../shared/agent-session-operation-ledger'
-import type { AgentSessionRecord } from '../../shared/agent-session-record'
+import type { AgentSessionLease, AgentSessionRecord } from '../../shared/agent-session-record'
 import { raiseAgentSessionFencesAfterBackupRecovery } from './agent-session-backup-recovery-fence'
 import {
   AGENT_SESSION_STORE_SCHEMA_VERSION,
@@ -9,13 +9,28 @@ import {
   type AgentSessionStoreState,
   type LoadedAgentSessionStore
 } from './agent-session-record-store-file'
-import { withAgentSessionStoreTransactionLock } from './agent-session-store-transaction-lock'
+import { withFileTransactionLock } from '../file-transaction-lock'
+
+/** Latch fields older builds wrote. Nothing reads them, and dropping them keeps a lease this build
+ *  writes back from carrying a stale latch to an older build after a downgrade. */
+type RetiredAgentSessionLeaseFields = {
+  processlessAt?: unknown
+  settlementRetryRequired?: unknown
+  settlementRetryId?: unknown
+}
 
 function markLoadedLeasesUnreconciled(state: AgentSessionStoreState): void {
   for (const [sessionId, record] of state.records) {
+    const lease: AgentSessionLease & RetiredAgentSessionLeaseFields = record.lease
+    const {
+      processlessAt: _processlessAt,
+      settlementRetryRequired: _settlementRetryRequired,
+      settlementRetryId: _settlementRetryId,
+      ...current
+    } = lease
     state.records.set(sessionId, {
       ...record,
-      lease: { ...record.lease, unreconciled: true }
+      lease: { ...current, unreconciled: true }
     })
   }
 }
@@ -37,12 +52,16 @@ function agentSessionStoreStateChanged(
   records: ReadonlyMap<string, AgentSessionRecord>,
   operations: ReadonlyMap<string, AgentSessionOperationRow>,
   retiredClaimKeys: AgentSessionStoreState['retiredClaimKeys'],
-  unreadableRecords: AgentSessionStoreState['unreadableRecords']
+  unreadableRecords: AgentSessionStoreState['unreadableRecords'],
+  sessionTabs: AgentSessionStoreState['sessionTabs']
 ): boolean {
   return (
     !mapEntriesMatch(state.records, records) ||
     !mapEntriesMatch(state.operations, operations) ||
     !mapEntriesMatch(state.unreadableRecords, unreadableRecords) ||
+    (state.sessionTabs && sessionTabs
+      ? !state.sessionTabs.equals(sessionTabs)
+      : state.sessionTabs !== sessionTabs) ||
     state.retiredClaimKeys.length !== retiredClaimKeys.length ||
     state.retiredClaimKeys.some((entry, index) => entry !== retiredClaimKeys[index])
   )
@@ -85,7 +104,7 @@ export class AgentSessionStoreTransactionQueue {
 
   transact<T>(apply: () => T): Promise<T> {
     const run = this.queue.then(() =>
-      withAgentSessionStoreTransactionLock(this.filePath, async () => {
+      withFileTransactionLock(this.filePath, async () => {
         if (this.readOnly) {
           throw new Error('agent_session_legacy_required')
         }
@@ -94,6 +113,7 @@ export class AgentSessionStoreTransactionQueue {
         const operations = new Map(this.state.operations)
         const retiredClaimKeys = [...this.state.retiredClaimKeys]
         const unreadableRecords = new Map(this.state.unreadableRecords)
+        const sessionTabs = this.state.sessionTabs?.clone() ?? null
         try {
           // The lost commit may have granted a higher fence than the backup records show. Rather
           // than refuse forever, raise every recovered fence clear of anything that commit could
@@ -111,7 +131,8 @@ export class AgentSessionStoreTransactionQueue {
               records,
               operations,
               retiredClaimKeys,
-              unreadableRecords
+              unreadableRecords,
+              sessionTabs
             )
           ) {
             return result
@@ -130,6 +151,7 @@ export class AgentSessionStoreTransactionQueue {
           this.state.operations = operations
           this.state.retiredClaimKeys = retiredClaimKeys
           this.state.unreadableRecords = unreadableRecords
+          this.state.sessionTabs = sessionTabs
           throw error
         }
       })

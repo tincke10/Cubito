@@ -5,6 +5,7 @@ import type {
 import type { GitHistoryOptions, GitHistoryResult } from '../../shared/git-history'
 import type { GitConflictOperation } from '../../shared/git-status-types'
 import type { MergeWinnerResult } from '../git/merge-winner'
+import type { GitAdmissionTier } from '../git/command-runner/git-exec-options'
 import { SshGitNoninteractiveProvider } from './ssh-git-noninteractive-provider'
 
 export class SshGitWorkingTreeProvider extends SshGitNoninteractiveProvider {
@@ -124,10 +125,15 @@ export class SshGitWorkingTreeProvider extends SshGitNoninteractiveProvider {
     }
   }
 
-  async getBranchCompare(worktreePath: string, baseRef: string): Promise<GitBranchCompareResult> {
+  async getBranchCompare(
+    worktreePath: string,
+    baseRef: string,
+    options: { admissionTier?: GitAdmissionTier } = {}
+  ): Promise<GitBranchCompareResult> {
     return (await this.mux.request('git.branchCompare', {
       worktreePath,
-      baseRef
+      baseRef,
+      ...(options.admissionTier ? { admissionTier: options.admissionTier } : {})
     })) as GitBranchCompareResult
   }
 

@@ -12,6 +12,8 @@ import type { PtyProcessInspection } from '../providers/pty-process-inspection'
 import { shouldHandoffDaemonHistory } from './daemon-history-handoff'
 import type { DaemonPtyRouterDataEvent, DaemonPtyRouterExitEvent } from './daemon-pty-router-events'
 import { DaemonSessionOwnerResolver } from './daemon-session-owner-resolution'
+import type { WriteSettlement } from '../../shared/pty-write-settlement'
+import type { TerminalOscColorQueryReplyColors } from '../../shared/terminal-osc-color-reply'
 
 export class DaemonPtyRouter implements IPtyProvider {
   private current: DaemonPtyAdapter
@@ -93,7 +95,7 @@ export class DaemonPtyRouter implements IPtyProvider {
     return this.adapterFor(id).write(id, data)
   }
 
-  writeWithSettlement(id: string, data: string): Promise<boolean> {
+  writeWithSettlement(id: string, data: string): Promise<WriteSettlement> {
     return this.adapterFor(id).writeWithSettlement(id, data)
   }
 
@@ -161,8 +163,18 @@ export class DaemonPtyRouter implements IPtyProvider {
     await this.adapterFor(id).clearBuffer(id)
   }
 
+  async resetInputModes(id: string): Promise<void> {
+    await this.adapterFor(id).resetInputModes(id)
+  }
+
   async closeStartupQueryAuthority(id: string): Promise<number> {
     return (await this.adapterFor(id).closeStartupQueryAuthority?.(id)) ?? 0
+  }
+
+  setColorQueryReplyColors(colors: TerminalOscColorQueryReplyColors): void {
+    for (const adapter of this.allAdapters()) {
+      adapter.setColorQueryReplyColors(colors)
+    }
   }
 
   acknowledgeDataEvent(id: string, charCount: number): void {
@@ -177,8 +189,11 @@ export class DaemonPtyRouter implements IPtyProvider {
     return this.adapterFor(id).getForegroundProcess(id)
   }
 
-  async inspectProcess(id: string): Promise<PtyProcessInspection> {
-    return this.adapterForInspection(id).inspectProcess(id)
+  async inspectProcess(
+    id: string,
+    options?: { expectedIncarnationId?: string; steadyState?: boolean }
+  ): Promise<PtyProcessInspection> {
+    return this.adapterForInspection(id).inspectProcess(id, options)
   }
 
   async confirmForegroundProcess(id: string): Promise<string | null> {

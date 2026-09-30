@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { isStreamingMethod } from '../core'
+import { eraseRpcMethods, isStreamingMethod } from '../core'
 import { AGENT_ACTIVITY_METHODS } from './agent-activity-methods'
 import { ALL_RPC_METHODS } from './index'
-import { MOBILE_RPC_METHOD_ALLOWLIST } from '../../runtime-rpc'
+import { isMobileRpcMethodAllowed } from '../../runtime-rpc/cubito-mobile-rpc-methods'
 
 const read = vi.fn()
 
@@ -12,7 +12,7 @@ vi.mock('../../../agent-hooks/agent-activity-recording', () => ({
 }))
 
 function method(name: string) {
-  const found = AGENT_ACTIVITY_METHODS.find((candidate) => candidate.name === name)
+  const found = eraseRpcMethods(AGENT_ACTIVITY_METHODS).find((candidate) => candidate.name === name)
   if (!found) {
     throw new Error(`Missing method ${name}`)
   }
@@ -76,7 +76,7 @@ describe('agent.activity registration', () => {
     expect(ALL_RPC_METHODS.some((candidate) => candidate.name === 'agent.activity')).toBe(true)
   })
 
-  it('is present in MOBILE_RPC_METHOD_ALLOWLIST', () => {
-    expect(MOBILE_RPC_METHOD_ALLOWLIST.has('agent.activity')).toBe(true)
+  it('is allowed for mobile-scope devices', () => {
+    expect(isMobileRpcMethodAllowed('agent.activity')).toBe(true)
   })
 })

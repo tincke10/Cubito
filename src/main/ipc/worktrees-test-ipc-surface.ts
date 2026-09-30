@@ -1,4 +1,6 @@
+import { EventEmitter } from 'node:events'
 import { type Mock, vi } from 'vitest'
+import type { WorktreeMeta } from '../../shared/worktree/meta-types'
 
 export type HandlerMap = Record<string, (_event: unknown, args: unknown) => unknown>
 
@@ -7,7 +9,7 @@ type StoreMock = Mock<(...args: unknown[]) => unknown>
 /** Store lookups tests re-implement per id, so the first arg stays narrowed. */
 type KeyedStoreMock = Mock<(id: string, ...rest: unknown[]) => unknown>
 /** Store writers tests re-implement by merging the patch they receive. */
-type KeyedStoreWriteMock = Mock<(id: string, patch: object) => unknown>
+type KeyedStoreWriteMock = Mock<(id: string, patch: Partial<WorktreeMeta>) => unknown>
 
 export type TestMainWindow = {
   isDestroyed: () => boolean
@@ -24,10 +26,12 @@ export type TestStore = {
   getWorktreeMeta: KeyedStoreMock
   getWorktreeMetaForHost: StoreMock
   getAllWorktreeMeta: StoreMock
+  captureNativeLocalWorktreeMetadataScanExpectation: StoreMock
   setWorktreeMeta: KeyedStoreWriteMock
   setWorktreeMetaForHost: StoreMock
   getProjectHostSetups: StoreMock
   removeWorktreeMeta: KeyedStoreMock
+  pruneSessionlessMissingLocalWorktreeMetadataForRepo: StoreMock
   removeWorkspaceSessionStateForWorktree: KeyedStoreMock
   getAllWorktreeLineage: StoreMock
   removeWorktreeLineage: KeyedStoreMock
@@ -47,7 +51,7 @@ export const mainWindow: TestMainWindow = {
     send: vi.fn()
   }
 }
-export const ipcEvent = { sender: { id: 1 } }
+export const ipcEvent = { sender: Object.assign(new EventEmitter(), { id: 1 }) }
 export const store: TestStore = {
   getProfileStorageDirectory: vi.fn(() => '/profile-a'),
   getRepos: vi.fn(),
@@ -58,10 +62,12 @@ export const store: TestStore = {
   getWorktreeMeta: vi.fn(),
   getWorktreeMetaForHost: vi.fn(),
   getAllWorktreeMeta: vi.fn(),
+  captureNativeLocalWorktreeMetadataScanExpectation: vi.fn(),
   setWorktreeMeta: vi.fn(),
   setWorktreeMetaForHost: vi.fn(),
   getProjectHostSetups: vi.fn(),
   removeWorktreeMeta: vi.fn(),
+  pruneSessionlessMissingLocalWorktreeMetadataForRepo: vi.fn(),
   removeWorkspaceSessionStateForWorktree: vi.fn(),
   getAllWorktreeLineage: vi.fn(),
   removeWorktreeLineage: vi.fn(),

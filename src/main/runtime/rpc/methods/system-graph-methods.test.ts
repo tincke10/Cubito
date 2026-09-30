@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OrcaRuntimeService } from '../../orca-runtime'
-import { isStreamingMethod } from '../core'
+import { eraseRpcMethods, isStreamingMethod } from '../core'
 import type { EngineSystemGraph } from '../../../system-graph/system-graph-model'
 import { SYSTEM_GRAPH_METHODS } from './system-graph-methods'
 import { ALL_RPC_METHODS } from './index'
-import { MOBILE_RPC_METHOD_ALLOWLIST } from '../../runtime-rpc'
+import { isMobileRpcMethodAllowed } from '../../runtime-rpc/cubito-mobile-rpc-methods'
 
 const ensureWatched = vi.fn(async (_worktreeId: string) => {})
 const getGraph = vi.fn<(worktreeId: string) => EngineSystemGraph | undefined>()
@@ -22,7 +22,7 @@ const runSystemGraphWatchStream = vi.hoisted(() =>
 vi.mock('./system-graph-watch-stream-lifecycle', () => ({ runSystemGraphWatchStream }))
 
 function method(name: string) {
-  const found = SYSTEM_GRAPH_METHODS.find((candidate) => candidate.name === name)
+  const found = eraseRpcMethods(SYSTEM_GRAPH_METHODS).find((candidate) => candidate.name === name)
   if (!found) {
     throw new Error(`Missing method ${name}`)
   }
@@ -125,8 +125,8 @@ describe('system.watch / system.unwatch registration', () => {
     expect(ALL_RPC_METHODS.some((candidate) => candidate.name === 'system.unwatch')).toBe(true)
   })
 
-  it('are present in MOBILE_RPC_METHOD_ALLOWLIST', () => {
-    expect(MOBILE_RPC_METHOD_ALLOWLIST.has('system.watch')).toBe(true)
-    expect(MOBILE_RPC_METHOD_ALLOWLIST.has('system.unwatch')).toBe(true)
+  it('are allowed for mobile-scope devices', () => {
+    expect(isMobileRpcMethodAllowed('system.watch')).toBe(true)
+    expect(isMobileRpcMethodAllowed('system.unwatch')).toBe(true)
   })
 })
