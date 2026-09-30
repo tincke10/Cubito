@@ -48,6 +48,39 @@ async function mergedRepo(winnerFile: string): Promise<{ parentDir: string; comm
   return { parentDir, commitOid: result.commitOid }
 }
 
+// Why: orca.yaml is committed on the parent before the merge; the winner may then rewrite it.
+async function mergedRepoWithYaml(
+  parentYaml: string,
+  winnerYaml?: string
+): Promise<{ parentDir: string; commitOid: string }> {
+  const root = await mkdtemp(path.join(tmpdir(), 'orca-dep-setup-'))
+  tempRoots.push(root)
+  const repo = path.join(root, 'repo')
+  execFileSync('git', ['init', '-q', '-b', 'main', repo])
+  git(repo, ['config', 'user.email', 'test@example.com'])
+  git(repo, ['config', 'user.name', 'Test User'])
+  git(repo, ['config', 'commit.gpgSign', 'false'])
+  await writeFile(path.join(repo, 'base.txt'), 'base\n')
+  await writeFile(path.join(repo, 'orca.yaml'), parentYaml)
+  git(repo, ['add', '-A'])
+  git(repo, ['commit', '-q', '-m', 'base'])
+  const parentDir = path.join(root, 'parent')
+  const winnerDir = path.join(root, 'winner')
+  git(repo, ['worktree', 'add', '-q', '-b', 'parent-branch', parentDir])
+  git(repo, ['worktree', 'add', '-q', '-b', 'winner-branch', winnerDir])
+  await writeFile(path.join(winnerDir, 'package.json'), '{}\n')
+  if (winnerYaml) {
+    await writeFile(path.join(winnerDir, 'orca.yaml'), winnerYaml)
+  }
+  git(winnerDir, ['add', '-A'])
+  git(winnerDir, ['commit', '-q', '-m', 'winner'])
+  const result = await mergeWinnerIntoParent(parentDir, winnerDir, 'merge')
+  if (result.outcome !== 'clean') {
+    throw new Error('expected clean merge')
+  }
+  return { parentDir, commitOid: result.commitOid }
+}
+
 afterEach(async () => {
   invalidateGitReadCaches()
   await Promise.all(tempRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
@@ -154,6 +187,62 @@ describe('startParentDependencySetupAfterMerge', () => {
     expect(result).toEqual({ status: 'started' })
     await new Promise((resolve) => setTimeout(resolve, 500))
     await expect(access(path.join(parentDir, 'pwned'))).rejects.toThrow()
+  })
+
+  it('runs the orca.yaml setup as it was before the merge', async () => {
+    const { parentDir, commitOid } = await mergedRepoWithYaml('scripts:\n  setup: pre-merge-cmd\n')
+    const runSetup = vi.fn(async () => ({ success: true, output: '' }))
+    await expect(
+      startParentDependencySetupAfterMerge({
+        repo: repoWithSetup({
+          hookSettings: { mode: 'auto', scripts: { setup: '', archive: '' } }
+        }),
+        parentPath: parentDir,
+        commitOid,
+        workingTree: { status: 'synced' },
+        runSetup
+      })
+    ).resolves.toEqual({ status: 'started' })
+    const [repoArg] = runSetup.mock.calls[0] as unknown as [Repo]
+    expect(repoArg.hookSettings?.scripts.setup).toBe('pre-merge-cmd')
+    expect(repoArg.hookSettings?.commandSourcePolicy).toBe('local-only')
+  })
+
+  it('ignores a winner-changed orca.yaml and runs the pre-merge one', async () => {
+    const { parentDir, commitOid } = await mergedRepoWithYaml(
+      'scripts:\n  setup: pre-merge-cmd\n',
+      'scripts:\n  setup: winner-cmd\n'
+    )
+    const runSetup = vi.fn(async () => ({ success: true, output: '' }))
+    await startParentDependencySetupAfterMerge({
+      repo: repoWithSetup({ hookSettings: { mode: 'auto', scripts: { setup: '', archive: '' } } }),
+      parentPath: parentDir,
+      commitOid,
+      workingTree: { status: 'synced' },
+      runSetup
+    })
+    const [repoArg] = runSetup.mock.calls[0] as unknown as [Repo]
+    expect(repoArg.hookSettings?.scripts.setup).toBe('pre-merge-cmd')
+  })
+
+  it('combines pre-merge yaml and local setup under run-both', async () => {
+    const { parentDir, commitOid } = await mergedRepoWithYaml('scripts:\n  setup: from-yaml\n')
+    const runSetup = vi.fn(async () => ({ success: true, output: '' }))
+    await startParentDependencySetupAfterMerge({
+      repo: repoWithSetup({
+        hookSettings: {
+          mode: 'auto',
+          commandSourcePolicy: 'run-both',
+          scripts: { setup: 'from-local', archive: '' }
+        }
+      }),
+      parentPath: parentDir,
+      commitOid,
+      workingTree: { status: 'synced' },
+      runSetup
+    })
+    const [repoArg] = runSetup.mock.calls[0] as unknown as [Repo]
+    expect(repoArg.hookSettings?.scripts.setup).toBe('from-yaml\nfrom-local')
   })
 
   it('does nothing when the setup command only exists in orca.yaml', async () => {

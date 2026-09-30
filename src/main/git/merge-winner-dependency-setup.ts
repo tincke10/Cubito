@@ -1,6 +1,7 @@
+import type { OrcaHooks } from '../../shared/orca-yaml-hook-types'
 import type { Repo } from '../../shared/repo-types'
-import { runHook } from '../hooks'
-import { getEffectiveSetupRunPolicy } from '../effective-hook-config'
+import { parseOrcaYaml, runHook } from '../hooks'
+import { getEffectiveHooksFromConfig, getEffectiveSetupRunPolicy } from '../effective-hook-config'
 import type { GitRuntimeOptions } from './git-runtime-options'
 import { gitOptionsForWorktree } from './git-runtime-options'
 import type { ParentWorkingTreeSyncResult } from './merge-winner-sync'
@@ -34,18 +35,32 @@ type SetupRunner = (
   options: GitRuntimeOptions
 ) => Promise<{ success: boolean; output: string }>
 
-// Why: the winner is agent-authored, so post-merge orca.yaml must never pick the command; only the pre-merge local setting is trusted.
+// Why: the runner gets the already-resolved script as a local-only setting so runHook never reads the winner-authored on-disk orca.yaml.
 const defaultSetupRunner: SetupRunner = (repo, cwd, options) =>
-  runHook(
-    'setup',
-    cwd,
-    { ...repo, hookSettings: { ...repo.hookSettings!, commandSourcePolicy: 'local-only' } },
-    cwd,
-    options
-  )
+  runHook('setup', cwd, repo, cwd, options)
+
+/** Effective setup script from orca.yaml as of the old parent tip (pre-merge) plus local settings. */
+async function resolvePreMergeSetupScript(
+  repo: Repo,
+  parentPath: string,
+  commitOid: string,
+  options: GitRuntimeOptions | undefined
+): Promise<string | undefined> {
+  let yamlHooks: OrcaHooks | null = null
+  try {
+    const { stdout } = await gitExecFileAsync(
+      ['show', `${commitOid}^1:orca.yaml`],
+      gitOptionsForWorktree(parentPath, options)
+    )
+    yamlHooks = parseOrcaYaml(stdout)
+  } catch {
+    // Why: no orca.yaml at the old tip (or unparsable) means only the local setting applies.
+  }
+  return getEffectiveHooksFromConfig(repo, yamlHooks)?.scripts.setup?.trim() || undefined
+}
 
 /**
- * After a synced winner merge, starts the repo's locally configured setup hook in the parent in the
+ * After a synced winner merge, starts the repo's setup hook (pre-merge orca.yaml plus local settings) in the parent in the
  * background so installed dependencies match the merged manifests. Never throws, never awaits the
  * hook (it outlives the RPC timeout), and never runs unless dependency files changed, the working
  * tree really synced, and the repo opted into run-by-default setup.
@@ -63,17 +78,26 @@ export async function startParentDependencySetupAfterMerge(args: {
     return undefined
   }
   try {
-    if (
-      getEffectiveSetupRunPolicy(repo) !== 'run-by-default' ||
-      repo.hookSettings?.commandSourcePolicy === 'shared-only' ||
-      !repo.hookSettings?.scripts.setup?.trim()
-    ) {
+    if (getEffectiveSetupRunPolicy(repo) !== 'run-by-default') {
       return undefined
     }
     if (!(await mergeChangedDependencyManifests(parentPath, commitOid, args.options))) {
       return undefined
     }
-    void (args.runSetup ?? defaultSetupRunner)(repo, parentPath, args.options ?? {})
+    const script = await resolvePreMergeSetupScript(repo, parentPath, commitOid, args.options)
+    if (!script) {
+      return undefined
+    }
+    const pinnedRepo: Repo = {
+      ...repo,
+      hookSettings: {
+        mode: 'auto',
+        ...repo.hookSettings,
+        commandSourcePolicy: 'local-only',
+        scripts: { archive: '', ...repo.hookSettings?.scripts, setup: script }
+      }
+    }
+    void (args.runSetup ?? defaultSetupRunner)(pinnedRepo, parentPath, args.options ?? {})
       .then((result) => {
         if (!result.success) {
           console.error(`[hooks] parent dependency setup failed in ${parentPath}:`, result.output)
