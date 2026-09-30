@@ -138,6 +138,11 @@ describe('Dockerfile', () => {
     expect(runtimeStage).toMatch(/apt-get install[^&]*\bcurl\b/)
   })
 
+  // Why: worktree setup commands (pnpm install/yarn) run as the node user and need the shims.
+  it('enables corepack in the runtime stage so pnpm/yarn setup commands resolve', () => {
+    expect(runtimeStage).toMatch(/RUN corepack enable/)
+  })
+
   // Why: the terminal wrapper sources /etc/profile, which on Debian resets PATH and drops the
   // shim dir cubito-start prepends; /usr/local/bin survives that reset.
   it('installs the orca CLI on the default PATH for interactive terminals', () => {

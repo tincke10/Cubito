@@ -58,6 +58,9 @@ RUN apt-get update \
 
 RUN npm i -g @anthropic-ai/claude-code
 
+# Why: repo setup commands (pnpm install / yarn) run in worktrees; corepack provides the shims.
+RUN corepack enable
+
 # Why: terminals source /etc/profile, which on Debian resets PATH and drops cubito-start's shim dir.
 RUN printf '#!/bin/sh\nexec node /app/out/cli/index.js "$@"\n' > /usr/local/bin/orca \
   && chmod 755 /usr/local/bin/orca

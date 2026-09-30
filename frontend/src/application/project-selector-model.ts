@@ -9,6 +9,8 @@ export type ProjectSelectorSlice =
       view: 'add-form'
       path: string
       kind: RepoKind
+      /** Optional setup command persisted as the repo's setup hook right after add. */
+      setup?: string
       status: ProjectSelectorStatus
       errorMessage?: string
     }
@@ -23,7 +25,7 @@ export type ProjectSelectorAction =
   | { type: 'set-query'; query: string }
   | { type: 'move-highlight'; delta: number }
   | { type: 'open-add-form' }
-  | { type: 'update-add-field'; field: 'path' | 'kind'; value: string }
+  | { type: 'update-add-field'; field: 'path' | 'kind' | 'setup'; value: string }
   | { type: 'submit-add' }
   | { type: 'submit-add-ok' }
   | { type: 'submit-add-error'; message: string }
@@ -67,11 +69,12 @@ export function reduceProjectSelector(
 
 function updateAddField(
   slice: ProjectSelectorSlice,
-  field: 'path' | 'kind',
+  field: 'path' | 'kind' | 'setup',
   value: string
 ): ProjectSelectorSlice {
   if (slice.view !== 'add-form') return slice
   if (field === 'kind') return { ...slice, kind: value === 'folder' ? 'folder' : 'git' }
+  if (field === 'setup') return { ...slice, setup: value }
   return { ...slice, path: value }
 }
 

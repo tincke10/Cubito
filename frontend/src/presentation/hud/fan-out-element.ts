@@ -56,6 +56,9 @@ export function createFanOutForm(doc: Document = document): FanOutFormHandle {
   const errorLine = doc.createElement('div')
   errorLine.className = 'cubito-fanout-form__error'
 
+  const setupNotice = doc.createElement('div')
+  setupNotice.className = 'cubito-fanout-form__notice'
+
   const callout = doc.createElement('div')
   callout.className = 'cubito-fanout-form__callout'
 
@@ -72,6 +75,7 @@ export function createFanOutForm(doc: Document = document): FanOutFormHandle {
     agentSelect,
     promptArea,
     errorLine,
+    setupNotice,
     submitButton,
     cancelButton,
     callout,
@@ -107,6 +111,7 @@ export function createFanOutForm(doc: Document = document): FanOutFormHandle {
     agentSelect.style.display = display
     promptArea.style.display = display
     errorLine.style.display = visible && errorLine.textContent !== '' ? '' : 'none'
+    setupNotice.style.display = visible && setupNotice.textContent !== '' ? '' : 'none'
     submitButton.style.display = display
     cancelButton.style.display = display
   }
@@ -148,6 +153,8 @@ export function createFanOutForm(doc: Document = document): FanOutFormHandle {
         submitButton.disabled = !model.submitEnabled
         errorLine.textContent = model.errorMessage ?? ''
         errorLine.style.display = model.errorMessage === null ? 'none' : ''
+        setupNotice.textContent = model.setupHint ?? ''
+        setupNotice.style.display = model.setupHint === null ? 'none' : ''
         return
       }
       showFields(false)

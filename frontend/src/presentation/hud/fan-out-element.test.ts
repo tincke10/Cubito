@@ -65,6 +65,7 @@ const formModel = (overrides: Partial<FanOutFormViewModel> = {}): FanOutFormView
   prompt: { value: '', enabled: false },
   submitEnabled: false,
   errorMessage: null,
+  setupHint: null,
   ...overrides
 })
 
@@ -82,6 +83,17 @@ const countInputOf = (root: FakeElement): FakeElement =>
   root.children.find((c) => c.tagName === 'INPUT' && c.className.includes('count'))!
 
 describe('createFanOutForm — form view', () => {
+  it('apply() shows the setup notice only when the model carries a hint', () => {
+    const form = createFanOutForm(createFakeDocument())
+    const root = form.element as unknown as FakeElement
+    const notice = root.children.find((c) => c.className.includes('notice'))!
+    form.apply(formModel({ setupHint: 'sin setup' }))
+    expect(notice.textContent).toBe('sin setup')
+    expect(notice.style.display).toBe('')
+    form.apply(formModel())
+    expect(notice.style.display).toBe('none')
+  })
+
   it('apply() writes count/agent/prompt values and enablement from the model', () => {
     const form = createFanOutForm(createFakeDocument())
     form.apply(

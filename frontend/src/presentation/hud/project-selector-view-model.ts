@@ -21,6 +21,7 @@ export type ProjectSelectorAddFormViewModel = {
   readonly view: 'add-form'
   readonly path: string
   readonly kind: RepoKind
+  readonly setup: string
   readonly submitLabel: string
   readonly submitEnabled: boolean
   readonly errorMessage: string | null
@@ -56,6 +57,7 @@ export function projectSelectorViewModel(
       view: 'add-form',
       path: slice.path,
       kind: slice.kind,
+      setup: slice.setup ?? '',
       submitLabel: submitting ? 'agregando…' : 'agregar repo',
       submitEnabled: slice.path.trim() !== '' && !submitting,
       errorMessage: slice.status === 'error' ? (slice.errorMessage ?? 'error') : null

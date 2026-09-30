@@ -13,6 +13,7 @@ import type { CreateWorktreeInput, RuntimeGateway } from '../../application/port
 import type { CamadaMemberPoll } from '../../application/camada-member-poll'
 import { runCamadaLeaseSubmit } from '../../application/fan-out-lease-submit'
 import type { FanOutFormHandle } from './fan-out-element'
+import { createSetupHintTracker } from '../../application/repo-setup-hint'
 import { fanOutViewModel } from './fan-out-view-model'
 
 /** listRepos/createWorktree/listWorktreePs for the v1 loop and the member poll it owns, plus
@@ -23,6 +24,7 @@ export type FanOutGatewayPort = Pick<
   | 'listRepos'
   | 'createWorktree'
   | 'listWorktreePs'
+  | 'repoSetupCommand'
   | 'orchestrationRunCreate'
   | 'orchestrationTaskCreate'
   | 'orchestrationWorkerStart'
@@ -70,9 +72,17 @@ export function createFanOutController(deps: FanOutControllerDeps): FanOutContro
   let gateway = deps.gateway
   let element: FanOutFormHandle | null = null
   let currentSlice: FanOutSlice = emptyFanOutSlice()
+  let currentGraph: WorktreeGraph | null = null
   let previousView: FanOutSlice['view'] = 'closed'
   let repoFetchInFlight = false
   let syncGeneration = 0
+
+  const setupHints = createSetupHintTracker({
+    probe: (repoSelector) => gateway.repoSetupCommand(repoSelector),
+    onChange: () => {
+      if (currentGraph) controller.sync(currentSlice, currentGraph)
+    }
+  })
 
   const generateMutationId = deps.generateMutationId ?? (() => crypto.randomUUID())
   const activeRepoId = deps.activeRepoId ?? (() => null)
@@ -206,20 +216,26 @@ export function createFanOutController(deps: FanOutControllerDeps): FanOutContro
     await deps.refetch()
   }
 
-  return {
+  const controller: FanOutController = {
     sync(fanOut: FanOutSlice, graph: WorktreeGraph): void {
       const generation = ++syncGeneration
       currentSlice = fanOut
+      currentGraph = graph
       maybeFetchRepoSelector(fanOut, graph)
       // A re-entrant dispatch above already re-synced with the newer slice.
       if (generation !== syncGeneration) return
       if (fanOut.view === 'closed') {
         unmount()
+        setupHints.reset()
         deps.memberPoll.stop()
         previousView = 'closed'
         return
       }
-      const model = fanOutViewModel(fanOut)
+      if (fanOut.view === 'form') setupHints.ensure(fanOut.repoSelector)
+      const model = fanOutViewModel(
+        fanOut,
+        fanOut.view === 'form' ? setupHints.hint(fanOut.repoSelector) : null
+      )
       const mounted = mount()
       if (model !== null) mounted.apply(model)
       // display:none force-blurs a focused descendant, mirroring project-selector's focusPath()
@@ -229,6 +245,7 @@ export function createFanOutController(deps: FanOutControllerDeps): FanOutContro
     },
     rebindGateway(newGateway: FanOutGatewayPort): void {
       gateway = newGateway
+      setupHints.reset()
       deps.memberPoll.rebindGateway(newGateway)
     },
     dispose(): void {
@@ -236,4 +253,5 @@ export function createFanOutController(deps: FanOutControllerDeps): FanOutContro
       deps.memberPoll.stop()
     }
   }
+  return controller
 }

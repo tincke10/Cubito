@@ -156,3 +156,12 @@ describe('spawnViewModel — form', () => {
     expect(model.errorMessage).toBeNull()
   })
 })
+
+describe('spawnViewModel — setup hint', () => {
+  it('surfaces the setup hint on the form model, null by default', () => {
+    expect(spawnViewModel(formSlice(), emptyWorktreeGraph())).toMatchObject({ setupHint: null })
+    expect(spawnViewModel(formSlice(), emptyWorktreeGraph(), 'sin setup')).toMatchObject({
+      setupHint: 'sin setup'
+    })
+  })
+})

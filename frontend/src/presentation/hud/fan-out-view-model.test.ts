@@ -251,3 +251,10 @@ describe('fanOutViewModel — running — gate/question rows (Change F)', () => 
     expect(model.questions).toEqual([])
   })
 })
+
+describe('fanOutViewModel — setup hint', () => {
+  it('surfaces the setup hint on the form model, null by default', () => {
+    expect(fanOutViewModel(formSlice())).toMatchObject({ setupHint: null })
+    expect(fanOutViewModel(formSlice(), 'sin setup')).toMatchObject({ setupHint: 'sin setup' })
+  })
+})

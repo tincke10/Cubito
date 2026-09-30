@@ -53,7 +53,9 @@ const createFakeForm = (): FakeForm => {
 function setup(form: FakeForm) {
   const store = createSceneStore()
   const controller = createFanOutController({
-    gateway: {} as FanOutControllerDeps['gateway'],
+    gateway: {
+      repoSetupCommand: async () => 'pnpm install'
+    } as unknown as FanOutControllerDeps['gateway'],
     createElement: () => form,
     hud: { appendChild: () => {} },
     dispatch: (action) => store.dispatchFanOut(action),

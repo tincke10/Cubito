@@ -32,6 +32,8 @@ export type SpawnFormViewModel = {
   readonly submitLabel: string
   readonly submitEnabled: boolean
   readonly errorMessage: string | null
+  /** Non-blocking note shown when the target repo has no setup command; null otherwise. */
+  readonly setupHint: string | null
 }
 
 export type SpawnViewModel = SpawnRadialViewModel | SpawnFormViewModel | null
@@ -45,7 +47,11 @@ const formTitle = (parentBranch: string | null): string =>
  * Pure render model for the spawn radial/form (SPAWN-002/003/004). DOM projection lives in
  * spawn-menu-element.ts/spawn-form-element.ts; this owns only content, tone and enablement.
  */
-export function spawnViewModel(slice: SpawnMenuSlice, graph: WorktreeGraph): SpawnViewModel {
+export function spawnViewModel(
+  slice: SpawnMenuSlice,
+  graph: WorktreeGraph,
+  setupHint: string | null = null
+): SpawnViewModel {
   if (slice.view === 'closed') return null
   if (slice.view === 'radial') return { view: 'radial', chips: RADIAL_CHIPS }
 
@@ -63,6 +69,7 @@ export function spawnViewModel(slice: SpawnMenuSlice, graph: WorktreeGraph): Spa
     prompt: { value: slice.fields.prompt, enabled: agentActive && !submitting },
     submitLabel: submitting ? 'creando…' : 'crear worktree',
     submitEnabled: slice.fields.name.trim() !== '' && !submitting,
-    errorMessage: slice.status === 'error' ? (slice.errorMessage ?? 'error') : null
+    errorMessage: slice.status === 'error' ? (slice.errorMessage ?? 'error') : null,
+    setupHint
   }
 }

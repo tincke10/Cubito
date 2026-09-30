@@ -13,6 +13,7 @@ import type { RpcSuccessFrame } from './envelope'
 import { createOrchestrationLeaseMethods } from './orcad-orchestration-gateway'
 import { createGitMergeMethods } from './orcad-git-merge-gateway'
 import { createAgentActivityMethods } from './orcad-agent-activity-gateway'
+import { createRepoSetupMethods } from './orcad-repo-setup-gateway'
 import { toSystemGraphSnapshot } from './system-graph-snapshot-projection'
 
 /** Projects a raw `worktree.ps` row onto the local `WorktreePsRow` shape. */
@@ -224,6 +225,7 @@ export function createOrcadGateway(
       const response = await connection.call('system.snapshot', { worktree })
       return toSystemGraphSnapshot(response.result as Parameters<typeof toSystemGraphSnapshot>[0])
     },
-    ...createAgentActivityMethods(connection)
+    ...createAgentActivityMethods(connection),
+    ...createRepoSetupMethods(connection)
   }
 }

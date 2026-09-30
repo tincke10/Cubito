@@ -79,7 +79,8 @@ const createFakeGateway = () => ({
     async () => ({
       worktreeId: 'wt-1'
     })
-  )
+  ),
+  repoSetupCommand: vi.fn<(repo: string) => Promise<string | null>>(async () => null)
 })
 
 const setup = () => {
@@ -188,6 +189,27 @@ describe('createSpawnMenuController', () => {
     controller.sync({ ...radialSlice(), repoSelector: 'id:repo-1' }, emptyWorktreeGraph())
     await flush()
     expect(gateway.listRepos).toHaveBeenCalledOnce() // not refetched
+  })
+
+  it('probes the target repo setup once per open and re-applies the form with the no-setup hint', async () => {
+    const { controller, gateway, forms } = setup()
+    const slice: SpawnMenuSlice = { ...rootlessFormSlice(), repoSelector: 'id:repo-1' }
+    controller.sync(slice, emptyWorktreeGraph())
+    controller.sync(slice, emptyWorktreeGraph())
+    await flush()
+    expect(gateway.repoSetupCommand).toHaveBeenCalledOnce()
+    expect(gateway.repoSetupCommand).toHaveBeenCalledWith('id:repo-1')
+    expect(forms[0]!.apply).toHaveBeenLastCalledWith(
+      expect.objectContaining({ setupHint: expect.stringContaining('sin setup') })
+    )
+  })
+
+  it('shows no hint when the repo has a setup command', async () => {
+    const { controller, gateway, forms } = setup()
+    gateway.repoSetupCommand.mockResolvedValue('pnpm install')
+    controller.sync({ ...rootlessFormSlice(), repoSelector: 'id:repo-1' }, emptyWorktreeGraph())
+    await flush()
+    expect(forms[0]!.apply).toHaveBeenLastCalledWith(expect.objectContaining({ setupHint: null }))
   })
 
   it('does not refetch once the slice already carries a resolved repoSelector', async () => {

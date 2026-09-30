@@ -92,6 +92,19 @@ describe('reduceProjectSelector', () => {
     })
   })
 
+  it('update-add-field stores the optional setup command', () => {
+    const slice: ProjectSelectorSlice = { view: 'add-form', path: '', kind: 'git', status: 'idle' }
+    expect(
+      reduceProjectSelector(slice, { type: 'update-add-field', field: 'setup', value: 'pnpm i' })
+    ).toEqual({
+      view: 'add-form',
+      path: '',
+      kind: 'git',
+      status: 'idle',
+      setup: 'pnpm i'
+    })
+  })
+
   it('open-add-form is a no-op outside the open view', () => {
     const closed = emptyProjectSelectorSlice()
     expect(reduceProjectSelector(closed, { type: 'open-add-form' })).toBe(closed)

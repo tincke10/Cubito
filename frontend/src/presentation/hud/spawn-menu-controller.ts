@@ -6,10 +6,14 @@ import { repoSelectorForNode } from '../../application/anchor-repo-selector'
 import type { RuntimeGateway } from '../../application/ports/runtime-gateway'
 import type { SpawnMenuHandle } from './spawn-menu-element'
 import type { SpawnFormHandle } from './spawn-form-element'
+import { createSetupHintTracker } from '../../application/repo-setup-hint'
 import { spawnViewModel } from './spawn-view-model'
 
 /** Only the two methods spawn needs — narrow like the other controller ports in this dir. */
-export type SpawnGatewayPort = Pick<RuntimeGateway, 'listRepos' | 'createWorktree'>
+export type SpawnGatewayPort = Pick<
+  RuntimeGateway,
+  'listRepos' | 'createWorktree' | 'repoSetupCommand'
+>
 
 export type SpawnMenuControllerDeps = {
   gateway: SpawnGatewayPort
@@ -45,8 +49,16 @@ export function createSpawnMenuController(deps: SpawnMenuControllerDeps): SpawnM
   let form: SpawnFormHandle | null = null
   let currentNodeId: WorktreeId | null = null
   let currentSlice: SpawnMenuSlice = { view: 'closed', repoSelector: null }
+  let currentGraph: WorktreeGraph | null = null
   let repoFetchInFlight = false
   let syncGeneration = 0
+
+  const setupHints = createSetupHintTracker({
+    probe: (repoSelector) => gateway.repoSetupCommand(repoSelector),
+    onChange: () => {
+      if (currentGraph) controller.sync(currentSlice, currentGraph)
+    }
+  })
 
   const generateMutationId = deps.generateMutationId ?? (() => crypto.randomUUID())
   const activeRepoId = deps.activeRepoId ?? (() => null)
@@ -136,14 +148,21 @@ export function createSpawnMenuController(deps: SpawnMenuControllerDeps): SpawnM
     }
   }
 
-  return {
+  const controller: SpawnMenuController = {
     sync(spawnMenu: SpawnMenuSlice, graph: WorktreeGraph): void {
       const generation = ++syncGeneration
       currentSlice = spawnMenu
+      currentGraph = graph
       maybeFetchRepoSelector(spawnMenu, graph)
       // A re-entrant dispatch above already re-synced with the newer slice.
       if (generation !== syncGeneration) return
-      const model = spawnViewModel(spawnMenu, graph)
+      if (spawnMenu.view === 'form') setupHints.ensure(spawnMenu.repoSelector)
+      else if (spawnMenu.view === 'closed') setupHints.reset()
+      const model = spawnViewModel(
+        spawnMenu,
+        graph,
+        spawnMenu.view === 'form' ? setupHints.hint(spawnMenu.repoSelector) : null
+      )
       if (model === null) {
         unmountMenu()
         unmountForm()
@@ -166,10 +185,12 @@ export function createSpawnMenuController(deps: SpawnMenuControllerDeps): SpawnM
     },
     rebindGateway(newGateway: SpawnGatewayPort): void {
       gateway = newGateway
+      setupHints.reset()
     },
     dispose(): void {
       unmountMenu()
       unmountForm()
     }
   }
+  return controller
 }

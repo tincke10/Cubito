@@ -56,7 +56,8 @@ function setup(menus: FakeMenu[]) {
   const store = createSceneStore()
   const gateway: SpawnMenuControllerDeps['gateway'] = {
     listRepos: vi.fn(async () => []),
-    createWorktree: vi.fn()
+    createWorktree: vi.fn(),
+    repoSetupCommand: vi.fn(async () => 'pnpm install')
   }
   const controller = createSpawnMenuController({
     gateway,

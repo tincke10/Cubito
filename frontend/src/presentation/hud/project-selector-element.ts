@@ -33,6 +33,13 @@ export function resolveProjectSelectorKey(
   return null
 }
 
+/** Setup-command editor for the active repo, shown under the list; `command` null = no setup. */
+export type ProjectSelectorSetupModel = {
+  readonly repoName: string
+  readonly command: string | null
+  readonly message: string
+}
+
 export type ProjectSelectorHandle = {
   readonly element: HTMLElement
   apply(model: ProjectSelectorPanelModel): void
@@ -41,7 +48,10 @@ export type ProjectSelectorHandle = {
   onActivate(callback: (repoId: string) => void): () => void
   onOpenAddForm(callback: () => void): () => void
   onClose(callback: () => void): () => void
-  onAddFieldChange(callback: (field: 'path' | 'kind', value: string) => void): () => void
+  onAddFieldChange(callback: (field: 'path' | 'kind' | 'setup', value: string) => void): () => void
+  /** `null` hides the setup section (no active repo / still loading). */
+  applySetup(model: ProjectSelectorSetupModel | null): void
+  onSetupSave(callback: (command: string) => void): () => void
   onAddSubmit(callback: () => void): () => void
   onAddCancel(callback: () => void): () => void
   focusQuery(): void
@@ -79,6 +89,22 @@ export function createProjectSelector(doc: Document = document): ProjectSelector
   listSection.appendChild(rows)
   listSection.appendChild(addRow)
 
+  const setupSection = doc.createElement('div')
+  setupSection.className = 'cubito-project-selector__setup'
+  setupSection.style.display = 'none'
+  const setupLabel = doc.createElement('div')
+  setupLabel.className = 'cubito-project-selector__notice'
+  const setupCommandInput = doc.createElement('input')
+  setupCommandInput.className =
+    'cubito-project-selector__field cubito-project-selector__field--setup'
+  const setupSaveButton = doc.createElement('button')
+  setupSaveButton.className = 'cubito-project-selector__cancel'
+  setupSaveButton.textContent = 'guardar setup'
+  setupSection.appendChild(setupLabel)
+  setupSection.appendChild(setupCommandInput)
+  setupSection.appendChild(setupSaveButton)
+  listSection.appendChild(setupSection)
+
   const formSection = doc.createElement('div')
   formSection.className = 'cubito-project-selector__form'
 
@@ -94,6 +120,10 @@ export function createProjectSelector(doc: Document = document): ProjectSelector
     kindSelect.appendChild(option)
   }
 
+  const setupInput = doc.createElement('input')
+  setupInput.className = 'cubito-project-selector__field cubito-project-selector__field--setup'
+  setupInput.placeholder = 'comando de setup (opcional), ej. pnpm install'
+
   const submitButton = doc.createElement('button')
   submitButton.className = 'cubito-project-selector__submit'
 
@@ -106,6 +136,7 @@ export function createProjectSelector(doc: Document = document): ProjectSelector
 
   formSection.appendChild(pathInput)
   formSection.appendChild(kindSelect)
+  formSection.appendChild(setupInput)
   formSection.appendChild(errorLine)
   formSection.appendChild(submitButton)
   formSection.appendChild(cancelButton)
@@ -118,7 +149,9 @@ export function createProjectSelector(doc: Document = document): ProjectSelector
   let activateCallback: ((repoId: string) => void) | null = null
   let openAddFormCallback: (() => void) | null = null
   let closeCallback: (() => void) | null = null
-  let addFieldChangeCallback: ((field: 'path' | 'kind', value: string) => void) | null = null
+  let addFieldChangeCallback: ((field: 'path' | 'kind' | 'setup', value: string) => void) | null =
+    null
+  let setupSaveCallback: ((command: string) => void) | null = null
   let addSubmitCallback: (() => void) | null = null
   let addCancelCallback: (() => void) | null = null
 
@@ -130,6 +163,19 @@ export function createProjectSelector(doc: Document = document): ProjectSelector
 
   pathInput.addEventListener('input', () => {
     addFieldChangeCallback?.('path', (pathInput as unknown as { value: string }).value)
+  })
+  setupInput.addEventListener('input', () => {
+    addFieldChangeCallback?.('setup', (setupInput as unknown as { value: string }).value)
+  })
+  const saveSetup = (): void =>
+    setupSaveCallback?.((setupCommandInput as unknown as { value: string }).value)
+  setupSaveButton.addEventListener('click', saveSetup)
+  // Why: keys typed in the setup field must not reach the list's highlight/activate handler.
+  setupCommandInput.addEventListener('keydown', (event) => {
+    ;(event as KeyboardEvent).stopPropagation()
+    const key = (event as KeyboardEvent).key
+    if (key === 'Enter') saveSetup()
+    else if (key === 'Escape') closeCallback?.()
   })
   kindSelect.addEventListener('change', () => {
     addFieldChangeCallback?.('kind', (kindSelect as unknown as { value: string }).value)
@@ -205,10 +251,22 @@ export function createProjectSelector(doc: Document = document): ProjectSelector
       }
       pathInput.value = model.path
       kindSelect.value = model.kind
+      setupInput.value = model.setup
       submitButton.textContent = model.submitLabel
       submitButton.disabled = !model.submitEnabled
       errorLine.textContent = model.errorMessage ?? ''
       errorLine.style.display = model.errorMessage === null ? 'none' : ''
+    },
+    applySetup(model) {
+      setupSection.style.display = model === null ? 'none' : ''
+      if (model === null) return
+      setupLabel.textContent = `setup de ${model.repoName}${model.message === '' ? '' : ` · ${model.message}`}`
+      setupCommandInput.value = model.command ?? ''
+      setupCommandInput.placeholder = 'sin setup (ej. pnpm install)'
+    },
+    onSetupSave(callback) {
+      setupSaveCallback = callback
+      return () => (setupSaveCallback = null)
     },
     onQueryChange(callback) {
       queryChangeCallback = callback

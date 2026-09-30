@@ -93,7 +93,9 @@ describe('createOrcadGateway', () => {
       'gitBranchDiff',
       'gitWorkingTreeDiff',
       'systemSnapshot',
-      'agentActivity'
+      'agentActivity',
+      'repoSetupCommand',
+      'setRepoSetupCommand'
     ])
   })
 

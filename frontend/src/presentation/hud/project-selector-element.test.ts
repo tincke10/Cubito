@@ -35,6 +35,7 @@ type FakeElement = {
   className: string
   textContent: string
   value: string
+  placeholder: string
   disabled: boolean
   readonly listeners: Record<string, ((event: unknown) => void)[]>
   addEventListener(type: string, cb: (event: unknown) => void): void
@@ -56,6 +57,7 @@ const createFakeElement = (tag: string): FakeElement => {
     className: '',
     textContent: '',
     value: '',
+    placeholder: '',
     disabled: false,
     listeners,
     addEventListener(type, cb) {
@@ -101,6 +103,7 @@ const formModel = (
   view: 'add-form' as const,
   path: '',
   kind: 'git' as const,
+  setup: '',
   submitLabel: 'agregar repo',
   submitEnabled: false,
   errorMessage: null,
@@ -115,9 +118,65 @@ const rowsOf = (root: FakeElement) => root.children[0]!.children[1]!
 const addRowOf = (root: FakeElement) => root.children[0]!.children[2]!
 const pathInputOf = (root: FakeElement) => root.children[1]!.children[0]!
 const kindSelectOf = (root: FakeElement) => root.children[1]!.children[1]!
-const errorLineOf = (root: FakeElement) => root.children[1]!.children[2]!
-const submitButtonOf = (root: FakeElement) => root.children[1]!.children[3]!
-const cancelButtonOf = (root: FakeElement) => root.children[1]!.children[4]!
+const setupInputOf = (root: FakeElement) => root.children[1]!.children[2]!
+const errorLineOf = (root: FakeElement) => root.children[1]!.children[3]!
+const submitButtonOf = (root: FakeElement) => root.children[1]!.children[4]!
+const cancelButtonOf = (root: FakeElement) => root.children[1]!.children[5]!
+const setupSectionOf = (root: FakeElement) => root.children[0]!.children[3]!
+
+describe('createProjectSelector — setup', () => {
+  it('add-form setup input writes the model value and emits a setup field change', () => {
+    const selector = createProjectSelector(createFakeDocument())
+    const changes: [string, string][] = []
+    selector.onAddFieldChange((field, value) => changes.push([field, value]))
+    selector.apply(formModel({ setup: 'pnpm install' }))
+    const input = setupInputOf(rootOf(selector))
+    expect(input.value).toBe('pnpm install')
+    input.value = 'yarn'
+    input.fire('input')
+    expect(changes).toEqual([['setup', 'yarn']])
+  })
+
+  it('applySetup(null) hides the list setup section; a model shows it with the current command', () => {
+    const selector = createProjectSelector(createFakeDocument())
+    selector.apply(listModel())
+    const section = setupSectionOf(rootOf(selector))
+    selector.applySetup(null)
+    expect(section.style.display).toBe('none')
+    selector.applySetup({ repoName: 'Cubito', command: 'pnpm install', message: '' })
+    expect(section.style.display).toBe('')
+    expect(section.children[0]!.textContent).toContain('Cubito')
+    expect(section.children[1]!.value).toBe('pnpm install')
+    selector.applySetup({ repoName: 'Cubito', command: null, message: '' })
+    expect(section.children[1]!.value).toBe('')
+    expect(section.children[1]!.placeholder).toContain('sin setup')
+  })
+
+  it('saves the typed command on Enter or the save button without triggering list activation', () => {
+    const selector = createProjectSelector(createFakeDocument())
+    const saved: string[] = []
+    const activated: string[] = []
+    const closed = vi.fn()
+    selector.onSetupSave((command) => saved.push(command))
+    selector.onActivate((id) => activated.push(id))
+    selector.onClose(closed)
+    selector.apply(
+      listModel({
+        rows: [{ repoId: 'r1', displayName: 'A', path: '/a', active: true, highlighted: true }]
+      })
+    )
+    selector.applySetup({ repoName: 'A', command: null, message: '' })
+    const section = setupSectionOf(rootOf(selector))
+    const input = section.children[1]!
+    input.value = 'pnpm install'
+    input.fire('keydown', { key: 'Enter', stopPropagation: () => {} })
+    section.children[2]!.fire('click')
+    input.fire('keydown', { key: 'Escape', stopPropagation: () => {} })
+    expect(saved).toEqual(['pnpm install', 'pnpm install'])
+    expect(activated).toEqual([])
+    expect(closed).toHaveBeenCalledOnce()
+  })
+})
 
 describe('createProjectSelector', () => {
   it('apply() in list view shows the list section, hides the form, and writes the query', () => {

@@ -116,6 +116,7 @@ describe('projectSelectorViewModel', () => {
       view: 'add-form',
       path: '',
       kind: 'git',
+      setup: '',
       submitLabel: 'agregar repo',
       submitEnabled: false,
       errorMessage: null

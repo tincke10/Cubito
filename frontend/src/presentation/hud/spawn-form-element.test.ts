@@ -85,10 +85,22 @@ const idleModel = (overrides: Partial<SpawnFormViewModel> = {}): SpawnFormViewMo
   submitLabel: 'crear worktree',
   submitEnabled: false,
   errorMessage: null,
+  setupHint: null,
   ...overrides
 })
 
 describe('createSpawnForm', () => {
+  it('apply() shows the setup notice only when the model carries a hint', () => {
+    const form = createSpawnForm(createFakeDocument())
+    const root = form.element as unknown as FakeElement
+    const notice = root.children.find((c) => c.className.includes('notice'))!
+    form.apply(idleModel({ setupHint: 'sin setup' }))
+    expect(notice.textContent).toBe('sin setup')
+    expect(notice.style.display).toBe('')
+    form.apply(idleModel())
+    expect(notice.style.display).toBe('none')
+  })
+
   it('apply() writes field values and enablement from the model', () => {
     const form = createSpawnForm(createFakeDocument())
     form.apply(

@@ -68,6 +68,9 @@ export function createSpawnForm(doc: Document = document): SpawnFormHandle {
   const errorLine = doc.createElement('div')
   errorLine.className = 'cubito-spawn-form__error'
 
+  const setupNotice = doc.createElement('div')
+  setupNotice.className = 'cubito-spawn-form__notice'
+
   const hint = doc.createElement('div')
   hint.className = 'cubito-spawn-form__hint'
   hint.textContent = '⏎ crear · esc cancelar'
@@ -79,6 +82,7 @@ export function createSpawnForm(doc: Document = document): SpawnFormHandle {
     baseInput,
     promptArea,
     errorLine,
+    setupNotice,
     submitButton,
     cancelButton,
     hint
@@ -127,6 +131,8 @@ export function createSpawnForm(doc: Document = document): SpawnFormHandle {
       submitButton.disabled = !model.submitEnabled
       errorLine.textContent = model.errorMessage ?? ''
       errorLine.style.display = model.errorMessage === null ? 'none' : ''
+      setupNotice.textContent = model.setupHint ?? ''
+      setupNotice.style.display = model.setupHint === null ? 'none' : ''
     },
     onFieldChange(callback) {
       fieldChangeCallback = callback

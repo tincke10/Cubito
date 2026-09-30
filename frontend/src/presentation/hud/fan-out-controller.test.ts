@@ -141,6 +141,7 @@ const createFakeGateway = () => ({
     async () => ({ worktreeId: 'wt-1' })
   ),
   listWorktreePs: vi.fn<() => Promise<readonly WorktreePsRow[]>>(async () => []),
+  repoSetupCommand: vi.fn<(repo: string) => Promise<string | null>>(async () => null),
   orchestrationRunCreate: vi.fn<(input: LeaseRunCreateInput) => Promise<LeaseRunCreateResult>>(
     async () => {
       throw new Error('orchestrationRunCreate not implemented in this fake')
@@ -237,6 +238,18 @@ describe('createFanOutController', () => {
     expect(forms).toHaveLength(1)
     expect(hud.appendChild).toHaveBeenCalledWith(forms[0]!.element)
     expect(forms[0]!.apply).toHaveBeenCalled()
+  })
+
+  it('probes the target repo setup once and re-applies the form with the no-setup hint', async () => {
+    const { controller, gateway, forms } = setup()
+    const slice = formSlice({ repoSelector: 'id:repo-1' })
+    controller.sync(slice, emptyWorktreeGraph())
+    controller.sync(slice, emptyWorktreeGraph())
+    await flush()
+    expect(gateway.repoSetupCommand).toHaveBeenCalledOnce()
+    expect(forms[0]!.apply).toHaveBeenLastCalledWith(
+      expect.objectContaining({ setupHint: expect.stringContaining('sin setup') })
+    )
   })
 
   it('focuses the first field on the closed -> form transition', () => {

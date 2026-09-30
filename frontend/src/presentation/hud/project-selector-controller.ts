@@ -7,8 +7,11 @@ import type { RuntimeGateway } from '../../application/ports/runtime-gateway'
 import type { ProjectSelectorHandle } from './project-selector-element'
 import { projectSelectorViewModel } from './project-selector-view-model'
 
-/** Only the two methods the selector needs — narrow like SpawnGatewayPort. */
-export type ProjectSelectorGatewayPort = Pick<RuntimeGateway, 'listRepos' | 'addRepo'>
+/** Only the methods the selector needs — narrow like SpawnGatewayPort. */
+export type ProjectSelectorGatewayPort = Pick<
+  RuntimeGateway,
+  'listRepos' | 'addRepo' | 'repoSetupCommand' | 'setRepoSetupCommand'
+>
 
 export type ProjectSelectorControllerDeps = {
   gateway: ProjectSelectorGatewayPort
@@ -41,6 +44,45 @@ export function createProjectSelectorController(
   let wasClosed = true
   let previousView: ProjectSelectorSlice['view'] = 'closed'
   let currentSlice: ProjectSelectorSlice = { view: 'closed' }
+  let setupRepo: { id: string; name: string; command: string | null } | null = null
+  let setupRequestedFor: string | null = null
+  let setupShown = false
+
+  const showSetup = (message = ''): void => {
+    if (!element || !setupRepo) return
+    setupShown = true
+    element.applySetup({ repoName: setupRepo.name, command: setupRepo.command, message })
+  }
+
+  // One fetch per (open, active repo); a repo switch or a fresh open re-reads the host.
+  const loadSetup = (repos: ReposSlice): void => {
+    const active = repos.list.find((repo) => repo.id === repos.activeRepoId)
+    if (!active || setupRequestedFor === active.id) return
+    setupRequestedFor = active.id
+    void gateway
+      .repoSetupCommand(`id:${active.id}`)
+      .then((command) => {
+        if (setupRequestedFor !== active.id) return
+        setupRepo = { id: active.id, name: active.displayName, command }
+        showSetup()
+      })
+      .catch(() => {
+        if (setupRequestedFor === active.id) setupRequestedFor = null
+      })
+  }
+
+  const handleSetupSave = async (command: string): Promise<void> => {
+    if (!setupRepo) return
+    const target = setupRepo
+    const trimmed = command.trim()
+    try {
+      await gateway.setRepoSetupCommand(`id:${target.id}`, trimmed)
+      setupRepo = { ...target, command: trimmed === '' ? null : trimmed }
+      showSetup('guardado')
+    } catch (error) {
+      showSetup(`error: ${error instanceof Error ? error.message : 'no se pudo guardar'}`)
+    }
+  }
 
   const handleAddSubmit = async (): Promise<void> => {
     const slice = currentSlice
@@ -50,9 +92,25 @@ export function createProjectSelectorController(
     try {
       const repo = await gateway.addRepo({ path: slice.path, kind: slice.kind })
       deps.reposDispatch({ type: 'set-active', repoId: repo.id })
+      const setup = slice.setup?.trim() ?? ''
+      let setupError: string | null = null
+      if (setup !== '') {
+        try {
+          await gateway.setRepoSetupCommand(`id:${repo.id}`, setup)
+        } catch (error) {
+          setupError = error instanceof Error ? error.message : 'error'
+        }
+      }
       await deps.refetch()
       deps.focusIsland(repo.id)
-      deps.dispatch({ type: 'submit-add-ok' })
+      deps.dispatch(
+        setupError === null
+          ? { type: 'submit-add-ok' }
+          : {
+              type: 'submit-add-error',
+              message: `repo agregado, pero el setup no se guardó: ${setupError}`
+            }
+      )
     } catch (error) {
       deps.dispatch({
         type: 'submit-add-error',
@@ -78,6 +136,7 @@ export function createProjectSelectorController(
       )
       created.onAddSubmit(() => void handleAddSubmit())
       created.onAddCancel(() => deps.dispatch({ type: 'back-to-list' }))
+      created.onSetupSave((command) => void handleSetupSave(command))
       deps.hud.appendChild(created.element)
       element = created
       created.focusQuery()
@@ -86,6 +145,9 @@ export function createProjectSelectorController(
   }
 
   const unmount = (): void => {
+    setupRepo = null
+    setupRequestedFor = null
+    setupShown = false
     if (!element) return
     element.dispose()
     element = null
@@ -111,6 +173,11 @@ export function createProjectSelectorController(
       }
       const mounted = mount()
       mounted.apply(model)
+      if (selector.view === 'open') {
+        loadSetup(repos)
+        // Why: re-applying on every sync would clobber a half-typed setup command.
+        if (!setupShown) showSetup()
+      }
       // display:none force-blurs a focused descendant, so the path input needs an explicit
       // focus() on the list -> add-form transition, mirroring spawn-form's focusFirstField().
       if (selector.view === 'add-form' && previousView !== 'add-form') mounted.focusPath()

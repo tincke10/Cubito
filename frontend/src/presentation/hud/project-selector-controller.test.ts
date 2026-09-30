@@ -12,7 +12,7 @@ import type {
 import { emptyReposSlice, reduceRepos } from '../../application/repos-model'
 import type { ReposAction, ReposSlice } from '../../application/repos-model'
 import type { RepoSummary } from '../../application/ports/runtime-gateway'
-import type { ProjectSelectorHandle } from './project-selector-element'
+import type { ProjectSelectorHandle, ProjectSelectorSetupModel } from './project-selector-element'
 
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
 
@@ -25,7 +25,8 @@ type FakeSelector = ProjectSelectorHandle & {
   emitActivate(repoId: string): void
   emitOpenAddForm(): void
   emitClose(): void
-  emitAddFieldChange(field: 'path' | 'kind', value: string): void
+  emitAddFieldChange(field: 'path' | 'kind' | 'setup', value: string): void
+  emitSetupSave(command: string): void
   emitAddSubmit(): void
   emitAddCancel(): void
 }
@@ -36,7 +37,8 @@ const createFakeSelector = (): FakeSelector => {
   let activateCb: ((repoId: string) => void) | null = null
   let openAddFormCb: (() => void) | null = null
   let closeCb: (() => void) | null = null
-  let addFieldCb: ((field: 'path' | 'kind', value: string) => void) | null = null
+  let addFieldCb: ((field: 'path' | 'kind' | 'setup', value: string) => void) | null = null
+  let setupSaveCb: ((command: string) => void) | null = null
   let addSubmitCb: (() => void) | null = null
   let addCancelCb: (() => void) | null = null
 
@@ -78,6 +80,14 @@ const createFakeSelector = (): FakeSelector => {
       addCancelCb = cb
       return () => (addCancelCb = null)
     },
+    applySetup: vi.fn<(model: ProjectSelectorSetupModel | null) => void>(),
+    onSetupSave(cb) {
+      setupSaveCb = cb
+      return () => (setupSaveCb = null)
+    },
+    emitSetupSave(command) {
+      setupSaveCb?.(command)
+    },
     focusQuery: vi.fn(() => (selector.focused = true)),
     focusPath: vi.fn(),
     dispose: vi.fn(() => (selector.disposed = true)),
@@ -115,7 +125,9 @@ const createFakeGateway = () => ({
   listRepos: vi.fn<() => Promise<readonly RepoSummary[]>>(async () => [REPO_A]),
   addRepo: vi.fn<(input: { path: string; kind?: 'git' | 'folder' }) => Promise<RepoSummary>>(
     async () => ({ id: 'repo-new', path: '/new', displayName: 'New', kind: 'git' })
-  )
+  ),
+  repoSetupCommand: vi.fn<(repo: string) => Promise<string | null>>(async () => null),
+  setRepoSetupCommand: vi.fn<(repo: string, command: string) => Promise<void>>(async () => {})
 })
 
 const setup = () => {
@@ -145,6 +157,106 @@ const setup = () => {
 
 const openSlice = (): ProjectSelectorSlice =>
   reduceProjectSelector(emptyProjectSelectorSlice(), { type: 'open' })
+
+const addFormWith = (command: string): ProjectSelectorSlice => ({
+  view: 'add-form',
+  path: '/abs/new',
+  kind: 'git',
+  status: 'idle',
+  setup: command
+})
+
+describe('createProjectSelectorController — repo setup', () => {
+  const activeA = { list: [REPO_A], activeRepoId: 'repo-a' }
+
+  it('loads the active repo setup once per open and shows it in the selector', async () => {
+    const { controller, gateway, selectors } = setup()
+    gateway.repoSetupCommand.mockResolvedValue('pnpm install')
+    controller.sync(openSlice(), activeA)
+    controller.sync(openSlice(), activeA)
+    await flush()
+    expect(gateway.repoSetupCommand).toHaveBeenCalledOnce()
+    expect(gateway.repoSetupCommand).toHaveBeenCalledWith('id:repo-a')
+    expect(selectors[0]!.applySetup).toHaveBeenLastCalledWith({
+      repoName: 'A',
+      command: 'pnpm install',
+      message: ''
+    })
+  })
+
+  it('does not re-apply the setup section on later syncs (keeps a half-typed command)', async () => {
+    const { controller, selectors } = setup()
+    controller.sync(openSlice(), activeA)
+    await flush()
+    controller.sync(openSlice(), activeA)
+    controller.sync(openSlice(), activeA)
+    expect(selectors[0]!.applySetup).toHaveBeenCalledOnce()
+  })
+
+  it('does not show the setup section without an active repo', () => {
+    const { controller, gateway, selectors } = setup()
+    controller.sync(openSlice(), emptyReposSlice())
+    expect(gateway.repoSetupCommand).not.toHaveBeenCalled()
+    expect(selectors[0]!.applySetup).not.toHaveBeenCalled()
+  })
+
+  it('saves the typed command for the active repo and confirms it', async () => {
+    const { controller, gateway, selectors } = setup()
+    controller.sync(openSlice(), activeA)
+    await flush()
+    selectors[0]!.emitSetupSave('  pnpm install ')
+    await flush()
+    expect(gateway.setRepoSetupCommand).toHaveBeenCalledWith('id:repo-a', 'pnpm install')
+    expect(selectors[0]!.applySetup).toHaveBeenLastCalledWith({
+      repoName: 'A',
+      command: 'pnpm install',
+      message: 'guardado'
+    })
+  })
+
+  it('reports a save failure in the setup section', async () => {
+    const { controller, gateway, selectors } = setup()
+    gateway.setRepoSetupCommand.mockRejectedValue(new Error('boom'))
+    controller.sync(openSlice(), activeA)
+    await flush()
+    selectors[0]!.emitSetupSave('x')
+    await flush()
+    expect(selectors[0]!.applySetup).toHaveBeenLastCalledWith(
+      expect.objectContaining({ message: expect.stringContaining('boom') })
+    )
+  })
+
+  it('persists the add-form setup on the new repo after adding it', async () => {
+    const { controller, gateway, selectors, dispatch } = setup()
+    controller.sync(addFormWith(' pnpm install '), emptyReposSlice())
+    selectors[0]!.emitAddSubmit()
+    await flush()
+    expect(gateway.setRepoSetupCommand).toHaveBeenCalledWith('id:repo-new', 'pnpm install')
+    expect(dispatch).toHaveBeenCalledWith({ type: 'submit-add-ok' })
+  })
+
+  it('skips the setup write when the add-form setup is blank', async () => {
+    const { controller, gateway, selectors } = setup()
+    controller.sync(addFormWith('  '), emptyReposSlice())
+    selectors[0]!.emitAddSubmit()
+    await flush()
+    expect(gateway.setRepoSetupCommand).not.toHaveBeenCalled()
+  })
+
+  it('reports a setup write failure after the repo was already added', async () => {
+    const { controller, gateway, selectors, dispatch, refetch } = setup()
+    gateway.setRepoSetupCommand.mockRejectedValue(new Error('boom'))
+    controller.sync(addFormWith('pnpm install'), emptyReposSlice())
+    selectors[0]!.emitAddSubmit()
+    await flush()
+    expect(refetch).toHaveBeenCalledOnce()
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'submit-add-error',
+      message: expect.stringContaining('setup')
+    })
+    expect(dispatch).not.toHaveBeenCalledWith({ type: 'submit-add-ok' })
+  })
+})
 
 describe('createProjectSelectorController', () => {
   it('does nothing when the slice is closed', () => {

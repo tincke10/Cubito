@@ -275,4 +275,8 @@ export type RuntimeGateway = {
     syncWorkingTree?: boolean
   ): Promise<MergeWinnerResult>
   agentActivity(input: AgentActivityInput): Promise<AgentActivityPage>
+  /** Effective setup command for a repo (`repo.hooks`: orca.yaml or local override); null when none. */
+  repoSetupCommand(repo: string): Promise<string | null>
+  /** Persists the repo-local setup command via `repo.update` hookSettings; '' clears it. */
+  setRepoSetupCommand(repo: string, command: string): Promise<void>
 }

@@ -29,6 +29,8 @@ export type FanOutFormViewModel = {
   readonly prompt: FanOutFieldViewModel
   readonly submitEnabled: boolean
   readonly errorMessage: string | null
+  /** Non-blocking note shown when the target repo has no setup command; null otherwise. */
+  readonly setupHint: string | null
 }
 
 export type FanOutRunningViewModel = {
@@ -55,7 +57,10 @@ const countersLine = (slice: Extract<FanOutSlice, { view: 'running' }>): string 
  * Pure render model for the fan-out form/running HUD (mirrors spawn-view-model.ts). DOM
  * projection lives in fan-out-element.ts; this owns only content and enablement.
  */
-export function fanOutViewModel(slice: FanOutSlice): FanOutViewModel {
+export function fanOutViewModel(
+  slice: FanOutSlice,
+  setupHint: string | null = null
+): FanOutViewModel {
   if (slice.view === 'closed') return null
 
   if (slice.view === 'form') {
@@ -67,7 +72,8 @@ export function fanOutViewModel(slice: FanOutSlice): FanOutViewModel {
       agent: { value: slice.fields.agent, enabled: true },
       prompt: { value: slice.fields.prompt, enabled: agentActive },
       submitEnabled: slice.repoSelector !== null && countInBounds,
-      errorMessage: slice.errorMessage ?? null
+      errorMessage: slice.errorMessage ?? null,
+      setupHint
     }
   }
 
