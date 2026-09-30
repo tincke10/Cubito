@@ -41,6 +41,14 @@ const workingTreeText = (
   return `padre no sincronizado: ${workingTree.message}`
 }
 
+/** Copy for the parent setup-hook re-run triggered by changed package manifests. */
+const dependencySetupText = (
+  setup: NonNullable<Extract<CompareMergeState, { phase: 'clean' }>['dependencySetup']>
+): string =>
+  setup.status === 'ran'
+    ? 'dependencias del padre reinstaladas (setup).'
+    : `setup del padre falló: ${setup.message}`
+
 /**
  * Compare mode's winner-merge action (Change E) — a real interactive `<button>` (the keyboard-bar
  * chips are inert, they can't host this). Two-step arm is EPHEMERAL, local to this element: 1st
@@ -122,6 +130,13 @@ export function createCompareMergeAction(doc: Document = document): CompareMerge
         ? workingTreeText(merge.workingTree)
         : cleanText(merge.commitOid)
       result.appendChild(line)
+      if (merge.dependencySetup) {
+        const setupLine = doc.createElement('div')
+        setupLine.className =
+          'compare-merge-action__result-line compare-merge-action__result-line--clean'
+        setupLine.textContent = dependencySetupText(merge.dependencySetup)
+        result.appendChild(setupLine)
+      }
     } else if (merge.phase === 'conflict') {
       const heading = doc.createElement('div')
       heading.className =

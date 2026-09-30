@@ -1,5 +1,9 @@
 import type { WorktreeId } from '../domain/worktree-graph/types'
-import type { DiffFileContent, ParentWorkingTreeSyncResult } from './ports/runtime-gateway'
+import type {
+  DiffFileContent,
+  ParentDependencySetupResult,
+  ParentWorkingTreeSyncResult
+} from './ports/runtime-gateway'
 import type { DiffFileRow } from './diff-view-model'
 import { emptyCompareChildLoad, reduceCompareChildLoad } from './compare-child-load'
 import type { CompareChildLoad, CompareChildLoadAction } from './compare-child-load'
@@ -11,7 +15,12 @@ export type { CompareChildLoad }
 export type CompareMergeState =
   | { phase: 'idle' }
   | { phase: 'running' }
-  | { phase: 'clean'; commitOid: string; workingTree?: ParentWorkingTreeSyncResult }
+  | {
+      phase: 'clean'
+      commitOid: string
+      workingTree?: ParentWorkingTreeSyncResult
+      dependencySetup?: ParentDependencySetupResult
+    }
   | { phase: 'conflict'; files: readonly string[] }
   | { phase: 'error'; message: string }
 
@@ -46,7 +55,12 @@ export type CompareViewAction =
   | { type: 'child-panel-error'; childId: WorktreeId; path: string; message?: string }
   | { type: 'set-winner'; winnerId: WorktreeId | null }
   | { type: 'merge-start' }
-  | { type: 'merge-clean'; commitOid: string; workingTree?: ParentWorkingTreeSyncResult }
+  | {
+      type: 'merge-clean'
+      commitOid: string
+      workingTree?: ParentWorkingTreeSyncResult
+      dependencySetup?: ParentDependencySetupResult
+    }
   | { type: 'merge-conflict'; files: readonly string[] }
   | { type: 'merge-error'; message: string }
   | { type: 'merge-reset' }
@@ -90,7 +104,8 @@ export function reduceCompareView(
             merge: {
               phase: 'clean',
               commitOid: action.commitOid,
-              ...(action.workingTree ? { workingTree: action.workingTree } : {})
+              ...(action.workingTree ? { workingTree: action.workingTree } : {}),
+              ...(action.dependencySetup ? { dependencySetup: action.dependencySetup } : {})
             }
           }
         : slice

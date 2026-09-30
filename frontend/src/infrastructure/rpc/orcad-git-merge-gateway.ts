@@ -1,5 +1,6 @@
 import type {
   MergeWinnerResult,
+  ParentDependencySetupResult,
   ParentWorkingTreeSyncResult,
   RuntimeGateway
 } from '../../application/ports/runtime-gateway'
@@ -26,19 +27,37 @@ function toWorkingTreeResult(workingTree: unknown): ParentWorkingTreeSyncResult 
   return undefined
 }
 
+/** Projects a raw `dependencySetup` sub-shape; malformed/missing -> undefined (best-effort field). */
+function toDependencySetupResult(value: unknown): ParentDependencySetupResult | undefined {
+  if (typeof value !== 'object' || value === null) {
+    return undefined
+  }
+  const d = value as { status?: unknown; message?: unknown }
+  if (d.status === 'ran') {
+    return { status: 'ran' }
+  }
+  if (d.status === 'failed' && typeof d.message === 'string') {
+    return { status: 'failed', message: d.message }
+  }
+  return undefined
+}
+
 /** Projects a raw `git.mergeWinnerIntoParent` result onto the local `MergeWinnerResult` shape. */
 function toMergeWinnerResult(result: {
   outcome?: unknown
   commitOid?: unknown
   files?: unknown
   workingTree?: unknown
+  dependencySetup?: unknown
 }): MergeWinnerResult {
   if (result.outcome === 'clean' && typeof result.commitOid === 'string') {
     const workingTree = toWorkingTreeResult(result.workingTree)
+    const dependencySetup = toDependencySetupResult(result.dependencySetup)
     return {
       outcome: 'clean',
       commitOid: result.commitOid,
-      ...(workingTree ? { workingTree } : {})
+      ...(workingTree ? { workingTree } : {}),
+      ...(dependencySetup ? { dependencySetup } : {})
     }
   }
   if (result.outcome === 'conflict' && Array.isArray(result.files)) {

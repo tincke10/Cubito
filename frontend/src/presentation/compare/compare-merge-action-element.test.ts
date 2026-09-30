@@ -298,6 +298,37 @@ describe('createCompareMergeAction', () => {
     expect(result.children[0]!.textContent).toContain('refusing to clobber x.txt')
   })
 
+  it('adds a dependency-setup line: reinstalled on ran, the message on failed, none when absent', () => {
+    const action = createCompareMergeAction(createFakeDocument())
+    const result = resultOf(rootOf(action))
+    action.apply(
+      model({
+        merge: {
+          phase: 'clean',
+          commitOid: 'abcdef1',
+          workingTree: { status: 'synced' },
+          dependencySetup: { status: 'ran' }
+        }
+      })
+    )
+    expect(result.children[1]!.textContent).toContain('dependencias')
+    action.apply(
+      model({
+        merge: {
+          phase: 'clean',
+          commitOid: 'abcdef1',
+          workingTree: { status: 'synced' },
+          dependencySetup: { status: 'failed', message: 'ERR_PNPM' }
+        }
+      })
+    )
+    expect(result.children[1]!.textContent).toContain('ERR_PNPM')
+    action.apply(
+      model({ merge: { phase: 'clean', commitOid: 'abcdef1', workingTree: { status: 'synced' } } })
+    )
+    expect(result.children).toHaveLength(1)
+  })
+
   it('renders the unchanged R1 copy when workingTree is absent', () => {
     const action = createCompareMergeAction(createFakeDocument())
     action.apply(model({ merge: { phase: 'clean', commitOid: 'abcdef1234567' } }))

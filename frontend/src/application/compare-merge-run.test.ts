@@ -90,6 +90,21 @@ describe('runCompareMerge — happy path', () => {
     })
   })
 
+  it('threads result.dependencySetup into the dispatched merge-clean action', async () => {
+    const gateway = createFakeGateway(async () => ({
+      outcome: 'clean',
+      commitOid: 'abc123',
+      dependencySetup: { status: 'ran' }
+    }))
+    const { dispatch } = setup(gateway)
+    await runCompareMerge(openWithWinner(), runningFanOut(), { gateway, dispatch }, true)
+    expect(dispatch).toHaveBeenLastCalledWith({
+      type: 'merge-clean',
+      commitOid: 'abc123',
+      dependencySetup: { status: 'ran' }
+    })
+  })
+
   it('dispatches merge-conflict with the file list on a conflict outcome', async () => {
     const gateway = createFakeGateway(async () => ({
       outcome: 'conflict',

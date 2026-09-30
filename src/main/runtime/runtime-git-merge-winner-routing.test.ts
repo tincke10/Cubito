@@ -6,12 +6,17 @@ import type { RuntimeGitTarget } from './runtime-git-command-target'
 
 const mocks = vi.hoisted(() => ({
   mergeWinnerIntoParent: vi.fn(),
+  runParentDependencySetupAfterMerge: vi.fn(),
   getSshGitProvider: vi.fn()
 }))
 
 vi.mock('../git/merge-winner', async () => ({
   ...(await vi.importActual<typeof MergeWinnerModule>('../git/merge-winner')),
   mergeWinnerIntoParent: mocks.mergeWinnerIntoParent
+}))
+
+vi.mock('../git/merge-winner-dependency-setup', () => ({
+  runParentDependencySetupAfterMerge: mocks.runParentDependencySetupAfterMerge
 }))
 
 vi.mock('../providers/ssh-git-dispatch', () => ({
@@ -47,7 +52,58 @@ function makeCommands(targetsBySelector: Record<string, RuntimeGitTarget>): Runt
 describe('RuntimeGitCommands.mergeRuntimeGitWinnerIntoParent', () => {
   beforeEach(() => {
     mocks.mergeWinnerIntoParent.mockReset()
+    mocks.runParentDependencySetupAfterMerge.mockReset()
     mocks.getSshGitProvider.mockReset()
+  })
+
+  it('attaches the parent dependency-setup outcome to a clean local merge', async () => {
+    const clean = {
+      outcome: 'clean',
+      commitOid: 'c'.repeat(40),
+      workingTree: { status: 'synced' }
+    }
+    mocks.mergeWinnerIntoParent.mockResolvedValue(clean)
+    mocks.runParentDependencySetupAfterMerge.mockResolvedValue({ status: 'ran' })
+    const repo = { id: 'repo-1', path: '/repo' } as unknown as RuntimeGitTarget['repo']
+    const commands = makeCommands({
+      'id:parent': { worktree: makeWorktree('/repo/parent', 'parent-branch'), repo },
+      'id:winner': { worktree: makeWorktree('/repo/winner', 'winner-branch') }
+    })
+
+    const result = await commands.mergeRuntimeGitWinnerIntoParent(
+      'id:parent',
+      'id:winner',
+      'm',
+      true
+    )
+
+    expect(result).toEqual({ ...clean, dependencySetup: { status: 'ran' } })
+    expect(mocks.runParentDependencySetupAfterMerge).toHaveBeenCalledWith(
+      expect.objectContaining({
+        repo,
+        parentPath: '/repo/parent',
+        commitOid: 'c'.repeat(40),
+        workingTree: { status: 'synced' }
+      })
+    )
+  })
+
+  it('leaves the result untouched when no dependency setup ran, and for conflicts', async () => {
+    const clean = { outcome: 'clean', commitOid: 'c'.repeat(40) }
+    mocks.mergeWinnerIntoParent.mockResolvedValueOnce(clean)
+    mocks.runParentDependencySetupAfterMerge.mockResolvedValue(undefined)
+    const commands = makeCommands({
+      'id:parent': { worktree: makeWorktree('/repo/parent', 'parent-branch') },
+      'id:winner': { worktree: makeWorktree('/repo/winner', 'winner-branch') }
+    })
+    await expect(
+      commands.mergeRuntimeGitWinnerIntoParent('id:parent', 'id:winner')
+    ).resolves.toEqual(clean)
+
+    mocks.mergeWinnerIntoParent.mockResolvedValueOnce({ outcome: 'conflict', files: ['a'] })
+    mocks.runParentDependencySetupAfterMerge.mockClear()
+    await commands.mergeRuntimeGitWinnerIntoParent('id:parent', 'id:winner')
+    expect(mocks.runParentDependencySetupAfterMerge).not.toHaveBeenCalled()
   })
 
   it('merges locally when both targets share no SSH connection', async () => {

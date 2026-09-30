@@ -43,7 +43,8 @@ export async function runCompareMerge(
         ? {
             type: 'merge-clean',
             commitOid: result.commitOid,
-            ...(result.workingTree ? { workingTree: result.workingTree } : {})
+            ...(result.workingTree ? { workingTree: result.workingTree } : {}),
+            ...(result.dependencySetup ? { dependencySetup: result.dependencySetup } : {})
           }
         : { type: 'merge-conflict', files: result.files }
     )

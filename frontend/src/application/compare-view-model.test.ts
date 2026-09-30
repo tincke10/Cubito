@@ -171,6 +171,18 @@ describe('reduceCompareView — merge (Change E)', () => {
     })
   })
 
+  it('merge-clean carries an optional dependencySetup outcome through', () => {
+    const running = reduceCompareView(openSlice(), { type: 'merge-start' })
+    const slice = reduceCompareView(running, {
+      type: 'merge-clean',
+      commitOid: 'abc123',
+      dependencySetup: { status: 'failed', message: 'boom' }
+    })
+    expect(slice).toMatchObject({
+      merge: { phase: 'clean', dependencySetup: { status: 'failed', message: 'boom' } }
+    })
+  })
+
   it('merge-conflict sets phase to conflict with the file list', () => {
     const running = reduceCompareView(openSlice(), { type: 'merge-start' })
     const slice = reduceCompareView(running, {

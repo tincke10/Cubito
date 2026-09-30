@@ -229,10 +229,19 @@ export type ParentWorkingTreeSyncResult =
   | { status: 'skipped'; reason: 'dirty' }
   | { status: 'failed'; message: string }
 
+/** Optional `dependencySetup` on a clean merge: the parent's setup hook re-ran because
+ *  package manifests/lockfiles changed. Absent = did not apply (or an older host). */
+export type ParentDependencySetupResult = { status: 'ran' } | { status: 'failed'; message: string }
+
 /** `git.mergeWinnerIntoParent` result (Change E): LOCAL mirror of the engine's headless-merge
  *  outcome — clean moves the parent branch ref, conflict mutates nothing (file-name list only). */
 export type MergeWinnerResult =
-  | { outcome: 'clean'; commitOid: string; workingTree?: ParentWorkingTreeSyncResult }
+  | {
+      outcome: 'clean'
+      commitOid: string
+      workingTree?: ParentWorkingTreeSyncResult
+      dependencySetup?: ParentDependencySetupResult
+    }
   | { outcome: 'conflict'; files: readonly string[] }
 
 /**

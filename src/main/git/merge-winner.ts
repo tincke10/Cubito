@@ -8,6 +8,7 @@ import { gitOptionsForWorktree } from './git-runtime-options'
 import { mergeTreeWriteTree } from './merge-tree-write-tree'
 import type { ParentWorkingTreeSyncResult } from './merge-winner-sync'
 import { syncParentWorkingTree } from './merge-winner-sync'
+import type { ParentDependencySetupResult } from './merge-winner-dependency-setup'
 import { gitExecFileAsync } from './runner'
 import { runWithGitReadCacheInvalidation } from './status'
 import { runWithGitWorktreeOperationLock } from '../../shared/git-worktree-operation-lock'
@@ -15,7 +16,13 @@ import { runWithGitWorktreeOperationLock } from '../../shared/git-worktree-opera
 export type MergeWinnerOptions = GitRuntimeOptions & { syncWorkingTree?: boolean }
 
 export type MergeWinnerResult =
-  | { outcome: 'clean'; commitOid: string; workingTree?: ParentWorkingTreeSyncResult }
+  | {
+      outcome: 'clean'
+      commitOid: string
+      workingTree?: ParentWorkingTreeSyncResult
+      /** Set only when the parent setup hook re-ran because dependency files changed. */
+      dependencySetup?: ParentDependencySetupResult
+    }
   | { outcome: 'conflict'; files: string[] }
 
 /**

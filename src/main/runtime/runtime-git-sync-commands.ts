@@ -3,6 +3,7 @@ import type { GitUpstreamStatus } from '../../shared/git-status-types'
 import type { GitPushTarget } from '../../shared/worktree/types'
 import { gitSyncForkDefaultBranch } from '../git/fork-sync'
 import { mergeWinnerIntoParent, type MergeWinnerResult } from '../git/merge-winner'
+import { runParentDependencySetupAfterMerge } from '../git/merge-winner-dependency-setup'
 import { gitFastForward, gitFetch, gitPull, gitPullRebaseFromBase, gitPush } from '../git/remote'
 import { abortMerge, abortRebase, commitChanges } from '../git/status'
 import { getUpstreamStatus } from '../git/upstream'
@@ -218,7 +219,7 @@ export class RuntimeGitSyncCommands {
             resolvedMessage
           )
     }
-    return mergeWinnerIntoParent(
+    const merged = await mergeWinnerIntoParent(
       parentTarget.worktree.path,
       winnerTarget.worktree.path,
       resolvedMessage,
@@ -227,5 +228,17 @@ export class RuntimeGitSyncCommands {
         syncWorkingTree
       }
     )
+    if (merged.outcome !== 'clean') {
+      return merged
+    }
+    // Why: the parent's node_modules must follow merged manifests; local hosts only (setup runs on the execution host).
+    const dependencySetup = await runParentDependencySetupAfterMerge({
+      repo: parentTarget.repo,
+      parentPath: parentTarget.worktree.path,
+      commitOid: merged.commitOid,
+      workingTree: merged.workingTree,
+      options: localGitOptionsForTarget(parentTarget)
+    })
+    return dependencySetup ? { ...merged, dependencySetup } : merged
   }
 }
