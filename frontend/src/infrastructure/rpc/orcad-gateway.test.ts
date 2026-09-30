@@ -95,6 +95,7 @@ describe('createOrcadGateway', () => {
       'systemSnapshot',
       'agentActivity',
       'repoSetupCommand',
+      'repoSetupInfo',
       'setRepoSetupCommand'
     ])
   })

@@ -88,6 +88,7 @@ const fakeGateway = (
   },
   agentActivity: async () => ({ events: [], latestSeq: 0 }),
   repoSetupCommand: async () => null,
+  repoSetupInfo: async () => ({ local: null, shared: null, known: true }),
   setRepoSetupCommand: async () => undefined
 })
 

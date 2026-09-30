@@ -43,19 +43,23 @@ describe('createSetupHintTracker', () => {
     expect(probe).toHaveBeenCalledTimes(2)
   })
 
-  it('ignores a null selector and swallows probe failures (no hint, no throw)', async () => {
+  it('ignores a null selector; a failed probe is unknown (no hint) and is not retried until reset', async () => {
     const onChange = vi.fn()
-    const tracker = createSetupHintTracker({
-      probe: async () => {
-        throw new Error('offline')
-      },
-      onChange
+    const probe = vi.fn(async () => {
+      throw new Error('offline')
     })
+    const tracker = createSetupHintTracker({ probe, onChange })
     tracker.ensure(null)
     tracker.ensure('id:r1')
     await flush()
+    tracker.ensure('id:r1')
+    tracker.ensure('id:r1')
+    expect(probe).toHaveBeenCalledTimes(1)
     expect(tracker.hint('id:r1')).toBeNull()
     expect(tracker.hint(null)).toBeNull()
     expect(onChange).not.toHaveBeenCalled()
+    tracker.reset()
+    tracker.ensure('id:r1')
+    expect(probe).toHaveBeenCalledTimes(2)
   })
 })

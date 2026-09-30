@@ -10,7 +10,7 @@ import { projectSelectorViewModel } from './project-selector-view-model'
 /** Only the methods the selector needs — narrow like SpawnGatewayPort. */
 export type ProjectSelectorGatewayPort = Pick<
   RuntimeGateway,
-  'listRepos' | 'addRepo' | 'repoSetupCommand' | 'setRepoSetupCommand'
+  'listRepos' | 'addRepo' | 'repoSetupInfo' | 'setRepoSetupCommand'
 >
 
 export type ProjectSelectorControllerDeps = {
@@ -44,14 +44,24 @@ export function createProjectSelectorController(
   let wasClosed = true
   let previousView: ProjectSelectorSlice['view'] = 'closed'
   let currentSlice: ProjectSelectorSlice = { view: 'closed' }
-  let setupRepo: { id: string; name: string; command: string | null } | null = null
+  let setupRepo: {
+    id: string
+    name: string
+    command: string | null
+    sharedCommand: string | null
+  } | null = null
   let setupRequestedFor: string | null = null
   let setupShown = false
 
   const showSetup = (message = ''): void => {
     if (!element || !setupRepo) return
     setupShown = true
-    element.applySetup({ repoName: setupRepo.name, command: setupRepo.command, message })
+    element.applySetup({
+      repoName: setupRepo.name,
+      command: setupRepo.command,
+      sharedCommand: setupRepo.sharedCommand,
+      message
+    })
   }
 
   // One fetch per (open, active repo); a repo switch or a fresh open re-reads the host.
@@ -60,15 +70,19 @@ export function createProjectSelectorController(
     if (!active || setupRequestedFor === active.id) return
     setupRequestedFor = active.id
     void gateway
-      .repoSetupCommand(`id:${active.id}`)
-      .then((command) => {
+      .repoSetupInfo(`id:${active.id}`)
+      .then((info) => {
         if (setupRequestedFor !== active.id) return
-        setupRepo = { id: active.id, name: active.displayName, command }
+        setupRepo = {
+          id: active.id,
+          name: active.displayName,
+          command: info.local,
+          sharedCommand: info.shared
+        }
         showSetup()
       })
-      .catch(() => {
-        if (setupRequestedFor === active.id) setupRequestedFor = null
-      })
+      // Why: a failed read keeps the request marked so an open selector doesn't re-probe on every sync.
+      .catch(() => undefined)
   }
 
   const handleSetupSave = async (command: string): Promise<void> => {

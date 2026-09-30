@@ -229,6 +229,13 @@ export type ParentWorkingTreeSyncResult =
   | { status: 'skipped'; reason: 'dirty' }
   | { status: 'failed'; message: string }
 
+/** `known: false` = the host could not read orca.yaml (e.g. SSH filesystem down): absence proves nothing. */
+export type RepoSetupInfo = {
+  readonly local: string | null
+  readonly shared: string | null
+  readonly known: boolean
+}
+
 /** Optional `dependencySetup` on a clean merge: the parent's setup hook was started in the
  *  background because package manifests/lockfiles changed. Absent = did not apply (or an older host). */
 export type ParentDependencySetupResult = { status: 'started' }
@@ -284,8 +291,10 @@ export type RuntimeGateway = {
     syncWorkingTree?: boolean
   ): Promise<MergeWinnerResult>
   agentActivity(input: AgentActivityInput): Promise<AgentActivityPage>
-  /** Effective setup command for a repo (`repo.hooks`: orca.yaml or local override); null when none. */
+  /** Effective setup command for a repo (orca.yaml or local override); null when none; rejects when unknown. */
   repoSetupCommand(repo: string): Promise<string | null>
+  /** Where a repo's setup comes from; the editor only owns `local`, `shared` is read-only orca.yaml. */
+  repoSetupInfo(repo: string): Promise<RepoSetupInfo>
   /** Persists the repo-local setup command via `repo.update` hookSettings; '' clears it. */
   setRepoSetupCommand(repo: string, command: string): Promise<void>
 }

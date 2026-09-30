@@ -11,7 +11,7 @@ import type {
 } from '../../application/project-selector-model'
 import { emptyReposSlice, reduceRepos } from '../../application/repos-model'
 import type { ReposAction, ReposSlice } from '../../application/repos-model'
-import type { RepoSummary } from '../../application/ports/runtime-gateway'
+import type { RepoSetupInfo, RepoSummary } from '../../application/ports/runtime-gateway'
 import type { ProjectSelectorHandle, ProjectSelectorSetupModel } from './project-selector-element'
 
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
@@ -126,7 +126,11 @@ const createFakeGateway = () => ({
   addRepo: vi.fn<(input: { path: string; kind?: 'git' | 'folder' }) => Promise<RepoSummary>>(
     async () => ({ id: 'repo-new', path: '/new', displayName: 'New', kind: 'git' })
   ),
-  repoSetupCommand: vi.fn<(repo: string) => Promise<string | null>>(async () => null),
+  repoSetupInfo: vi.fn<(repo: string) => Promise<RepoSetupInfo>>(async () => ({
+    local: null,
+    shared: null,
+    known: true
+  })),
   setRepoSetupCommand: vi.fn<(repo: string, command: string) => Promise<void>>(async () => {})
 })
 
@@ -171,17 +175,36 @@ describe('createProjectSelectorController — repo setup', () => {
 
   it('loads the active repo setup once per open and shows it in the selector', async () => {
     const { controller, gateway, selectors } = setup()
-    gateway.repoSetupCommand.mockResolvedValue('pnpm install')
+    gateway.repoSetupInfo.mockResolvedValue({ local: 'pnpm install', shared: null, known: true })
     controller.sync(openSlice(), activeA)
     controller.sync(openSlice(), activeA)
     await flush()
-    expect(gateway.repoSetupCommand).toHaveBeenCalledOnce()
-    expect(gateway.repoSetupCommand).toHaveBeenCalledWith('id:repo-a')
+    expect(gateway.repoSetupInfo).toHaveBeenCalledOnce()
+    expect(gateway.repoSetupInfo).toHaveBeenCalledWith('id:repo-a')
     expect(selectors[0]!.applySetup).toHaveBeenLastCalledWith({
       repoName: 'A',
       command: 'pnpm install',
+      sharedCommand: null,
       message: ''
     })
+  })
+
+  it('surfaces the orca.yaml command as read-only, and does not re-probe after a failed read', async () => {
+    const { controller, gateway, selectors } = setup()
+    gateway.repoSetupInfo.mockResolvedValueOnce({ local: null, shared: 'pnpm i', known: true })
+    controller.sync(openSlice(), activeA)
+    await flush()
+    expect(selectors[0]!.applySetup).toHaveBeenLastCalledWith(
+      expect.objectContaining({ command: null, sharedCommand: 'pnpm i' })
+    )
+    controller.sync({ view: 'closed' }, activeA)
+    gateway.repoSetupInfo.mockClear()
+    gateway.repoSetupInfo.mockRejectedValue(new Error('down'))
+    controller.sync(openSlice(), activeA)
+    await flush()
+    controller.sync(openSlice(), activeA)
+    controller.sync(openSlice(), activeA)
+    expect(gateway.repoSetupInfo).toHaveBeenCalledOnce()
   })
 
   it('does not re-apply the setup section on later syncs (keeps a half-typed command)', async () => {
@@ -196,7 +219,7 @@ describe('createProjectSelectorController — repo setup', () => {
   it('does not show the setup section without an active repo', () => {
     const { controller, gateway, selectors } = setup()
     controller.sync(openSlice(), emptyReposSlice())
-    expect(gateway.repoSetupCommand).not.toHaveBeenCalled()
+    expect(gateway.repoSetupInfo).not.toHaveBeenCalled()
     expect(selectors[0]!.applySetup).not.toHaveBeenCalled()
   })
 
@@ -210,6 +233,7 @@ describe('createProjectSelectorController — repo setup', () => {
     expect(selectors[0]!.applySetup).toHaveBeenLastCalledWith({
       repoName: 'A',
       command: 'pnpm install',
+      sharedCommand: null,
       message: 'guardado'
     })
   })

@@ -163,6 +163,7 @@ const demoGateway: RuntimeGateway = {
   },
   agentActivity: async () => ({ events: [], latestSeq: 0 }),
   repoSetupCommand: async () => null,
+  repoSetupInfo: async () => ({ local: null, shared: null, known: true }),
   setRepoSetupCommand: async () => {
     throw new Error('setRepoSetupCommand not implemented in the demo gateway')
   }

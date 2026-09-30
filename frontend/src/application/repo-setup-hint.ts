@@ -8,7 +8,7 @@ export type SetupHintTracker = {
   reset(): void
 }
 
-/** Caches one "has this repo a setup command?" probe per selector; failures stay silent (no hint). */
+/** Caches one "has this repo a setup command?" probe per selector; a failed probe is recorded as unknown (no hint, no re-probe until reset). */
 export function createSetupHintTracker(deps: {
   probe: (repoSelector: string) => Promise<string | null>
   onChange: () => void
@@ -31,7 +31,9 @@ export function createSetupHintTracker(deps: {
           missing.set(repoSelector, command === null)
           deps.onChange()
         })
-        .catch(() => undefined)
+        .catch(() => {
+          if (startEpoch === epoch) missing.set(repoSelector, false)
+        })
         .finally(() => inflight.delete(repoSelector))
     },
     reset() {

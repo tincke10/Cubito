@@ -166,6 +166,10 @@ describe('createProjectSelector — setup', () => {
     selector.applySetup({ repoName: 'Cubito', command: null, message: '' })
     expect(section.children[1]!.value).toBe('')
     expect(section.children[1]!.placeholder).toContain('sin setup')
+    selector.applySetup({ repoName: 'Cubito', command: null, sharedCommand: 'pnpm i', message: '' })
+    expect(section.children[0]!.textContent).toContain('orca.yaml')
+    expect(section.children[0]!.textContent).toContain('pnpm i')
+    expect(section.children[1]!.placeholder).not.toContain('sin setup')
   })
 
   it('saves the typed command on Enter or the save button without triggering list activation', () => {

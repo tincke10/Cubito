@@ -71,6 +71,7 @@ function createFakeConnection(overrides?: {
         throw new Error('addRepo not implemented in this fake')
       },
       repoSetupCommand: async () => null,
+      repoSetupInfo: async () => ({ local: null, shared: null, known: true }),
       setRepoSetupCommand: async () => undefined,
       listWorktreePs: async () => [],
       gitStatus: async () => ({ entries: [], branch: '', branchLineTotal: 0 }),

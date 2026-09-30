@@ -37,6 +37,8 @@ export function resolveProjectSelectorKey(
 export type ProjectSelectorSetupModel = {
   readonly repoName: string
   readonly command: string | null
+  /** Read-only command coming from orca.yaml; not editable or clearable from here. */
+  readonly sharedCommand?: string | null
   readonly message: string
 }
 
@@ -268,9 +270,12 @@ export function createProjectSelector(doc: Document = document): ProjectSelector
     applySetup(model) {
       setupSection.style.display = model === null ? 'none' : ''
       if (model === null) return
-      setupLabel.textContent = `setup de ${model.repoName}${model.message === '' ? '' : ` · ${model.message}`}`
+      const shared = model.sharedCommand ?? null
+      const sharedText = shared === null ? '' : ` · orca.yaml (solo lectura): ${shared}`
+      setupLabel.textContent = `setup de ${model.repoName}${sharedText}${model.message === '' ? '' : ` · ${model.message}`}`
       setupCommandInput.value = model.command ?? ''
-      setupCommandInput.placeholder = 'sin setup (ej. pnpm install)'
+      setupCommandInput.placeholder =
+        shared === null ? 'sin setup (ej. pnpm install)' : 'sin override local (aplica orca.yaml)'
     },
     onSetupSave(callback) {
       setupSaveCallback = callback
