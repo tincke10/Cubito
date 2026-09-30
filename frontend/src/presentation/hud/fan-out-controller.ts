@@ -234,7 +234,8 @@ export function createFanOutController(deps: FanOutControllerDeps): FanOutContro
       if (fanOut.view === 'form') setupHints.ensure(fanOut.repoSelector)
       const model = fanOutViewModel(
         fanOut,
-        fanOut.view === 'form' ? setupHints.hint(fanOut.repoSelector) : null
+        fanOut.view === 'form' ? setupHints.hint(fanOut.repoSelector) : null,
+        graph
       )
       const mounted = mount()
       if (model !== null) mounted.apply(model)

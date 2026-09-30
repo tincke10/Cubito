@@ -7,6 +7,8 @@ import {
 import type { FanOutSlice } from '../../application/fan-out-model'
 import type { SpawnAgent } from '../../application/ports/runtime-gateway'
 import { emptyDecisionVisibility } from '../../application/fan-out-decision-visibility'
+import type { WorktreeGraph } from '../../domain/worktree-graph/types'
+import { fromParentLabel } from './node-label-model'
 import { fanOutBatchFailures } from '../../application/fan-out-batch-failures'
 import type { FanOutBatchFailure } from '../../application/fan-out-batch-failures'
 import { pendingGatesViewModel, pendingQuestionsViewModel } from './fan-out-decision-view-model'
@@ -24,6 +26,7 @@ export type FanOutFieldViewModel = { readonly value: string; readonly enabled: b
 
 export type FanOutFormViewModel = {
   readonly view: 'form'
+  readonly title: string
   readonly count: FanOutStepperViewModel
   readonly agent: FanOutAgentViewModel
   readonly prompt: FanOutFieldViewModel
@@ -53,13 +56,19 @@ const countersLine = (slice: Extract<FanOutSlice, { view: 'running' }>): string 
   return counts.failed > 0 ? `${base} · ${counts.failed} error` : base
 }
 
+const formTitle = (parentId: string, graph: WorktreeGraph | null): string => {
+  const parent = graph?.nodes.get(parentId)
+  return parent ? `fan-out · ${fromParentLabel(parent.branch)}` : 'fan-out'
+}
+
 /**
  * Pure render model for the fan-out form/running HUD (mirrors spawn-view-model.ts). DOM
  * projection lives in fan-out-element.ts; this owns only content and enablement.
  */
 export function fanOutViewModel(
   slice: FanOutSlice,
-  setupHint: string | null = null
+  setupHint: string | null = null,
+  graph: WorktreeGraph | null = null
 ): FanOutViewModel {
   if (slice.view === 'closed') return null
 
@@ -68,6 +77,7 @@ export function fanOutViewModel(
     const countInBounds = slice.fields.count >= MIN_FANOUT && slice.fields.count <= MAX_FANOUT
     return {
       view: 'form',
+      title: formTitle(slice.parentId, graph),
       count: { value: slice.fields.count, min: MIN_FANOUT, max: MAX_FANOUT, enabled: true },
       agent: { value: slice.fields.agent, enabled: true },
       prompt: { value: slice.fields.prompt, enabled: agentActive },

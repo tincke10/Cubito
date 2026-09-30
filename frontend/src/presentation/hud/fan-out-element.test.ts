@@ -60,6 +60,7 @@ const createFakeDocument = (): Document =>
 
 const formModel = (overrides: Partial<FanOutFormViewModel> = {}): FanOutFormViewModel => ({
   view: 'form',
+  title: 'fan-out · desde main',
   count: { value: 3, min: 2, max: 8, enabled: true },
   agent: { value: 'none', enabled: true },
   prompt: { value: '', enabled: false },
@@ -83,6 +84,16 @@ const countInputOf = (root: FakeElement): FakeElement =>
   root.children.find((c) => c.tagName === 'INPUT' && c.className.includes('count'))!
 
 describe('createFanOutForm — form view', () => {
+  it('apply() renders the form title and hides it in the running view', () => {
+    const form = createFanOutForm(createFakeDocument())
+    const root = form.element as unknown as FakeElement
+    const title = root.children.find((c) => c.className.includes('title'))!
+    form.apply(formModel({ title: 'fan-out · desde feat/x' }))
+    expect(title.textContent).toBe('fan-out · desde feat/x')
+    form.apply(runningModel())
+    expect(title.style.display).toBe('none')
+  })
+
   it('apply() shows the setup notice only when the model carries a hint', () => {
     const form = createFanOutForm(createFakeDocument())
     const root = form.element as unknown as FakeElement

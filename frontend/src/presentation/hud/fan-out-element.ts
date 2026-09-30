@@ -53,6 +53,9 @@ export function createFanOutForm(doc: Document = document): FanOutFormHandle {
   cancelButton.className = 'cubito-fanout-form__cancel'
   cancelButton.textContent = 'cancelar'
 
+  const title = doc.createElement('div')
+  title.className = 'cubito-fanout-form__title'
+
   const errorLine = doc.createElement('div')
   errorLine.className = 'cubito-fanout-form__error'
 
@@ -71,6 +74,7 @@ export function createFanOutForm(doc: Document = document): FanOutFormHandle {
   const gateList = createFanOutGateList(doc)
 
   for (const child of [
+    title,
     countInput,
     agentSelect,
     promptArea,
@@ -107,6 +111,7 @@ export function createFanOutForm(doc: Document = document): FanOutFormHandle {
 
   const showFields = (visible: boolean): void => {
     const display = visible ? '' : 'none'
+    title.style.display = display
     countInput.style.display = display
     agentSelect.style.display = display
     promptArea.style.display = display
@@ -142,6 +147,7 @@ export function createFanOutForm(doc: Document = document): FanOutFormHandle {
       if (model.view === 'form') {
         showFields(true)
         showRunning(false)
+        title.textContent = model.title
         countInput.value = String(model.count.value)
         ;(countInput as unknown as { min: string }).min = String(model.count.min)
         ;(countInput as unknown as { max: string }).max = String(model.count.max)

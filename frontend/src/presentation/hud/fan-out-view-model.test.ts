@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { fanOutViewModel } from './fan-out-view-model'
+import { emptyWorktreeGraph } from '../../domain/worktree-graph/types'
+import type { WorktreeGraph, WorktreeNode } from '../../domain/worktree-graph/types'
+import { inertActivity } from '../../domain/worktree-graph/node-activity'
 import { MIN_FANOUT, MAX_FANOUT } from '../../application/fan-out-model'
 import type { FanOutSlice } from '../../application/fan-out-model'
 
@@ -256,5 +259,41 @@ describe('fanOutViewModel — setup hint', () => {
   it('surfaces the setup hint on the form model, null by default', () => {
     expect(fanOutViewModel(formSlice())).toMatchObject({ setupHint: null })
     expect(fanOutViewModel(formSlice(), 'sin setup')).toMatchObject({ setupHint: 'sin setup' })
+  })
+})
+
+const graphWith = (id: string, branch: string): WorktreeGraph => {
+  const node: WorktreeNode = {
+    id,
+    repoId: 'repo',
+    branch,
+    path: `/tmp/${id}`,
+    status: 'clean',
+    isMain: false,
+    kind: 'worktree',
+    parentId: null,
+    childIds: [],
+    activity: inertActivity()
+  }
+  return { ...emptyWorktreeGraph(), nodes: new Map([[id, node]]) }
+}
+
+describe('fanOutViewModel — form title', () => {
+  it('names the parent branch, short form, like the spawn form does', () => {
+    const model = fanOutViewModel(formSlice(), null, graphWith('w1', 'refs/heads/feat/login'))
+    if (model?.view !== 'form') throw new Error('expected form')
+    expect(model.title).toBe('fan-out · desde feat/login')
+  })
+
+  it('falls back to a plain title when the parent is not in the graph', () => {
+    const model = fanOutViewModel(formSlice(), null, emptyWorktreeGraph())
+    if (model?.view !== 'form') throw new Error('expected form')
+    expect(model.title).toBe('fan-out')
+  })
+
+  it('falls back to a plain title when no graph is supplied', () => {
+    const model = fanOutViewModel(formSlice())
+    if (model?.view !== 'form') throw new Error('expected form')
+    expect(model.title).toBe('fan-out')
   })
 })

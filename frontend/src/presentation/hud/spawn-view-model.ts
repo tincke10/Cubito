@@ -1,7 +1,7 @@
 import type { SpawnMenuSlice } from '../../application/spawn-menu-model'
 import type { SpawnAgent } from '../../application/ports/runtime-gateway'
 import type { WorktreeGraph } from '../../domain/worktree-graph/types'
-import { shortBranchName } from './node-label-model'
+import { fromParentLabel } from './node-label-model'
 
 export type SpawnChipTone = 'active' | 'disabled'
 export type SpawnChip = {
@@ -38,11 +38,6 @@ export type SpawnFormViewModel = {
 
 export type SpawnViewModel = SpawnRadialViewModel | SpawnFormViewModel | null
 
-const formTitle = (parentBranch: string | null): string =>
-  parentBranch !== null
-    ? `spawn hijo · desde ${shortBranchName(parentBranch)}`
-    : 'spawn hijo · desde raíz'
-
 /**
  * Pure render model for the spawn radial/form (SPAWN-002/003/004). DOM projection lives in
  * spawn-menu-element.ts/spawn-form-element.ts; this owns only content, tone and enablement.
@@ -62,7 +57,7 @@ export function spawnViewModel(
 
   return {
     view: 'form',
-    title: formTitle(parentBranch),
+    title: `spawn hijo · ${fromParentLabel(parentBranch)}`,
     name: { value: slice.fields.name, enabled: !submitting },
     agent: { value: slice.fields.agent, enabled: !submitting },
     baseBranch: { value: slice.fields.baseBranch, enabled: !submitting },

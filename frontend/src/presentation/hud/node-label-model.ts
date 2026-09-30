@@ -15,6 +15,10 @@ const MINUS = '−'
 const REFS_HEADS_PREFIX = 'refs/heads/'
 
 /** `refs/heads/feature-x` → `feature-x`; anything else passes through unchanged. */
+/** "desde <short>" for a form anchored on a parent branch; null parent = the repo root. */
+export const fromParentLabel = (parentBranch: string | null): string =>
+  parentBranch !== null ? `desde ${shortBranchName(parentBranch)}` : 'desde raíz'
+
 export const shortBranchName = (branch: string): string =>
   branch.startsWith(REFS_HEADS_PREFIX) ? branch.slice(REFS_HEADS_PREFIX.length) : branch
 
