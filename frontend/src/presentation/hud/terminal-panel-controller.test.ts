@@ -25,8 +25,11 @@ const createFakePanel = (): FakePanel => {
   let dataCb: ((data: string) => void) | null = null
   let resizeCb: ((cols: number, rows: number) => void) | null = null
   const panel: FakePanel = {
-    object: { position: { set: vi.fn() } } as unknown as TerminalPanelHandle['object'],
-    element: {} as HTMLElement,
+    object: {
+      position: { set: vi.fn() },
+      center: { set: vi.fn() }
+    } as unknown as TerminalPanelHandle['object'],
+    element: { offsetWidth: 520, offsetHeight: 360 } as HTMLElement,
     writes: [],
     resetCalls: 0,
     fitCalls: 0,
@@ -212,6 +215,40 @@ describe('createTerminalPanelController', () => {
     controller.tick()
     expect(deps.nodeCenter).toHaveBeenCalledWith('repo::/wt/a')
     expect(panels[0]!.object.position.set).toHaveBeenCalled()
+  })
+
+  it('shifts the panel pivot so a node near the left edge keeps the panel inside the viewport', async () => {
+    const { controller, panels, deps } = setup()
+    // ndc x -0.9 -> screen x 50 on a 1000px viewport: the 520px panel would clip by 210px.
+    deps.projectToNdc = vi.fn(() => ({ x: -0.9, y: 0, z: 0 }))
+    controller.sync(openedState())
+    await flush()
+    controller.tick()
+    const [cx, cy] = (panels[0]!.object.center.set as ReturnType<typeof vi.fn>).mock.calls.at(-1)!
+    // Shift right by (260 + 12) - 50 = 222px -> pivot moves left of center by 222 / 520.
+    expect(cx).toBeCloseTo(0.5 - 222 / 520)
+    expect(cy).toBeCloseTo(0.5)
+  })
+
+  it('shifts the pivot down when the panel would clip the top edge', async () => {
+    const { controller, panels, deps } = setup()
+    // ndc y 1 -> screen y 0: shift down by (180 + 12) px on the 800px viewport.
+    deps.projectToNdc = vi.fn(() => ({ x: 0, y: 1, z: 0 }))
+    controller.sync(openedState())
+    await flush()
+    controller.tick()
+    const [, cy] = (panels[0]!.object.center.set as ReturnType<typeof vi.fn>).mock.calls.at(-1)!
+    expect(cy).toBeCloseTo(0.5 - 192 / 360)
+  })
+
+  it('leaves the pivot centered when the panel already fits', async () => {
+    const { controller, panels, deps } = setup()
+    deps.projectToNdc = vi.fn(() => ({ x: 0, y: 0, z: 0 }))
+    controller.sync(openedState())
+    await flush()
+    controller.tick()
+    const [cx] = (panels[0]!.object.center.set as ReturnType<typeof vi.fn>).mock.calls.at(-1)!
+    expect(cx).toBeCloseTo(0.5)
   })
 
   it('applies the dashed connector in scene placement and hides it in hud placement', async () => {

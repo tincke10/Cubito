@@ -15,9 +15,14 @@ import type { TerminalConnectorHandle } from './terminal-connector-element'
 import { terminalPanelModel } from './terminal-panel-model'
 import type { NdcPoint } from './terminal-connector-projector'
 import { projectToScreen } from './terminal-connector-projector'
+import { clampPanelToViewport } from './terminal-panel-viewport-clamp'
 
 /** World-space lift above the node center the panel floats at (mirrors node-label's fixed offset). */
 const PANEL_WORLD_LIFT = 3
+/** Matches the .cubito-terminal-panel CSS size when the element hasn't been measured yet. */
+const PANEL_FALLBACK_SIZE = { width: 520, height: 360 }
+/** Keeps the in-scene panel this far from the viewport edges (the #hud inset). */
+const PANEL_VIEWPORT_MARGIN = 12
 
 export type TerminalPanelControllerDeps = {
   port: TerminalStreamPort
@@ -270,14 +275,32 @@ export function createTerminalPanelController(
       const panelWorld: Vec3 = { x: center.x, y: center.y + PANEL_WORLD_LIFT, z: center.z }
       mounted.panel.object.position.set(panelWorld.x, panelWorld.y, panelWorld.z)
 
+      const { object, element } = mounted.panel
       if (mounted.placement !== 'scene') {
+        object.center.set(0.5, 0.5)
         connector.hide()
         return
       }
       const { width, height } = deps.viewport()
       const nodeScreen = projectToScreen(deps.projectToNdc(center), width, height)
       const panelScreen = projectToScreen(deps.projectToNdc(panelWorld), width, height)
-      connector.apply(nodeScreen, panelScreen)
+      const size = {
+        width: element.offsetWidth || PANEL_FALLBACK_SIZE.width,
+        height: element.offsetHeight || PANEL_FALLBACK_SIZE.height
+      }
+      const clamped = clampPanelToViewport(
+        panelScreen,
+        size,
+        { width, height },
+        PANEL_VIEWPORT_MARGIN
+      )
+      // Why: CSS2DObject.center is the element pivot, so moving it shifts the panel on screen
+      // without touching its world position.
+      object.center.set(
+        0.5 - (clamped.x - panelScreen.x) / size.width,
+        0.5 - (clamped.y - panelScreen.y) / size.height
+      )
+      connector.apply(nodeScreen, { ...panelScreen, x: clamped.x, y: clamped.y })
     },
     dispose(): void {
       unmount()

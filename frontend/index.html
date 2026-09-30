@@ -38,6 +38,9 @@
         /* CSS2DRenderer never clips its children, so a node label near the right edge would
            paint over the panel (and, before this, over the HUD). */
         overflow: hidden;
+        /* CSS2DRenderer stacks labels/panels with large z-indexes; contain them so #hud (z-index 1)
+           always paints above. */
+        isolation: isolate;
       }
       /* Vignette (design §7.5): the mockup's vignette is a gradient, so CSS reproduces it
          pixel-exactly at zero scene cost. */
