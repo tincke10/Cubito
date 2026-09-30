@@ -119,29 +119,15 @@ describe('createGitMergeMethods — gitMergeWinnerIntoParent', () => {
   })
 
   it('projects the dependencySetup outcome, dropping a malformed one', async () => {
-    const ran: RpcCaller = vi.fn(async () =>
-      frame({ outcome: 'clean', commitOid: 'abc123', dependencySetup: { status: 'ran' } })
+    const started: RpcCaller = vi.fn(async () =>
+      frame({ outcome: 'clean', commitOid: 'abc123', dependencySetup: { status: 'started' } })
     )
     await expect(
-      createGitMergeMethods({ call: ran }).gitMergeWinnerIntoParent('p', 'w')
+      createGitMergeMethods({ call: started }).gitMergeWinnerIntoParent('p', 'w')
     ).resolves.toEqual({
       outcome: 'clean',
       commitOid: 'abc123',
-      dependencySetup: { status: 'ran' }
-    })
-    const failed: RpcCaller = vi.fn(async () =>
-      frame({
-        outcome: 'clean',
-        commitOid: 'abc123',
-        dependencySetup: { status: 'failed', message: 'ERR_PNPM' }
-      })
-    )
-    await expect(
-      createGitMergeMethods({ call: failed }).gitMergeWinnerIntoParent('p', 'w')
-    ).resolves.toEqual({
-      outcome: 'clean',
-      commitOid: 'abc123',
-      dependencySetup: { status: 'failed', message: 'ERR_PNPM' }
+      dependencySetup: { status: 'started' }
     })
     const bogus: RpcCaller = vi.fn(async () =>
       frame({ outcome: 'clean', commitOid: 'abc123', dependencySetup: { status: 'x' } })

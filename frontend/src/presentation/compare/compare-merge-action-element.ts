@@ -41,13 +41,10 @@ const workingTreeText = (
   return `padre no sincronizado: ${workingTree.message}`
 }
 
-/** Copy for the parent setup-hook re-run triggered by changed package manifests. */
+/** Copy for the background parent setup-hook re-run triggered by changed package manifests. */
 const dependencySetupText = (
-  setup: NonNullable<Extract<CompareMergeState, { phase: 'clean' }>['dependencySetup']>
-): string =>
-  setup.status === 'ran'
-    ? 'dependencias del padre reinstaladas (setup).'
-    : `setup del padre falló: ${setup.message}`
+  _setup: NonNullable<Extract<CompareMergeState, { phase: 'clean' }>['dependencySetup']>
+): string => 'reinstalando dependencias del padre en segundo plano (setup).'
 
 /**
  * Compare mode's winner-merge action (Change E) — a real interactive `<button>` (the keyboard-bar

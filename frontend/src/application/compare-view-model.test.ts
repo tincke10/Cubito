@@ -176,10 +176,10 @@ describe('reduceCompareView — merge (Change E)', () => {
     const slice = reduceCompareView(running, {
       type: 'merge-clean',
       commitOid: 'abc123',
-      dependencySetup: { status: 'failed', message: 'boom' }
+      dependencySetup: { status: 'started' }
     })
     expect(slice).toMatchObject({
-      merge: { phase: 'clean', dependencySetup: { status: 'failed', message: 'boom' } }
+      merge: { phase: 'clean', dependencySetup: { status: 'started' } }
     })
   })
 

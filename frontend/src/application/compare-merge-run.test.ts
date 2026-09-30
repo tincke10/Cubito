@@ -94,14 +94,14 @@ describe('runCompareMerge — happy path', () => {
     const gateway = createFakeGateway(async () => ({
       outcome: 'clean',
       commitOid: 'abc123',
-      dependencySetup: { status: 'ran' }
+      dependencySetup: { status: 'started' }
     }))
     const { dispatch } = setup(gateway)
     await runCompareMerge(openWithWinner(), runningFanOut(), { gateway, dispatch }, true)
     expect(dispatch).toHaveBeenLastCalledWith({
       type: 'merge-clean',
       commitOid: 'abc123',
-      dependencySetup: { status: 'ran' }
+      dependencySetup: { status: 'started' }
     })
   })
 

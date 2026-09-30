@@ -32,14 +32,7 @@ function toDependencySetupResult(value: unknown): ParentDependencySetupResult | 
   if (typeof value !== 'object' || value === null) {
     return undefined
   }
-  const d = value as { status?: unknown; message?: unknown }
-  if (d.status === 'ran') {
-    return { status: 'ran' }
-  }
-  if (d.status === 'failed' && typeof d.message === 'string') {
-    return { status: 'failed', message: d.message }
-  }
-  return undefined
+  return (value as { status?: unknown }).status === 'started' ? { status: 'started' } : undefined
 }
 
 /** Projects a raw `git.mergeWinnerIntoParent` result onto the local `MergeWinnerResult` shape. */

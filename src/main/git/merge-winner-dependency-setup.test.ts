@@ -1,12 +1,12 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { access, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import * as path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Repo } from '../../shared/repo-types'
 import {
   mergeChangedDependencyManifests,
-  runParentDependencySetupAfterMerge
+  startParentDependencySetupAfterMerge
 } from './merge-winner-dependency-setup'
 import { mergeWinnerIntoParent } from './merge-winner'
 import { invalidateGitReadCaches } from './status'
@@ -68,7 +68,7 @@ describe('mergeChangedDependencyManifests', () => {
   })
 })
 
-describe('runParentDependencySetupAfterMerge', () => {
+describe('startParentDependencySetupAfterMerge', () => {
   const repoWithSetup = (overrides: Partial<Repo> = {}): Repo =>
     ({
       id: 'r1',
@@ -80,34 +80,105 @@ describe('runParentDependencySetupAfterMerge', () => {
   it('runs the setup hook in the parent when dependency files changed after a synced merge', async () => {
     const { parentDir, commitOid } = await mergedRepo('package.json')
     const runSetup = vi.fn(async () => ({ success: true, output: '' }))
-    const result = await runParentDependencySetupAfterMerge({
+    const result = await startParentDependencySetupAfterMerge({
       repo: repoWithSetup(),
       parentPath: parentDir,
       commitOid,
       workingTree: { status: 'synced' },
       runSetup
     })
-    expect(result).toEqual({ status: 'ran' })
-    expect(runSetup).toHaveBeenCalledWith(expect.objectContaining({ id: 'r1' }), parentDir)
+    expect(result).toEqual({ status: 'started' })
+    expect(runSetup).toHaveBeenCalledWith(expect.objectContaining({ id: 'r1' }), parentDir, {})
   })
 
-  it('reports a failing hook without throwing', async () => {
+  it('passes the project runtime options to the runner', async () => {
+    const { parentDir, commitOid } = await mergedRepo('package.json')
+    const runSetup = vi.fn(async () => ({ success: true, output: '' }))
+    await startParentDependencySetupAfterMerge({
+      repo: repoWithSetup(),
+      parentPath: parentDir,
+      commitOid,
+      workingTree: { status: 'synced' },
+      options: { wslDistro: 'Ubuntu' },
+      runSetup
+    })
+    expect(runSetup).toHaveBeenCalledWith(expect.anything(), parentDir, { wslDistro: 'Ubuntu' })
+  })
+
+  it('returns before a slow hook finishes', async () => {
+    const { parentDir, commitOid } = await mergedRepo('package.json')
+    const runSetup = vi.fn(() => new Promise<{ success: boolean; output: string }>(() => {}))
+    await expect(
+      startParentDependencySetupAfterMerge({
+        repo: repoWithSetup(),
+        parentPath: parentDir,
+        commitOid,
+        workingTree: { status: 'synced' },
+        runSetup
+      })
+    ).resolves.toEqual({ status: 'started' })
+  })
+
+  it('logs a failing hook without throwing', async () => {
     const { parentDir, commitOid } = await mergedRepo('pnpm-lock.yaml')
-    const result = await runParentDependencySetupAfterMerge({
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const result = await startParentDependencySetupAfterMerge({
       repo: repoWithSetup(),
       parentPath: parentDir,
       commitOid,
       workingTree: { status: 'synced' },
       runSetup: async () => ({ success: false, output: 'ERR_PNPM' })
     })
-    expect(result).toEqual({ status: 'failed', message: 'ERR_PNPM' })
+    await vi.waitFor(() => expect(errorSpy).toHaveBeenCalled())
+    expect(result).toEqual({ status: 'started' })
+    errorSpy.mockRestore()
+  })
+
+  it('does not run an orca.yaml setup introduced by the winner', async () => {
+    const { parentDir, commitOid } = await mergedRepo('package.json')
+    await writeFile(path.join(parentDir, 'orca.yaml'), 'scripts:\n  setup: touch pwned\n')
+    const repo = repoWithSetup({
+      path: parentDir,
+      hookSettings: {
+        mode: 'auto',
+        commandSourcePolicy: 'run-both',
+        scripts: { setup: 'true', archive: '' }
+      }
+    })
+    const result = await startParentDependencySetupAfterMerge({
+      repo,
+      parentPath: parentDir,
+      commitOid,
+      workingTree: { status: 'synced' }
+    })
+    expect(result).toEqual({ status: 'started' })
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    await expect(access(path.join(parentDir, 'pwned'))).rejects.toThrow()
+  })
+
+  it('does nothing when the setup command only exists in orca.yaml', async () => {
+    const { parentDir, commitOid } = await mergedRepo('package.json')
+    await writeFile(path.join(parentDir, 'orca.yaml'), 'scripts:\n  setup: touch pwned\n')
+    const runSetup = vi.fn(async () => ({ success: true, output: '' }))
+    await expect(
+      startParentDependencySetupAfterMerge({
+        repo: repoWithSetup({
+          hookSettings: { mode: 'auto', scripts: { setup: '', archive: '' } }
+        }),
+        parentPath: parentDir,
+        commitOid,
+        workingTree: { status: 'synced' },
+        runSetup
+      })
+    ).resolves.toBeUndefined()
+    expect(runSetup).not.toHaveBeenCalled()
   })
 
   it('does nothing when only source files changed', async () => {
     const { parentDir, commitOid } = await mergedRepo('src/app.ts')
     const runSetup = vi.fn(async () => ({ success: true, output: '' }))
     await expect(
-      runParentDependencySetupAfterMerge({
+      startParentDependencySetupAfterMerge({
         repo: repoWithSetup(),
         parentPath: parentDir,
         commitOid,
@@ -126,7 +197,7 @@ describe('runParentDependencySetupAfterMerge', () => {
     const { parentDir, commitOid } = await mergedRepo('package.json')
     const runSetup = vi.fn(async () => ({ success: true, output: '' }))
     await expect(
-      runParentDependencySetupAfterMerge({
+      startParentDependencySetupAfterMerge({
         repo: repoWithSetup(),
         parentPath: parentDir,
         commitOid,
@@ -147,13 +218,13 @@ describe('runParentDependencySetupAfterMerge', () => {
       runSetup
     }
     await expect(
-      runParentDependencySetupAfterMerge({
+      startParentDependencySetupAfterMerge({
         ...base,
         repo: repoWithSetup({ hookSettings: { mode: 'auto', scripts: { setup: '', archive: '' } } })
       })
     ).resolves.toBeUndefined()
     await expect(
-      runParentDependencySetupAfterMerge({
+      startParentDependencySetupAfterMerge({
         ...base,
         repo: repoWithSetup({
           hookSettings: {
@@ -165,7 +236,7 @@ describe('runParentDependencySetupAfterMerge', () => {
       })
     ).resolves.toBeUndefined()
     await expect(
-      runParentDependencySetupAfterMerge({ ...base, repo: undefined })
+      startParentDependencySetupAfterMerge({ ...base, repo: undefined })
     ).resolves.toBeUndefined()
     expect(runSetup).not.toHaveBeenCalled()
   })

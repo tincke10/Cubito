@@ -1,13 +1,13 @@
 import type { Repo } from '../../shared/repo-types'
-import { getEffectiveHooks, runHook } from '../hooks'
+import { runHook } from '../hooks'
 import { getEffectiveSetupRunPolicy } from '../effective-hook-config'
 import type { GitRuntimeOptions } from './git-runtime-options'
 import { gitOptionsForWorktree } from './git-runtime-options'
 import type { ParentWorkingTreeSyncResult } from './merge-winner-sync'
 import { gitExecFileAsync } from './runner'
 
-/** Outcome of re-running the repo setup hook in the parent; absent when it did not apply. */
-export type ParentDependencySetupResult = { status: 'ran' } | { status: 'failed'; message: string }
+/** The parent's setup hook was kicked off in the background; absent when it did not apply. */
+export type ParentDependencySetupResult = { status: 'started' }
 
 const DEPENDENCY_MANIFEST =
   /(^|\/)(package\.json|package-lock\.json|npm-shrinkwrap\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?)$/
@@ -28,16 +28,29 @@ export async function mergeChangedDependencyManifests(
     .some((file) => DEPENDENCY_MANIFEST.test(file))
 }
 
-type SetupRunner = (repo: Repo, cwd: string) => Promise<{ success: boolean; output: string }>
+type SetupRunner = (
+  repo: Repo,
+  cwd: string,
+  options: GitRuntimeOptions
+) => Promise<{ success: boolean; output: string }>
 
-const defaultSetupRunner: SetupRunner = (repo, cwd) => runHook('setup', cwd, repo, cwd)
+// Why: the winner is agent-authored, so post-merge orca.yaml must never pick the command; only the pre-merge local setting is trusted.
+const defaultSetupRunner: SetupRunner = (repo, cwd, options) =>
+  runHook(
+    'setup',
+    cwd,
+    { ...repo, hookSettings: { ...repo.hookSettings!, commandSourcePolicy: 'local-only' } },
+    cwd,
+    options
+  )
 
 /**
- * After a synced winner merge, re-runs the repo's setup hook in the parent so its installed
- * dependencies match the merged manifests. Never throws and never runs unless dependency files
- * changed, the working tree really synced, and the repo opted into run-by-default setup.
+ * After a synced winner merge, starts the repo's locally configured setup hook in the parent in the
+ * background so installed dependencies match the merged manifests. Never throws, never awaits the
+ * hook (it outlives the RPC timeout), and never runs unless dependency files changed, the working
+ * tree really synced, and the repo opted into run-by-default setup.
  */
-export async function runParentDependencySetupAfterMerge(args: {
+export async function startParentDependencySetupAfterMerge(args: {
   repo: Repo | undefined
   parentPath: string
   commitOid: string
@@ -52,18 +65,26 @@ export async function runParentDependencySetupAfterMerge(args: {
   try {
     if (
       getEffectiveSetupRunPolicy(repo) !== 'run-by-default' ||
-      !getEffectiveHooks(repo, parentPath)?.scripts.setup
+      repo.hookSettings?.commandSourcePolicy === 'shared-only' ||
+      !repo.hookSettings?.scripts.setup?.trim()
     ) {
       return undefined
     }
     if (!(await mergeChangedDependencyManifests(parentPath, commitOid, args.options))) {
       return undefined
     }
-    const result = await (args.runSetup ?? defaultSetupRunner)(repo, parentPath)
-    return result.success
-      ? { status: 'ran' }
-      : { status: 'failed', message: result.output || 'setup hook failed' }
+    void (args.runSetup ?? defaultSetupRunner)(repo, parentPath, args.options ?? {})
+      .then((result) => {
+        if (!result.success) {
+          console.error(`[hooks] parent dependency setup failed in ${parentPath}:`, result.output)
+        }
+      })
+      .catch((error: unknown) => {
+        console.error(`[hooks] parent dependency setup failed in ${parentPath}:`, error)
+      })
+    return { status: 'started' }
   } catch (error) {
-    return { status: 'failed', message: error instanceof Error ? error.message : String(error) }
+    console.error(`[hooks] parent dependency setup skipped in ${parentPath}:`, error)
+    return undefined
   }
 }
