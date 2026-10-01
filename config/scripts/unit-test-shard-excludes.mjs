@@ -50,6 +50,10 @@ export const UNIT_TEST_SHARD_EXCLUDES = [
   },
   { path: 'src/shared/startup-shell-portability.live-shell.test.ts', why: 'requires a live shell' },
   {
+    path: 'src/main/runtime/structured-session-cli-login-shell.live-shell.test.ts',
+    why: 'requires a live zsh login shell'
+  },
+  {
     path: 'src/shared/posix-command-path-lookup.test.ts',
     why: 'depends on the host PATH/shell environment'
   },
