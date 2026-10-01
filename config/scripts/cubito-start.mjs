@@ -124,9 +124,14 @@ function seedIsolatedProfile(launchPlan) {
 function waitForReadiness(child) {
   return new Promise((resolvePromise, rejectPromise) => {
     let stderr = ''
+    let settled = false
     child.stderr.setEncoding('utf8')
+    // Why: orcad's operational warnings (e.g. unsealed credentials) must reach `docker compose logs`.
     child.stderr.on('data', (chunk) => {
-      stderr += chunk
+      process.stderr.write(chunk)
+      if (!settled) {
+        stderr += chunk
+      }
     })
     const timer = setTimeout(
       () => rejectPromise(new Error(`orcad printed no ready line within ${READY_TIMEOUT_MS}ms`)),
@@ -136,8 +141,11 @@ function waitForReadiness(child) {
     lines.on('line', (line) => {
       const parsed = parseReadinessLine(line)
       if (parsed) {
+        settled = true
         clearTimeout(timer)
         lines.close()
+        // Why: an unread stdout pipe fills up and blocks orcad's later writes.
+        child.stdout.pipe(process.stdout)
         resolvePromise(parsed)
       }
     })
