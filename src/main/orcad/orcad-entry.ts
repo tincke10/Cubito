@@ -165,8 +165,6 @@ async function startOrcadRuntime(
       }
     }
   })
-  const { DesktopPushService } = await import('../runtime/push/desktop-push-service')
-  const { resolvePushGatewayOrigin } = await import('../runtime/push/push-gateway-origin')
 
   const runtimeUserDataPath = getAppEnvironment().getPath('userData')
   // Why before the store opens: a bad configured key must fail the launch before anything is
@@ -349,13 +347,8 @@ async function startOrcadRuntime(
     ...(options.webClientRoot !== undefined ? { webClientRoot: options.webClientRoot } : {})
   })
   await rpc.start()
-  const pushService = DesktopPushService.create({
-    runtime,
-    runtimeRpc: rpc,
-    gatewayUrl: resolvePushGatewayOrigin(process.env, getAppEnvironment().isPackaged())
-  })
-  pushService?.start()
-  getAppEnvironment().onWillQuit(() => pushService?.stop())
+  // Why no DesktopPushService: Cubito has no mobile companion, and the service is a dormant path to
+  // push.onorca.dev. Without a registrar, push RPCs answer "not registered" and nothing subscribes.
   console.error(`[orcad] ${describeOrcadBindExposure(bindHost)}`)
 
   const boundEndpoint = rpc.getWebSocketEndpoint()

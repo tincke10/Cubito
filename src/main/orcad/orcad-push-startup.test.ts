@@ -148,7 +148,7 @@ it('refuses recovery overlap before initializing the browser provider or runtime
   }
 })
 
-it('starts push after RPC identity is available and stops dispatch on shutdown', async () => {
+it('never starts the push service: Cubito has no mobile companion and push.onorca.dev stays untouched', async () => {
   state.root = mkdtempSync(join(tmpdir(), 'orca-headless-push-'))
   state.controller = new RuntimeMobileNotificationController()
   state.registry = new DeviceRegistry(state.root)
@@ -156,18 +156,20 @@ it('starts push after RPC identity is available and stops dispatch on shutdown',
   const { startOrcad } = await import('./orcad-entry')
   const host = await startOrcad({ noPairing: true, json: true })
   try {
-    const result = await state.controller.registerPushDevice({
-      deviceId: phone.deviceId,
-      platform: 'android',
-      token: 'test-token',
-      filter: {
-        onlyWhenDesktopAway: true
-      }
+    // Why: with no registrar the controller degrades to a clean "not registered" answer.
+    expect(
+      await state.controller.registerPushDevice({
+        deviceId: phone.deviceId,
+        platform: 'android',
+        token: 'test-token',
+        filter: { onlyWhenDesktopAway: true }
+      })
+    ).toEqual({ registered: false, reason: 'gateway_unreachable' })
+    expect(await state.controller.testPushDevice(phone.deviceId)).toEqual({
+      accepted: false,
+      reason: 'unavailable'
     })
-    expect(result).toMatchObject({ registered: true })
-    expect(state.registry.getDevice(phone.deviceId)?.pushRegistration?.expiresAt).toBeGreaterThan(
-      Date.now()
-    )
+    expect(state.controller.getListenerCount()).toBe(0)
     state.controller.dispatch({
       type: 'notification',
       source: 'agent-task-complete',
@@ -175,16 +177,13 @@ it('starts push after RPC identity is available and stops dispatch on shutdown',
       body: 'QA'
     })
     await new Promise((resolve) => setImmediate(resolve))
-    expect(state.send).toHaveBeenCalledTimes(1)
+    expect(state.register).not.toHaveBeenCalled()
+    expect(state.send).not.toHaveBeenCalled()
   } finally {
     await host.stop()
   }
   expect(readdirSync(profileStateAccessPaths(state.root).participants)).toEqual([])
   acquireProfileStateMaintenance(state.root).release()
-  expect(state.controller.getListenerCount()).toBe(0)
-  expect(await state.controller.registerPushDevice({} as never)).toMatchObject({
-    registered: false
-  })
 })
 
 it('starts automations after recovery and stops them on shutdown', async () => {
