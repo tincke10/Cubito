@@ -94,4 +94,15 @@ describe('createFilesMethods — filesStat / filesWrite', () => {
       content: 'body'
     })
   })
+
+  it('pins the executing host: the host rejects mutations without expectedExecutionHostId', async () => {
+    const call = vi.fn<RpcCaller>(async () => frame({ ok: true }))
+    await createFilesMethods({ call }).filesWrite('w', 'a', 'body', 'local')
+    expect(call).toHaveBeenCalledWith('files.write', {
+      worktree: 'w',
+      relativePath: 'a',
+      content: 'body',
+      expectedExecutionHostId: 'local'
+    })
+  })
 })

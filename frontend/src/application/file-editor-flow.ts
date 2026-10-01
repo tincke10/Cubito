@@ -31,6 +31,8 @@ export type FileEditorDeps = {
   gateway: FileEditorGatewayPort
   /** Fired after a successful write so diff/status can refresh. */
   onSaved(nodeId: WorktreeId, path: string): void
+  /** Execution host of a node; writes must name it (the host refuses otherwise). */
+  hostIdOf?(nodeId: WorktreeId): string | undefined
 }
 
 export type FileEditorFlow = {
@@ -92,7 +94,11 @@ export function createFileEditorFlow(deps: FileEditorDeps): FileEditorFlow {
     try {
       const read = await gateway.filesRead(nodeId, path)
       text = read.content
-      fields = { status: 'ready', content: text, readOnly: read.truncated ? 'truncated' : null }
+      // Why: the host only refuses binaries by extension; a NUL means non-text, and saving the
+      // lossy utf-8 decode would corrupt the file.
+      fields = text.includes('\u0000')
+        ? { status: 'ready', readOnly: 'binary', content: '' }
+        : { status: 'ready', content: text, readOnly: read.truncated ? 'truncated' : null }
     } catch (error) {
       fields = isBinaryRefusal(error)
         ? { status: 'ready', readOnly: 'binary', content: '' }
@@ -107,7 +113,10 @@ export function createFileEditorFlow(deps: FileEditorDeps): FileEditorFlow {
   async function write(nodeId: WorktreeId, path: string, content: string): Promise<void> {
     patch({ saving: true, error: null, notice: null })
     try {
-      await gateway.filesWrite(nodeId, path, content)
+      const hostId = deps.hostIdOf?.(nodeId)
+      await (hostId
+        ? gateway.filesWrite(nodeId, path, content, hostId)
+        : gateway.filesWrite(nodeId, path, content))
     } catch (error) {
       patch({ saving: false, error: `no se pudo guardar: ${messageOf(error)}` })
       return

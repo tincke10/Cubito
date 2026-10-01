@@ -79,8 +79,13 @@ export function createFilesMethods(connection: { call: RpcCaller }): FilesMethod
       }
       return { size: result.size, mtime: result.mtime }
     },
-    async filesWrite(worktree, relativePath, content) {
-      await connection.call('files.write', { worktree, relativePath, content })
+    async filesWrite(worktree, relativePath, content, hostId) {
+      await connection.call('files.write', {
+        worktree,
+        relativePath,
+        content,
+        ...(hostId ? { expectedExecutionHostId: hostId } : {})
+      })
     }
   }
 }

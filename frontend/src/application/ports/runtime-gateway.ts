@@ -383,8 +383,14 @@ export type RuntimeGateway = {
   /** Rejects with `binary_file` for binary paths; text only. */
   filesRead(worktree: string, relativePath: string): Promise<FileReadResult>
   filesStat(worktree: string, relativePath: string): Promise<FileStamp>
-  /** Whole-file overwrite with no host-side conflict check: callers compare `filesStat` first. */
-  filesWrite(worktree: string, relativePath: string, content: string): Promise<void>
+  /** Whole-file overwrite with no host-side conflict check: callers compare `filesStat` first.
+   * `hostId` is the node's execution host; the host refuses mutations that do not name it. */
+  filesWrite(
+    worktree: string,
+    relativePath: string,
+    content: string,
+    hostId?: string
+  ): Promise<void>
   /** Removes a worktree (the host stops its PTYs/agents itself); rejects when git refuses, e.g. dirty. */
   worktreeRemove(worktree: string, options?: WorktreeRemoveOptions): Promise<WorktreeRemoveResult>
   agentActivity(input: AgentActivityInput): Promise<AgentActivityPage>

@@ -23,6 +23,7 @@ export function createFileWorkspaceBinder(deps: {
   demoGateway: FilesGateway
   /** Diff/status refresh after a successful write. */
   onSaved(nodeId: string, path: string): void
+  hostIdOf?(nodeId: string): string | undefined
   createQuickOpen?: () => FileQuickOpenHandle
   createEditor?: () => FileEditorHandle
 }): FileWorkspaceBinder {
@@ -32,7 +33,11 @@ export function createFileWorkspaceBinder(deps: {
   /** Why: a two-step button blurs itself on confirm; the pane must keep keyboard focus. */
   const settle = (action: Promise<void>): Promise<void> => action.then(() => editor?.focusText())
 
-  const editorFlow = createFileEditorFlow({ gateway: deps.demoGateway, onSaved: deps.onSaved })
+  const editorFlow = createFileEditorFlow({
+    gateway: deps.demoGateway,
+    onSaved: deps.onSaved,
+    ...(deps.hostIdOf ? { hostIdOf: deps.hostIdOf } : {})
+  })
   const quickOpenFlow = createFileQuickOpenFlow({
     gateway: deps.demoGateway,
     onPick: (nodeId, path) => void editorFlow.open(nodeId, path)

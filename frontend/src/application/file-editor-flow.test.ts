@@ -65,6 +65,23 @@ describe('file editor flow — open', () => {
     })
   })
 
+  it('treats text containing NUL as read-only binary (host only checks extensions; saving would corrupt it)', async () => {
+    const { flow } = setup({
+      filesRead: vi.fn(async () => ({
+        content: 'PNG\u0000\u0000x',
+        truncated: false,
+        byteLength: 6
+      }))
+    })
+    await flow.open('w', 'pic.dat')
+    expect(open(flow.view())).toMatchObject({
+      status: 'ready',
+      readOnly: 'binary',
+      content: '',
+      error: null
+    })
+  })
+
   it('reports other read failures as an error state', async () => {
     const { flow } = setup({
       filesRead: vi.fn(async () => {
@@ -144,6 +161,19 @@ describe('file editor flow — edit and save', () => {
     })
     flow.edit('changed')
     expect(open(flow.view())).toMatchObject({ content: 'big', dirty: false })
+  })
+
+  it('passes the node host to the write so the host can verify where it lands', async () => {
+    const gateway = {
+      filesRead: vi.fn(async () => ({ content: 'hello', truncated: false, byteLength: 5 })),
+      filesStat: vi.fn(async () => stamp),
+      filesWrite: vi.fn(async () => undefined)
+    }
+    const flow = createFileEditorFlow({ gateway, onSaved: vi.fn(), hostIdOf: () => 'local' })
+    await flow.open('r::/w', 'src/a.ts')
+    flow.edit('hello world')
+    await flow.save()
+    expect(gateway.filesWrite).toHaveBeenCalledWith('r::/w', 'src/a.ts', 'hello world', 'local')
   })
 
   it('re-stats before writing, then writes the whole content and clears dirty', async () => {

@@ -351,6 +351,7 @@ const worktreeDeleteBinder = createWorktreeDeleteBinder({
 const fileWorkspaceBinder = createFileWorkspaceBinder({
   slot: document.body,
   demoGateway,
+  hostIdOf: (nodeId) => store.get().graph.nodes.get(nodeId)?.hostId,
   onSaved: () => {
     diffViewBinder.refresh()
     sourceControlBinder.reload()
