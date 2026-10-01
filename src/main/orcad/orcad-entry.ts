@@ -5,7 +5,8 @@
  * desktop uses, installs a PTY controller via `registerHeadlessPtyRuntime`, and
  * serves runtime RPC. See docs/design/node-only-runtime-backend.html.
  *
- * Desktop UI surfaces stay uninstalled: no native notifications or renderer delivery.
+ * Desktop UI surfaces stay uninstalled: no native notifications or renderer delivery;
+ * agent attention is produced by orcad-agent-attention-notifier and delivered over RPC.
  * Browser automation is installed through
  * the runtime factory, but only when an Electron serve sidecar or an operator-supplied
  * Chromium proves available at startup.
@@ -148,6 +149,7 @@ async function startOrcadRuntime(
     | undefined
   let uninstallHookStatusRepublish = (): void => {}
   let uninstallObservedStatusIdentity = (): void => {}
+  let uninstallAgentAttentionNotifier = (): void => {}
   registerCleanup(async () => {
     try {
       await rpc?.stop()
@@ -165,6 +167,7 @@ async function startOrcadRuntime(
           await stopOrcadDaemon()
         } finally {
           uninstallObservedStatusIdentity()
+          uninstallAgentAttentionNotifier()
           uninstallHookStatusRepublish()
           agentHookServer.stop()
         }
@@ -270,6 +273,21 @@ async function startOrcadRuntime(
   // feed must not get an empty page — the ring has to be recording from process start.
   const { ensureAgentActivityRecording } = await import('../agent-hooks/agent-activity-recording')
   ensureAgentActivityRecording()
+
+  // Why: the delivery path (replay buffer, notifications.subscribe, push) already exists;
+  // the deleted renderer was the only producer, so a headless host never raised attention.
+  const { createOrcadAgentAttentionNotifier } = await import('./orcad-agent-attention-notifier')
+  const attentionNotifier = createOrcadAgentAttentionNotifier({
+    dispatch: (event) => runtime.dispatchMobileNotification(event),
+    getNotificationSettings: () => profileStore.getSettings().notifications
+  })
+  const unsubscribeAttention = agentHookServer.subscribeEnrichedStatus((enriched) =>
+    attentionNotifier.observe(enriched)
+  )
+  uninstallAgentAttentionNotifier = () => {
+    unsubscribeAttention()
+    attentionNotifier.dispose()
+  }
 
   const { installOrcadSessionSearchService } = await import('./orcad-session-search')
   sessionSearch = await installOrcadSessionSearchService({

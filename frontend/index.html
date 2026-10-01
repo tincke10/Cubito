@@ -94,6 +94,43 @@
         text-align: center;
         pointer-events: none;
       }
+      .cubito-toast-stack {
+        position: fixed;
+        top: 14px;
+        right: 16px;
+        z-index: 3;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        width: min(360px, calc(100% - 32px));
+        pointer-events: none;
+      }
+      .cubito-toast {
+        padding: 8px 12px;
+        border: 1px solid var(--cubito-panel-border);
+        border-radius: 6px;
+        background: var(--cubito-panel-surface);
+        color: var(--cubito-text-primary);
+        font-size: 12px;
+        line-height: 1.45;
+        cursor: pointer;
+        pointer-events: auto;
+      }
+      .cubito-toast[data-state='blocked'],
+      .cubito-toast[data-state='waiting'] {
+        border-color: var(--cubito-amber);
+      }
+      .cubito-toast__title {
+        font-weight: 600;
+      }
+      .cubito-toast[data-state='blocked'] .cubito-toast__title,
+      .cubito-toast[data-state='waiting'] .cubito-toast__title {
+        color: var(--cubito-amber);
+      }
+      .cubito-toast__body {
+        color: var(--cubito-text-dim);
+        overflow-wrap: anywhere;
+      }
       #keyboard-bar {
         position: fixed;
         left: 16px;

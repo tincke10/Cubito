@@ -232,6 +232,27 @@ describe('connectOrcad', () => {
     }
   })
 
+  it('exposes an attentionNotifications port that opens notifications.subscribe', async () => {
+    const server = await startFakeOrcadServer()
+    servers.push(server)
+
+    const connection = await connectOrcad(offerFor(server))
+    try {
+      const subscription = connection.attentionNotifications.subscribe({
+        onFrame: () => {},
+        onUnsupported: () => {},
+        onClosed: () => {}
+      })
+      await vi.waitFor(() => expect(server.requestMethods).toContain('notifications.subscribe'))
+      expect(
+        server.requestFrames.find((frame) => frame.method === 'notifications.subscribe')?.params
+      ).toEqual({ includeDesktopSuppressed: true })
+      subscription.close()
+    } finally {
+      connection.close()
+    }
+  })
+
   it('adds a repo via repo.add, in the shape addRepo resolves (no server change)', async () => {
     const repo = { id: 'repo-2', path: '/abs/repo-2', displayName: 'Repo Two', kind: 'git' }
     const server = await startFakeOrcadServer({

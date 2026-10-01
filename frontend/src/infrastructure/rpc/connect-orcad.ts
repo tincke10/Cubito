@@ -13,6 +13,7 @@ import { RpcConnection } from './rpc-connection'
 import { createOrcadGateway } from './orcad-gateway'
 import { TerminalMultiplexClient } from './terminal-multiplex-client'
 import { createSystemGraphStreamPort } from './orcad-system-watch-gateway'
+import { createAttentionNotificationPort } from './orcad-notification-gateway'
 import type { PairingOffer } from './pairing-offer'
 import type { RuntimeGateway } from '../../application/ports/runtime-gateway'
 import type {
@@ -20,6 +21,7 @@ import type {
   TerminalStreamPort
 } from '../../application/ports/terminal-stream-port'
 import type { SystemGraphStreamPort } from '../../application/ports/system-graph-stream-port'
+import type { AttentionNotificationPort } from '../../application/ports/attention-notification-port'
 
 const DEFAULT_TIMEOUT_MS = 30_000
 
@@ -34,6 +36,7 @@ export type OrcadConnection = {
   gateway: RuntimeGateway
   terminals: TerminalStreamPort
   systemGraphStream: SystemGraphStreamPort
+  attentionNotifications: AttentionNotificationPort
   runtimeId?: string
   /** Host-negotiated capability ids, read once via `status.get` at connect time (Change B). */
   capabilities: readonly string[]
@@ -62,6 +65,7 @@ export async function connectOrcad(
     ),
     terminals,
     systemGraphStream: createSystemGraphStreamPort(rpcConnection),
+    attentionNotifications: createAttentionNotificationPort(rpcConnection),
     capabilities,
     close: () => transport.close(),
     // The transport only surfaces a human close reason, never a stable code — every

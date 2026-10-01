@@ -5,6 +5,7 @@ import type { SceneStore } from './scene-store'
 import type { RuntimeGateway } from './ports/runtime-gateway'
 import type { TerminalStreamPort } from './ports/terminal-stream-port'
 import type { SystemGraphStreamPort } from './ports/system-graph-stream-port'
+import type { AttentionNotificationPort } from './ports/attention-notification-port'
 
 /** Poll loop owns its own timer (D5) — `main.ts` only composes and calls `start()`. */
 export const LIVE_SYNC_POLL_INTERVAL_MS = 2000
@@ -19,6 +20,8 @@ export type LiveSyncConnection = {
   gateway: RuntimeGateway
   terminals: TerminalStreamPort
   systemGraphStream: SystemGraphStreamPort
+  /** Optional so older doubles still satisfy the shape; absent means no attention feed. */
+  attentionNotifications?: AttentionNotificationPort
   runtimeId?: string
   /** Host-negotiated capability ids (Change B: e.g. `orchestration.gui-run-lease.v1`), read once via `status.get` at connect time. */
   capabilities: readonly string[]

@@ -23,6 +23,9 @@ import { createDiffViewBinder } from './bind-diff-view'
 import { createCompareViewBinder } from './bind-compare-view'
 import { createHudOverlay } from './presentation/hud/hud-overlay'
 import { createDemoBanner } from './presentation/hud/demo-banner-element'
+import { createAttentionNotificationBinder } from './bind-attention-notifications'
+import { createAttentionToastHost } from './presentation/hud/attention-toast-host'
+import { createBrowserNotificationPresenter } from './presentation/hud/browser-notification-presenter'
 import { hudModel } from './presentation/hud/hud-model'
 import { createKeyboardBar } from './presentation/hud/keyboard-bar'
 import { createTerminalConnector } from './presentation/hud/terminal-connector-element'
@@ -463,6 +466,27 @@ function bindProjects(connection: LiveSyncConnection): void {
   projectSelectorController.sync(store.get().projectSelector, store.get().repos)
 }
 
+const selectAttentionWorktree = (worktreeId: string): void => {
+  if (store.get().graph.nodes.has(worktreeId)) store.select(worktreeId)
+}
+const attentionToasts = createAttentionToastHost(document, document.body, {
+  onActivate: selectAttentionWorktree
+})
+const browserNotifications = createBrowserNotificationPresenter({
+  notificationApi: typeof Notification === 'undefined' ? undefined : Notification,
+  isSecureContext: window.isSecureContext,
+  focusWindow: () => window.focus(),
+  onActivate: selectAttentionWorktree
+})
+// Why: Notification.requestPermission only prompts from a user gesture.
+document.addEventListener('pointerdown', () => browserNotifications.requestPermissionOnce(), {
+  once: true
+})
+const attentionBinder = createAttentionNotificationBinder({
+  toast: (notification) => attentionToasts.show(notification),
+  os: (notification) => browserNotifications.present(notification)
+})
+
 const pairingStorage = tryGetSessionStorage()
 const pairingEntry = decidePairingEntry(
   resolvePairingSource(consumePairingFragment(), pairingStorage)
@@ -481,6 +505,7 @@ if (pairingEntry.kind === 'connect') {
       bindSpawn(connection)
       bindProjects(connection)
       fanOutBinder.bind(connection)
+      attentionBinder.bind(connection)
       systemViewBinder.rebindGateway(connection.gateway, connection.systemGraphStream)
       diffViewBinder.rebindGateway(connection.gateway)
       compareViewBinder.rebindGateway(connection.gateway, connection.capabilities)
