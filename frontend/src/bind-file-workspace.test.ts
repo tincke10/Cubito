@@ -19,7 +19,15 @@ function setup() {
     focusQuery: vi.fn()
   }
   const editor = {
-    callbacks: { close: () => undefined as void },
+    callbacks: {
+      close: () => undefined as void,
+      edit: (_c: string) => undefined as void,
+      save: () => undefined as void,
+      reload: () => undefined as void,
+      overwrite: () => undefined as void,
+      discard: () => undefined as void,
+      keepEditing: () => undefined as void
+    },
     dispose: vi.fn(),
     focusText: vi.fn()
   }
@@ -36,7 +44,13 @@ function setup() {
   const editorHandle: FileEditorHandle = {
     root: {} as HTMLElement,
     apply: (model) => editorModels.push(model),
+    onEdit: (cb) => (editor.callbacks.edit = cb),
+    onSave: (cb) => (editor.callbacks.save = cb),
     onClose: (cb) => (editor.callbacks.close = cb),
+    onReload: (cb) => (editor.callbacks.reload = cb),
+    onOverwrite: (cb) => (editor.callbacks.overwrite = cb),
+    onDiscard: (cb) => (editor.callbacks.discard = cb),
+    onKeepEditing: (cb) => (editor.callbacks.keepEditing = cb),
     focusText: editor.focusText,
     dispose: editor.dispose
   }
@@ -50,14 +64,15 @@ function setup() {
     filesWrite: vi.fn(async () => undefined)
   }
   const slot = { appendChild: vi.fn() }
+  const onSaved = vi.fn()
   const binder = createFileWorkspaceBinder({
     slot,
     demoGateway: gateway,
-    onSaved: vi.fn(),
+    onSaved,
     createQuickOpen: () => quickHandle,
     createEditor: () => editorHandle
   })
-  return { binder, gateway, slot, quick, editor, quickModels, editorModels }
+  return { binder, gateway, slot, quick, editor, quickModels, editorModels, onSaved }
 }
 
 describe('file workspace binder', () => {
@@ -125,5 +140,48 @@ describe('file workspace binder', () => {
     await vi.advanceTimersByTimeAsync(0)
     expect(next.filesRead).toHaveBeenCalled()
     expect(gateway.filesRead).not.toHaveBeenCalled()
+  })
+
+  it('edits and saves through the flow, reporting the saved file', async () => {
+    const { binder, gateway, editor, editorModels, onSaved } = setup()
+    binder.openFile('r::/w', 'x.ts')
+    await vi.advanceTimersByTimeAsync(0)
+    editor.callbacks.edit('changed')
+    expect(editorModels.at(-1)).toMatchObject({ dirty: true, saveEnabled: true })
+    editor.callbacks.save()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(gateway.filesWrite).toHaveBeenCalledWith('r::/w', 'x.ts', 'changed')
+    expect(onSaved).toHaveBeenCalledWith('r::/w', 'x.ts')
+    expect(editorModels.at(-1)).toMatchObject({ dirty: false, notice: 'guardado' })
+  })
+
+  it('asks before discarding edits: close prompts, keepEditing backs out, discard closes', async () => {
+    const { binder, editor, editorModels } = setup()
+    binder.openFile('w', 'x.ts')
+    await vi.advanceTimersByTimeAsync(0)
+    editor.callbacks.edit('changed')
+    expect(binder.requestClose()).toBe(true)
+    expect(editorModels.at(-1)?.discard).not.toBeNull()
+    expect(binder.isOpen()).toBe(true)
+    editor.callbacks.keepEditing()
+    expect(editorModels.at(-1)?.discard).toBeNull()
+    binder.requestClose()
+    editor.callbacks.discard()
+    expect(binder.isOpen()).toBe(false)
+  })
+
+  it('a changed file blocks the save until overwrite is confirmed', async () => {
+    const { binder, gateway, editor, editorModels } = setup()
+    binder.openFile('w', 'x.ts')
+    await vi.advanceTimersByTimeAsync(0)
+    gateway.filesStat.mockResolvedValue({ size: 9, mtime: 99 })
+    editor.callbacks.edit('mine')
+    editor.callbacks.save()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(gateway.filesWrite).not.toHaveBeenCalled()
+    expect(editorModels.at(-1)?.conflict).not.toBeNull()
+    editor.callbacks.overwrite()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(gateway.filesWrite).toHaveBeenCalledWith('w', 'x.ts', 'mine')
   })
 })

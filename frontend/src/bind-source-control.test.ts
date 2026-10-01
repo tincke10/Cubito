@@ -73,6 +73,16 @@ function setup() {
 }
 
 describe('source control binder', () => {
+  it('reload refreshes the status of the open diff node without remounting the composer', async () => {
+    const { store, binder, slot, stage, gateway } = setup()
+    store.dispatchDiffView({ type: 'open', nodeId: 'r::/w', baseRef: 'main' })
+    binder.sync()
+    await vi.waitFor(() => expect(stage.source!.stageStates()).toBeDefined())
+    binder.reload()
+    await vi.waitFor(() => expect(gateway.gitSourceControlStatus).toHaveBeenCalledTimes(2))
+    expect(slot.appendChild).toHaveBeenCalledTimes(1)
+  })
+
   it('loads status when diff mode opens, mounts the composer and exposes stage states', async () => {
     const { store, binder, slot, stage, gateway } = setup()
     store.dispatchDiffView({ type: 'open', nodeId: 'r::/w', baseRef: 'main' })

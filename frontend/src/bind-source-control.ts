@@ -9,6 +9,8 @@ import { sourceControlModel } from './presentation/diff/source-control-view-mode
 export type SourceControlBinder = {
   /** Follows diff mode: loads status when it opens on a node, drops it when it closes. */
   sync(): void
+  /** Re-reads status in place, e.g. after a file edit changed the tree. */
+  reload(): void
   rebindGateway(gateway: SourceControlGatewayPort): void
 }
 
@@ -63,6 +65,9 @@ export function createSourceControlBinder(deps: {
       openFor = nodeId
       if (nodeId === null) flow.close()
       else void flow.open(nodeId)
+    },
+    reload() {
+      void flow.reload()
     },
     rebindGateway(gateway) {
       flow.rebindGateway(gateway)

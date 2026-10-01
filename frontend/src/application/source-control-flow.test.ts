@@ -92,6 +92,28 @@ const ready = (view: SourceControlView) => {
 }
 
 describe('source control flow', () => {
+  it('reload re-reads status in place, keeping the typed message and never hiding', async () => {
+    const { flow, gateway } = setup()
+    await flow.open('r::/w')
+    flow.setMessage('wip')
+    const phases: string[] = []
+    flow.subscribe((view) => phases.push(view.phase))
+    gateway.gitSourceControlStatus.mockResolvedValueOnce(
+      status({ entries: [{ path: 'new.ts', area: 'unstaged' }] })
+    )
+    await flow.reload()
+    expect(phases).not.toContain('hidden')
+    const view = ready(flow.view())
+    expect(view.message).toBe('wip')
+    expect([...view.stageStates.keys()]).toEqual(['new.ts'])
+  })
+
+  it('reload does nothing while hidden', async () => {
+    const { flow, gateway } = setup()
+    await flow.reload()
+    expect(gateway.gitSourceControlStatus).not.toHaveBeenCalled()
+  })
+
   it('stays hidden for a folder workspace without calling git', async () => {
     const { flow, gateway } = setup({ repoKind: 'folder' })
     await flow.open('r::/w')

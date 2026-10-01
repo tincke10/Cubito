@@ -96,6 +96,7 @@ describe('file editor flow — open', () => {
       )
     })
     const pending = flow.open('w', 'a.ts')
+    await vi.waitFor(() => expect(resolvers).toHaveLength(1))
     flow.requestClose()
     resolvers[0]!({ content: 'late', truncated: false, byteLength: 4 })
     await pending
@@ -115,5 +116,228 @@ describe('file editor flow — close', () => {
   it('requestClose is not handled when nothing is open', () => {
     const { flow } = setup()
     expect(flow.requestClose()).toBe(false)
+  })
+})
+
+const changed = (mtime: number, size = 5) => ({ size, mtime })
+
+async function openReady(over: Parameters<typeof setup>[0] = {}) {
+  const ctx = setup(over)
+  const onSaved = vi.fn()
+  await ctx.flow.open('r::/w', 'src/a.ts')
+  return { ...ctx, onSaved }
+}
+
+describe('file editor flow — edit and save', () => {
+  it('tracks dirtiness against the last saved content', async () => {
+    const { flow } = await openReady()
+    expect(open(flow.view()).dirty).toBe(false)
+    flow.edit('hello!')
+    expect(open(flow.view())).toMatchObject({ content: 'hello!', dirty: true })
+    flow.edit('hello')
+    expect(open(flow.view()).dirty).toBe(false)
+  })
+
+  it('ignores edits on read-only views', async () => {
+    const { flow } = await openReady({
+      filesRead: vi.fn(async () => ({ content: 'big', truncated: true, byteLength: 9 }))
+    })
+    flow.edit('changed')
+    expect(open(flow.view())).toMatchObject({ content: 'big', dirty: false })
+  })
+
+  it('re-stats before writing, then writes the whole content and clears dirty', async () => {
+    const { flow, gateway } = await openReady()
+    flow.edit('hello world')
+    await flow.save()
+    expect(gateway.filesStat).toHaveBeenCalledTimes(3)
+    expect(gateway.filesWrite).toHaveBeenCalledWith('r::/w', 'src/a.ts', 'hello world')
+    expect(open(flow.view())).toMatchObject({
+      dirty: false,
+      saving: false,
+      notice: 'guardado',
+      conflict: null,
+      error: null
+    })
+  })
+
+  it('reports the saved file so diff and status can refresh', async () => {
+    const gateway = {
+      filesRead: vi.fn(async () => ({ content: 'a', truncated: false, byteLength: 1 })),
+      filesStat: vi.fn(async () => stamp),
+      filesWrite: vi.fn(async () => undefined)
+    }
+    const onSaved = vi.fn()
+    const flow = createFileEditorFlow({ gateway, onSaved })
+    await flow.open('r::/w', 'src/a.ts')
+    flow.edit('b')
+    await flow.save()
+    expect(onSaved).toHaveBeenCalledWith('r::/w', 'src/a.ts')
+  })
+
+  it('does nothing when there is nothing to save', async () => {
+    const { flow, gateway } = await openReady()
+    await flow.save()
+    expect(gateway.filesWrite).not.toHaveBeenCalled()
+  })
+
+  it('keeps the edits and shows the error when the write fails', async () => {
+    const { flow } = await openReady({
+      filesWrite: vi.fn(async () => {
+        throw new Error('EACCES')
+      })
+    })
+    flow.edit('x')
+    await flow.save()
+    expect(open(flow.view())).toMatchObject({
+      dirty: true,
+      saving: false,
+      error: 'no se pudo guardar: EACCES'
+    })
+  })
+
+  it('stays dirty when typing continued during the write', async () => {
+    const finishers: Array<() => void> = []
+    const { flow } = await openReady({
+      filesWrite: vi.fn(() => new Promise<void>((resolve) => finishers.push(resolve)))
+    })
+    flow.edit('one')
+    const saving = flow.save()
+    await Promise.resolve()
+    await Promise.resolve()
+    flow.edit('one two')
+    finishers[0]!()
+    await saving
+    expect(open(flow.view())).toMatchObject({ content: 'one two', dirty: true, saving: false })
+  })
+})
+
+describe('file editor flow — conflict check', () => {
+  it('blocks the write when the file changed on disk since it was opened', async () => {
+    const stats = [stamp, changed(200)]
+    const { flow, gateway } = await openReady({
+      filesStat: vi.fn(async () => stats.shift() ?? changed(200))
+    })
+    flow.edit('mine')
+    await flow.save()
+    expect(gateway.filesWrite).not.toHaveBeenCalled()
+    expect(open(flow.view())).toMatchObject({ conflict: { reason: 'changed' }, dirty: true })
+  })
+
+  it('treats a size change with the same mtime as a conflict', async () => {
+    const stats = [stamp, changed(100, 9)]
+    const { flow, gateway } = await openReady({
+      filesStat: vi.fn(async () => stats.shift() ?? stamp)
+    })
+    flow.edit('mine')
+    await flow.save()
+    expect(gateway.filesWrite).not.toHaveBeenCalled()
+  })
+
+  it('flags a failed re-stat as unverifiable instead of writing blindly', async () => {
+    let calls = 0
+    const { flow, gateway } = await openReady({
+      filesStat: vi.fn(async () => {
+        calls += 1
+        if (calls > 1) throw new Error('gone')
+        return stamp
+      })
+    })
+    flow.edit('mine')
+    await flow.save()
+    expect(gateway.filesWrite).not.toHaveBeenCalled()
+    expect(open(flow.view()).conflict).toEqual({ reason: 'unverifiable' })
+  })
+
+  it('does not save again while a conflict is pending', async () => {
+    const stats = [stamp, changed(200)]
+    const { flow, gateway } = await openReady({
+      filesStat: vi.fn(async () => stats.shift() ?? changed(200))
+    })
+    flow.edit('mine')
+    await flow.save()
+    await flow.save()
+    expect(gateway.filesStat).toHaveBeenCalledTimes(2)
+    expect(gateway.filesWrite).not.toHaveBeenCalled()
+  })
+
+  it('overwrite writes without the check and clears the conflict', async () => {
+    const stats = [stamp, changed(200)]
+    const { flow, gateway } = await openReady({
+      filesStat: vi.fn(async () => stats.shift() ?? changed(300))
+    })
+    flow.edit('mine')
+    await flow.save()
+    await flow.resolveConflict('overwrite')
+    expect(gateway.filesWrite).toHaveBeenCalledWith('r::/w', 'src/a.ts', 'mine')
+    expect(open(flow.view())).toMatchObject({ conflict: null, dirty: false })
+  })
+
+  it('reload replaces the edits with the file on disk', async () => {
+    const stats = [stamp, changed(200)]
+    const reads = [
+      { content: 'hello', truncated: false, byteLength: 5 },
+      { content: 'theirs', truncated: false, byteLength: 6 }
+    ]
+    const { flow, gateway } = await openReady({
+      filesStat: vi.fn(async () => stats.shift() ?? changed(200, 6)),
+      filesRead: vi.fn(async () => reads.shift() ?? reads[0]!)
+    })
+    flow.edit('mine')
+    await flow.save()
+    await flow.resolveConflict('reload')
+    expect(gateway.filesWrite).not.toHaveBeenCalled()
+    expect(open(flow.view())).toMatchObject({ content: 'theirs', dirty: false, conflict: null })
+  })
+
+  it('after a save the next save compares against the new stamp', async () => {
+    const stats = [stamp, stamp, changed(150, 6), changed(150, 6)]
+    const { flow, gateway } = await openReady({
+      filesStat: vi.fn(async () => stats.shift() ?? changed(150, 6))
+    })
+    flow.edit('mine')
+    await flow.save()
+    flow.edit('mine again')
+    await flow.save()
+    expect(gateway.filesWrite).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('file editor flow — closing with unsaved changes', () => {
+  it('asks before discarding, then closes on discard', async () => {
+    const { flow } = await openReady()
+    flow.edit('dirty')
+    expect(flow.requestClose()).toBe(true)
+    expect(open(flow.view()).confirmDiscard).toBe(true)
+    flow.discard()
+    expect(flow.view()).toEqual({ phase: 'closed' })
+  })
+
+  it('Esc again, or keepEditing, goes back to editing', async () => {
+    const { flow } = await openReady()
+    flow.edit('dirty')
+    flow.requestClose()
+    expect(flow.requestClose()).toBe(true)
+    expect(open(flow.view())).toMatchObject({ confirmDiscard: false, content: 'dirty' })
+    flow.requestClose()
+    flow.keepEditing()
+    expect(open(flow.view()).confirmDiscard).toBe(false)
+  })
+
+  it('closes straight away when clean, and refuses to close mid-save', async () => {
+    const finishers: Array<() => void> = []
+    const { flow } = await openReady({
+      filesWrite: vi.fn(() => new Promise<void>((resolve) => finishers.push(resolve)))
+    })
+    flow.edit('x')
+    const saving = flow.save()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(flow.requestClose()).toBe(true)
+    expect(flow.isOpen()).toBe(true)
+    finishers[0]!()
+    await saving
+    expect(flow.requestClose()).toBe(true)
+    expect(flow.isOpen()).toBe(false)
   })
 })

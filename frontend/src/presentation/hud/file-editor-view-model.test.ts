@@ -9,7 +9,13 @@ const view = (over: Partial<Extract<FileEditorView, { phase: 'open' }>> = {}): F
   status: 'ready',
   content: 'hello',
   readOnly: null,
+  dirty: false,
+  saving: false,
+  reloading: false,
+  notice: null,
   error: null,
+  conflict: null,
+  confirmDiscard: false,
   ...over
 })
 
@@ -52,5 +58,55 @@ describe('fileEditorPanelModel', () => {
       message: 'ENOENT',
       readOnly: true
     })
+  })
+
+  it('marks unsaved edits and enables save only when there is something to save', () => {
+    expect(fileEditorPanelModel(view({ dirty: true }))).toMatchObject({
+      dirty: true,
+      saveEnabled: true
+    })
+    expect(fileEditorPanelModel(view())).toMatchObject({ dirty: false, saveEnabled: false })
+    expect(fileEditorPanelModel(view({ dirty: true, saving: true })).saveEnabled).toBe(false)
+    expect(fileEditorPanelModel(view({ dirty: true, readOnly: 'truncated' })).saveEnabled).toBe(
+      false
+    )
+  })
+
+  it('shows a saved notice and a save error under the text', () => {
+    expect(fileEditorPanelModel(view({ notice: 'guardado' })).notice).toBe('guardado')
+    expect(
+      fileEditorPanelModel(view({ dirty: true, error: 'no se pudo guardar: EACCES' }))
+    ).toMatchObject({
+      message: 'no se pudo guardar: EACCES'
+    })
+  })
+
+  it('offers reload and overwrite through two-step labels when the file changed', () => {
+    const model = fileEditorPanelModel(view({ dirty: true, conflict: { reason: 'changed' } }))
+    expect(model.conflict).toMatchObject({
+      message: 'el archivo cambió en disco desde que lo abriste',
+      reload: { idle: 'recargar', confirm: 'confirmar recargar (pierdes tus cambios)' },
+      overwrite: { idle: 'sobrescribir', confirm: 'confirmar sobrescribir' },
+      busy: false
+    })
+    expect(model.saveEnabled).toBe(false)
+  })
+
+  it('words an unverifiable conflict differently and is busy while saving or reloading', () => {
+    const model = fileEditorPanelModel(
+      view({ dirty: true, conflict: { reason: 'unverifiable' }, reloading: true })
+    )
+    expect(model.conflict?.message).toBe('no se pudo verificar el archivo en disco')
+    expect(model.conflict?.busy).toBe(true)
+  })
+
+  it('asks to discard unsaved changes on close', () => {
+    expect(fileEditorPanelModel(view({ dirty: true, confirmDiscard: true })).discard).toMatchObject(
+      {
+        message: 'hay cambios sin guardar',
+        labels: { idle: 'descartar cambios', confirm: 'confirmar descartar' }
+      }
+    )
+    expect(fileEditorPanelModel(view({ dirty: true })).discard).toBeNull()
   })
 })

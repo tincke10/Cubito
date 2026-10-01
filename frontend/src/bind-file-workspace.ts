@@ -29,6 +29,9 @@ export function createFileWorkspaceBinder(deps: {
   let quickOpen: FileQuickOpenHandle | null = null
   let editor: FileEditorHandle | null = null
 
+  /** Why: a two-step button blurs itself on confirm; the pane must keep keyboard focus. */
+  const settle = (action: Promise<void>): Promise<void> => action.then(() => editor?.focusText())
+
   const editorFlow = createFileEditorFlow({ gateway: deps.demoGateway, onSaved: deps.onSaved })
   const quickOpenFlow = createFileQuickOpenFlow({
     gateway: deps.demoGateway,
@@ -62,6 +65,15 @@ export function createFileWorkspaceBinder(deps: {
     if (!editor) {
       editor = (deps.createEditor ?? createFileEditor)()
       editor.onClose(() => void editorFlow.requestClose())
+      editor.onEdit((content) => editorFlow.edit(content))
+      editor.onSave(() => void editorFlow.save())
+      editor.onReload(() => void settle(editorFlow.resolveConflict('reload')))
+      editor.onOverwrite(() => void settle(editorFlow.resolveConflict('overwrite')))
+      editor.onDiscard(() => editorFlow.discard())
+      editor.onKeepEditing(() => {
+        editorFlow.keepEditing()
+        editor?.focusText()
+      })
       deps.slot.appendChild(editor.root)
       editor.focusText()
     }

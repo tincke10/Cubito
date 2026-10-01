@@ -73,6 +73,8 @@ export type SourceControlFlow = {
   /** Loads status for a node; stays hidden for folder workspaces or when git.status fails. */
   open(nodeId: WorktreeId): Promise<void>
   close(): void
+  /** Re-reads status in place (after a file was edited); no-op while hidden. */
+  reload(): Promise<void>
   toggleStage(path: string): Promise<void>
   setMessage(message: string): void
   commit(): Promise<void>
@@ -281,6 +283,10 @@ export function createSourceControlFlow(deps: SourceControlFlowDeps): SourceCont
       const repo = deps.store.get().repos.list.find((entry) => entry.id === node?.repoId)
       if (!node || repo?.kind === 'folder') return
       await reload(nodeId, ownGeneration)
+    },
+    async reload() {
+      if (current.phase !== 'ready') return
+      await reload(current.nodeId, generation)
     },
     close() {
       generation += 1

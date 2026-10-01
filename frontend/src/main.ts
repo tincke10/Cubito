@@ -351,7 +351,10 @@ const worktreeDeleteBinder = createWorktreeDeleteBinder({
 const fileWorkspaceBinder = createFileWorkspaceBinder({
   slot: document.body,
   demoGateway,
-  onSaved: () => undefined
+  onSaved: () => {
+    diffViewBinder.refresh()
+    sourceControlBinder.reload()
+  }
 })
 
 const keyboardController = createKeyboardController({

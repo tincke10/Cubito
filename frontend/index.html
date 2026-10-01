@@ -1330,6 +1330,61 @@
         outline: none;
         border-color: var(--cubito-accent);
       }
+      .cubito-file-editor__dirty {
+        color: var(--cubito-amber);
+      }
+      .cubito-file-editor__notice {
+        font-size: 11px;
+        color: var(--cubito-text-dim);
+      }
+      .cubito-file-editor__dirty[hidden],
+      .cubito-file-editor__notice[hidden],
+      .cubito-file-editor__bar[hidden],
+      .cubito-file-editor__save[hidden] {
+        display: none;
+      }
+      .cubito-file-editor__save {
+        height: 28px;
+        padding: 0 12px;
+        border: none;
+        border-radius: 4px;
+        background: var(--cubito-accent);
+        color: var(--cubito-background);
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .cubito-file-editor__save:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+      .cubito-file-editor__bar {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        padding: 8px 10px;
+        border: 1px solid var(--cubito-amber);
+        border-radius: 4px;
+      }
+      .cubito-file-editor__bar-text {
+        flex: 1;
+        color: var(--cubito-amber);
+      }
+      .cubito-file-editor__bar-action {
+        height: 28px;
+        padding: 0 12px;
+        border: none;
+        border-radius: 4px;
+        background: var(--cubito-amber);
+        color: var(--cubito-background);
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .cubito-file-editor__bar-action:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
       /* Diff mode source control (U2): the commit composer sits under the file rail. */
       :root {
         --cubito-diff-composer-h: 176px;
