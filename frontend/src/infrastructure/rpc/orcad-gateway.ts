@@ -13,6 +13,7 @@ import type { RpcSuccessFrame } from './envelope'
 import { createOrchestrationLeaseMethods } from './orcad-orchestration-gateway'
 import { createGitMergeMethods } from './orcad-git-merge-gateway'
 import { createGitWriteMethods } from './orcad-git-write-gateway'
+import { createFilesMethods } from './orcad-files-gateway'
 import { createHostedReviewMethods } from './orcad-hosted-review-gateway'
 import { createWorktreeRemoveMethods } from './orcad-worktree-remove-gateway'
 import { createAgentActivityMethods } from './orcad-agent-activity-gateway'
@@ -151,6 +152,7 @@ export function createOrcadGateway(
     ...createGitMergeMethods(connection),
     ...createGitWriteMethods(connection),
     ...createHostedReviewMethods(connection),
+    ...createFilesMethods(connection),
     ...createWorktreeRemoveMethods(connection),
     async listWorktrees() {
       const response = await connection.call('worktree.list')

@@ -101,6 +101,10 @@ const fakeGateway = (
     throw new Error('not implemented in this fake')
   },
   hostedReviewCreate: async () => ({ ok: true as const, url: '' }),
+  filesSearchPaths: async () => ({ files: [], truncated: false }),
+  filesRead: async () => ({ content: '', truncated: false, byteLength: 0 }),
+  filesStat: async () => ({ size: 0, mtime: 0 }),
+  filesWrite: async () => undefined,
   worktreeRemove: async () => ({ removed: true as const }),
   agentActivity: async () => ({ events: [], latestSeq: 0 }),
   repoSetupCommand: async () => null,

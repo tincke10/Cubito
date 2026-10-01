@@ -89,6 +89,12 @@ function setup(selectedId: string | null = 'a') {
     terminal,
     diff: { select: vi.fn() },
     worktreeDelete: { request: vi.fn(), isOpen: () => false, cancel: () => false },
+    fileWorkspace: {
+      openPicker: vi.fn(),
+      openFile: vi.fn(),
+      isOpen: () => false,
+      requestClose: () => false
+    },
     platform: { isMac: false }
   })
   return { store, heights, terminal, controller }

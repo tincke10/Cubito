@@ -22,6 +22,8 @@ export type NavCommand =
   | { kind: 'open-compare' }
   /** Bare Backspace/Delete: ask to remove the selected worktree (always behind a confirm panel). */
   | { kind: 'delete-worktree' }
+  /** Bare 'o': quick-open a file in the selected worktree (or the diff rail's selected file). */
+  | { kind: 'open-file' }
   /** Bare 'g' — closes whichever scene-replacing mode (system, diff or compare) currently owns
    *  the screen, returning to the worktree graph (no other bare-key meaning claims 'g'). No-op
    *  when neither mode is open. */
@@ -142,6 +144,9 @@ export function resolveNavCommand(
   }
   if (key === 'g') {
     return { kind: 'close-scene-mode' }
+  }
+  if (key === 'o') {
+    return { kind: 'open-file' }
   }
   if (key === 'Backspace' || key === 'Delete') {
     return { kind: 'delete-worktree' }

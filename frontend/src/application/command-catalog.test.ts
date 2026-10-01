@@ -62,7 +62,8 @@ describe('commandCatalog', () => {
       'open-system',
       'open-diff',
       'open-compare',
-      'delete-worktree'
+      'delete-worktree',
+      'open-file'
     ])
   })
 
@@ -129,6 +130,9 @@ describe('commandCatalog', () => {
     ['delete-worktree', avail({ hasSelection: true, isConnected: true }), true],
     ['delete-worktree', avail({ hasSelection: true, isConnected: false }), false],
     ['delete-worktree', avail({ hasSelection: false, isConnected: true }), false],
+    ['open-file', avail({ hasSelection: true, isConnected: true }), true],
+    ['open-file', avail({ hasSelection: true, isConnected: false }), false],
+    ['open-file', avail({ hasSelection: false, isConnected: true }), false],
     ['open-compare', avail({ hasRunningCamada: true }), true],
     ['open-compare', avail({ hasRunningCamada: false }), false],
     // selection/connection are irrelevant to open-compare — only hasRunningCamada gates it.

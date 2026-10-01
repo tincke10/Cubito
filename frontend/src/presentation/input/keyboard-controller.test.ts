@@ -107,6 +107,12 @@ function setup(selectedId: string | null = 'b', platform = LINUX) {
     terminal,
     diff,
     worktreeDelete,
+    fileWorkspace: {
+      openPicker: vi.fn(),
+      openFile: vi.fn(),
+      isOpen: () => false,
+      requestClose: () => false
+    },
     platform
   })
   return { store, heights, terminal, diff, worktreeDelete, controller }
@@ -141,6 +147,12 @@ function setupWithRepos() {
     terminal,
     diff: { select: vi.fn() },
     worktreeDelete: fakeWorktreeDelete(),
+    fileWorkspace: {
+      openPicker: vi.fn(),
+      openFile: vi.fn(),
+      isOpen: () => false,
+      requestClose: () => false
+    },
     platform: LINUX
   })
   return { store, heights, terminal, controller }
@@ -191,6 +203,12 @@ describe('createKeyboardController — delete worktree', () => {
       terminal: fakeTerminalCommandPort(),
       diff: { select: vi.fn() },
       worktreeDelete,
+      fileWorkspace: {
+        openPicker: vi.fn(),
+        openFile: vi.fn(),
+        isOpen: () => false,
+        requestClose: () => false
+      },
       platform: LINUX
     })
     expect(controller.handleKeyDown(baseEvent({ key: 'Backspace' }))).toBe(true)

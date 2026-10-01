@@ -38,12 +38,22 @@ export type WorktreeDeletePort = {
   cancel(): boolean
 }
 
+/** Quick-open picker + file pane: while open it owns the keyboard (only Esc is routed to it). */
+export type FileWorkspacePort = {
+  openPicker(nodeId: string): void
+  openFile(nodeId: string, path: string): void
+  isOpen(): boolean
+  /** True when it consumed the key (closed, or asked to confirm discarding edits). */
+  requestClose(): boolean
+}
+
 export type KeyboardControllerDeps = {
   store: SceneStore
   heights: CameraHeightController
   terminal: TerminalCommandPort
   diff: DiffSelectPort
   worktreeDelete: WorktreeDeletePort
+  fileWorkspace: FileWorkspacePort
   /** Mac vs. Linux/Windows — selects the ⌘P/Ctrl+P chord (PROJ-005). */
   platform: { isMac: boolean }
 }
@@ -67,7 +77,7 @@ type DomKeydownTarget = {
  * height. No camera math lives here — it all delegates to `heights`.
  */
 export function createKeyboardController(deps: KeyboardControllerDeps): KeyboardController {
-  const { store, heights, terminal, diff, worktreeDelete, platform } = deps
+  const { store, heights, terminal, diff, worktreeDelete, fileWorkspace, platform } = deps
 
   const handleKeyDown = (event: KeyboardControllerEvent): boolean => {
     const command = resolveNavCommand(
@@ -75,6 +85,13 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
       { alt: event.altKey, ctrl: event.ctrlKey, meta: event.metaKey, shift: event.shiftKey },
       platform
     )
+    // Why: a modal opened over the file pane would steal focus from the editor.
+    if (
+      (command?.kind === 'open-projects' || command?.kind === 'open-palette') &&
+      fileWorkspace.isOpen()
+    ) {
+      return true
+    }
     // ⌘P/Ctrl+P must open the selector even while a terminal (a text-entry target) is focused
     // (PROJ-008) — checked before the text-entry gate below, unlike every other command.
     if (command?.kind === 'open-projects') {
@@ -93,6 +110,10 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
       // Covers xterm.js's hidden helper textarea too (TEXT_ENTRY_TAGS includes TEXTAREA) — while
       // a terminal is focused, every other keystroke (incl. Esc) reaches the PTY, never the graph.
       return false
+    }
+    if (fileWorkspace.isOpen()) {
+      if (command?.kind === 'escape') fileWorkspace.requestClose()
+      return true
     }
     if (!command) {
       return false
@@ -122,6 +143,16 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
       if (command.kind === 'open-diff' && systemOpen && selectedId !== null) {
         store.dispatchSystemView({ type: 'close' })
         store.dispatchDiffView({ type: 'open', nodeId: selectedId, baseRef: '' })
+      }
+      if (
+        (command.kind === 'open-file' || command.kind === 'descend-island') &&
+        diffView.view === 'open'
+      ) {
+        if (diffView.selectedPath !== null) {
+          fileWorkspace.openFile(diffView.focusedNodeId, diffView.selectedPath)
+        } else if (command.kind === 'open-file') {
+          fileWorkspace.openPicker(diffView.focusedNodeId)
+        }
       }
       if (command.kind === 'close-scene-mode') {
         if (systemOpen) store.dispatchSystemView({ type: 'close' })
@@ -158,6 +189,20 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
       const selectedId = store.get().selection.selectedId
       if (selectedId === null) return false
       worktreeDelete.request(selectedId)
+      return true
+    }
+    if (command.kind === 'open-file') {
+      if (
+        store.get().commandPalette.view !== 'closed' ||
+        store.get().projectSelector.view !== 'closed' ||
+        store.get().spawnMenu.view !== 'closed' ||
+        worktreeDelete.isOpen()
+      ) {
+        return true
+      }
+      const selectedId = store.get().selection.selectedId
+      if (selectedId === null) return false
+      fileWorkspace.openPicker(selectedId)
       return true
     }
     if (command.kind === 'move') {

@@ -309,6 +309,17 @@ export type HostedReviewCreateResult =
   | { ok: true; number?: number; url: string }
   | { ok: false; code: string; error: string; existingReview?: HostedReviewLink }
 
+export type FilePathMatch = { relativePath: string; basename: string; binary: boolean }
+
+/** Ranked quick-open matches; `truncated` means more files matched than were returned. */
+export type FilePathSearchResult = { files: readonly FilePathMatch[]; truncated: boolean }
+
+/** `files.read` is a text preview: `truncated` content must never be written back. */
+export type FileReadResult = { content: string; truncated: boolean; byteLength: number }
+
+/** `mtime` is epoch milliseconds from the host; size+mtime together detect an outside edit. */
+export type FileStamp = { size: number; mtime: number }
+
 /** `worktree.rm` knobs: `hostId` pins the executing host (SSH); `force` removes a dirty tree. */
 export type WorktreeRemoveOptions = { hostId?: string; force?: boolean }
 
@@ -367,6 +378,13 @@ export type RuntimeGateway = {
   gitPush(worktree: string, options?: { publish?: boolean }): Promise<void>
   hostedReviewEligibility(input: HostedReviewEligibilityInput): Promise<HostedReviewEligibility>
   hostedReviewCreate(input: HostedReviewCreateInput): Promise<HostedReviewCreateResult>
+  /** Fuzzy path search (ripgrep on the host, no git needed); `limit` is clamped to the host's 32. */
+  filesSearchPaths(worktree: string, query: string, limit?: number): Promise<FilePathSearchResult>
+  /** Rejects with `binary_file` for binary paths; text only. */
+  filesRead(worktree: string, relativePath: string): Promise<FileReadResult>
+  filesStat(worktree: string, relativePath: string): Promise<FileStamp>
+  /** Whole-file overwrite with no host-side conflict check: callers compare `filesStat` first. */
+  filesWrite(worktree: string, relativePath: string, content: string): Promise<void>
   /** Removes a worktree (the host stops its PTYs/agents itself); rejects when git refuses, e.g. dirty. */
   worktreeRemove(worktree: string, options?: WorktreeRemoveOptions): Promise<WorktreeRemoveResult>
   agentActivity(input: AgentActivityInput): Promise<AgentActivityPage>

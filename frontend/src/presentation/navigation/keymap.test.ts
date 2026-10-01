@@ -61,13 +61,14 @@ describe('resolveNavCommand', () => {
     ['d', { kind: 'open-diff' }],
     ['c', { kind: 'open-compare' }],
     ['g', { kind: 'close-scene-mode' }],
+    ['o', { kind: 'open-file' }],
     ['Backspace', { kind: 'delete-worktree' }],
     ['Delete', { kind: 'delete-worktree' }]
   ] as const)('maps %s with no modifiers to %o', (key, expected) => {
     expect(resolveNavCommand(key, noModifiers, LINUX)).toEqual(expected)
   })
 
-  it.each(['x', 'd', 'c', 'g', 'Backspace', 'Delete'] as const)(
+  it.each(['x', 'd', 'c', 'g', 'o', 'Backspace', 'Delete'] as const)(
     'returns null for scene-mode key %s when any modifier is held',
     (key) => {
       expect(resolveNavCommand(key, { ...noModifiers, ctrl: true }, LINUX)).toBeNull()

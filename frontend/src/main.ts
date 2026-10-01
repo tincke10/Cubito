@@ -22,6 +22,7 @@ import { demoSystemGraph } from './demo-system-graph'
 import { createDiffViewBinder } from './bind-diff-view'
 import { createCompareViewBinder } from './bind-compare-view'
 import { createWorktreeDeleteBinder } from './bind-worktree-delete'
+import { createFileWorkspaceBinder } from './bind-file-workspace'
 import { createSourceControlBinder } from './bind-source-control'
 import { createHudOverlay } from './presentation/hud/hud-overlay'
 import { createDemoBanner } from './presentation/hud/demo-banner-element'
@@ -187,6 +188,18 @@ const demoGateway: RuntimeGateway = {
   hostedReviewCreate: async () => {
     throw new Error('hostedReviewCreate not implemented in the demo gateway')
   },
+  filesSearchPaths: async () => {
+    throw new Error('filesSearchPaths not implemented in the demo gateway')
+  },
+  filesRead: async () => {
+    throw new Error('filesRead not implemented in the demo gateway')
+  },
+  filesStat: async () => {
+    throw new Error('filesStat not implemented in the demo gateway')
+  },
+  filesWrite: async () => {
+    throw new Error('filesWrite not implemented in the demo gateway')
+  },
   worktreeRemove: async () => {
     throw new Error('worktreeRemove not implemented in the demo gateway')
   },
@@ -334,12 +347,20 @@ const worktreeDeleteBinder = createWorktreeDeleteBinder({
   onSelectionSettled: (selectedId) => heights.onSelectionChanged(selectedId)
 })
 
+// Quick-open + file pane (U4): mounts on the body because diff/system modes hide the HUD.
+const fileWorkspaceBinder = createFileWorkspaceBinder({
+  slot: document.body,
+  demoGateway,
+  onSaved: () => undefined
+})
+
 const keyboardController = createKeyboardController({
   store,
   heights,
   terminal: terminalCommands,
   diff: diffViewBinder,
   worktreeDelete: worktreeDeleteBinder,
+  fileWorkspace: fileWorkspaceBinder,
   platform
 })
 keyboardController.attach(window)
@@ -353,6 +374,7 @@ const commandPaletteController = createCommandPaletteController({
   heights,
   terminal: terminalCommands,
   worktreeDelete: worktreeDeleteBinder,
+  fileWorkspace: fileWorkspaceBinder,
   createElement: createCommandPalette,
   hud: hudElement,
   platform
@@ -553,6 +575,7 @@ if (pairingEntry.kind === 'connect') {
       fanOutBinder.bind(connection)
       attentionBinder.bind(connection)
       worktreeDeleteBinder.rebindGateway(connection.gateway)
+      fileWorkspaceBinder.rebindGateway(connection.gateway)
       systemViewBinder.rebindGateway(connection.gateway, connection.systemGraphStream)
       diffViewBinder.rebindGateway(connection.gateway)
       sourceControlBinder.rebindGateway(connection.gateway)

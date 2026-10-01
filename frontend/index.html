@@ -1183,6 +1183,153 @@
         opacity: 0.5;
         cursor: default;
       }
+      /* File quick-open + file pane (U4): body-level overlays, visible over diff/system modes. */
+      .cubito-file-quick-open,
+      .cubito-file-editor {
+        position: fixed;
+        inset: 0;
+        z-index: 25;
+        display: flex;
+        pointer-events: auto;
+      }
+      .cubito-file-quick-open[hidden],
+      .cubito-file-editor[hidden] {
+        display: none;
+      }
+      .cubito-file-quick-open {
+        align-items: flex-start;
+        justify-content: center;
+        padding-top: 12vh;
+      }
+      .cubito-file-quick-open__backdrop {
+        position: absolute;
+        inset: 0;
+        background: color-mix(in srgb, var(--cubito-background) 70%, transparent);
+      }
+      .cubito-file-quick-open__card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        width: min(560px, calc(100% - 32px));
+        padding: 12px;
+        background: var(--cubito-panel-surface);
+        border: 1px solid var(--cubito-panel-border);
+        border-radius: 6px;
+        font-size: 12.5px;
+        color: var(--cubito-text-primary);
+      }
+      .cubito-file-quick-open__query {
+        height: 36px;
+        padding: 0 12px;
+        background: var(--cubito-background);
+        border: 1px solid var(--cubito-panel-border);
+        border-radius: 4px;
+        color: var(--cubito-text-primary);
+        font: inherit;
+      }
+      .cubito-file-quick-open__query:focus {
+        outline: none;
+        border-color: var(--cubito-accent);
+      }
+      .cubito-file-quick-open__status {
+        font-size: 11px;
+        color: var(--cubito-text-dim);
+      }
+      .cubito-file-quick-open__status--error {
+        color: var(--cubito-amber);
+      }
+      .cubito-file-quick-open__rows {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        max-height: 320px;
+        overflow-y: auto;
+      }
+      .cubito-file-quick-open__row {
+        display: flex;
+        gap: 10px;
+        align-items: baseline;
+        padding: 6px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .cubito-file-quick-open__row--highlighted {
+        background: color-mix(in srgb, var(--cubito-accent) 22%, transparent);
+      }
+      .cubito-file-quick-open__folder {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 11px;
+        color: var(--cubito-text-dim);
+      }
+      .cubito-file-editor {
+        align-items: stretch;
+        justify-content: center;
+        background: color-mix(in srgb, var(--cubito-background) 85%, transparent);
+      }
+      .cubito-file-editor__card {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        width: min(1000px, 100%);
+        padding: 16px;
+        background: var(--cubito-panel-surface);
+        border: 1px solid var(--cubito-panel-border);
+        font-size: 12.5px;
+        color: var(--cubito-text-primary);
+      }
+      .cubito-file-editor__header {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .cubito-file-editor__title {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 600;
+      }
+      .cubito-file-editor__badge,
+      .cubito-file-editor__message {
+        font-size: 11px;
+        color: var(--cubito-amber);
+      }
+      .cubito-file-editor__badge[hidden],
+      .cubito-file-editor__message[hidden] {
+        display: none;
+      }
+      .cubito-file-editor__close {
+        height: 28px;
+        padding: 0 12px;
+        border: 1px solid var(--cubito-panel-border);
+        border-radius: 4px;
+        background: transparent;
+        color: var(--cubito-text-dim);
+        font: inherit;
+        cursor: pointer;
+      }
+      .cubito-file-editor__text {
+        flex: 1;
+        min-height: 0;
+        resize: none;
+        padding: 10px;
+        background: var(--cubito-background);
+        border: 1px solid var(--cubito-panel-border);
+        border-radius: 4px;
+        color: var(--cubito-text-primary);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+        line-height: 1.5;
+        tab-size: 2;
+        white-space: pre;
+      }
+      .cubito-file-editor__text:focus {
+        outline: none;
+        border-color: var(--cubito-accent);
+      }
       /* Diff mode source control (U2): the commit composer sits under the file rail. */
       :root {
         --cubito-diff-composer-h: 176px;

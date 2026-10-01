@@ -12,6 +12,7 @@ export type CommandId =
   | 'open-diff'
   | 'open-compare'
   | 'delete-worktree'
+  | 'open-file'
 
 export type CommandAvailability = {
   readonly hasSelection: boolean
@@ -102,6 +103,12 @@ export const commandCatalog = (platform: { isMac: boolean }): readonly PaletteCo
     label: 'eliminar worktree',
     keybindingHint: '⌫',
     // The confirm panel itself explains why the primary worktree is refused.
+    isAvailable: (a) => a.hasSelection && a.isConnected
+  },
+  {
+    id: 'open-file',
+    label: 'abrir archivo',
+    keybindingHint: 'o',
     isAvailable: (a) => a.hasSelection && a.isConnected
   }
 ]

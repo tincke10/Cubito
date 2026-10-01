@@ -4,7 +4,11 @@ import { commandCatalog, toCommandAvailability } from '../../application/command
 import type { CommandPaletteSlice } from '../../application/command-palette-model'
 import { commandPaletteViewModel } from './command-palette-view-model'
 import type { CommandPaletteHandle } from './command-palette-element'
-import type { TerminalCommandPort, WorktreeDeletePort } from '../input/keyboard-controller'
+import type {
+  FileWorkspacePort,
+  TerminalCommandPort,
+  WorktreeDeletePort
+} from '../input/keyboard-controller'
 import type { CameraHeightController } from '../input/camera-height-controller'
 import { fanOutMemberIds } from '../../application/fan-out-model'
 
@@ -13,6 +17,7 @@ export type CommandPaletteControllerDeps = {
   heights: Pick<CameraHeightController, 'goTo'>
   terminal: Pick<TerminalCommandPort, 'focusActivePanel'>
   worktreeDelete: Pick<WorktreeDeletePort, 'request'>
+  fileWorkspace: Pick<FileWorkspacePort, 'openPicker'>
   createElement: () => CommandPaletteHandle
   hud: { appendChild(element: unknown): void }
   platform: { isMac: boolean }
@@ -31,7 +36,7 @@ export type CommandPaletteController = {
 export function createCommandPaletteController(
   deps: CommandPaletteControllerDeps
 ): CommandPaletteController {
-  const { store, heights, terminal, worktreeDelete } = deps
+  const { store, heights, terminal, worktreeDelete, fileWorkspace } = deps
   const catalog = commandCatalog(deps.platform)
   let element: CommandPaletteHandle | null = null
 
@@ -96,6 +101,10 @@ export function createCommandPaletteController(
     'delete-worktree': () => {
       const selectedId = store.get().selection.selectedId
       if (selectedId !== null) worktreeDelete.request(selectedId)
+    },
+    'open-file': () => {
+      const selectedId = store.get().selection.selectedId
+      if (selectedId !== null) fileWorkspace.openPicker(selectedId)
     }
   }
 
