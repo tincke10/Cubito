@@ -1,6 +1,7 @@
 import type { ConnectionState } from '../../application/scene-store'
 import { diffHudCounts } from '../../application/diff-view-model'
 import type { DiffViewSlice } from '../../application/diff-view-model'
+import type { StageState } from '../../application/source-control-flow'
 import { diffRailViewModel } from './diff-rail-model'
 import { diffPanelViewModel } from './diff-panel-model'
 import type { DiffRailHandle } from './diff-rail-element'
@@ -17,6 +18,8 @@ export type DiffViewControllerDeps = {
   keyboardBarSlot: { appendChild(element: unknown): void }
   /** Forwards a rail row click to the live loader (`loader.select(path)`), wired on mount. */
   onSelect: (path: string) => void
+  /** Forwards a rail row's stage toggle to source control. */
+  onStageToggle?: (path: string) => void
   /** Fires once on the closed->open transition, after mounting — the seam for hiding the
    *  worktree HUD/keyboard-bar/3D scene, keeping this controller DOM-scoped to #diff. */
   onEnter?: () => void
@@ -25,7 +28,12 @@ export type DiffViewControllerDeps = {
 }
 
 export type DiffViewController = {
-  sync(diffView: DiffViewSlice, connection: ConnectionState, branchLabel: string): void
+  sync(
+    diffView: DiffViewSlice,
+    connection: ConnectionState,
+    branchLabel: string,
+    stageStates?: ReadonlyMap<string, StageState>
+  ): void
   dispose(): void
 }
 
@@ -44,6 +52,7 @@ export function createDiffViewController(deps: DiffViewControllerDeps): DiffView
     const panel = deps.createPanel()
     const hud = deps.createHud()
     rail.onSelect((path) => deps.onSelect(path))
+    rail.onStageToggle((path) => deps.onStageToggle?.(path))
     deps.hud.appendChild(hud.root)
     deps.hud.appendChild(rail.root)
     deps.hud.appendChild(panel.element)
@@ -62,7 +71,7 @@ export function createDiffViewController(deps: DiffViewControllerDeps): DiffView
   }
 
   return {
-    sync(diffView, connection, branchLabel) {
+    sync(diffView, connection, branchLabel, stageStates) {
       if (diffView.view !== 'open') {
         if (mounted) {
           unmount()
@@ -73,7 +82,7 @@ export function createDiffViewController(deps: DiffViewControllerDeps): DiffView
       const enteringNow = !mounted
       const entry = mounted ?? mount()
       if (enteringNow) deps.onEnter?.()
-      entry.rail.apply(diffRailViewModel(diffView.files, diffView.selectedPath))
+      entry.rail.apply(diffRailViewModel(diffView.files, diffView.selectedPath, stageStates))
       entry.panel.apply(diffPanelViewModel(diffView.panel))
       entry.hud.apply({ connection, branch: branchLabel, counts: diffHudCounts(diffView) })
     },

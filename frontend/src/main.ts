@@ -22,6 +22,7 @@ import { demoSystemGraph } from './demo-system-graph'
 import { createDiffViewBinder } from './bind-diff-view'
 import { createCompareViewBinder } from './bind-compare-view'
 import { createWorktreeDeleteBinder } from './bind-worktree-delete'
+import { createSourceControlBinder } from './bind-source-control'
 import { createHudOverlay } from './presentation/hud/hud-overlay'
 import { createDemoBanner } from './presentation/hud/demo-banner-element'
 import { createAttentionNotificationBinder } from './bind-attention-notifications'
@@ -165,6 +166,21 @@ const demoGateway: RuntimeGateway = {
   gitMergeWinnerIntoParent: async () => {
     throw new Error('gitMergeWinnerIntoParent not implemented in the demo gateway')
   },
+  gitSourceControlStatus: async () => ({
+    branch: '',
+    entries: [],
+    hasUpstream: false,
+    ahead: 0,
+    behind: 0
+  }),
+  gitStage: async () => undefined,
+  gitUnstage: async () => undefined,
+  gitCommit: async () => {
+    throw new Error('gitCommit not implemented in the demo gateway')
+  },
+  gitPush: async () => {
+    throw new Error('gitPush not implemented in the demo gateway')
+  },
   worktreeRemove: async () => {
     throw new Error('worktreeRemove not implemented in the demo gateway')
   },
@@ -276,6 +292,14 @@ const diffViewBinder = createDiffViewBinder({
   diffSlot,
   keyboardBarSlot,
   demoGateway
+})
+
+// Commit/push composer + rail stage toggles (U2): follows diff mode, gateway swapped in on connect.
+const sourceControlBinder = createSourceControlBinder({
+  store,
+  slot: diffSlot,
+  demoGateway,
+  diff: diffViewBinder
 })
 
 // Comparar la camada (design camada, Change D): same eager pattern as sistema en vivo/diff — no
@@ -390,6 +414,7 @@ store.subscribe((state) => {
   fanOutBinder.sync()
   systemViewBinder.sync()
   diffViewBinder.sync()
+  sourceControlBinder.sync()
   compareViewBinder.sync()
   commandPaletteController.sync(state.commandPalette, state)
   if (!framed && state.graph.nodes.size > 0) {
@@ -524,6 +549,7 @@ if (pairingEntry.kind === 'connect') {
       worktreeDeleteBinder.rebindGateway(connection.gateway)
       systemViewBinder.rebindGateway(connection.gateway, connection.systemGraphStream)
       diffViewBinder.rebindGateway(connection.gateway)
+      sourceControlBinder.rebindGateway(connection.gateway)
       compareViewBinder.rebindGateway(connection.gateway, connection.capabilities)
     },
     onDisconnected: () => store.dispatchTerminal({ type: 'connection-lost' }),

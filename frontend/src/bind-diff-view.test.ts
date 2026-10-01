@@ -117,6 +117,7 @@ const createFakeRail = (): DiffRailHandle & {
       this.applyCalls.push(rows)
     },
     onSelect: vi.fn((cb: (path: string) => void) => (selectCb = cb)),
+    onStageToggle: vi.fn(),
     dispose: vi.fn(),
     emitSelect(path: string) {
       selectCb?.(path)

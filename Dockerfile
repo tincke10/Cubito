@@ -58,6 +58,32 @@ RUN apt-get update \
     git \
   && rm -rf /var/lib/apt/lists/*
 
+# Why: Cubito's commit/PR/MR actions shell out to gh and glab; release tarballs are pinned and
+# checksum-verified per architecture instead of trusting a moving apt repo.
+ARG GH_VERSION=2.102.0
+ARG GH_SHA256_AMD64=bb766f710eef8ede859c18578c72c327597cd4c8a85b06001b1f3843c6019386
+ARG GH_SHA256_ARM64=7862c86c72f43df3a2d93ddde6f473285b4e2af61b494849846827e513ef6484
+ARG GLAB_VERSION=1.120.0
+ARG GLAB_SHA256_AMD64=4e6c59de9f7ed2f304bf93aad01ea8f8a69584f0450ce90ad696ef81f69c69aa
+ARG GLAB_SHA256_ARM64=c60ebb4cb36f276714847a118845b9b4e69f46a8080c68b21ca63f158722cdea
+RUN set -eu; \
+  arch="$(dpkg --print-architecture)"; \
+  case "$arch" in \
+    amd64) gh_sha="$GH_SHA256_AMD64"; glab_sha="$GLAB_SHA256_AMD64" ;; \
+    arm64) gh_sha="$GH_SHA256_ARM64"; glab_sha="$GLAB_SHA256_ARM64" ;; \
+    *) echo "unsupported architecture: $arch" >&2; exit 1 ;; \
+  esac; \
+  curl -fsSL -o /tmp/gh.tgz "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${arch}.tar.gz"; \
+  echo "${gh_sha}  /tmp/gh.tgz" | sha256sum -c -; \
+  tar -xzf /tmp/gh.tgz -C /tmp --strip-components=2 "gh_${GH_VERSION}_linux_${arch}/bin/gh"; \
+  install -m 755 /tmp/gh /usr/local/bin/gh; \
+  curl -fsSL -o /tmp/glab.tgz "https://gitlab.com/gitlab-org/cli/-/releases/v${GLAB_VERSION}/downloads/glab_${GLAB_VERSION}_linux_${arch}.tar.gz"; \
+  echo "${glab_sha}  /tmp/glab.tgz" | sha256sum -c -; \
+  tar -xzf /tmp/glab.tgz -C /tmp --strip-components=1 bin/glab; \
+  install -m 755 /tmp/glab /usr/local/bin/glab; \
+  rm -f /tmp/gh /tmp/glab /tmp/gh.tgz /tmp/glab.tgz; \
+  gh --version; glab --version
+
 RUN npm i -g @anthropic-ai/claude-code
 
 # Why: repo setup commands (pnpm install / yarn) run in worktrees; corepack provides the shims.

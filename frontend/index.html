@@ -1183,6 +1183,90 @@
         opacity: 0.5;
         cursor: default;
       }
+      /* Diff mode source control (U2): the commit composer sits under the file rail. */
+      :root {
+        --cubito-diff-composer-h: 176px;
+      }
+      #diff .cubito-diff-rail {
+        height: calc(100% - var(--cubito-diff-composer-h));
+      }
+      .cubito-source-control {
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        width: 240px;
+        height: var(--cubito-diff-composer-h);
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 8px 10px;
+        overflow-y: auto;
+        background: var(--cubito-panel-surface);
+        border-top: 1px solid var(--cubito-panel-border);
+        border-right: 1px solid var(--cubito-panel-border);
+        font-size: 11.5px;
+        pointer-events: auto;
+      }
+      .cubito-source-control[hidden] {
+        display: none;
+      }
+      .cubito-source-control__status {
+        color: var(--cubito-text-dim);
+      }
+      .cubito-source-control__message {
+        resize: none;
+        padding: 6px 8px;
+        background: var(--cubito-background);
+        border: 1px solid var(--cubito-panel-border);
+        border-radius: 4px;
+        color: var(--cubito-text-primary);
+        font: inherit;
+      }
+      .cubito-source-control__message:focus {
+        outline: none;
+        border-color: var(--cubito-accent);
+      }
+      .cubito-source-control__actions {
+        display: flex;
+        gap: 6px;
+      }
+      .cubito-source-control__button {
+        flex: 1;
+        height: 28px;
+        border: 1px solid var(--cubito-panel-border);
+        border-radius: 4px;
+        background: transparent;
+        color: var(--cubito-text-primary);
+        font: inherit;
+        cursor: pointer;
+      }
+      .cubito-source-control__button:not(:disabled):hover {
+        border-color: var(--cubito-accent);
+      }
+      .cubito-source-control__button:disabled {
+        color: var(--cubito-text-faint);
+        cursor: default;
+      }
+      .cubito-source-control__notice--ok {
+        color: var(--cubito-accent);
+      }
+      .cubito-source-control__notice--error {
+        color: var(--cubito-amber-ink);
+      }
+      .diff-rail__stage {
+        order: -1;
+        width: 18px;
+        padding: 0;
+        border: none;
+        background: none;
+        color: var(--cubito-text-dim);
+        font: inherit;
+        cursor: pointer;
+      }
+      .diff-rail__stage--staged {
+        color: var(--cubito-accent);
+      }
     </style>
   </head>
   <body>

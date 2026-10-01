@@ -5,7 +5,8 @@ const EMPTY_TEXT = 'sin cambios'
 const buildRow = (
   doc: Document,
   row: DiffRailRow,
-  onClick: (path: string) => void
+  onClick: (path: string) => void,
+  onStageToggle: (path: string) => void
 ): HTMLElement => {
   const rowElement = doc.createElement('div')
   rowElement.className = row.cssClass
@@ -37,6 +38,18 @@ const buildRow = (
     oldPath.textContent = row.oldPathText
     rowElement.appendChild(oldPath)
   }
+  if (row.stage !== undefined) {
+    const toggle = doc.createElement('button')
+    toggle.type = 'button'
+    toggle.className = `diff-rail__stage diff-rail__stage--${row.stage.state}`
+    toggle.textContent = row.stage.glyph
+    toggle.title = row.stage.label
+    toggle.addEventListener('click', (event) => {
+      event.stopPropagation() // the row click selects the file; the toggle only stages
+      onStageToggle(row.path)
+    })
+    rowElement.appendChild(toggle)
+  }
   rowElement.addEventListener('click', () => onClick(row.path))
   return rowElement
 }
@@ -45,6 +58,7 @@ export type DiffRailHandle = {
   readonly root: HTMLElement
   apply(rows: readonly DiffRailRow[]): void
   onSelect(cb: (path: string) => void): void
+  onStageToggle(cb: (path: string) => void): void
   dispose(): void
 }
 
@@ -58,6 +72,7 @@ export function createDiffRail(doc: Document = document): DiffRailHandle {
   root.className = 'cubito-diff-rail'
 
   let selectCallback: ((path: string) => void) | null = null
+  let stageToggleCallback: ((path: string) => void) | null = null
 
   return {
     root,
@@ -71,7 +86,12 @@ export function createDiffRail(doc: Document = document): DiffRailHandle {
         return
       }
       for (const row of rows) {
-        const rowElement = buildRow(doc, row, (path) => selectCallback?.(path))
+        const rowElement = buildRow(
+          doc,
+          row,
+          (path) => selectCallback?.(path),
+          (path) => stageToggleCallback?.(path)
+        )
         root.appendChild(rowElement)
         // Why: keyboard j/k can select rows below the rail's fold.
         if (row.selected) rowElement.scrollIntoView({ block: 'nearest' })
@@ -79,6 +99,9 @@ export function createDiffRail(doc: Document = document): DiffRailHandle {
     },
     onSelect(cb) {
       selectCallback = cb
+    },
+    onStageToggle(cb) {
+      stageToggleCallback = cb
     },
     dispose() {
       root.remove()

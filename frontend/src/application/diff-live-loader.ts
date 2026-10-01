@@ -21,6 +21,8 @@ export type DiffLiveLoaderDeps = {
 export type DiffLiveLoader = {
   start(nodeId: string): void
   select(path: string): void
+  /** Reloads the rail in place (after stage/commit); keeps the selection when the file survives. */
+  refresh(): void
   stop(): void
   rebindGateway(gateway: DiffLiveLoaderGatewayPort): void
 }
@@ -39,7 +41,7 @@ export function createDiffLiveLoader(deps: DiffLiveLoaderDeps): DiffLiveLoader {
     deps.store.dispatchDiffView(action)
   }
 
-  async function loadRail(nodeId: WorktreeId): Promise<void> {
+  async function loadRail(nodeId: WorktreeId, keepSelection = false): Promise<void> {
     // Joined with git.status (working tree) so uncommitted changes show up alongside branch
     // ones — see design sdd/diff-working-tree. Both fetches run concurrently either way.
     const [result, workingResult] = await Promise.all([
@@ -67,7 +69,10 @@ export function createDiffLiveLoader(deps: DiffLiveLoaderDeps): DiffLiveLoader {
           }))
         })
         // Why: without an initial selection the first j would land on row 0 instead of moving.
-        if (merged.length > 0) select(merged[0]!.path)
+        const kept = keepSelection
+          ? merged.find((entry) => entry.path === slice.selectedPath)
+          : undefined
+        if (merged.length > 0) select((kept ?? merged[0]!).path)
         return
       }
       case 'not-ready':
@@ -148,6 +153,11 @@ export function createDiffLiveLoader(deps: DiffLiveLoaderDeps): DiffLiveLoader {
       void loadRail(nodeId)
     },
     select,
+    refresh() {
+      const slice = deps.store.get().diffView
+      if (stopped || slice.view !== 'open' || slice.compare === null) return
+      void loadRail(slice.focusedNodeId, true)
+    },
     stop() {
       stopped = true
     },

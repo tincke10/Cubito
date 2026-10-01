@@ -251,6 +251,21 @@ export type MergeWinnerResult =
     }
   | { outcome: 'conflict'; files: readonly string[] }
 
+/** Staging area of one `git.status` entry; a path edited after staging appears in two areas. */
+export type GitStagingArea = 'staged' | 'unstaged' | 'untracked'
+
+/** `git.status` projected for source control: staging areas + upstream counters (not the diff-mode GitStatus). */
+export type SourceControlStatus = {
+  branch: string
+  entries: readonly { path: string; area: GitStagingArea }[]
+  hasUpstream: boolean
+  ahead: number
+  behind: number
+}
+
+/** `git.commit` reports a refused commit as `success: false` instead of throwing. */
+export type GitCommitResult = { success: true } | { success: false; error: string }
+
 /** `worktree.rm` knobs: `hostId` pins the executing host (SSH); `force` removes a dirty tree. */
 export type WorktreeRemoveOptions = { hostId?: string; force?: boolean }
 
@@ -300,6 +315,13 @@ export type RuntimeGateway = {
     message?: string,
     syncWorkingTree?: boolean
   ): Promise<MergeWinnerResult>
+  gitSourceControlStatus(worktree: string): Promise<SourceControlStatus>
+  /** Bulk stage/unstage; an empty list is a no-op. */
+  gitStage(worktree: string, paths: readonly string[]): Promise<void>
+  gitUnstage(worktree: string, paths: readonly string[]): Promise<void>
+  gitCommit(worktree: string, message: string): Promise<GitCommitResult>
+  /** `publish` sets the upstream (first push of a branch); rejects when the remote refuses. */
+  gitPush(worktree: string, options?: { publish?: boolean }): Promise<void>
   /** Removes a worktree (the host stops its PTYs/agents itself); rejects when git refuses, e.g. dirty. */
   worktreeRemove(worktree: string, options?: WorktreeRemoveOptions): Promise<WorktreeRemoveResult>
   agentActivity(input: AgentActivityInput): Promise<AgentActivityPage>

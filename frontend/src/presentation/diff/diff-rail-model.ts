@@ -1,4 +1,7 @@
 import type { DiffFileRow } from '../../application/diff-view-model'
+import type { StageState } from '../../application/source-control-flow'
+
+export type DiffRailStage = { state: StageState; glyph: string; label: string }
 
 export type DiffRailRow = {
   path: string
@@ -11,6 +14,8 @@ export type DiffRailRow = {
   oldPathText?: string
   /** "naciendo"/"sin commitear" badge — set only when the row has a working-tree component. */
   originText?: string
+  /** Stage toggle — set only for rows git.status knows about (an uncommitted component). */
+  stage?: DiffRailStage
 }
 
 const MINUS_GLYPH = '−'
@@ -20,6 +25,12 @@ const HAS_WORKING_COMPONENT = new Set(['working', 'both'])
 
 const railCssClass = (status: string, selected: boolean, hasWorkingComponent: boolean): string =>
   `diff-rail__row diff-rail__row--${status}${hasWorkingComponent ? ' diff-rail__row--wt' : ''}${selected ? ' diff-rail__row--selected' : ''}`
+
+const STAGE_PRESENTATION: Record<StageState, { glyph: string; label: string }> = {
+  staged: { glyph: '●', label: 'quitar del stage' },
+  partial: { glyph: '◐', label: 'stagear el resto' },
+  unstaged: { glyph: '○', label: 'stagear' }
+}
 
 const originTextFor = (file: DiffFileRow): string | undefined =>
   file.origin !== undefined && HAS_WORKING_COMPONENT.has(file.origin)
@@ -31,9 +42,11 @@ const originTextFor = (file: DiffFileRow): string | undefined =>
 /** Pure projection of the diff rail's file list, selection-aware. No DOM. */
 export function diffRailViewModel(
   files: readonly DiffFileRow[],
-  selectedPath: string | null
+  selectedPath: string | null,
+  stageStates?: ReadonlyMap<string, StageState>
 ): readonly DiffRailRow[] {
   return files.map((file) => {
+    const stageState = stageStates?.get(file.path)
     const selected = file.path === selectedPath
     const originText = originTextFor(file)
     return {
@@ -44,7 +57,10 @@ export function diffRailViewModel(
       cssClass: railCssClass(file.status, selected, originText !== undefined),
       selected,
       ...(file.oldPath === undefined ? {} : { oldPathText: `${file.oldPath} →` }),
-      ...(originText === undefined ? {} : { originText })
+      ...(originText === undefined ? {} : { originText }),
+      ...(stageState === undefined
+        ? {}
+        : { stage: { state: stageState, ...STAGE_PRESENTATION[stageState] } })
     }
   })
 }

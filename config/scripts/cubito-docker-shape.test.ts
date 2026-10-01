@@ -87,6 +87,55 @@ describe('compose.yaml', () => {
   })
 })
 
+describe('git host CLIs and tokens', () => {
+  const compose = parse(readFileSync(join(REPO_ROOT, 'compose.yaml'), 'utf8')) as ComposeFile
+  const env = compose.services.cubito.environment ?? {}
+  const dockerfile = readFileSync(join(REPO_ROOT, 'Dockerfile'), 'utf8')
+  const runtimeStage = dockerfile.slice(dockerfile.indexOf('FROM node:24-bookworm-slim'))
+  const entrypoint = readFileSync(join(REPO_ROOT, 'config/docker/cubito/entrypoint.sh'), 'utf8')
+  const readme = readFileSync(join(REPO_ROOT, 'README.md'), 'utf8')
+
+  it('passes GH_TOKEN and GITLAB_TOKEN through from the host without storing a value', () => {
+    for (const key of ['GH_TOKEN', 'GITLAB_TOKEN']) {
+      expect(Object.hasOwn(env, key)).toBe(true)
+      expect(env[key]).toBeNull()
+    }
+  })
+
+  it('installs gh and glab in the runtime stage from pinned, checksum-verified releases', () => {
+    expect(runtimeStage).toMatch(/ARG GH_VERSION=\d+\.\d+\.\d+/)
+    expect(runtimeStage).toMatch(/ARG GLAB_VERSION=\d+\.\d+\.\d+/)
+    expect(runtimeStage.match(/GH_SHA256_(AMD64|ARM64)=[0-9a-f]{64}/g)).toHaveLength(2)
+    expect(runtimeStage.match(/GLAB_SHA256_(AMD64|ARM64)=[0-9a-f]{64}/g)).toHaveLength(2)
+    expect(runtimeStage).toContain('sha256sum -c -')
+    expect(runtimeStage).toContain('/usr/local/bin/gh')
+    expect(runtimeStage).toContain('/usr/local/bin/glab')
+  })
+
+  it('wires gh as the github.com git credential helper as node when GH_TOKEN is set', () => {
+    expect(entrypoint).toMatch(/if \[ -n "\$\{GH_TOKEN:-\}" \]/)
+    expect(entrypoint).toContain("'!gh auth git-credential'")
+    expect(entrypoint).toContain('https://github.com')
+    expect(entrypoint.indexOf('!gh auth git-credential')).toBeLessThan(
+      entrypoint.indexOf('exec setpriv')
+    )
+  })
+
+  it('wires glab for gitlab.com when GITLAB_TOKEN is set', () => {
+    expect(entrypoint).toMatch(/if \[ -n "\$\{GITLAB_TOKEN:-\}" \]/)
+    expect(entrypoint).toContain("'!glab auth git-credential'")
+  })
+
+  it('never echoes a token', () => {
+    expect(entrypoint).not.toMatch(/echo[^\n]*\$\{?(GH_TOKEN|GITLAB_TOKEN)/)
+  })
+
+  it('documents the token passthrough in the Docker README', () => {
+    expect(readme).toContain('export GH_TOKEN=')
+    expect(readme).toContain('export GITLAB_TOKEN=')
+  })
+})
+
 describe('Dockerfile', () => {
   const dockerfile = readFileSync(join(REPO_ROOT, 'Dockerfile'), 'utf8')
   const fromLines = dockerfile.match(/^FROM .+$/gm) ?? []

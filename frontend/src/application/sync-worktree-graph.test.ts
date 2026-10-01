@@ -86,6 +86,17 @@ const fakeGateway = (
   gitMergeWinnerIntoParent: async () => {
     throw new Error('gitMergeWinnerIntoParent not implemented in this fake')
   },
+  gitSourceControlStatus: async () => ({
+    branch: '',
+    entries: [],
+    hasUpstream: false,
+    ahead: 0,
+    behind: 0
+  }),
+  gitStage: async () => undefined,
+  gitUnstage: async () => undefined,
+  gitCommit: async () => ({ success: true as const }),
+  gitPush: async () => undefined,
   worktreeRemove: async () => ({ removed: true as const }),
   agentActivity: async () => ({ events: [], latestSeq: 0 }),
   repoSetupCommand: async () => null,

@@ -5,6 +5,7 @@ import { createDiffHud } from './presentation/diff/diff-hud-element'
 import { createDiffLiveLoader } from './application/diff-live-loader'
 import type { DiffLiveLoaderGatewayPort } from './application/diff-live-loader'
 import type { SceneStore } from './application/scene-store'
+import type { StageState } from './application/source-control-flow'
 import type { DiffRailHandle } from './presentation/diff/diff-rail-element'
 import type { DiffPanelHandle } from './presentation/diff/diff-panel-element'
 import type { DiffHudHandle } from './presentation/diff/diff-hud-element'
@@ -20,10 +21,19 @@ export type BindDiffViewDeps = {
   createHud?: () => DiffHudHandle
 }
 
+/** Stage toggles on the rail rows; late-bound because source control is built after the diff binder. */
+export type DiffStageSource = {
+  stageStates(): ReadonlyMap<string, StageState> | undefined
+  toggle(path: string): void
+}
+
 export type DiffViewBinder = {
   sync(): void
   /** Selects a rail file through the live loader (fetches its panel). */
   select(path: string): void
+  /** Reloads the rail in place (after stage/commit), keeping the selected file. */
+  refresh(): void
+  attachStageSource(source: DiffStageSource): void
   rebindGateway(gateway: DiffLiveLoaderGatewayPort): void
 }
 
@@ -37,6 +47,7 @@ export type DiffViewBinder = {
  */
 export function createDiffViewBinder(deps: BindDiffViewDeps): DiffViewBinder {
   const loader = createDiffLiveLoader({ store: deps.store, gateway: deps.demoGateway })
+  let stageSource: DiffStageSource | null = null
 
   const controller = createDiffViewController({
     createRail: deps.createRail ?? createDiffRail,
@@ -44,7 +55,8 @@ export function createDiffViewBinder(deps: BindDiffViewDeps): DiffViewBinder {
     createHud: deps.createHud ?? createDiffHud,
     hud: deps.diffSlot,
     keyboardBarSlot: deps.keyboardBarSlot,
-    onSelect: (path) => loader.select(path)
+    onSelect: (path) => loader.select(path),
+    onStageToggle: (path) => stageSource?.toggle(path)
   })
 
   let wasOpen = false
@@ -66,10 +78,21 @@ export function createDiffViewBinder(deps: BindDiffViewDeps): DiffViewBinder {
       const selectedId = state.selection.selectedId
       const branchLabel =
         selectedId !== null ? (state.graph.nodes.get(selectedId)?.branch ?? '') : ''
-      controller.sync(deps.store.get().diffView, state.connection, branchLabel)
+      controller.sync(
+        deps.store.get().diffView,
+        state.connection,
+        branchLabel,
+        stageSource?.stageStates()
+      )
     },
     select(path: string): void {
       loader.select(path)
+    },
+    refresh(): void {
+      loader.refresh()
+    },
+    attachStageSource(source): void {
+      stageSource = source
     },
     rebindGateway(gateway: DiffLiveLoaderGatewayPort): void {
       loader.rebindGateway(gateway)

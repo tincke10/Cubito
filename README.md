@@ -157,6 +157,15 @@ export CUBITO_GIT_EMAIL="$(git config user.email)"
 
 Without them the container logs a warning at startup and agent commits fail with "Author identity unknown".
 
+To commit-and-push from Cubito's diff view and open pull/merge requests, give the container a token for your host. The image ships `gh` and `glab`; the entrypoint wires them as git credential helpers for `github.com` and `gitlab.com` when the token is set:
+
+```bash
+export GH_TOKEN="$(gh auth token)"          # GitHub: repo scope
+export GITLAB_TOKEN=glpat-...               # GitLab: api + write_repository scopes
+```
+
+`compose.yaml` only passes the variables through, and nothing prints them. Without a token, push and PR/MR creation answer "authentication required" in the diff view: export the token and restart the container. Outside Docker, run `gh auth login` / `glab auth login` once on the host instead.
+
 By default agents keep Claude's own permission prompts: they stop to ask before an action Claude considers risky; answer in Cubito's `[t]` terminal. To let agents run every tool without asking, opt in from the host shell:
 
 ```bash

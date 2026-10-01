@@ -680,4 +680,54 @@ describe('createDiffLiveLoader', () => {
     expect(gatewayA.diffCalls.length).toBe(1)
     loader.stop()
   })
+
+  describe('refresh', () => {
+    it('reloads the rail and keeps the selected file when it still exists', async () => {
+      setupGraph()
+      const gateway = createFakeGateway()
+      gateway.gitBranchCompareImpl = async () =>
+        branchCompare({
+          entries: [
+            { path: 'src/a.ts', status: 'modified', added: 1, removed: 0 },
+            { path: 'src/b.ts', status: 'modified', added: 1, removed: 0 }
+          ]
+        })
+      const loader = createDiffLiveLoader({ store, gateway })
+      loader.start('repo::child')
+      await vi.waitFor(() => expect(gateway.diffCalls.length).toBe(1))
+      loader.select('src/b.ts')
+      await vi.waitFor(() => expect(gateway.diffCalls.length).toBe(2))
+
+      loader.refresh()
+      await vi.waitFor(() => expect(gateway.compareCalls.length).toBe(2))
+      await vi.waitFor(() => expect(gateway.diffCalls.length).toBe(3))
+      const slice = store.get().diffView
+      expect(slice.view === 'open' && slice.selectedPath).toBe('src/b.ts')
+      loader.stop()
+    })
+
+    it('falls back to the first file when the selected one disappeared', async () => {
+      setupGraph()
+      const gateway = createFakeGateway()
+      const loader = createDiffLiveLoader({ store, gateway })
+      loader.start('repo::child')
+      await vi.waitFor(() => expect(gateway.diffCalls.length).toBe(1))
+      gateway.gitBranchCompareImpl = async () =>
+        branchCompare({ entries: [{ path: 'src/z.ts', status: 'modified', added: 1, removed: 0 }] })
+
+      loader.refresh()
+      await vi.waitFor(() => {
+        const slice = store.get().diffView
+        expect(slice.view === 'open' && slice.selectedPath).toBe('src/z.ts')
+      })
+      loader.stop()
+    })
+
+    it('is a no-op while closed', () => {
+      setupGraph()
+      const gateway = createFakeGateway()
+      createDiffLiveLoader({ store, gateway }).refresh()
+      expect(gateway.compareCalls.length).toBe(0)
+    })
+  })
 })

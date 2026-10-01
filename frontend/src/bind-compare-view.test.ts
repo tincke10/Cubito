@@ -21,6 +21,7 @@ const fakeFileRail = (): DiffRailHandle => ({
   root: {} as HTMLElement,
   apply() {},
   onSelect() {},
+  onStageToggle() {},
   dispose() {}
 })
 

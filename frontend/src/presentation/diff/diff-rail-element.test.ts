@@ -13,13 +13,16 @@ type FakeElement = {
   replaceChildren(): void
   remove(): void
   dispatchClick(): void
+  clicks: number
+  title: string
+  type: string
   scrollIntoView(options: unknown): void
   scrolled: unknown[]
-  addEventListener(type: string, handler: () => void): void
+  addEventListener(type: string, handler: (event: { stopPropagation(): void }) => void): void
 }
 
 const createFakeElement = (tag: string): FakeElement => {
-  let clickHandler: (() => void) | null = null
+  let clickHandler: ((event: { stopPropagation(): void }) => void) | null = null
   const el: FakeElement = {
     tagName: tag.toUpperCase(),
     style: {},
@@ -28,6 +31,9 @@ const createFakeElement = (tag: string): FakeElement => {
     textContent: '',
     onclick: null,
     scrolled: [],
+    clicks: 0,
+    title: '',
+    type: '',
     scrollIntoView(options) {
       el.scrolled.push(options)
     },
@@ -43,7 +49,7 @@ const createFakeElement = (tag: string): FakeElement => {
       if (type === 'click') clickHandler = handler
     },
     dispatchClick() {
-      clickHandler?.()
+      clickHandler?.({ stopPropagation: () => el.clicks++ })
     }
   }
   return el
@@ -169,5 +175,26 @@ describe('createDiffRail', () => {
     root.remove = () => (removed = true)
     rail.dispose()
     expect(removed).toBe(true)
+  })
+
+  it('renders a stage toggle that reports its path without selecting the row', () => {
+    const rail = createDiffRail(createFakeDocument())
+    rail.apply([
+      row({ path: 'a.ts', stage: { state: 'unstaged', glyph: '○', label: 'stagear' } }),
+      row({ path: 'b.ts' })
+    ])
+    const toggled: string[] = []
+    const selected: string[] = []
+    rail.onStageToggle((path) => toggled.push(path))
+    rail.onSelect((path) => selected.push(path))
+    const [withStage, without] = rootOf(rail).children
+    expect(without!.children).toHaveLength(3)
+    const button = withStage!.children[3]!
+    expect(button.textContent).toBe('○')
+    expect(button.title).toBe('stagear')
+    button.dispatchClick()
+    expect(toggled).toEqual(['a.ts'])
+    expect(button.clicks).toBe(1) // stopPropagation was called
+    expect(selected).toEqual([])
   })
 })

@@ -33,5 +33,22 @@ else
   echo "[cubito] warning: set CUBITO_GIT_NAME and CUBITO_GIT_EMAIL so agents can commit" >&2
 fi
 
+# Why: git push over HTTPS and gh/glab need the tokens; the helper reads them from the env, so no
+# token is ever written to a file or printed here.
+as_node() { setpriv --reuid=node --regid=node --init-groups env HOME=/home/node "$@"; }
+configure_credential_helper() {
+  host_url="$1"
+  helper="$2"
+  as_node git config --global --unset-all "credential.${host_url}.helper" || true
+  as_node git config --global --add "credential.${host_url}.helper" ''
+  as_node git config --global --add "credential.${host_url}.helper" "$helper"
+}
+if [ -n "${GH_TOKEN:-}" ]; then
+  configure_credential_helper https://github.com '!gh auth git-credential'
+fi
+if [ -n "${GITLAB_TOKEN:-}" ]; then
+  configure_credential_helper https://gitlab.com '!glab auth git-credential'
+fi
+
 # Why not root: agents launched with bypass permissions are refused by Claude Code as root.
 exec setpriv --reuid=node --regid=node --init-groups env HOME=/home/node USER=node node config/scripts/cubito-start.mjs $register_args --agent-permissions "$agent_mode"

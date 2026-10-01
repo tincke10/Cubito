@@ -105,4 +105,31 @@ describe('diffRailViewModel', () => {
     expect(rows[1]!.cssClass).toContain('diff-rail__row--wt')
     expect(rows[2]!.cssClass).not.toContain('diff-rail__row--wt')
   })
+
+  describe('stage toggles', () => {
+    const wt = (path: string) => file({ path, origin: 'working' })
+
+    it('adds a stage descriptor only to rows that have a stage state', () => {
+      const rows = diffRailViewModel(
+        [wt('a.ts'), wt('b.ts'), file({ path: 'c.ts', origin: 'branch' })],
+        null,
+        new Map([
+          ['a.ts', 'staged'],
+          ['b.ts', 'unstaged']
+        ])
+      )
+      expect(rows[0]!.stage).toEqual({ state: 'staged', glyph: '●', label: 'quitar del stage' })
+      expect(rows[1]!.stage).toEqual({ state: 'unstaged', glyph: '○', label: 'stagear' })
+      expect(rows[2]!.stage).toBeUndefined()
+    })
+
+    it('shows a partial stage as half-filled and stages the rest on toggle', () => {
+      const [row] = diffRailViewModel([wt('a.ts')], null, new Map([['a.ts', 'partial']]))
+      expect(row!.stage).toEqual({ state: 'partial', glyph: '◐', label: 'stagear el resto' })
+    })
+
+    it('leaves rows untouched when no stage states are given', () => {
+      expect(diffRailViewModel([wt('a.ts')], null)[0]!.stage).toBeUndefined()
+    })
+  })
 })

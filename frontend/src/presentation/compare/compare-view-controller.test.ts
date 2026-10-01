@@ -50,6 +50,7 @@ const createFakeFileRail = (): DiffRailHandle & {
     disposed: false,
     apply: vi.fn((rows) => handle.applyCalls.push(rows)),
     onSelect: vi.fn((cb: (path: string) => void) => (selectCb = cb)),
+    onStageToggle: vi.fn(),
     dispose: vi.fn(() => (handle.disposed = true)),
     emitSelect(path: string) {
       selectCb?.(path)

@@ -14,17 +14,23 @@ const createFakeRail = (): DiffRailHandle & {
   applyCalls: unknown[]
   disposed: boolean
   emitSelect(path: string): void
+  emitStageToggle(path: string): void
 } => {
   let selectCb: ((path: string) => void) | null = null
+  let stageCb: ((path: string) => void) | null = null
   const handle = {
     root: {} as HTMLElement,
     applyCalls: [] as unknown[],
     disposed: false,
     apply: vi.fn((rows) => handle.applyCalls.push(rows)),
     onSelect: vi.fn((cb: (path: string) => void) => (selectCb = cb)),
+    onStageToggle: vi.fn((cb: (path: string) => void) => (stageCb = cb)),
     dispose: vi.fn(() => (handle.disposed = true)),
     emitSelect(path: string) {
       selectCb?.(path)
+    },
+    emitStageToggle(path: string) {
+      stageCb?.(path)
     }
   }
   return handle
@@ -63,6 +69,7 @@ const setup = () => {
   const onEnter = vi.fn()
   const onExit = vi.fn()
   const onSelect = vi.fn()
+  const onStageToggle = vi.fn()
   const deps: DiffViewControllerDeps = {
     createRail: () => {
       const r = createFakeRail()
@@ -82,11 +89,23 @@ const setup = () => {
     hud,
     keyboardBarSlot,
     onSelect,
+    onStageToggle,
     onEnter,
     onExit
   }
   const controller = createDiffViewController(deps)
-  return { controller, rails, panels, huds, hud, keyboardBarSlot, onEnter, onExit, onSelect }
+  return {
+    controller,
+    rails,
+    panels,
+    huds,
+    hud,
+    keyboardBarSlot,
+    onEnter,
+    onExit,
+    onSelect,
+    onStageToggle
+  }
 }
 
 const openSlice = (nodeId = 'router'): DiffViewSlice =>
@@ -139,6 +158,24 @@ describe('createDiffViewController', () => {
     controller.sync(openSlice(), CONNECTED, 'main')
     rails[0]!.emitSelect('a.ts')
     expect(onSelect).toHaveBeenCalledWith('a.ts')
+  })
+
+  it('forwards a rail stage toggle to deps.onStageToggle', () => {
+    const { controller, rails, onStageToggle } = setup()
+    controller.sync(openSlice(), CONNECTED, 'main')
+    rails[0]!.emitStageToggle('a.ts')
+    expect(onStageToggle).toHaveBeenCalledWith('a.ts')
+  })
+
+  it('projects stage states into the rail rows', () => {
+    const { controller, rails } = setup()
+    const slice = reduceDiffView(openSlice('router'), {
+      type: 'rail-loaded',
+      compare: { headOid: 'abc', mergeBase: 'def' },
+      files: [{ path: 'a.ts', status: 'modified', added: 1, removed: 0, origin: 'working' }]
+    })
+    controller.sync(slice, CONNECTED, 'main', new Map([['a.ts', 'staged']]))
+    expect(rails[0]!.applyCalls[0]).toMatchObject([{ path: 'a.ts', stage: { state: 'staged' } }])
   })
 
   it('does not remount on a second open sync — same instances, apply called again', () => {

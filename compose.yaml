@@ -14,6 +14,9 @@ services:
       CUBITO_SECRET_KEY:
       # `accept` in the host shell lets agents bypass permission prompts; unset means they ask.
       CUBITO_AGENT_BYPASS:
+      # Tokens for gh/glab (PR/MR creation and git push over HTTPS); read from the host shell, never written here.
+      GH_TOKEN:
+      GITLAB_TOKEN:
       # The identity agents commit with; the container's own user has none.
       CUBITO_GIT_NAME:
       CUBITO_GIT_EMAIL:
