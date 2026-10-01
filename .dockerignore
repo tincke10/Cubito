@@ -5,3 +5,6 @@ frontend/dist
 .git
 tests/cross-version-wire/.cross-version-checkouts
 *.log
+.env
+.env.*
+!.env.example
