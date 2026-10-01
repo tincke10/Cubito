@@ -10,6 +10,8 @@ services:
       CUBITO_PAIRING_ADDRESS: 127.0.0.1:6799
       # Read from the host shell when set (from `claude setup-token`); never written here.
       CLAUDE_CODE_OAUTH_TOKEN:
+      # Seals stored credentials (Linear, Jira, ...) at rest; read from the host shell, never written here.
+      CUBITO_SECRET_KEY:
       # `accept` in the host shell lets agents bypass permission prompts; unset means they ask.
       CUBITO_AGENT_BYPASS:
       # The identity agents commit with; the container's own user has none.

@@ -139,6 +139,15 @@ docker compose up --build
 
 `compose.yaml` only passes the variable through from your shell; the token is never written to the repo. For a quick session instead, `docker compose exec -u node cubito claude login` works too, but that login lives in the container and is lost when it is recreated.
 
+Credentials you give Cubito (Linear, Jira, ...) are stored unencrypted unless orcad has a key to seal them with; the startup log says which. Generate a key once and keep it (a password manager is fine) — a new key cannot read what an old one sealed:
+
+```bash
+export CUBITO_SECRET_KEY="$(openssl rand -base64 32)"   # 32 bytes, base64 or 64 hex chars
+docker compose up --build
+```
+
+`compose.yaml` only passes the variable through. Use `CUBITO_SECRET_KEY_FILE=/path` instead to read the key from a file (a Docker secret, for example); the inline variable wins when both are set. A key that is set but malformed stops orcad at startup instead of silently falling back to plaintext. Outside Docker on macOS, orcad keeps a generated master key in your login Keychain via the `security` CLI (the key is visible in that process's arguments for a moment, once, when it is first created); without either, orcad warns and stores credentials unsealed in a `0700` data directory.
+
 Agents commit as the container's own user, so give it your git identity:
 
 ```bash

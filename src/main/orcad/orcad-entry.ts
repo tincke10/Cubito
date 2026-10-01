@@ -13,7 +13,8 @@
  */
 import process from 'node:process'
 import { setAppEnvironment, type AppEnvironment } from '../../shared/app-environment'
-import { setSecretStore, type SecretStore } from '../../shared/secret-store'
+import { setSecretStore } from '../../shared/secret-store'
+import { createLazyOrcadSecretStore } from './orcad-secret-store'
 import type { ServeReadiness } from '../server/serve-readiness'
 import { applyOrcadAgentPermissions, type OrcadAgentPermissions } from './orcad-agent-permissions'
 import { resolveOrcadInstallRoot, resolveOrcadPath, resolveUserDataPath } from './orcad-app-paths'
@@ -63,28 +64,15 @@ function createNodeAppEnvironment(): AppEnvironment {
   }
 }
 
-/**
- * Why not silently plaintext: `isEncryptionAvailable() === false` already makes every
- * caller fall back to unsealed storage, which is a security posture, not a detail.
- * `describeProtectionGap()` gives the reason a client can surface.
- */
-function createNodeSecretStore(): SecretStore {
-  return {
-    isEncryptionAvailable: () => false,
-    encryptString: () => {
-      throw new Error('orcad_secret_sealing_unavailable')
-    },
-    decryptString: () => {
-      throw new Error('orcad_secret_sealing_unavailable')
-    },
-    describeProtectionGap: () =>
-      'This host has no OS keyring, so credentials are stored unencrypted. Pair from a desktop to manage secrets, or install and unlock a keyring.'
-  }
-}
+// Why lazy: installing adapters must not touch the Keychain; startup resolves it explicitly.
+const orcadSecretStore = createLazyOrcadSecretStore({
+  env: process.env,
+  platform: process.platform
+})
 
 export function installOrcadHostAdapters(): void {
   setAppEnvironment(createNodeAppEnvironment())
-  setSecretStore(createNodeSecretStore())
+  setSecretStore(orcadSecretStore)
 }
 
 export type OrcadOptions = {
@@ -181,6 +169,10 @@ async function startOrcadRuntime(
   const { resolvePushGatewayOrigin } = await import('../runtime/push/push-gateway-origin')
 
   const runtimeUserDataPath = getAppEnvironment().getPath('userData')
+  // Why before the store opens: a bad configured key must fail the launch before anything is
+  // sealed, and the operator needs the protection posture in the log from the first line.
+  const { reportOrcadSecretProtection } = await import('./orcad-secret-protection-startup')
+  reportOrcadSecretProtection({ store: orcadSecretStore, userDataPath: runtimeUserDataPath })
   const { store: profileStore, authority: profileStateAuthority } =
     await createOrcadProfileStateStartup(runtimeUserDataPath)
   const observedPaneIdentities = new AgentStatusObservedPaneIdentities()

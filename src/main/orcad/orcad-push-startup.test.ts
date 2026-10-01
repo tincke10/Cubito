@@ -127,6 +127,9 @@ vi.mock('../runtime/push/push-gateway-client', () => ({
   }
 }))
 
+// Why: startup resolves the secret key; an explicit one keeps tests off the macOS Keychain.
+vi.stubEnv('CUBITO_SECRET_KEY', 'ab'.repeat(32))
+
 afterEach(() => {
   rmSync(state.root, { recursive: true, force: true })
   vi.clearAllMocks()

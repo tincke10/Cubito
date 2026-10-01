@@ -64,7 +64,7 @@ It refuses to start when:
 | `orcad_data_root_unusable`             | the root cannot be created, stat'd or written                 |
 
 A root that is merely too permissive and that we own is tightened to `0700` rather than
-refused — orcad stores credentials there unsealed (no OS keyring on this host), so the goal
+refused — orcad stores credentials there unsealed unless `CUBITO_SECRET_KEY` (or a macOS Keychain master key) seals them, so the goal
 is a private root, and refusing when we could just fix it helps nobody. We refuse when the
 permissions are not ours to fix. Windows is exempt from the owner and mode checks: ACLs are
 not expressible as a POSIX mode, and `statSync().mode` there reports a synthesized one.
@@ -76,6 +76,16 @@ read as alive). A record belonging to a different identity is never reclaimed.
 daemon, which lives under `<data-root>/daemon` and fences its own endpoint with its own PID
 record. A lock that asked "is any process using this root" would refuse exactly the restarts
 a live daemon makes worthwhile.
+
+## Credential sealing
+
+orcad resolves one AES-256-GCM key at startup, first match wins: `CUBITO_SECRET_KEY` (32 bytes,
+base64 or hex), `CUBITO_SECRET_KEY_FILE` (same format, read from a file), then on macOS a
+master key kept in the login Keychain through `/usr/bin/security`. With none of them
+credentials are stored unsealed and the startup log says so on every launch. A configured key
+that is malformed or unreadable exits `78` (configuration) rather than downgrading to
+plaintext. The key is never logged. Changing the key makes previously sealed credentials
+unreadable; re-enter them.
 
 ## Supervision
 

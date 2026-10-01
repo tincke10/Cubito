@@ -73,6 +73,13 @@ describe('compose.yaml', () => {
     expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBeNull()
   })
 
+  it('passes the credential sealing key through from the host without storing a value', () => {
+    const env = cubito.environment ?? {}
+    expect(Object.hasOwn(env, 'CUBITO_SECRET_KEY')).toBe(true)
+    // Why null: the key must come from the host shell, never from a file in the repo.
+    expect(env.CUBITO_SECRET_KEY).toBeNull()
+  })
+
   it('passes the agent bypass opt-in through from the host without storing a value', () => {
     const env = cubito.environment ?? {}
     expect(Object.hasOwn(env, 'CUBITO_AGENT_BYPASS')).toBe(true)
@@ -216,6 +223,11 @@ describe('container user', () => {
     expect(entrypoint).toMatch(
       /exec setpriv .*cubito-start\.mjs .*--agent-permissions "?\$agent_mode"?/
     )
+  })
+
+  it('documents sealing credentials at rest with CUBITO_SECRET_KEY in the Docker README', () => {
+    expect(readme).toContain('export CUBITO_SECRET_KEY=')
+    expect(readme).toContain('openssl rand -base64 32')
   })
 
   it('documents the bypass opt-in in the Docker README', () => {
