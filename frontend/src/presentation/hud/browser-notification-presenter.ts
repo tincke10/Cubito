@@ -10,6 +10,7 @@ export type BrowserNotificationPresenter = {
 export function createBrowserNotificationPresenter(env: {
   notificationApi: typeof Notification | undefined
   isSecureContext: boolean
+  isPageVisible(): boolean
   focusWindow(): void
   onActivate(worktreeId: string): void
 }): BrowserNotificationPresenter {
@@ -17,7 +18,8 @@ export function createBrowserNotificationPresenter(env: {
   const api = env.isSecureContext ? env.notificationApi : undefined
   return {
     present(notification) {
-      if (!api || api.permission !== 'granted') return
+      // Why: a visible tab already shows the HUD toast; an OS popup would duplicate it.
+      if (!api || api.permission !== 'granted' || env.isPageVisible()) return
       try {
         const shown = new api(notification.title, {
           body: notification.body,

@@ -36,6 +36,7 @@ describe('browser notification presenter', () => {
     const presenter = createBrowserNotificationPresenter({
       notificationApi: api,
       isSecureContext: true,
+      isPageVisible: () => false,
       focusWindow: vi.fn(),
       onActivate
     })
@@ -47,6 +48,18 @@ describe('browser notification presenter', () => {
     expect(onActivate).toHaveBeenCalledWith('r::/p')
   })
 
+  it('skips the OS notification while the tab is visible (the HUD toast already covers it)', () => {
+    const { api, created } = fakeNotificationApi('granted')
+    createBrowserNotificationPresenter({
+      notificationApi: api,
+      isSecureContext: true,
+      isPageVisible: () => true,
+      focusWindow: vi.fn(),
+      onActivate: vi.fn()
+    }).present(note)
+    expect(created).toHaveLength(0)
+  })
+
   it.each([
     ['not granted', 'default', true],
     ['an insecure context', 'granted', false]
@@ -55,6 +68,7 @@ describe('browser notification presenter', () => {
     createBrowserNotificationPresenter({
       notificationApi: api,
       isSecureContext,
+      isPageVisible: () => false,
       focusWindow: vi.fn(),
       onActivate: vi.fn()
     }).present(note)
@@ -65,6 +79,7 @@ describe('browser notification presenter', () => {
     const presenter = createBrowserNotificationPresenter({
       notificationApi: undefined,
       isSecureContext: true,
+      isPageVisible: () => false,
       focusWindow: vi.fn(),
       onActivate: vi.fn()
     })
@@ -77,6 +92,7 @@ describe('browser notification presenter', () => {
     const presenter = createBrowserNotificationPresenter({
       notificationApi: api,
       isSecureContext: true,
+      isPageVisible: () => false,
       focusWindow: vi.fn(),
       onActivate: vi.fn()
     })
@@ -88,6 +104,7 @@ describe('browser notification presenter', () => {
     createBrowserNotificationPresenter({
       notificationApi: insecure.api,
       isSecureContext: false,
+      isPageVisible: () => false,
       focusWindow: vi.fn(),
       onActivate: vi.fn()
     }).requestPermissionOnce()

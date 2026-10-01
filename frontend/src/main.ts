@@ -475,6 +475,7 @@ const attentionToasts = createAttentionToastHost(document, document.body, {
 const browserNotifications = createBrowserNotificationPresenter({
   notificationApi: typeof Notification === 'undefined' ? undefined : Notification,
   isSecureContext: window.isSecureContext,
+  isPageVisible: () => document.visibilityState === 'visible',
   focusWindow: () => window.focus(),
   onActivate: selectAttentionWorktree
 })
