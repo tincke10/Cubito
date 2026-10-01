@@ -1112,6 +1112,77 @@
         padding: 0 0 0 16px;
         color: var(--cubito-text-dim);
       }
+      /* Remove-worktree confirm (U1): centered in-app modal, same dim backdrop as the palette. */
+      .cubito-worktree-delete {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: auto;
+      }
+      .cubito-worktree-delete[hidden] {
+        display: none;
+      }
+      .cubito-worktree-delete__backdrop {
+        position: absolute;
+        inset: 0;
+        background: color-mix(in srgb, var(--cubito-background) 70%, transparent);
+      }
+      .cubito-worktree-delete__card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        width: min(420px, calc(100% - 32px));
+        padding: 18px;
+        background: var(--cubito-panel-surface);
+        border: 1px solid var(--cubito-panel-border);
+        border-radius: 6px;
+        font-size: 12.5px;
+        color: var(--cubito-text-primary);
+      }
+      .cubito-worktree-delete__title {
+        font-weight: 600;
+      }
+      .cubito-worktree-delete__lines {
+        margin: 0;
+        padding: 0 0 0 16px;
+        color: var(--cubito-text-dim);
+      }
+      .cubito-worktree-delete__error {
+        font-size: 11px;
+        color: var(--cubito-amber);
+      }
+      .cubito-worktree-delete__actions {
+        display: flex;
+        gap: 8px;
+      }
+      .cubito-worktree-delete__action,
+      .cubito-worktree-delete__cancel {
+        flex: 1;
+        height: 36px;
+        border-radius: 4px;
+        font: inherit;
+        cursor: pointer;
+      }
+      .cubito-worktree-delete__action {
+        border: none;
+        background: var(--cubito-amber);
+        color: var(--cubito-background);
+        font-weight: 600;
+      }
+      .cubito-worktree-delete__cancel {
+        border: 1px solid var(--cubito-panel-border);
+        background: transparent;
+        color: var(--cubito-text-dim);
+      }
+      .cubito-worktree-delete__action:disabled,
+      .cubito-worktree-delete__cancel:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
     </style>
   </head>
   <body>

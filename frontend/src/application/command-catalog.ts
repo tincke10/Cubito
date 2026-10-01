@@ -11,6 +11,7 @@ export type CommandId =
   | 'open-system'
   | 'open-diff'
   | 'open-compare'
+  | 'delete-worktree'
 
 export type CommandAvailability = {
   readonly hasSelection: boolean
@@ -95,5 +96,12 @@ export const commandCatalog = (platform: { isMac: boolean }): readonly PaletteCo
     keybindingHint: 'c',
     // Anchor is the running camada, not selection — hasSelection is irrelevant here.
     isAvailable: (a) => a.hasRunningCamada
+  },
+  {
+    id: 'delete-worktree',
+    label: 'eliminar worktree',
+    keybindingHint: '⌫',
+    // The confirm panel itself explains why the primary worktree is refused.
+    isAvailable: (a) => a.hasSelection && a.isConnected
   }
 ]

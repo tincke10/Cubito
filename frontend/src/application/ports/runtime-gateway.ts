@@ -251,6 +251,16 @@ export type MergeWinnerResult =
     }
   | { outcome: 'conflict'; files: readonly string[] }
 
+/** `worktree.rm` knobs: `hostId` pins the executing host (SSH); `force` removes a dirty tree. */
+export type WorktreeRemoveOptions = { hostId?: string; force?: boolean }
+
+export type WorktreeRemoveResult = {
+  removed: true
+  warning?: string
+  /** The branch survived removal (unmerged work); the host did not delete it. */
+  preservedBranch?: string
+}
+
 /**
  * Port to the orcad runtime. The application layer depends on this shape
  * only; infrastructure provides the RPC-backed implementation.
@@ -290,6 +300,8 @@ export type RuntimeGateway = {
     message?: string,
     syncWorkingTree?: boolean
   ): Promise<MergeWinnerResult>
+  /** Removes a worktree (the host stops its PTYs/agents itself); rejects when git refuses, e.g. dirty. */
+  worktreeRemove(worktree: string, options?: WorktreeRemoveOptions): Promise<WorktreeRemoveResult>
   agentActivity(input: AgentActivityInput): Promise<AgentActivityPage>
   /** Effective setup command for a repo (orca.yaml or local override); null when none; rejects when unknown. */
   repoSetupCommand(repo: string): Promise<string | null>

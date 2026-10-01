@@ -50,7 +50,7 @@ describe('commandCatalog', () => {
   const mac = commandCatalog({ isMac: true })
   const other = commandCatalog({ isMac: false })
 
-  it('orders the 9 commands per the proposal', () => {
+  it('orders the 11 commands per the proposal', () => {
     expect(mac.map((c) => c.id)).toEqual([
       'focus',
       'fit-all',
@@ -61,7 +61,8 @@ describe('commandCatalog', () => {
       'fan-out',
       'open-system',
       'open-diff',
-      'open-compare'
+      'open-compare',
+      'delete-worktree'
     ])
   })
 
@@ -125,6 +126,9 @@ describe('commandCatalog', () => {
     ['open-system', avail({ hasSelection: false, isConnected: true }), false],
     ['open-diff', avail({ hasSelection: true, isConnected: false }), true],
     ['open-diff', avail({ hasSelection: false, isConnected: true }), false],
+    ['delete-worktree', avail({ hasSelection: true, isConnected: true }), true],
+    ['delete-worktree', avail({ hasSelection: true, isConnected: false }), false],
+    ['delete-worktree', avail({ hasSelection: false, isConnected: true }), false],
     ['open-compare', avail({ hasRunningCamada: true }), true],
     ['open-compare', avail({ hasRunningCamada: false }), false],
     // selection/connection are irrelevant to open-compare — only hasRunningCamada gates it.

@@ -26,6 +26,8 @@ export type RawWorktreeRecord = {
   spawn?: SpawnProgress
   /** Persisted create-base for stale-base probes; diff mode's baseRef resolution truth. */
   baseRef?: string
+  /** Execution host (SSH) — echoed back on mutations that must run where the worktree lives. */
+  hostId?: string
 }
 
 /** Overrides only the optional fields a record actually supplies; the rest stays inert. */
@@ -75,7 +77,8 @@ export function buildWorktreeGraph(records: readonly RawWorktreeRecord[]): Workt
       parentId: raw.parentWorktreeId,
       childIds: [...raw.childWorktreeIds],
       activity: activityFromRecord(raw),
-      ...(raw.baseRef !== undefined ? { baseRef: raw.baseRef } : {})
+      ...(raw.baseRef !== undefined ? { baseRef: raw.baseRef } : {}),
+      ...(raw.hostId !== undefined ? { hostId: raw.hostId } : {})
     })
   }
 

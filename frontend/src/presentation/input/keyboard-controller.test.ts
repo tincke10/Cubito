@@ -55,6 +55,10 @@ function fakeTerminalCommandPort() {
   return { focusActivePanel: vi.fn(), closeActiveSession: vi.fn() }
 }
 
+function fakeWorktreeDelete(open = false) {
+  return { request: vi.fn(), isOpen: vi.fn(() => open), cancel: vi.fn(() => open) }
+}
+
 const LINUX = { isMac: false }
 const MAC = { isMac: true }
 
@@ -96,8 +100,16 @@ function setup(selectedId: string | null = 'b', platform = LINUX) {
   const heights = fakeHeights()
   const terminal = fakeTerminalCommandPort()
   const diff = { select: vi.fn() }
-  const controller = createKeyboardController({ store, heights, terminal, diff, platform })
-  return { store, heights, terminal, diff, controller }
+  const worktreeDelete = fakeWorktreeDelete()
+  const controller = createKeyboardController({
+    store,
+    heights,
+    terminal,
+    diff,
+    worktreeDelete,
+    platform
+  })
+  return { store, heights, terminal, diff, worktreeDelete, controller }
 }
 
 /** Two-island graph (repos 'r1'/'r2') for Tab island-cycling (PROJ-008). */
@@ -128,10 +140,65 @@ function setupWithRepos() {
     heights,
     terminal,
     diff: { select: vi.fn() },
+    worktreeDelete: fakeWorktreeDelete(),
     platform: LINUX
   })
   return { store, heights, terminal, controller }
 }
+
+describe('createKeyboardController — delete worktree', () => {
+  it.each(['Backspace', 'Delete'])('%s requests deletion of the selected node', (key) => {
+    const { controller, worktreeDelete } = setup('b')
+    expect(controller.handleKeyDown(baseEvent({ key }))).toBe(true)
+    expect(worktreeDelete.request).toHaveBeenCalledWith('b')
+  })
+
+  it('does nothing without a selection', () => {
+    const { controller, worktreeDelete } = setup(null)
+    expect(controller.handleKeyDown(baseEvent({ key: 'Backspace' }))).toBe(false)
+    expect(worktreeDelete.request).not.toHaveBeenCalled()
+  })
+
+  it('ignores Backspace typed into a text field', () => {
+    const { controller, worktreeDelete } = setup('b')
+    const target = { tagName: 'TEXTAREA', isContentEditable: false }
+    expect(controller.handleKeyDown(baseEvent({ key: 'Backspace', target }))).toBe(false)
+    expect(worktreeDelete.request).not.toHaveBeenCalled()
+  })
+
+  it('is swallowed without a request while a scene mode owns the screen', () => {
+    const { controller, store, worktreeDelete } = setup('b')
+    store.dispatchDiffView({ type: 'open', nodeId: 'b', baseRef: 'root' })
+    expect(controller.handleKeyDown(baseEvent({ key: 'Backspace' }))).toBe(true)
+    expect(worktreeDelete.request).not.toHaveBeenCalled()
+  })
+
+  it.each(['palette', 'selector'])('does not fire while the %s is open', (modal) => {
+    const { controller, store, worktreeDelete } = setup('b')
+    if (modal === 'palette') store.dispatchCommandPalette({ type: 'open' })
+    else store.dispatchProjectSelector({ type: 'open' })
+    expect(controller.handleKeyDown(baseEvent({ key: 'Backspace' }))).toBe(true)
+    expect(worktreeDelete.request).not.toHaveBeenCalled()
+  })
+
+  it('does not re-request while the confirm panel is already open, and Escape closes it first', () => {
+    const store = createSceneStore()
+    store.update({ graph: buildFanGraph(), selection: { selectedId: 'b' } })
+    const worktreeDelete = fakeWorktreeDelete(true)
+    const controller = createKeyboardController({
+      store,
+      heights: fakeHeights(),
+      terminal: fakeTerminalCommandPort(),
+      diff: { select: vi.fn() },
+      worktreeDelete,
+      platform: LINUX
+    })
+    expect(controller.handleKeyDown(baseEvent({ key: 'Backspace' }))).toBe(true)
+    expect(worktreeDelete.request).not.toHaveBeenCalled()
+    expect(controller.handleKeyDown(baseEvent({ key: 'Escape' }))).toBe(true)
+    expect(worktreeDelete.cancel).toHaveBeenCalled()
+  })
+})
 
 describe('createKeyboardController', () => {
   it('h delegates to moveSelection for "parent" — no parent-lookup logic of its own', () => {

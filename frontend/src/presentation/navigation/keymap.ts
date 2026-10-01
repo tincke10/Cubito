@@ -20,6 +20,8 @@ export type NavCommand =
   | { kind: 'open-system' }
   | { kind: 'open-diff' }
   | { kind: 'open-compare' }
+  /** Bare Backspace/Delete: ask to remove the selected worktree (always behind a confirm panel). */
+  | { kind: 'delete-worktree' }
   /** Bare 'g' — closes whichever scene-replacing mode (system, diff or compare) currently owns
    *  the screen, returning to the worktree graph (no other bare-key meaning claims 'g'). No-op
    *  when neither mode is open. */
@@ -140,6 +142,9 @@ export function resolveNavCommand(
   }
   if (key === 'g') {
     return { kind: 'close-scene-mode' }
+  }
+  if (key === 'Backspace' || key === 'Delete') {
+    return { kind: 'delete-worktree' }
   }
   return null
 }

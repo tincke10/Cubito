@@ -83,6 +83,7 @@ describe('createOrcadGateway', () => {
       'orchestrationQuestionList',
       'orchestrationQuestionAnswer',
       'gitMergeWinnerIntoParent',
+      'worktreeRemove',
       'listWorktrees',
       'listRepos',
       'addRepo',

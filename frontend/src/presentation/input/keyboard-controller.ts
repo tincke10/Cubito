@@ -30,11 +30,20 @@ export type DiffSelectPort = {
   select(path: string): void
 }
 
+/** The delete-worktree confirm flow: `request` opens it; the keyboard layer must not act while it is open. */
+export type WorktreeDeletePort = {
+  request(nodeId: string): void
+  isOpen(): boolean
+  /** True when it closed the panel (false while a removal is running or when idle). */
+  cancel(): boolean
+}
+
 export type KeyboardControllerDeps = {
   store: SceneStore
   heights: CameraHeightController
   terminal: TerminalCommandPort
   diff: DiffSelectPort
+  worktreeDelete: WorktreeDeletePort
   /** Mac vs. Linux/Windows — selects the ⌘P/Ctrl+P chord (PROJ-005). */
   platform: { isMac: boolean }
 }
@@ -58,7 +67,7 @@ type DomKeydownTarget = {
  * height. No camera math lives here — it all delegates to `heights`.
  */
 export function createKeyboardController(deps: KeyboardControllerDeps): KeyboardController {
-  const { store, heights, terminal, diff, platform } = deps
+  const { store, heights, terminal, diff, worktreeDelete, platform } = deps
 
   const handleKeyDown = (event: KeyboardControllerEvent): boolean => {
     const command = resolveNavCommand(
@@ -134,6 +143,21 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
         const next = stepCompareFocus(compareView.members, compareView.focusedChildId, step)
         if (next !== null) store.dispatchCompareView({ type: 'focus-child', childId: next })
       }
+      return true
+    }
+    if (command.kind === 'delete-worktree') {
+      // Handled-but-inert while any modal owns the keyboard, so Backspace never double-fires.
+      if (
+        worktreeDelete.isOpen() ||
+        store.get().commandPalette.view !== 'closed' ||
+        store.get().projectSelector.view !== 'closed' ||
+        store.get().spawnMenu.view !== 'closed'
+      ) {
+        return true
+      }
+      const selectedId = store.get().selection.selectedId
+      if (selectedId === null) return false
+      worktreeDelete.request(selectedId)
       return true
     }
     if (command.kind === 'move') {
@@ -273,6 +297,10 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
     // terminal-close, then selector-close wins over spawn/system/diff/compare/terminal-close
     // (PROJ-008); each modal's own query/path input already intercepts Escape above, this is
     // belt-and-suspenders.
+    if (worktreeDelete.isOpen()) {
+      worktreeDelete.cancel()
+      return true
+    }
     if (store.get().commandPalette.view !== 'closed') {
       store.dispatchCommandPalette({ type: 'close' })
       return true
@@ -328,7 +356,8 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
         !domEvent.ctrlKey &&
         !domEvent.metaKey &&
         (domEvent.key === 's' || (domEvent.shiftKey && domEvent.key.toLowerCase() === 'f'))
-      if (handled && (domEvent.key === 'Tab' || isBrowserChord || opensFormField)) {
+      const isDeleteKey = domEvent.key === 'Backspace' || domEvent.key === 'Delete'
+      if (handled && (domEvent.key === 'Tab' || isBrowserChord || opensFormField || isDeleteKey)) {
         domEvent.preventDefault()
       }
     }

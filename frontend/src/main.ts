@@ -21,6 +21,7 @@ import { createSystemViewBinder } from './bind-system-view'
 import { demoSystemGraph } from './demo-system-graph'
 import { createDiffViewBinder } from './bind-diff-view'
 import { createCompareViewBinder } from './bind-compare-view'
+import { createWorktreeDeleteBinder } from './bind-worktree-delete'
 import { createHudOverlay } from './presentation/hud/hud-overlay'
 import { createDemoBanner } from './presentation/hud/demo-banner-element'
 import { createAttentionNotificationBinder } from './bind-attention-notifications'
@@ -164,6 +165,9 @@ const demoGateway: RuntimeGateway = {
   gitMergeWinnerIntoParent: async () => {
     throw new Error('gitMergeWinnerIntoParent not implemented in the demo gateway')
   },
+  worktreeRemove: async () => {
+    throw new Error('worktreeRemove not implemented in the demo gateway')
+  },
   agentActivity: async () => ({ events: [], latestSeq: 0 }),
   repoSetupCommand: async () => null,
   repoSetupInfo: async () => ({ local: null, shared: null, known: true }),
@@ -292,11 +296,20 @@ const terminalCommands = {
   closeActiveSession: () => terminalController?.closeActiveSession()
 }
 
+// Remove worktree (U1): eager like the palette; the gateway is swapped in on connect.
+const worktreeDeleteBinder = createWorktreeDeleteBinder({
+  store,
+  hud: hudElement,
+  demoGateway,
+  onSelectionSettled: (selectedId) => heights.onSelectionChanged(selectedId)
+})
+
 const keyboardController = createKeyboardController({
   store,
   heights,
   terminal: terminalCommands,
   diff: diffViewBinder,
+  worktreeDelete: worktreeDeleteBinder,
   platform
 })
 keyboardController.attach(window)
@@ -309,6 +322,7 @@ const commandPaletteController = createCommandPaletteController({
   store,
   heights,
   terminal: terminalCommands,
+  worktreeDelete: worktreeDeleteBinder,
   createElement: createCommandPalette,
   hud: hudElement,
   platform
@@ -507,6 +521,7 @@ if (pairingEntry.kind === 'connect') {
       bindProjects(connection)
       fanOutBinder.bind(connection)
       attentionBinder.bind(connection)
+      worktreeDeleteBinder.rebindGateway(connection.gateway)
       systemViewBinder.rebindGateway(connection.gateway, connection.systemGraphStream)
       diffViewBinder.rebindGateway(connection.gateway)
       compareViewBinder.rebindGateway(connection.gateway, connection.capabilities)

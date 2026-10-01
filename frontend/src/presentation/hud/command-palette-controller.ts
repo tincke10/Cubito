@@ -4,7 +4,7 @@ import { commandCatalog, toCommandAvailability } from '../../application/command
 import type { CommandPaletteSlice } from '../../application/command-palette-model'
 import { commandPaletteViewModel } from './command-palette-view-model'
 import type { CommandPaletteHandle } from './command-palette-element'
-import type { TerminalCommandPort } from '../input/keyboard-controller'
+import type { TerminalCommandPort, WorktreeDeletePort } from '../input/keyboard-controller'
 import type { CameraHeightController } from '../input/camera-height-controller'
 import { fanOutMemberIds } from '../../application/fan-out-model'
 
@@ -12,6 +12,7 @@ export type CommandPaletteControllerDeps = {
   store: SceneStore
   heights: Pick<CameraHeightController, 'goTo'>
   terminal: Pick<TerminalCommandPort, 'focusActivePanel'>
+  worktreeDelete: Pick<WorktreeDeletePort, 'request'>
   createElement: () => CommandPaletteHandle
   hud: { appendChild(element: unknown): void }
   platform: { isMac: boolean }
@@ -30,7 +31,7 @@ export type CommandPaletteController = {
 export function createCommandPaletteController(
   deps: CommandPaletteControllerDeps
 ): CommandPaletteController {
-  const { store, heights, terminal } = deps
+  const { store, heights, terminal, worktreeDelete } = deps
   const catalog = commandCatalog(deps.platform)
   let element: CommandPaletteHandle | null = null
 
@@ -91,6 +92,10 @@ export function createCommandPaletteController(
       const litter = fanOutMemberIds(fanOut).slice(1) // drop the parent, keep only the children
       if (litter.length === 0) return
       store.dispatchCompareView({ type: 'open', members: litter })
+    },
+    'delete-worktree': () => {
+      const selectedId = store.get().selection.selectedId
+      if (selectedId !== null) worktreeDelete.request(selectedId)
     }
   }
 

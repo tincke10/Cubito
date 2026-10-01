@@ -1,4 +1,5 @@
 import type { CompareMergeState } from '../../application/compare-view-model'
+import { createTwoStepButton } from '../hud/two-step-button'
 
 export type CompareMergeActionModel = {
   /** Hidden until a winner is picked — merge never implies picking one. */
@@ -56,9 +57,8 @@ export function createCompareMergeAction(doc: Document = document): CompareMerge
   const root = doc.createElement('div')
   root.className = 'cubito-compare-merge-action'
 
-  const button = doc.createElement('button')
-  button.type = 'button'
-  button.className = 'compare-merge-action__button'
+  const twoStep = createTwoStepButton(doc, 'compare-merge-action__button')
+  const button = twoStep.element
 
   const syncRow = doc.createElement('label')
   syncRow.className = 'compare-merge-action__sync'
@@ -77,46 +77,14 @@ export function createCompareMergeAction(doc: Document = document): CompareMerge
   root.appendChild(syncRow)
   root.appendChild(result)
 
-  let armed = false
   let capable = false
-  let running = false
   let mergeCallback: ((syncWorkingTree: boolean) => void) | null = null
-
-  const renderLabel = (): void => {
-    button.textContent = !capable
-      ? UNSUPPORTED_LABEL
-      : running
-        ? RUNNING_LABEL
-        : armed
-          ? CONFIRM_LABEL
-          : IDLE_LABEL
-  }
-
-  const disarm = (): void => {
-    armed = false
-    renderLabel()
-  }
 
   const resetSyncCheckbox = (): void => {
     syncCheckbox.checked = false
   }
 
-  button.addEventListener('click', () => {
-    if (button.disabled) return
-    if (!armed) {
-      armed = true
-      renderLabel()
-      return
-    }
-    const syncWorkingTree = syncCheckbox.checked
-    disarm()
-    mergeCallback?.(syncWorkingTree)
-    button.blur?.() // release focus — a focused button re-fires on Enter (risk 3)
-  })
-  button.addEventListener('blur', disarm)
-  button.addEventListener('keydown', (event: KeyboardEvent) => {
-    if (event.key === 'Escape') disarm()
-  })
+  twoStep.onConfirm(() => mergeCallback?.(syncCheckbox.checked))
 
   const renderResult = (merge: CompareMergeState): void => {
     result.replaceChildren()
@@ -161,14 +129,20 @@ export function createCompareMergeAction(doc: Document = document): CompareMerge
     apply(model) {
       root.hidden = !model.visible
       if (!model.visible) {
-        disarm()
+        twoStep.disarm()
         resetSyncCheckbox()
       }
       capable = model.capable
-      running = model.merge.phase === 'running'
-      button.disabled = !capable || running
+      twoStep.apply({
+        labels: {
+          idle: capable ? IDLE_LABEL : UNSUPPORTED_LABEL,
+          confirm: capable ? CONFIRM_LABEL : UNSUPPORTED_LABEL,
+          busy: RUNNING_LABEL
+        },
+        busy: model.merge.phase === 'running',
+        disabled: !capable
+      })
       syncRow.hidden = !model.syncCapable
-      renderLabel()
       renderResult(model.merge)
     },
     onMergeWinner(cb) {

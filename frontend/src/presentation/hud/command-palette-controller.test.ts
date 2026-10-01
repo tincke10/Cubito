@@ -107,12 +107,14 @@ function setup(selectedId: string | null = 'a', connected = true) {
   // WHICH heights method got called for each command.
   const heights = { goTo: vi.fn() }
   const terminal = { focusActivePanel: vi.fn() }
+  const worktreeDelete = { request: vi.fn() }
   const hud = { appendChild: vi.fn() }
   const handles: FakeHandle[] = []
   const deps: CommandPaletteControllerDeps = {
     store,
     heights,
     terminal,
+    worktreeDelete,
     createElement: () => {
       const h = createFakeHandle()
       handles.push(h)
@@ -122,7 +124,7 @@ function setup(selectedId: string | null = 'a', connected = true) {
     platform: LINUX
   }
   const controller = createCommandPaletteController(deps)
-  return { store, heights, terminal, hud, handles, controller }
+  return { store, heights, terminal, worktreeDelete, hud, handles, controller }
 }
 
 const openAndMount = (setupResult: ReturnType<typeof setup>): void => {
@@ -308,6 +310,14 @@ describe('createCommandPaletteController', () => {
       const before = setupResult.store.get()
       setupResult.handles[0]!.emitActivate('open-compare')
       expect(setupResult.store.get().compareView).toBe(before.compareView)
+    })
+
+    it('delete-worktree asks the delete flow for the selected node, closing the palette first', () => {
+      const setupResult = setup('a')
+      openAndMount(setupResult)
+      setupResult.handles[0]!.emitActivate('delete-worktree')
+      expect(setupResult.store.get().commandPalette.view).toBe('closed')
+      expect(setupResult.worktreeDelete.request).toHaveBeenCalledWith('a')
     })
 
     it('activating a currently-disabled command no-ops entirely (guard, belt-and-suspenders)', () => {

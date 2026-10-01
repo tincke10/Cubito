@@ -122,6 +122,7 @@ function createFakeConnection(overrides?: {
       gitMergeWinnerIntoParent: async () => {
         throw new Error('gitMergeWinnerIntoParent not implemented in this fake')
       },
+      worktreeRemove: async () => ({ removed: true as const }),
       agentActivity: async () => ({ events: [], latestSeq: 0 })
     },
     terminals: createFakeTerminalsPort(),
