@@ -3,7 +3,7 @@
 Estado real del fork, verificado contra `git log` y el CI. Fuente única: este archivo. Se actualiza
 al cerrar cada tramo, con el commit que lo cierra.
 
-Última revisión: 2026-09-30 · después de los UX fixes (ver commits por fila).
+Última revisión: 2026-10-01 · después del sync con Orca (ver commits por fila).
 
 ## Cerrado
 
@@ -33,6 +33,7 @@ al cerrar cada tramo, con el commit que lo cierra.
 | Dogfood fixes | Foco de la terminal al abrirla, CLI `orca` en el PATH de los agentes (el fan-out reporta), estado de agentes para spawns comunes (`worktree.ps` headless + overlay en el frontend), nombres de servicio con extensión en `[x]`, crawl de `.tsx`/`.jsx`; Hono validado en vivo | 2026-09-29 · `82b2a64b2` |
 | UX fixes | Comando de setup por repo (worktrees nuevos con deps, `corepack` en la imagen) y re-setup del padre tras un merge que toca manifests; pairing que sobrevive la recarga + banner de modo demo; `j`/`k` en el rail de `[d]`; `d`↔`x` directo; la `s` del spawn ya no se filtra; panel `[t]` dentro del viewport y bajo el HUD; título del fan-out con el nodo padre; ayuda en la ruta de "agregar repo". Validado en vivo salvo el re-setup del padre (solo unit tests) | 2026-09-30 · `7deebb5ec` |
 | UX follow-ups | Re-setup del padre con el `orca.yaml` pre-merge (`<commit>^1`, nunca el del ganador) validado en vivo; hint "sin setup" que se refresca en forms abiertos; `[d]` abre con el primer archivo seleccionado; el nodo recién spawneado queda seleccionado | 2026-09-30 · `f9791ccb5` |
+| Sync con Orca | Merge real de upstream `d74388f8a2` (+2773 commits) en `src/main`, `src/shared`, `src/cli` y `src/relay`; lo de Cubito portado sobre la estructura nueva (trust de agentes, run-lease, merge-winner, wirings de orcad); build de orcad en Node sin Bun con todos los workers; validado en vivo en Docker con un agente Claude real | 2026-10-01 · `de5aed831` |
 
 ## Cerrado sin implementar
 
@@ -51,10 +52,9 @@ al cerrar cada tramo, con el commit que lo cierra.
 
 ## Pendiente
 
-1. **Cubito atrasado respecto de Orca.** Upstream avanzó 2773 commits desde el fork (merge-base
-   `a1f198be0`, 2026-08-29): 1259 fixes, 499 perf, 232 feats, parches de seguridad de deps. Un merge
-   directo choca con lo borrado en `bb24b404b`; lo realista es un sync selectivo de `src/main`,
-   `src/shared` y `src/cli`. Detalle en engram `survey/upstream-drift`.
+1. **Syncs periódicos con Orca.** El merge-base ya avanzó a `d74388f8a2`: el próximo sync es un
+   `git merge upstream/main` con la misma política (fuera de `src/main|shared|cli|relay` gana Cubito).
+   Sin Bun: el deploy remoto de orcad por SSH de upstream no aplica a un build de Cubito.
 2. **Wirings perdidos con el main de Electron** (relevamiento en engram `survey/orca-feature-coverage`):
    notificaciones al terminar un agente, scheduler de automations, `StatsCollector`, cifrado de
    secretos (tokens de Linear/Jira en texto plano).
@@ -63,6 +63,9 @@ al cerrar cada tramo, con el commit que lo cierra.
    splits de terminal, puertos/preview.
 4. **Detalles:** el rail del compare no refresca las stats tras nuevos commits en los hijos hasta
    reabrirlo; no hay forma de desregistrar un repo desde la UI ni el CLI.
+5. **Cosméticos vistos al validar el sync:** en `[x]` el texto "aún no hay actividad" y una scrollbar
+   horizontal aparecen sin estilo abajo a la izquierda; en compare el checkbox "sincronizar el padre"
+   queda tapado por la barra de atajos.
 
 ## Ideas sin decidir
 
