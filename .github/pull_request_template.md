@@ -1,54 +1,32 @@
-## ELI5
+## Summary
 
-<!-- Simple high-level explanation -->
-
-## What Changed
-
-<!-- Describe the change clearly and keep scope tight. -->
+<!-- What changed, in plain language. The PR title is the one-liner. -->
 
 ## Why
 
 <!-- What problem does this solve, and why is this approach right? -->
 
-## Linked Issue
+## Linked issue
 
-<!-- Link the issue this PR addresses, there should ALWAYS be one -->
+<!-- There should be one. -->
 
 Fixes #
 
-## Visual Proof
+## Visual proof
 
-<!-- REQUIRED for UI / behavior changes. Please attach a BEFORE and AFTER that can easily tabbed/switched. Use videos for when appropriate over screenshots -->
-<!-- If there is truly no visual or interaction change, write exactly: `N/A` and briefly say why. -->
-<!-- For attachments NEVER add directly to the PR files (do not commit to files), use `gh image` extension or drag + drop (works for any attachment) -->
+<!-- UI changes: before and after (drag and drop screenshots or video; do not commit them). No visual change: write `N/A` and say why. -->
 
 ## Testing
 
-<!-- How did you verify this? Steps a reviewer can follow. Which platforms did you actually test (macOS / Linux / Windows / SSH)? -->
+<!-- Steps a reviewer can follow. Docker or native macOS? Which browser? -->
 
-- [ ] I manually tested these changes locally
-- [ ] Automated tests added/updated, or explained why not below
-
-## AI Disclosure
-
-<!-- DO NOT FILL IN IF YOU ARE STABLYAI TEAM MEMBER (INTERNAL CONTRIBUTOR), IGNORE SECTION: -->
-<!-- Which AI model if anyone was used, please state the details -->
-
-## Review
-
-## Agent skill upstream boundary
-
-- [ ] Not applicable, or this change follows `docs/reference/agent-skill-sharing-upstream-boundary.md` and copies or mechanically translates no upstream skill-installer source, tests, fixtures, registry entries, path tables, comments, or documentation.
-
-## Notes
-
-Ensure no issues in: Security, Cross-platoform support (Linux, Windows, Mac), Remote SSH, Mobile, general backwards compatibility, performance
+- [ ] Tests written first and passing (`pnpm test <file>` / `pnpm --dir frontend run test`)
+- [ ] Validated against a headless `orcad` in a browser (UI changes), or N/A
 
 ## Checklist
 
-- [ ] This PR is small and focused
-- [ ] I explained what changed and why (including ELI5)
-- [ ] Before/after screenshots or videos attached for UI changes, or `N/A` with reason
-- [ ] Self-reviewed for correctness, security, and performance
-- [ ] Cross-platform, SSH/remote, and path/shortcut impact considered (or N/A)
-- [ ] `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm build` pass (or CI will cover; local preferred)
+- [ ] Small and focused, conventional commit messages
+- [ ] `pnpm tc`, `oxlint` and `pnpm --dir frontend run typecheck` / `lint` pass
+- [ ] Did not run `pnpm run format` repo-wide
+- [ ] Changes under `src/main|shared|cli|relay` are additive and wire-compatible (or N/A)
+- [ ] Docs (README, `docs/ROADMAP.md`) updated if behavior or env vars changed

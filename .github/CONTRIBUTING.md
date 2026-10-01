@@ -1,131 +1,68 @@
-# Contributing to Orca
+# Contributing to Cubito
 
-Thanks for contributing to Orca.
+Thanks for helping. Cubito is a spatial frontend (`frontend/`) over ORCA's headless engine (`orcad`, under `src/main/`). Small, focused changes with tests are easiest to review.
 
-## Before You Start
+## Setup
 
-- Keep changes scoped to a clear user-facing improvement, bug fix, or refactor.
-- Orca targets macOS, Linux, and Windows. Every change must stay compatible with all three platforms unless the code is explicitly guarded by a runtime platform check.
-- For keyboard shortcuts, use runtime platform checks in renderer code and `CmdOrCtrl` in Electron menu accelerators.
-- For shortcut labels, show `⌘` and `⇧` on macOS, and `Ctrl+` and `Shift+` on Linux and Windows.
-- For file paths, use Node or Electron path utilities such as `path.join`.
-- Orca must work against local repositories, remote servers, and SSH worktrees. Do not assume a process, file, credential, shell, or network path exists only on the local machine.
-- Orca supports many CLI agents, integrations, and git providers. Keep generic behavior provider-neutral; guard integration-specific logic behind explicit checks.
-- Keep changes well-engineered and performant: follow existing architecture, avoid unnecessary work in hot paths, clean up owned resources, and use concrete module names.
-- For UI work, follow [`docs/STYLEGUIDE.md`](../docs/STYLEGUIDE.md), use the tokens and shadcn primitives it specifies, and verify polished behavior across platforms, light/dark mode, and SSH latency.
-
-## Local Setup
+Requirements: Node 24, pnpm 10 (via `corepack enable`), git, and on macOS the Xcode Command Line Tools (`node-pty` compiles from source).
 
 ```bash
-pnpm install
-pnpm dev
+git clone https://github.com/tincke10/Cubito.git && cd Cubito
+pnpm cubito:install     # installs and builds engine + frontend, stages the web client
+pnpm cubito:start       # boots orcad and prints the pairing URL
 ```
 
-## Branch Naming
+Docker users can build from source with `pnpm cubito:docker`. See the [README](../README.md) for the rest.
 
-Use a clear, descriptive branch name that reflects the change.
+## Workflow
 
-Good examples:
+- **Strict TDD.** Write the failing test first (RED), make it pass (GREEN), then clean up. Behavior changes and bug fixes need a test that would catch the regression, not one that only walks the happy path.
+- **Conventional commits**, one logical change each: `feat(frontend): ...`, `fix(orcad): ...`, `docs(readme): ...`, `chore(docker): ...`. No AI attribution trailers.
+- **Reuse before reimplementing.** Search for an existing implementation and extend it before writing a parallel one.
+- Comments: one concise line, only for what is not obvious (why, not how). Never disable `max-lines`. Name files after what they contain, not `helpers` or `utils`. Type declarations go in `.ts`, not `.d.ts`.
+- Cubito is cross-platform where it runs natively (macOS, Linux) and in Docker: use `path.join`, and check the platform at runtime for shortcuts (`⌘` on Mac, `Ctrl+` elsewhere).
+- Keep CSS in `frontend/index.html` and reuse the `--cubito-*` tokens before inventing values.
 
-- `fix/ctrl-backspace-delete-word`
-- `feat/shift-enter-newline`
-- `chore/update-contributor-guide`
+## Checks
 
-Avoid vague names like `test`, `misc`, or `changes`.
-
-## Before Opening a PR
-
-Run the same checks that CI runs:
+Run what CI runs, scoped to what you touched:
 
 ```bash
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm build
+pnpm tc                                   # typecheck (or tc:node / tc:cli / tc:web)
+pnpm test path/to/file.test.ts            # engine tests
+pnpm exec oxlint                          # or: pnpm run check:code-quality:changed
+pnpm --dir frontend run typecheck
+pnpm --dir frontend run test              # one file: pnpm --dir frontend exec vitest run <path>
+pnpm --dir frontend run lint
 ```
 
-Add high-quality tests for behavior changes and bug fixes. Prefer tests that would actually catch a regression, not shallow coverage that only exercises the happy path.
+Never run `pnpm run format` over the whole repo: it rewrites files that follow upstream and makes syncs painful. Format only the files you changed.
 
-If your change affects UI or interaction behavior, verify it on the platforms it could impact.
+If you touch `compose.yaml`, the `Dockerfile` or `config/docker/`, also run `pnpm test config/scripts/cubito-docker-shape.test.ts`.
 
-## Type Declarations: Prefer `.ts` Over `.d.ts`
+## Validating UI changes
 
-Project-owned type declarations belong in `.ts` files. `.d.ts` is reserved for ambient shims (e.g., `env.d.ts`, `vite/client.d.ts`). TypeScript's `skipLibCheck: true` setting applies globally, including to our own `.d.ts` files, which means any unresolved type reference in a `.d.ts` silently becomes `any` at its call sites. Write your types in `.ts` files so the compiler actually checks them.
-
-CI enforces this for `src/preload/` and `src/shared/`.
-
-## Pull Requests
-
-Each pull request should follow [`.github/pull_request_template.md`](./pull_request_template.md). In particular:
-
-- open with an ELI5 of the change (plain language paragraph; the PR title is the one-liner)
-- explain what changed and why, and stay focused on a single topic when possible
-- for any UI or interaction change, attach **before and after** screenshots (or short videos); if there is no visual change, say `No visual change` and why
-- include high-quality tests when behavior changes or bug fixes warrant them
-- include a brief code review summary from your AI coding agent that explicitly checks cross-platform compatibility, SSH/remote/local compatibility, supported agent and integration compatibility, performance risk, UI quality when applicable, and basic security risk
-- mention any platform-specific, remote/SSH-specific, agent-specific, integration-specific, or git-provider-specific behavior and testing notes
-- **Include your X (Twitter) handle** in the PR template Author section — we shout out contributors when we merge features on [@orca_build](https://x.com/orca_build).
-
-## Release Process
-
-Version bumps, tags, and releases are maintainer-managed. Do not include release version changes in a normal contribution unless a maintainer asks for them.
-
-### Cutting a release (maintainers)
-
-All releases are cut from the **Cut Release** GitHub Actions workflow. There is no local `pnpm release:*` script — running releases locally is too easy to get wrong (dirty tree, wrong branch, stale main).
-
-**To cut a release:**
-
-1. Open [Actions → Cut Release](../../actions/workflows/release-cut.yml).
-2. Click **Run workflow** and pick:
-   - **kind**: one of `rc`, `patch`, `minor`, `major`.
-   - **ref**: the branch, tag, or SHA to build from. Defaults to `main`.
-3. Run it.
-
-The workflow resolves the next version from GitHub Releases, bumps `package.json`, tags, pushes, and runs the multi-platform build + publish inline.
-
-**How the next version is chosen:**
-
-All stable kinds (`patch`, `minor`, `major`) are computed off the latest _stable_ release, ignoring any RCs in between.
-
-- `kind=rc` + last tag was stable (e.g. `v1.3.14`) → `v1.3.15-rc.0`.
-- `kind=rc` + active RC series (e.g. `v1.3.15-rc.2`) → `v1.3.15-rc.3`.
-- `kind=patch` + latest stable `v1.3.14` → `v1.3.15` (regardless of any intermediate RCs).
-- `kind=minor` + latest stable `v1.3.14` → `v1.4.0`.
-- `kind=major` + latest stable `v1.3.14` → `v2.0.0`.
-
-**Safety guarantees:**
-
-- Stable releases are refused if the new version isn't strictly greater than the latest published stable. This is the only rule `electron-updater` actually needs — it compares semver within the `latest` channel, so a regressing stable is the one thing that breaks auto-update for fresh installs.
-- Complete RC draft releases created by the release workflow are published before cutting a new tag only when the draft tag was built from the current release ref. Stale drafts are skipped so fixes cut a fresh RC instead of exposing old artifacts.
-- If the latest RC tag exists but is still draft-only or missing its GitHub Release, the workflow resumes that tag only when it was built from the current release ref. Otherwise the next RC number is cut.
-- RC numbering also considers release commits on `main`, so deleting a stale tag does not let a later cut reuse the same RC number.
-- Off-main releases (when `ref` is not the tip of `main`) only push the tag. `main` is never mutated from a non-main ref, so you can safely release an older commit without polluting history.
-- When `ref` is the tip of `main`, the version-bump commit is fast-forwarded onto `main` so local `package.json` stays in sync with what's shipped.
-
-**Common scenarios:**
-
-- **Normal release:** `kind=patch`, `ref=main`.
-- **"A bad commit just landed on main, release the commit before it":** `kind=patch`, `ref=<good-sha>`. `main` is left alone; the tag points at the good SHA. Fix forward on `main` afterward.
-- **One-off RC for a feature branch:** `kind=rc`, `ref=<branch-or-sha>`. Produces an RC tag that does not touch `main`.
-- **Minor or major bump:** `kind=minor` or `kind=major`.
-
-The scheduled 2x/day RC cron in [`release-rc.yml`](../../actions/workflows/release-rc.yml) is independent and continues to run automatically from `main`.
-
-## Release Channels
-
-The public Homebrew cask tracks stable desktop releases:
+Validate rendered UI against a real headless `orcad` in a real browser:
 
 ```bash
-brew install --cask stablyai/orca/orca
+node out/orcad/orcad.js --port <p> --json     # prints the pairing URL
+pnpm --dir frontend run dev                   # Vite on 5180; open it through the pairing URL
 ```
 
-Release candidates use a separate cask token:
+Use a throwaway `--data-dir` so you do not touch your own Cubito data, and stop `orcad` and Vite when you are done.
 
-```bash
-brew install --cask stablyai/orca/orca@rc
-```
+## Upstream sync policy
 
-The two casks conflict because both install `Orca.app`. Switch channels with a
-normal `brew uninstall --cask` followed by the install for the other channel.
-Do not use `--zap` unless you intentionally want to remove local Orca state.
+Cubito is a fork of [ORCA](https://github.com/stablyai/orca) and merges upstream periodically. Only `src/main`, `src/shared`, `src/cli` and `src/relay` follow upstream; everywhere else Cubito wins on conflict. Engine changes here should stay additive and wire-compatible (new optional fields, new capability keys) so upstream merges and mixed-version pairings keep working. Do not edit those directories for style-only reasons.
+
+## Pull requests
+
+Follow the [pull request template](./pull_request_template.md): what changed and why, the linked issue, how you tested it, and before/after screenshots for UI changes. Keep PRs small and single-topic.
+
+## Releases
+
+Maintainer-managed. Pushing a `v*` tag runs the Cubito Release workflow (multi-arch image on GHCR plus a GitHub release). Do not bump versions in a normal PR.
+
+## Security
+
+Report vulnerabilities privately, see [SECURITY.md](../SECURITY.md).

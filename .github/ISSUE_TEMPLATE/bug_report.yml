@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a problem with Orca
+description: Report a problem with Cubito
 title: '[Bug]: '
 type: Bug
 labels:
@@ -8,28 +8,37 @@ body:
   - type: markdown
     attributes:
       value: |
-        Use this form for Orca bugs. Include enough detail for someone else to reproduce the issue.
+        Use this form for Cubito bugs. Include enough detail for someone else to reproduce the issue.
 
-        Please write your issue in English.
+        Please write your issue in English. Do not paste tokens or secrets from `.env`.
+
+  - type: input
+    id: cubito_version
+    attributes:
+      label: Cubito version
+      description: The release tag or image tag (for example `v0.1.0`), or the commit SHA if you built from source.
+      placeholder: v0.1.0
+    validations:
+      required: true
 
   - type: dropdown
-    id: os
+    id: runtime
     attributes:
-      label: Operating system
+      label: How are you running it?
       options:
-        - macOS
-        - Windows
-        - Linux
+        - Docker (published image)
+        - Docker (built from source)
+        - Native macOS
         - Other
     validations:
       required: true
 
   - type: input
-    id: orca_version
+    id: browser
     attributes:
-      label: Orca version
-      description: Include the exact Orca version if you can. You can find it in `Orca > About Orca`.
-      placeholder: v0.14.2
+      label: Browser
+      description: Name and version.
+      placeholder: Chrome 140
     validations:
       required: false
 
@@ -37,10 +46,9 @@ body:
     id: details
     attributes:
       label: Details
-      description: Describe the bug in your own words. Include a short summary, reproduction steps, and anything else that seems relevant.
+      description: What happened, and how can we reproduce it? Logs help (`docker compose logs cubito`), with secrets removed.
       placeholder: |
         Short summary:
-        Orca crashes when ...
 
         What happened?
 
@@ -48,7 +56,5 @@ body:
         1. ...
         2. ...
         3. ...
-
-        Anything else that might help:
     validations:
       required: true
