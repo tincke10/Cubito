@@ -111,6 +111,16 @@ COPY --from=builder /app/config/docker/cubito/demo-repo config/docker/cubito/dem
 COPY config/docker/cubito/entrypoint.sh /usr/local/bin/cubito-entrypoint
 RUN chmod +x /usr/local/bin/cubito-entrypoint
 
+# Why: declared last so a new version only busts these cheap layers, not the gh/claude installs.
+ARG CUBITO_VERSION=dev
+ARG CUBITO_REVISION=unknown
+ENV CUBITO_VERSION=$CUBITO_VERSION
+LABEL org.opencontainers.image.title="Cubito" \
+  org.opencontainers.image.source="https://github.com/tincke10/Cubito" \
+  org.opencontainers.image.licenses="MIT" \
+  org.opencontainers.image.version="$CUBITO_VERSION" \
+  org.opencontainers.image.revision="$CUBITO_REVISION"
+
 EXPOSE 6799
 
 ENTRYPOINT ["/usr/local/bin/cubito-entrypoint"]

@@ -333,6 +333,27 @@ describe('Dockerfile', () => {
   })
 })
 
+describe('image metadata', () => {
+  const dockerfile = readFileSync(join(REPO_ROOT, 'Dockerfile'), 'utf8')
+  const runtimeStage = dockerfile.slice(dockerfile.indexOf('FROM node:24-bookworm-slim'))
+
+  // Why: the release workflow stamps the git tag and commit via build args; local builds read "dev".
+  it('bakes the Cubito version and revision into env and OCI labels', () => {
+    expect(runtimeStage).toMatch(/^ARG CUBITO_VERSION=dev$/m)
+    expect(runtimeStage).toMatch(/^ARG CUBITO_REVISION=unknown$/m)
+    expect(runtimeStage).toMatch(/^ENV CUBITO_VERSION=\$CUBITO_VERSION$/m)
+    for (const label of [
+      'org.opencontainers.image.title="Cubito"',
+      'org.opencontainers.image.source="https://github.com/tincke10/Cubito"',
+      'org.opencontainers.image.licenses="MIT"',
+      'org.opencontainers.image.version="$CUBITO_VERSION"',
+      'org.opencontainers.image.revision="$CUBITO_REVISION"'
+    ]) {
+      expect(runtimeStage).toContain(label)
+    }
+  })
+})
+
 describe('.dockerignore', () => {
   const ignore = readFileSync(join(REPO_ROOT, '.dockerignore'), 'utf8')
 
