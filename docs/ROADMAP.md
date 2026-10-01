@@ -3,7 +3,7 @@
 Estado real del fork, verificado contra `git log` y el CI. Fuente única: este archivo. Se actualiza
 al cerrar cada tramo, con el commit que lo cierra.
 
-Última revisión: 2026-10-01 · después de wirings perdidos y dev essentials (ver commits por fila).
+Última revisión: 2026-10-01 · después del lanzamiento v0.1.0 (ver commits por fila).
 
 ## Cerrado
 
@@ -36,6 +36,7 @@ al cerrar cada tramo, con el commit que lo cierra.
 | Sync con Orca | Merge real de upstream `d74388f8a2` (+2773 commits) en `src/main`, `src/shared`, `src/cli` y `src/relay`; lo de Cubito portado sobre la estructura nueva (trust de agentes, run-lease, merge-winner, wirings de orcad); build de orcad en Node sin Bun con todos los workers; validado en vivo en Docker con un agente Claude real | 2026-10-01 · `de5aed831` |
 | Wirings perdidos | Notificaciones de atención de agentes (orcad las produce, toast en el HUD + Notification del browser con la pestaña oculta), scheduler de automations en orcad (`orca automations`), tokens cifrados con AES-256-GCM (`CUBITO_SECRET_KEY` / `_FILE` → Keychain en macOS → texto plano con aviso) | 2026-10-01 · `b2281cdc9` |
 | Dev essentials | Borrar worktree (`⌫`/⌘K, confirmación en dos pasos, forzar, principal bloqueado); stage/commit/push en `[d]`; PR/MR con botón de siguiente paso; `gh`/`glab` en la imagen con `GH_TOKEN`/`GITLAB_TOKEN`; abrir archivos con `o` y editarlos con ⌘S y chequeo de conflicto. Validado en vivo salvo una PR real y el Keychain | 2026-10-01 · `937919c67` |
+| Lanzamiento | Puerto publicado solo en loopback (`127.0.0.1:6799`); auditoría de egress (cero contacto con servicios de Orca) y hardening (wrapper offline de `glab`, orcad sin servicio de push, updater de Claude apagado, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`); pipeline de release: tag `v0.1.0` publica `ghcr.io/tincke10/cubito` multi-arch y un release de GitHub; docs: README con quickstart y tabla de variables, `.env.example`, CONTRIBUTING y plantillas, SECURITY, CHANGELOG, línea de copyright de Cubito | 2026-10-01 · `d1a5f3be59` (v0.1.0) |
 
 ## Cerrado sin implementar
 
@@ -54,17 +55,20 @@ al cerrar cada tramo, con el commit que lo cierra.
 
 ## Pendiente
 
-1. **Syncs periódicos con Orca.** El merge-base ya avanzó a `d74388f8a2`: el próximo sync es un
+1. **Habilitar private vulnerability reporting** en los settings del repo (`SECURITY.md` y el
+   link de `config.yml` lo asumen); además, hacer público el paquete GHCR si deja de serlo.
+2. **Sin validar en vivo:** crear una PR/MR real (requiere `GH_TOKEN`/`GITLAB_TOKEN`) y el Keychain
+   de macOS (requiere orcad nativo).
+3. **Syncs periódicos con Orca.** El merge-base ya avanzó a `d74388f8a2`: el próximo sync es un
    `git merge upstream/main` con la misma política (fuera de `src/main|shared|cli|relay` gana Cubito).
    Sin Bun: el deploy remoto de orcad por SSH de upstream no aplica a un build de Cubito.
-2. **Engine sin UI todavía:** checks de PR e issue → worktree, elección de agente y cuentas,
+4. **Engine sin UI todavía:** checks de PR e issue → worktree, elección de agente y cuentas,
    splits de terminal, puertos/preview, búsqueda de contenido (`files.search`), UI de automations,
    pull/sync de ramas (hoy el botón "sync" solo indica qué hacer).
-3. **Sin validar en vivo:** crear una PR/MR real (requiere `GH_TOKEN`/`GITLAB_TOKEN`) y el Keychain
-   de macOS (requiere orcad nativo).
-4. **Detalles:** el toast de notificación sale en inglés ("Claude finished"); el rail del compare no refresca las stats tras nuevos commits en los hijos hasta
+5. **Detalles:** el toast de notificación sale en inglés ("Claude finished") y el resto de la UI
+   en español; el rail del compare no refresca las stats tras nuevos commits en los hijos hasta
    reabrirlo; no hay forma de desregistrar un repo desde la UI ni el CLI.
-5. **Cosméticos vistos al validar el sync:** en `[x]` el texto "aún no hay actividad" y una scrollbar
+6. **Cosméticos vistos al validar el sync:** en `[x]` el texto "aún no hay actividad" y una scrollbar
    horizontal aparecen sin estilo abajo a la izquierda; en compare el checkbox "sincronizar el padre"
    queda tapado por la barra de atajos.
 
