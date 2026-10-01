@@ -3,7 +3,7 @@
 Estado real del fork, verificado contra `git log` y el CI. Fuente única: este archivo. Se actualiza
 al cerrar cada tramo, con el commit que lo cierra.
 
-Última revisión: 2026-10-01 · después del sync con Orca (ver commits por fila).
+Última revisión: 2026-10-01 · después de wirings perdidos y dev essentials (ver commits por fila).
 
 ## Cerrado
 
@@ -34,6 +34,8 @@ al cerrar cada tramo, con el commit que lo cierra.
 | UX fixes | Comando de setup por repo (worktrees nuevos con deps, `corepack` en la imagen) y re-setup del padre tras un merge que toca manifests; pairing que sobrevive la recarga + banner de modo demo; `j`/`k` en el rail de `[d]`; `d`↔`x` directo; la `s` del spawn ya no se filtra; panel `[t]` dentro del viewport y bajo el HUD; título del fan-out con el nodo padre; ayuda en la ruta de "agregar repo". Validado en vivo salvo el re-setup del padre (solo unit tests) | 2026-09-30 · `7deebb5ec` |
 | UX follow-ups | Re-setup del padre con el `orca.yaml` pre-merge (`<commit>^1`, nunca el del ganador) validado en vivo; hint "sin setup" que se refresca en forms abiertos; `[d]` abre con el primer archivo seleccionado; el nodo recién spawneado queda seleccionado | 2026-09-30 · `f9791ccb5` |
 | Sync con Orca | Merge real de upstream `d74388f8a2` (+2773 commits) en `src/main`, `src/shared`, `src/cli` y `src/relay`; lo de Cubito portado sobre la estructura nueva (trust de agentes, run-lease, merge-winner, wirings de orcad); build de orcad en Node sin Bun con todos los workers; validado en vivo en Docker con un agente Claude real | 2026-10-01 · `de5aed831` |
+| Wirings perdidos | Notificaciones de atención de agentes (orcad las produce, toast en el HUD + Notification del browser con la pestaña oculta), scheduler de automations en orcad (`orca automations`), tokens cifrados con AES-256-GCM (`CUBITO_SECRET_KEY` / `_FILE` → Keychain en macOS → texto plano con aviso) | 2026-10-01 · `b2281cdc9` |
+| Dev essentials | Borrar worktree (`⌫`/⌘K, confirmación en dos pasos, forzar, principal bloqueado); stage/commit/push en `[d]`; PR/MR con botón de siguiente paso; `gh`/`glab` en la imagen con `GH_TOKEN`/`GITLAB_TOKEN`; abrir archivos con `o` y editarlos con ⌘S y chequeo de conflicto. Validado en vivo salvo una PR real y el Keychain | 2026-10-01 · `937919c67` |
 
 ## Cerrado sin implementar
 
@@ -55,13 +57,12 @@ al cerrar cada tramo, con el commit que lo cierra.
 1. **Syncs periódicos con Orca.** El merge-base ya avanzó a `d74388f8a2`: el próximo sync es un
    `git merge upstream/main` con la misma política (fuera de `src/main|shared|cli|relay` gana Cubito).
    Sin Bun: el deploy remoto de orcad por SSH de upstream no aplica a un build de Cubito.
-2. **Wirings perdidos con el main de Electron** (relevamiento en engram `survey/orca-feature-coverage`):
-   notificaciones al terminar un agente, scheduler de automations, `StatsCollector`, cifrado de
-   secretos (tokens de Linear/Jira en texto plano).
-3. **Engine sin UI:** commit/push/PR desde un worktree, lectura/edición de archivos, borrar/archivar
-   worktrees (`worktree.rm`), elección de agente y cuentas, checks de PR e issue → worktree,
-   splits de terminal, puertos/preview.
-4. **Detalles:** el rail del compare no refresca las stats tras nuevos commits en los hijos hasta
+2. **Engine sin UI todavía:** checks de PR e issue → worktree, elección de agente y cuentas,
+   splits de terminal, puertos/preview, búsqueda de contenido (`files.search`), UI de automations,
+   pull/sync de ramas (hoy el botón "sync" solo indica qué hacer).
+3. **Sin validar en vivo:** crear una PR/MR real (requiere `GH_TOKEN`/`GITLAB_TOKEN`) y el Keychain
+   de macOS (requiere orcad nativo).
+4. **Detalles:** el toast de notificación sale en inglés ("Claude finished"); el rail del compare no refresca las stats tras nuevos commits en los hijos hasta
    reabrirlo; no hay forma de desregistrar un repo desde la UI ni el CLI.
 5. **Cosméticos vistos al validar el sync:** en `[x]` el texto "aún no hay actividad" y una scrollbar
    horizontal aparecen sin estilo abajo a la izquierda; en compare el checkbox "sincronizar el padre"
