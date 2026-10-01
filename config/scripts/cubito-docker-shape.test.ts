@@ -14,7 +14,8 @@ type ComposeFile = {
   services: Record<
     string,
     {
-      build?: string
+      image?: string
+      build?: string | { context?: string; args?: Record<string, string> }
       ports?: string[]
       environment?: Record<string, string | null>
       volumes?: string[]
@@ -29,9 +30,19 @@ describe('compose.yaml', () => {
   const compose = parse(readFileSync(join(REPO_ROOT, 'compose.yaml'), 'utf8')) as ComposeFile
   const cubito = compose.services.cubito
 
-  it('builds the cubito service from the repo root', () => {
+  it('pulls the published GHCR image by default', () => {
     expect(cubito).toBeDefined()
-    expect(cubito.build).toBe('.')
+    expect(cubito.image).toBe('ghcr.io/tincke10/cubito:latest')
+    expect(cubito.build).toBeUndefined()
+  })
+
+  it('builds from the repo root through the compose.build.yaml override', () => {
+    const override = parse(
+      readFileSync(join(REPO_ROOT, 'compose.build.yaml'), 'utf8')
+    ) as ComposeFile
+    const build = override.services.cubito.build
+    expect(typeof build === 'object' ? build.context : build).toBe('.')
+    expect(typeof build === 'object' ? build.args?.CUBITO_VERSION : undefined).toBe('dev')
   })
 
   it('publishes only the orcad port — the frontend is served through it', () => {
@@ -131,6 +142,12 @@ describe('git host CLIs and tokens', () => {
 
   it('never echoes a token', () => {
     expect(entrypoint).not.toMatch(/echo[^\n]*\$\{?(GH_TOKEN|GITLAB_TOKEN)/)
+  })
+
+  it('documents pull-and-run, the build-from-source override and the public package step', () => {
+    expect(readme).toContain('docker compose up\n')
+    expect(readme).toContain('docker compose -f compose.yaml -f compose.build.yaml up --build')
+    expect(readme).toContain('make the `cubito` package public')
   })
 
   it('documents the token passthrough in the Docker README', () => {

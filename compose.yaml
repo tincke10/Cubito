@@ -1,6 +1,6 @@
 services:
   cubito:
-    build: .
+    image: ghcr.io/tincke10/cubito:latest
     ports:
       # Why: loopback only — orcad launches agents; LAN peers must not reach it.
       - '127.0.0.1:6799:6799'

@@ -1,0 +1,7 @@
+# Build from source instead of pulling: docker compose -f compose.yaml -f compose.build.yaml up --build
+services:
+  cubito:
+    build:
+      context: .
+      args:
+        CUBITO_VERSION: dev

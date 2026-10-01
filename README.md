@@ -124,17 +124,25 @@ Override the defaults with flags or environment variables: `--data-dir` / `$ORCA
 Requirement: Docker Desktop.
 
 ```bash
-docker compose up --build   # or: pnpm cubito:docker
+docker compose up
 ```
 
-This builds the image and starts a `cubito` container publishing only `6799`, on the host loopback (`127.0.0.1`) so the LAN cannot reach it — orcad serves the frontend on that same port — with data in the `cubito-data`, `cubito-workspaces` and `cubito-repos` named volumes. Watch the logs for the printed pairing URL and open it on the host at `http://localhost:6799/...`.
+This pulls the published multi-arch image (`ghcr.io/tincke10/cubito`, amd64 and arm64) and starts a `cubito` container publishing only `6799`, on the host loopback (`127.0.0.1`) so the LAN cannot reach it — orcad serves the frontend on that same port — with data in the `cubito-data`, `cubito-workspaces` and `cubito-repos` named volumes. Watch the logs for the printed pairing URL and open it on the host at `http://localhost:6799/...`. Pin a release with `image: ghcr.io/tincke10/cubito:X.Y.Z` in `compose.yaml`; `latest` tracks the newest stable tag.
+
+To build from source instead of pulling (needed for unreleased changes, or if the GHCR package is not public yet):
+
+```bash
+docker compose -f compose.yaml -f compose.build.yaml up --build   # or: pnpm cubito:docker
+```
+
+Maintainers: after the first release, make the `cubito` package public (GitHub profile, Packages, Package settings, Change visibility) so anonymous `docker compose up` can pull it.
 
 Coding agents run inside the container, so they need their own Claude login. The login that survives rebuilds is a long-lived token: generate it once on the host and export it before starting the stack.
 
 ```bash
 claude setup-token                       # opens the browser once, prints the token
 export CLAUDE_CODE_OAUTH_TOKEN=<token>
-docker compose up --build
+docker compose up
 ```
 
 `compose.yaml` only passes the variable through from your shell; the token is never written to the repo. For a quick session instead, `docker compose exec -u node cubito claude login` works too, but that login lives in the container and is lost when it is recreated.
@@ -143,7 +151,7 @@ Credentials you give Cubito (Linear, Jira, ...) are stored unencrypted unless or
 
 ```bash
 export CUBITO_SECRET_KEY="$(openssl rand -base64 32)"   # 32 bytes, base64 or 64 hex chars
-docker compose up --build
+docker compose up
 ```
 
 `compose.yaml` only passes the variable through. Use `CUBITO_SECRET_KEY_FILE=/path` instead to read the key from a file (a Docker secret, for example); the inline variable wins when both are set. A key that is set but malformed stops orcad at startup instead of silently falling back to plaintext. Outside Docker on macOS, orcad keeps a generated master key in your login Keychain via the `security` CLI (the key is visible in that process's arguments for a moment, once, when it is first created); without either, orcad warns and stores credentials unsealed in a `0700` data directory.
@@ -170,7 +178,7 @@ By default agents keep Claude's own permission prompts: they stop to ask before 
 
 ```bash
 export CUBITO_AGENT_BYPASS=accept
-docker compose up --build
+docker compose up
 ```
 
 Setting it also accepts Claude's "Bypass Permissions mode" warning on your behalf. Only do this because the container is the sandbox: agents can then act freely on everything mounted in it.
