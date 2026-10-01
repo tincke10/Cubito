@@ -33,7 +33,8 @@ describe('compose.yaml', () => {
   })
 
   it('publishes only the orcad port — the frontend is served through it', () => {
-    expect(cubito.ports).toEqual(['6799:6799'])
+    // Why: a bare '6799:6799' publishes on every host interface, exposing an agent-running daemon to the LAN.
+    expect(cubito.ports).toEqual(['127.0.0.1:6799:6799'])
   })
 
   it('pins the pairing address to the one published port', () => {

@@ -127,7 +127,7 @@ Requirement: Docker Desktop.
 docker compose up --build   # or: pnpm cubito:docker
 ```
 
-This builds the image and starts a `cubito` container publishing only `6799` — orcad serves the frontend on that same port — with data in the `cubito-data`, `cubito-workspaces` and `cubito-repos` named volumes. Watch the logs for the printed pairing URL and open it on the host at `http://localhost:6799/...`.
+This builds the image and starts a `cubito` container publishing only `6799`, on the host loopback (`127.0.0.1`) so the LAN cannot reach it — orcad serves the frontend on that same port — with data in the `cubito-data`, `cubito-workspaces` and `cubito-repos` named volumes. Watch the logs for the printed pairing URL and open it on the host at `http://localhost:6799/...`.
 
 Coding agents run inside the container, so they need their own Claude login. The login that survives rebuilds is a long-lived token: generate it once on the host and export it before starting the stack.
 
