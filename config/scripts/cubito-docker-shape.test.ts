@@ -1,4 +1,6 @@
-import { readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { parse } from 'yaml'
 import { describe, expect, it } from 'vitest'
@@ -134,6 +136,71 @@ describe('git host CLIs and tokens', () => {
   it('documents the token passthrough in the Docker README', () => {
     expect(readme).toContain('export GH_TOKEN=')
     expect(readme).toContain('export GITLAB_TOKEN=')
+  })
+})
+
+describe('glab wrapper', () => {
+  const dockerfile = readFileSync(join(REPO_ROOT, 'Dockerfile'), 'utf8')
+  const runtimeStage = dockerfile.slice(dockerfile.indexOf('FROM node:24-bookworm-slim'))
+  const wrapper = join(REPO_ROOT, 'config/docker/cubito/glab-wrapper.sh')
+
+  // Why: orcad runs `glab auth status` on [d]; unconfigured, the real binary calls gitlab.com.
+  it('installs the real glab under a non-PATH name and the wrapper as /usr/local/bin/glab', () => {
+    expect(runtimeStage).toContain('/usr/local/libexec/glab-real')
+    expect(runtimeStage).not.toContain('install -m 755 /tmp/glab /usr/local/bin/glab')
+    expect(runtimeStage).toMatch(/glab-wrapper\.sh \/usr\/local\/bin\/glab/)
+  })
+
+  function run(args: string[], env: Record<string, string>, withConfig: boolean) {
+    const dir = mkdtempSync(join(tmpdir(), 'glab-wrapper-'))
+    const real = join(dir, 'glab-real')
+    writeFileSync(real, '#!/bin/sh\necho "REAL $*"\n')
+    chmodSync(real, 0o755)
+    const home = join(dir, 'home')
+    mkdirSync(join(home, '.config', 'glab-cli'), { recursive: true })
+    if (withConfig) {
+      writeFileSync(
+        join(home, '.config', 'glab-cli', 'config.yml'),
+        'hosts:\n  gitlab.example.com:\n    token: abc\n'
+      )
+    }
+    return spawnSync('sh', [wrapper, ...args], {
+      encoding: 'utf8',
+      env: { PATH: process.env.PATH ?? '', HOME: home, GLAB_REAL_BIN: real, ...env }
+    })
+  }
+
+  it('answers auth status as not logged in, offline, when nothing is configured', () => {
+    const r = run(['auth', 'status'], {}, false)
+    expect(r.status).not.toBe(0)
+    expect(r.stdout).not.toContain('REAL')
+    expect(r.stderr).toMatch(/not logged in/i)
+    expect(r.stderr.split('\n').length).toBeLessThan(4)
+  })
+
+  it('emits nothing the known-hosts parser would read as a host', () => {
+    const r = run(['auth', 'status'], {}, false)
+    expect(r.stderr).not.toMatch(/logged in to /i)
+    for (const line of r.stderr.split('\n').filter(Boolean)) {
+      expect(line).toMatch(/\s/)
+    }
+  })
+
+  it.each(['GITLAB_TOKEN', 'GITLAB_ACCESS_TOKEN', 'GLAB_TOKEN'])(
+    'execs the real glab with %s',
+    (k) => {
+      const r = run(['auth', 'status'], { [k]: 'x' }, false)
+      expect(r.stdout).toContain('REAL auth status')
+    }
+  )
+
+  it('execs the real glab when a config file lists hosts', () => {
+    expect(run(['auth', 'status'], {}, true).stdout).toContain('REAL auth status')
+  })
+
+  it('passes every other command through untouched', () => {
+    expect(run(['mr', 'list'], {}, false).stdout).toContain('REAL mr list')
+    expect(run(['api', 'user'], {}, false).stdout).toContain('REAL api user')
   })
 })
 

@@ -80,9 +80,13 @@ RUN set -eu; \
   curl -fsSL -o /tmp/glab.tgz "https://gitlab.com/gitlab-org/cli/-/releases/v${GLAB_VERSION}/downloads/glab_${GLAB_VERSION}_linux_${arch}.tar.gz"; \
   echo "${glab_sha}  /tmp/glab.tgz" | sha256sum -c -; \
   tar -xzf /tmp/glab.tgz -C /tmp --strip-components=1 bin/glab; \
-  install -m 755 /tmp/glab /usr/local/bin/glab; \
+  install -D -m 755 /tmp/glab /usr/local/libexec/glab-real; \
   rm -f /tmp/gh /tmp/glab /tmp/gh.tgz /tmp/glab.tgz; \
-  gh --version; glab --version
+  gh --version; /usr/local/libexec/glab-real --version
+
+# Why: the wrapper answers `glab auth status` offline when nothing is configured (see the script).
+COPY config/docker/cubito/glab-wrapper.sh /usr/local/bin/glab
+RUN chmod 755 /usr/local/bin/glab
 
 RUN npm i -g @anthropic-ai/claude-code
 
