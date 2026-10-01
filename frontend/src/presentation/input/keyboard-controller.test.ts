@@ -807,6 +807,10 @@ describe('createKeyboardController', () => {
       expect(press('F', true, null)).toHaveBeenCalledOnce()
     })
 
+    it('preventDefaults the handled o that opens the file picker (no leak into the query)', () => {
+      expect(press('o', false, null)).toHaveBeenCalledOnce()
+    })
+
     it('never preventDefaults an s typed into a text field (not handled)', () => {
       expect(
         press('s', false, { tagName: 'INPUT', isContentEditable: false })

@@ -395,12 +395,14 @@ export function createKeyboardController(deps: KeyboardControllerDeps): Keyboard
       // the browser/address-bar search (Chrome/Safari) or Firefox's quick-find.
       const isBrowserChord =
         (domEvent.ctrlKey || domEvent.metaKey) && (domEvent.key === 'p' || domEvent.key === 'k')
-      // Why: the handled s/shift+f open a form that focuses its first field synchronously, so
-      // the key's own input would otherwise land in it.
+      // Why: the handled s/o/shift+f open a form or picker that focuses its first field
+      // synchronously, so the key's own input would otherwise land in it.
       const opensFormField =
         !domEvent.ctrlKey &&
         !domEvent.metaKey &&
-        (domEvent.key === 's' || (domEvent.shiftKey && domEvent.key.toLowerCase() === 'f'))
+        (domEvent.key === 's' ||
+          domEvent.key === 'o' ||
+          (domEvent.shiftKey && domEvent.key.toLowerCase() === 'f'))
       const isDeleteKey = domEvent.key === 'Backspace' || domEvent.key === 'Delete'
       if (handled && (domEvent.key === 'Tab' || isBrowserChord || opensFormField || isDeleteKey)) {
         domEvent.preventDefault()
