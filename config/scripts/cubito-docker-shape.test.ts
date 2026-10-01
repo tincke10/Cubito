@@ -139,6 +139,32 @@ describe('git host CLIs and tokens', () => {
   })
 })
 
+describe('egress posture', () => {
+  const compose = parse(readFileSync(join(REPO_ROOT, 'compose.yaml'), 'utf8')) as ComposeFile
+  const env = compose.services.cubito.environment ?? {}
+  const dockerfile = readFileSync(join(REPO_ROOT, 'Dockerfile'), 'utf8')
+  const runtimeStage = dockerfile.slice(dockerfile.indexOf('FROM node:24-bookworm-slim'))
+  const readme = readFileSync(join(REPO_ROOT, 'README.md'), 'utf8')
+
+  // Why: Claude Code cannot usefully self-update inside an immutable image.
+  it('disables the Claude Code auto-updater in the runtime image', () => {
+    expect(runtimeStage).toMatch(/^ENV DISABLE_AUTOUPDATER=1$/m)
+  })
+
+  it('passes the nonessential-traffic switch through from the host without storing a value', () => {
+    expect(Object.hasOwn(env, 'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC')).toBe(true)
+    expect(env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC).toBeNull()
+  })
+
+  it('documents the expected network egress in a Privacy / network README section', () => {
+    expect(readme).toContain('## Privacy / network')
+    const section = readme.slice(readme.indexOf('## Privacy / network'))
+    for (const term of ['Anthropic', 'telemetry', 'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC']) {
+      expect(section).toContain(term)
+    }
+  })
+})
+
 describe('glab wrapper', () => {
   const dockerfile = readFileSync(join(REPO_ROOT, 'Dockerfile'), 'utf8')
   const runtimeStage = dockerfile.slice(dockerfile.indexOf('FROM node:24-bookworm-slim'))

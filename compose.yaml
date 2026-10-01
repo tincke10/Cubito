@@ -18,6 +18,8 @@ services:
       # Tokens for gh/glab (PR/MR creation and git push over HTTPS); read from the host shell, never written here.
       GH_TOKEN:
       GITLAB_TOKEN:
+      # `1` in the host shell stops Claude Code's own nonessential traffic (telemetry, error reports, updates); unset keeps its defaults.
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:
       # The identity agents commit with; the container's own user has none.
       CUBITO_GIT_NAME:
       CUBITO_GIT_EMAIL:

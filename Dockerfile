@@ -90,6 +90,9 @@ RUN chmod 755 /usr/local/bin/glab
 
 RUN npm i -g @anthropic-ai/claude-code
 
+# Why: the image is immutable; Claude Code cannot usefully update itself inside it (rebuild instead).
+ENV DISABLE_AUTOUPDATER=1
+
 # Why: repo setup commands (pnpm install / yarn) run in worktrees; corepack provides the shims.
 RUN corepack enable
 

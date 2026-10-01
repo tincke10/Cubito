@@ -189,6 +189,19 @@ To reset everything — data, worktrees and cloned repos:
 docker compose down -v
 ```
 
+## Privacy / network
+
+Cubito itself contacts nothing by default: no account, no analytics, no update check, no cloud relay. The frontend loads only from your own `orcad`. What leaves your machine is what you start:
+
+- Claude agents talk to Anthropic (Claude Code, run by you with your login or token).
+- Git remotes you fetch from or push to (`git fetch` on worktree creation, push from the diff view).
+- `gh` / `glab`, only when you commit, push or open and review PRs/MRs. In Docker, `glab auth status` answers offline until a GitLab token or login exists.
+- Package registries and anything else your repo's setup commands and agents run.
+
+The upstream ORCA telemetry code (PostHog) is present in the tree but is never initialized, and its build-time keys are absent. Likewise the mobile push gateway is not started.
+
+To silence Claude Code's own nonessential traffic (telemetry, error reporting, update checks) in Docker, export `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` before `docker compose up`; the image already sets `DISABLE_AUTOUPDATER=1`. Outside Docker, set the same variable in the shell that starts `cubito:start`.
+
 ## Verify
 
 ```bash
