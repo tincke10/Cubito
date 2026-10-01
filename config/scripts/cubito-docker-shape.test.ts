@@ -220,6 +220,12 @@ describe('Dockerfile', () => {
     expect(runtimeStage).toMatch(/\/usr\/local\/bin\/orca/)
     expect(runtimeStage).toContain('/app/out/cli/index.js')
   })
+
+  it('points the orca CLI at the data volume for docker compose exec shells', () => {
+    expect(runtimeStage).toContain(
+      'ORCA_USER_DATA_PATH="${ORCA_USER_DATA_PATH:-${ORCA_USER_DATA:-/data}}"'
+    )
+  })
 })
 
 describe('.dockerignore', () => {

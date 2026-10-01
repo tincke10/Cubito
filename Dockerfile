@@ -89,8 +89,9 @@ RUN npm i -g @anthropic-ai/claude-code
 # Why: repo setup commands (pnpm install / yarn) run in worktrees; corepack provides the shims.
 RUN corepack enable
 
-# Why: terminals source /etc/profile, which on Debian resets PATH and drops cubito-start's shim dir.
-RUN printf '#!/bin/sh\nexec node /app/out/cli/index.js "$@"\n' > /usr/local/bin/orca \
+# Why: terminals source /etc/profile, which on Debian resets PATH and drops cubito-start's shim dir;
+# `docker compose exec` shells lack ORCA_USER_DATA_PATH, so default it to the data volume.
+RUN printf '#!/bin/sh\nexport ORCA_USER_DATA_PATH="${ORCA_USER_DATA_PATH:-${ORCA_USER_DATA:-/data}}"\nexec node /app/out/cli/index.js "$@"\n' > /usr/local/bin/orca \
   && chmod 755 /usr/local/bin/orca
 
 WORKDIR /app
