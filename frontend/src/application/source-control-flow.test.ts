@@ -3,7 +3,28 @@ import { createSourceControlFlow } from './source-control-flow'
 import type { SourceControlView } from './source-control-flow'
 import { createSceneStore } from './scene-store'
 import { buildWorktreeGraph } from '../domain/worktree-graph/build-graph'
-import type { GitCommitResult, SourceControlStatus } from './ports/runtime-gateway'
+import type {
+  GitCommitResult,
+  HostedReviewCreateInput,
+  HostedReviewCreateResult,
+  HostedReviewEligibilityInput,
+  HostedReviewEligibility,
+  SourceControlStatus
+} from './ports/runtime-gateway'
+import { AUTH_REQUIRED_MESSAGE } from './hosted-review-presentation'
+
+const eligibility = (over: Partial<HostedReviewEligibility> = {}): HostedReviewEligibility => ({
+  provider: 'github',
+  review: null,
+  canCreate: true,
+  blockedReason: null,
+  nextAction: null,
+  defaultBaseRef: 'main',
+  head: 'feat',
+  title: 'Add x',
+  body: 'Body',
+  ...over
+})
 
 const status = (over: Partial<SourceControlStatus> = {}): SourceControlStatus => ({
   branch: 'feat',
@@ -21,7 +42,11 @@ const status = (over: Partial<SourceControlStatus> = {}): SourceControlStatus =>
 })
 
 function setup(
-  opts: { repoKind?: 'git' | 'folder'; status?: () => Promise<SourceControlStatus> } = {}
+  opts: {
+    repoKind?: 'git' | 'folder'
+    status?: () => Promise<SourceControlStatus>
+    eligibility?: HostedReviewEligibility
+  } = {}
 ) {
   const store = createSceneStore()
   store.update({
@@ -48,11 +73,17 @@ function setup(
     gitCommit: vi.fn<(w: string, m: string) => Promise<GitCommitResult>>(async () => ({
       success: true
     })),
-    gitPush: vi.fn<(w: string, o?: { publish?: boolean }) => Promise<void>>(async () => undefined)
+    gitPush: vi.fn<(w: string, o?: { publish?: boolean }) => Promise<void>>(async () => undefined),
+    hostedReviewEligibility: vi.fn<
+      (i: HostedReviewEligibilityInput) => Promise<HostedReviewEligibility>
+    >(async () => opts.eligibility ?? eligibility()),
+    hostedReviewCreate: vi.fn<(i: HostedReviewCreateInput) => Promise<HostedReviewCreateResult>>(
+      async () => ({ ok: true, number: 12, url: 'https://x/pull/12' })
+    )
   }
   const refreshDiff = vi.fn()
   const flow = createSourceControlFlow({ store, gateway, refreshDiff })
-  return { flow, gateway, refreshDiff }
+  return { flow, gateway, refreshDiff, store }
 }
 
 const ready = (view: SourceControlView) => {
@@ -203,5 +234,167 @@ describe('source control flow', () => {
     gate.release(status())
     await opening
     expect(flow.view().phase).toBe('hidden')
+  })
+})
+
+describe('source control flow — review', () => {
+  const reviewOf = (view: SourceControlView) => ready(view).review
+
+  it('asks the host for eligibility with the git state and an opaque repo selector', async () => {
+    const { flow, gateway } = setup()
+    await flow.open('r::/w')
+    expect(gateway.hostedReviewEligibility).toHaveBeenCalledWith({
+      repo: 'id:r',
+      worktree: 'r::/w',
+      branch: 'feat',
+      base: null,
+      hasUncommittedChanges: true,
+      hasUpstream: true,
+      ahead: 1,
+      behind: 0
+    })
+  })
+
+  it('derives the base from the parent node branch', async () => {
+    const { flow, gateway, store } = setup()
+    store.update({
+      graph: buildWorktreeGraph([
+        {
+          id: 'r::/main',
+          repoId: 'r',
+          branch: 'refs/heads/develop',
+          parentWorktreeId: null,
+          childWorktreeIds: ['r::/w'],
+          workspaceStatus: 'in-progress',
+          git: { path: '/main', isMainWorktree: true }
+        },
+        {
+          id: 'r::/w',
+          repoId: 'r',
+          branch: 'refs/heads/feat',
+          parentWorktreeId: 'r::/main',
+          childWorktreeIds: [],
+          workspaceStatus: 'in-progress',
+          git: { path: '/w', isMainWorktree: false }
+        }
+      ])
+    })
+    await flow.open('r::/w')
+    expect(gateway.hostedReviewEligibility).toHaveBeenCalledWith(
+      expect.objectContaining({ base: 'develop' })
+    )
+  })
+
+  it('prefills the form from the eligibility reply', async () => {
+    const { flow } = setup()
+    await flow.open('r::/w')
+    const review = reviewOf(flow.view())
+    expect(review).toMatchObject({ phase: 'ready', title: 'Add x', body: 'Body', draft: false })
+  })
+
+  it('degrades to unavailable when eligibility fails', async () => {
+    const { flow, gateway } = setup()
+    gateway.hostedReviewEligibility.mockRejectedValue(new Error('no remote'))
+    await flow.open('r::/w')
+    expect(reviewOf(flow.view()).phase).toBe('unavailable')
+    expect(flow.view().phase).toBe('ready')
+  })
+
+  it('keeps user edits across an eligibility reload', async () => {
+    const { flow } = setup()
+    await flow.open('r::/w')
+    flow.setReviewForm({ title: 'My title', draft: true })
+    await flow.toggleStage('b.ts')
+    expect(reviewOf(flow.view())).toMatchObject({ title: 'My title', draft: true })
+  })
+
+  it('creates the review with the opaque provider and form values, then reloads eligibility', async () => {
+    const { flow, gateway } = setup({ eligibility: eligibility({ provider: 'future-forge' }) })
+    await flow.open('r::/w')
+    flow.setReviewForm({ draft: true })
+    await flow.reviewPrimary()
+    expect(gateway.hostedReviewCreate).toHaveBeenCalledWith({
+      repo: 'id:r',
+      worktree: 'r::/w',
+      provider: 'future-forge',
+      base: 'main',
+      head: 'feat',
+      title: 'Add x',
+      body: 'Body',
+      draft: true
+    })
+    const review = reviewOf(flow.view())
+    expect(review).toMatchObject({
+      phase: 'ready',
+      result: { tone: 'ok', href: 'https://x/pull/12' }
+    })
+    expect(gateway.hostedReviewEligibility).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not create without a title', async () => {
+    const { flow, gateway } = setup()
+    await flow.open('r::/w')
+    flow.setReviewForm({ title: '  ' })
+    await flow.reviewPrimary()
+    expect(gateway.hostedReviewCreate).not.toHaveBeenCalled()
+  })
+
+  it('turns auth_required into the actionable message', async () => {
+    const { flow, gateway } = setup()
+    gateway.hostedReviewCreate.mockResolvedValueOnce({
+      ok: false,
+      code: 'auth_required',
+      error: 'gh: not logged in'
+    })
+    await flow.open('r::/w')
+    await flow.reviewPrimary()
+    expect(reviewOf(flow.view())).toMatchObject({
+      result: { tone: 'error', text: AUTH_REQUIRED_MESSAGE }
+    })
+  })
+
+  it('links the existing review on already_exists and shows other errors verbatim', async () => {
+    const { flow, gateway } = setup()
+    gateway.hostedReviewCreate
+      .mockResolvedValueOnce({
+        ok: false,
+        code: 'already_exists',
+        error: 'exists',
+        existingReview: { number: 3, url: 'https://x/3' }
+      })
+      .mockResolvedValueOnce({ ok: false, code: 'validation', error: 'title too long' })
+    await flow.open('r::/w')
+    await flow.reviewPrimary()
+    expect(reviewOf(flow.view())).toMatchObject({ result: { href: 'https://x/3' } })
+    await flow.reviewPrimary()
+    expect(reviewOf(flow.view())).toMatchObject({ result: { text: 'title too long' } })
+  })
+
+  it('routes the primary button by nextAction', async () => {
+    const publish = setup({
+      eligibility: eligibility({ canCreate: false, nextAction: 'publish' }),
+      status: async () => status({ hasUpstream: false, ahead: 0 })
+    })
+    await publish.flow.open('r::/w')
+    await publish.flow.reviewPrimary()
+    expect(publish.gateway.gitPush).toHaveBeenCalledWith('r::/w', { publish: true })
+
+    const sync = setup({ eligibility: eligibility({ canCreate: false, nextAction: 'sync' }) })
+    await sync.flow.open('r::/w')
+    await sync.flow.reviewPrimary()
+    expect(ready(sync.flow.view()).notice?.text).toMatch(/pull|rebase/)
+
+    const auth = setup({
+      eligibility: eligibility({ canCreate: false, nextAction: 'authenticate' })
+    })
+    await auth.flow.open('r::/w')
+    await auth.flow.reviewPrimary()
+    expect(ready(auth.flow.view()).notice?.text).toBe(AUTH_REQUIRED_MESSAGE)
+
+    const commit = setup({ eligibility: eligibility({ canCreate: false, nextAction: 'commit' }) })
+    await commit.flow.open('r::/w')
+    await commit.flow.reviewPrimary()
+    expect(commit.gateway.gitCommit).not.toHaveBeenCalled()
+    expect(ready(commit.flow.view()).notice?.tone).toBe('error')
   })
 })

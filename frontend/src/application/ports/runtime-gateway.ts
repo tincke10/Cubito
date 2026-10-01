@@ -266,6 +266,49 @@ export type SourceControlStatus = {
 /** `git.commit` reports a refused commit as `success: false` instead of throwing. */
 export type GitCommitResult = { success: true } | { success: false; error: string }
 
+/** Hosted review (GitHub PR, GitLab MR, ...) as the host reports it; `provider` stays opaque. */
+export type HostedReviewLink = { number?: number; url: string }
+
+export type HostedReviewEligibilityInput = {
+  repo: string
+  worktree: string
+  branch: string
+  base: string | null
+  hasUncommittedChanges: boolean
+  hasUpstream: boolean
+  ahead: number
+  behind: number
+}
+
+/** `blockedReason`/`nextAction` stay plain strings: a newer host may name values this build lacks. */
+export type HostedReviewEligibility = {
+  provider: string
+  review: HostedReviewLink | null
+  canCreate: boolean
+  blockedReason: string | null
+  nextAction: string | null
+  defaultBaseRef: string | null
+  head: string | null
+  title: string | null
+  body: string | null
+}
+
+export type HostedReviewCreateInput = {
+  repo: string
+  worktree: string
+  provider: string
+  base: string
+  head?: string
+  title: string
+  body?: string
+  draft?: boolean
+}
+
+/** Refusals come back as data (`ok: false`), never as a throw. */
+export type HostedReviewCreateResult =
+  | { ok: true; number?: number; url: string }
+  | { ok: false; code: string; error: string; existingReview?: HostedReviewLink }
+
 /** `worktree.rm` knobs: `hostId` pins the executing host (SSH); `force` removes a dirty tree. */
 export type WorktreeRemoveOptions = { hostId?: string; force?: boolean }
 
@@ -322,6 +365,8 @@ export type RuntimeGateway = {
   gitCommit(worktree: string, message: string): Promise<GitCommitResult>
   /** `publish` sets the upstream (first push of a branch); rejects when the remote refuses. */
   gitPush(worktree: string, options?: { publish?: boolean }): Promise<void>
+  hostedReviewEligibility(input: HostedReviewEligibilityInput): Promise<HostedReviewEligibility>
+  hostedReviewCreate(input: HostedReviewCreateInput): Promise<HostedReviewCreateResult>
   /** Removes a worktree (the host stops its PTYs/agents itself); rejects when git refuses, e.g. dirty. */
   worktreeRemove(worktree: string, options?: WorktreeRemoveOptions): Promise<WorktreeRemoveResult>
   agentActivity(input: AgentActivityInput): Promise<AgentActivityPage>

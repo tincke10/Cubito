@@ -1,6 +1,43 @@
 import { describe, expect, it } from 'vitest'
+import type { HostedReviewEligibility } from '../../application/ports/runtime-gateway'
 import { sourceControlModel } from './source-control-view-model'
 import type { SourceControlView } from '../../application/source-control-flow'
+
+const eligibility = (over: Partial<HostedReviewEligibility> = {}): HostedReviewEligibility => ({
+  provider: 'gitlab',
+  review: null,
+  canCreate: true,
+  blockedReason: null,
+  nextAction: null,
+  defaultBaseRef: 'main',
+  head: 'feat',
+  title: 'T',
+  body: 'B',
+  ...over
+})
+const withReview = (
+  over: Partial<
+    Extract<Extract<SourceControlView, { phase: 'ready' }>['review'], { phase: 'ready' }>
+  > = {},
+  e: Partial<HostedReviewEligibility> = {}
+): SourceControlView =>
+  ready({
+    review: {
+      phase: 'ready',
+      eligibility: eligibility(e),
+      title: 'T',
+      body: 'B',
+      draft: false,
+      touched: false,
+      creating: false,
+      result: null,
+      ...over
+    }
+  })
+
+it('has no review section when the host did not answer', () => {
+  expect(sourceControlModel(ready()).review).toBeNull()
+})
 
 const ready = (
   over: Partial<Extract<SourceControlView, { phase: 'ready' }>> = {}
@@ -16,6 +53,7 @@ const ready = (
   message: 'feat: x',
   busy: null,
   notice: null,
+  review: { phase: 'unavailable' },
   canCommit: true,
   canPush: true,
   ...over
@@ -50,5 +88,41 @@ describe('sourceControlModel', () => {
   it('carries the notice through', () => {
     const notice = { tone: 'error', text: 'boom' } as const
     expect(sourceControlModel(ready({ notice })).notice).toEqual(notice)
+  })
+
+  describe('review section', () => {
+    it('shows the create form with a provider-neutral label', () => {
+      const review = sourceControlModel(withReview()).review!
+      expect(review.primary).toMatchObject({ kind: 'create', label: 'crear MR', disabled: false })
+      expect(review.showForm).toBe(true)
+      expect(review.title).toBe('T')
+      expect(review.showDraft).toBe(true)
+    })
+
+    it('hides the form and draft toggle when the next step is not creating', () => {
+      const review = sourceControlModel(
+        withReview({}, { canCreate: false, nextAction: 'push' })
+      ).review!
+      expect(review.showForm).toBe(false)
+      expect(review.primary.label).toBe('push')
+    })
+
+    it('disables creation without a title and hides draft for bitbucket', () => {
+      expect(sourceControlModel(withReview({ title: ' ' })).review!.primary.disabled).toBe(true)
+      expect(sourceControlModel(withReview({}, { provider: 'bitbucket' })).review!.showDraft).toBe(
+        false
+      )
+    })
+
+    it('explains why creation is blocked and carries the result link', () => {
+      const review = sourceControlModel(
+        withReview(
+          { result: { tone: 'ok', text: 'MR #2 creado', href: 'https://x/2' } },
+          { canCreate: false, blockedReason: 'default_branch' }
+        )
+      ).review!
+      expect(review.blockedText).toMatch(/rama por defecto/)
+      expect(review.result).toEqual({ tone: 'ok', text: 'MR #2 creado', href: 'https://x/2' })
+    })
   })
 })

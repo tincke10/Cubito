@@ -6,6 +6,8 @@ export type SourceControlComposerHandle = {
   onMessageChange(cb: (message: string) => void): void
   onCommit(cb: () => void): void
   onPush(cb: () => void): void
+  onReviewForm(cb: (form: { title?: string; body?: string; draft?: boolean }) => void): void
+  onReviewPrimary(cb: () => void): void
   dispose(): void
 }
 
@@ -38,9 +40,61 @@ export function createSourceControlComposer(doc: Document = document): SourceCon
   root.appendChild(actions)
   root.appendChild(notice)
 
+  const review = doc.createElement('div')
+  review.className = 'cubito-source-control__review'
+  const reviewTitle = doc.createElement('input')
+  reviewTitle.type = 'text'
+  reviewTitle.className = 'cubito-source-control__review-title'
+  reviewTitle.placeholder = 'título'
+  const reviewBody = doc.createElement('textarea')
+  reviewBody.className = 'cubito-source-control__review-body'
+  reviewBody.placeholder = 'descripción'
+  reviewBody.rows = 3
+  const draftRow = doc.createElement('label')
+  draftRow.className = 'cubito-source-control__draft'
+  const draft = doc.createElement('input')
+  draft.type = 'checkbox'
+  const draftText = doc.createElement('span')
+  draftText.textContent = 'borrador'
+  draftRow.appendChild(draft)
+  draftRow.appendChild(draftText)
+  const reviewForm = doc.createElement('div')
+  reviewForm.className = 'cubito-source-control__review-form'
+  reviewForm.appendChild(reviewTitle)
+  reviewForm.appendChild(reviewBody)
+  reviewForm.appendChild(draftRow)
+  const reviewButton = doc.createElement('button')
+  reviewButton.type = 'button'
+  reviewButton.className = 'cubito-source-control__button cubito-source-control__button--primary'
+  const reviewLink = doc.createElement('a')
+  reviewLink.className = 'cubito-source-control__button cubito-source-control__button--primary'
+  reviewLink.target = '_blank'
+  // Why: the review page is third-party content; it must not get window.opener.
+  reviewLink.rel = 'noopener noreferrer'
+  const reviewBlocked = doc.createElement('div')
+  reviewBlocked.className = 'cubito-source-control__status'
+  const reviewResult = doc.createElement('div')
+  reviewResult.className = 'cubito-source-control__notice'
+  const reviewResultLink = doc.createElement('a')
+  reviewResultLink.className = 'cubito-source-control__result-link'
+  reviewResultLink.target = '_blank'
+  reviewResultLink.rel = 'noopener noreferrer'
+  reviewResultLink.textContent = 'abrir'
+  review.appendChild(reviewForm)
+  review.appendChild(reviewBlocked)
+  review.appendChild(reviewButton)
+  review.appendChild(reviewLink)
+  review.appendChild(reviewResult)
+  review.appendChild(reviewResultLink)
+  root.appendChild(review)
+
   let messageCallback: ((value: string) => void) | null = null
   let commitCallback: (() => void) | null = null
   let pushCallback: (() => void) | null = null
+  let reviewFormCallback:
+    | ((form: { title?: string; body?: string; draft?: boolean }) => void)
+    | null = null
+  let reviewPrimaryCallback: (() => void) | null = null
   message.addEventListener('input', () => messageCallback?.(message.value))
   message.addEventListener('keydown', (event: KeyboardEvent) => {
     // Why: ⌘/Ctrl+Enter is the editor-standard commit chord; plain Enter stays a newline.
@@ -51,6 +105,35 @@ export function createSourceControlComposer(doc: Document = document): SourceCon
   })
   commit.addEventListener('click', () => commitCallback?.())
   push.addEventListener('click', () => pushCallback?.())
+  reviewTitle.addEventListener('input', () => reviewFormCallback?.({ title: reviewTitle.value }))
+  reviewBody.addEventListener('input', () => reviewFormCallback?.({ body: reviewBody.value }))
+  draft.addEventListener('change', () => reviewFormCallback?.({ draft: draft.checked }))
+  reviewButton.addEventListener('click', () => reviewPrimaryCallback?.())
+
+  function applyReview(model: SourceControlModel['review']): void {
+    review.hidden = model === null
+    root.classList.toggle('cubito-source-control--review', model !== null)
+    if (model === null) return
+    reviewForm.hidden = !model.showForm
+    draftRow.hidden = !model.showDraft
+    // Why: rewriting a field's value while typing would reset the caret.
+    if (reviewTitle.value !== model.title) reviewTitle.value = model.title
+    if (reviewBody.value !== model.body) reviewBody.value = model.body
+    draft.checked = model.draft
+    reviewBlocked.textContent = model.blockedText ?? ''
+    reviewBlocked.hidden = model.blockedText === null
+    const isLink = model.primary.href !== undefined
+    reviewButton.hidden = isLink
+    reviewLink.hidden = !isLink
+    reviewButton.textContent = model.primary.label
+    reviewButton.disabled = model.primary.disabled
+    reviewLink.textContent = model.primary.label
+    if (model.primary.href !== undefined) reviewLink.href = model.primary.href
+    reviewResult.textContent = model.result?.text ?? ''
+    reviewResult.className = `cubito-source-control__notice${model.result ? ` cubito-source-control__notice--${model.result.tone}` : ''}`
+    reviewResultLink.hidden = model.result?.href === undefined
+    if (model.result?.href !== undefined) reviewResultLink.href = model.result.href
+  }
 
   return {
     root,
@@ -65,11 +148,14 @@ export function createSourceControlComposer(doc: Document = document): SourceCon
       push.textContent = model.pushLabel
       push.disabled = model.pushDisabled
       notice.textContent = model.notice?.text ?? ''
+      applyReview(model.review)
       notice.className = `cubito-source-control__notice${model.notice ? ` cubito-source-control__notice--${model.notice.tone}` : ''}`
     },
     onMessageChange: (cb) => (messageCallback = cb),
     onCommit: (cb) => (commitCallback = cb),
     onPush: (cb) => (pushCallback = cb),
+    onReviewForm: (cb) => (reviewFormCallback = cb),
+    onReviewPrimary: (cb) => (reviewPrimaryCallback = cb),
     dispose() {
       root.remove()
     }

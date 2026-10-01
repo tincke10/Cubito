@@ -46,6 +46,8 @@ export function createSourceControlBinder(deps: {
         composer.onMessageChange((message) => flow.setMessage(message))
         composer.onCommit(() => void flow.commit())
         composer.onPush(() => void flow.push())
+        composer.onReviewForm((form) => flow.setReviewForm(form))
+        composer.onReviewPrimary(() => void flow.reviewPrimary())
         deps.slot.appendChild(composer.root)
       }
       composer.apply(sourceControlModel(view))

@@ -1186,9 +1186,60 @@
       /* Diff mode source control (U2): the commit composer sits under the file rail. */
       :root {
         --cubito-diff-composer-h: 176px;
+        --cubito-diff-composer-review-h: 380px;
       }
       #diff .cubito-diff-rail {
         height: calc(100% - var(--cubito-diff-composer-h));
+      }
+      #diff:has(.cubito-source-control--review) .cubito-diff-rail {
+        height: calc(100% - var(--cubito-diff-composer-review-h));
+      }
+      .cubito-source-control--review {
+        height: var(--cubito-diff-composer-review-h);
+      }
+      .cubito-source-control__review,
+      .cubito-source-control__review-form {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .cubito-source-control__review[hidden],
+      .cubito-source-control__review-form[hidden],
+      .cubito-source-control__review [hidden] {
+        display: none;
+      }
+      .cubito-source-control__review-title,
+      .cubito-source-control__review-body {
+        padding: 6px 8px;
+        background: var(--cubito-background);
+        border: 1px solid var(--cubito-panel-border);
+        border-radius: 4px;
+        color: var(--cubito-text-primary);
+        font: inherit;
+        resize: none;
+      }
+      .cubito-source-control__review-title:focus,
+      .cubito-source-control__review-body:focus {
+        outline: none;
+        border-color: var(--cubito-accent);
+      }
+      .cubito-source-control__draft {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--cubito-text-dim);
+      }
+      .cubito-source-control__button--primary {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        border-color: var(--cubito-accent);
+        color: var(--cubito-accent);
+        text-decoration: none;
+      }
+      .cubito-source-control__result-link {
+        color: var(--cubito-accent);
       }
       .cubito-source-control {
         position: absolute;

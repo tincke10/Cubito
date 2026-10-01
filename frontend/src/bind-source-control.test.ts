@@ -34,6 +34,8 @@ function setup() {
     onMessageChange: (cb) => (handlers.message = cb),
     onCommit: (cb) => (handlers.commit = cb),
     onPush: (cb) => (handlers.push = cb),
+    onReviewForm: vi.fn(),
+    onReviewPrimary: vi.fn(),
     dispose: vi.fn()
   }
   const slot = { appendChild: vi.fn() }
@@ -54,7 +56,11 @@ function setup() {
     gitStage: vi.fn(async () => undefined),
     gitUnstage: vi.fn(async () => undefined),
     gitCommit: vi.fn(async () => ({ success: true as const })),
-    gitPush: vi.fn(async () => undefined)
+    gitPush: vi.fn(async () => undefined),
+    hostedReviewEligibility: vi.fn(async () => {
+      throw new Error('no remote')
+    }),
+    hostedReviewCreate: vi.fn(async () => ({ ok: true as const, url: 'https://x/1' }))
   }
   const binder = createSourceControlBinder({
     store,

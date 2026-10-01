@@ -97,6 +97,10 @@ const fakeGateway = (
   gitUnstage: async () => undefined,
   gitCommit: async () => ({ success: true as const }),
   gitPush: async () => undefined,
+  hostedReviewEligibility: async () => {
+    throw new Error('not implemented in this fake')
+  },
+  hostedReviewCreate: async () => ({ ok: true as const, url: '' }),
   worktreeRemove: async () => ({ removed: true as const }),
   agentActivity: async () => ({ events: [], latestSeq: 0 }),
   repoSetupCommand: async () => null,

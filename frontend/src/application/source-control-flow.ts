@@ -1,15 +1,45 @@
 import type { WorktreeId } from '../domain/worktree-graph/types'
-import type { RuntimeGateway, SourceControlStatus } from './ports/runtime-gateway'
+import { resolveBaseRef } from '../domain/worktree-graph/resolve-base-ref'
+import { shortBranchName } from '../presentation/hud/node-label-model'
+import { AUTH_REQUIRED_MESSAGE, reviewKindName } from './hosted-review-presentation'
+import type {
+  HostedReviewEligibility,
+  RuntimeGateway,
+  SourceControlStatus
+} from './ports/runtime-gateway'
 import type { SceneStore } from './scene-store'
 
 export type SourceControlGatewayPort = Pick<
   RuntimeGateway,
-  'gitSourceControlStatus' | 'gitStage' | 'gitUnstage' | 'gitCommit' | 'gitPush'
+  | 'gitSourceControlStatus'
+  | 'gitStage'
+  | 'gitUnstage'
+  | 'gitCommit'
+  | 'gitPush'
+  | 'hostedReviewEligibility'
+  | 'hostedReviewCreate'
 >
 
 export type StageState = 'staged' | 'partial' | 'unstaged'
 export type SourceControlBusy = 'stage' | 'commit' | 'push'
 export type SourceControlNotice = { tone: 'ok' | 'error'; text: string }
+
+export type ReviewResult = { tone: 'ok' | 'error'; text: string; href?: string }
+
+/** `unavailable`: no remote/provider answer; the commit and push controls still work. */
+export type ReviewState =
+  | { phase: 'unavailable' }
+  | {
+      phase: 'ready'
+      eligibility: HostedReviewEligibility
+      title: string
+      body: string
+      draft: boolean
+      /** Once the user edits the form, an eligibility reload no longer overwrites it. */
+      touched: boolean
+      creating: boolean
+      result: ReviewResult | null
+    }
 
 export type SourceControlView =
   | { phase: 'hidden' }
@@ -25,6 +55,7 @@ export type SourceControlView =
       message: string
       busy: SourceControlBusy | null
       notice: SourceControlNotice | null
+      review: ReviewState
       canCommit: boolean
       canPush: boolean
     }
@@ -46,6 +77,9 @@ export type SourceControlFlow = {
   setMessage(message: string): void
   commit(): Promise<void>
   push(): Promise<void>
+  setReviewForm(form: { title?: string; body?: string; draft?: boolean }): void
+  /** The one next step toward a review, chosen by the host's nextAction. */
+  reviewPrimary(): Promise<void>
   rebindGateway(gateway: SourceControlGatewayPort): void
 }
 
@@ -118,10 +152,101 @@ export function createSourceControlFlow(deps: SourceControlFlowDeps): SourceCont
         behind: status.behind,
         message: previous?.message ?? '',
         busy: previous?.busy ?? null,
-        notice: previous?.notice ?? null
+        notice: previous?.notice ?? null,
+        review: previous?.review ?? { phase: 'unavailable' }
       })
     )
-    return true
+    await loadReview(nodeId, ownGeneration)
+    return ownGeneration === generation
+  }
+
+  /** Best effort: any failure just hides the review controls. */
+  async function loadReview(nodeId: WorktreeId, ownGeneration: number): Promise<void> {
+    const view = current
+    const node = deps.store.get().graph.nodes.get(nodeId)
+    if (view.phase !== 'ready' || !node) return
+    const base = resolveBaseRef(deps.store.get().graph, nodeId)
+    let eligibility: HostedReviewEligibility
+    try {
+      eligibility = await gateway.hostedReviewEligibility({
+        repo: `id:${node.repoId}`,
+        worktree: nodeId,
+        branch: shortBranchName(node.branch),
+        base: base === null ? null : shortBranchName(base),
+        hasUncommittedChanges: view.stageStates.size > 0,
+        hasUpstream: view.hasUpstream,
+        ahead: view.ahead,
+        behind: view.behind
+      })
+    } catch {
+      if (ownGeneration === generation) patch({ review: { phase: 'unavailable' } })
+      return
+    }
+    if (ownGeneration !== generation || current.phase !== 'ready') return
+    const previous = current.review.phase === 'ready' ? current.review : null
+    const keep = previous?.touched === true
+    patch({
+      review: {
+        phase: 'ready',
+        eligibility,
+        title: keep ? previous.title : (eligibility.title ?? ''),
+        body: keep ? previous.body : (eligibility.body ?? ''),
+        draft: previous?.draft ?? false,
+        touched: keep,
+        creating: false,
+        result: previous?.result ?? null
+      }
+    })
+  }
+
+  function patchReview(fields: Partial<Extract<ReviewState, { phase: 'ready' }>>): void {
+    if (current.phase !== 'ready' || current.review.phase !== 'ready') return
+    patch({ review: { ...current.review, ...fields } })
+  }
+
+  async function createReview(): Promise<void> {
+    if (current.phase !== 'ready' || current.review.phase !== 'ready') return
+    const { nodeId } = current
+    const { eligibility, title, body, draft, creating } = current.review
+    const node = deps.store.get().graph.nodes.get(nodeId)
+    const base = eligibility.defaultBaseRef ?? resolveBaseRef(deps.store.get().graph, nodeId)
+    if (creating || !eligibility.canCreate || title.trim() === '' || !node || base === null) return
+    const ownGeneration = generation
+    patchReview({ creating: true, result: null })
+    let result: ReviewResult
+    try {
+      const created = await gateway.hostedReviewCreate({
+        repo: `id:${node.repoId}`,
+        worktree: nodeId,
+        provider: eligibility.provider,
+        base: shortBranchName(base),
+        head: eligibility.head ?? shortBranchName(node.branch),
+        title: title.trim(),
+        body,
+        draft
+      })
+      const kind = reviewKindName(eligibility.provider)
+      if (created.ok) {
+        result = {
+          tone: 'ok',
+          text: `${kind}${created.number === undefined ? '' : ` #${created.number}`} creado`,
+          href: created.url
+        }
+      } else if (created.code === 'auth_required') {
+        result = { tone: 'error', text: AUTH_REQUIRED_MESSAGE }
+      } else {
+        result = {
+          tone: 'error',
+          text: created.error,
+          ...(created.existingReview ? { href: created.existingReview.url } : {})
+        }
+      }
+    } catch (error) {
+      result = { tone: 'error', text: messageOf(error) }
+    }
+    if (ownGeneration !== generation) return
+    patchReview({ creating: false, result })
+    await loadReview(nodeId, ownGeneration)
   }
 
   async function run(
@@ -188,6 +313,39 @@ export function createSourceControlFlow(deps: SourceControlFlowDeps): SourceCont
         await gateway.gitPush(view.nodeId, view.hasUpstream ? {} : { publish: true })
         return { tone: 'ok', text: view.hasUpstream ? 'push realizado' : 'rama publicada' }
       })
+    },
+    setReviewForm(form) {
+      patchReview({ ...form, touched: true })
+    },
+    async reviewPrimary() {
+      if (current.phase !== 'ready' || current.review.phase !== 'ready') return
+      switch (current.review.eligibility.nextAction) {
+        case 'commit':
+          if (current.canCommit) await this.commit()
+          else
+            patch({
+              notice: { tone: 'error', text: 'stageá archivos y escribí un mensaje para commitear' }
+            })
+          return
+        case 'publish':
+        case 'push':
+          await this.push()
+          return
+        case 'sync':
+          patch({
+            notice: {
+              tone: 'error',
+              text: 'la rama está atrás del remoto: hacé pull o rebase en la terminal'
+            }
+          })
+          return
+        case 'authenticate':
+          patch({ notice: { tone: 'error', text: AUTH_REQUIRED_MESSAGE } })
+          return
+        case null:
+        default:
+          await createReview()
+      }
     },
     rebindGateway(next) {
       gateway = next

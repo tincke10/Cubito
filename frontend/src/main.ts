@@ -181,6 +181,12 @@ const demoGateway: RuntimeGateway = {
   gitPush: async () => {
     throw new Error('gitPush not implemented in the demo gateway')
   },
+  hostedReviewEligibility: async () => {
+    throw new Error('hostedReviewEligibility not implemented in the demo gateway')
+  },
+  hostedReviewCreate: async () => {
+    throw new Error('hostedReviewCreate not implemented in the demo gateway')
+  },
   worktreeRemove: async () => {
     throw new Error('worktreeRemove not implemented in the demo gateway')
   },

@@ -88,6 +88,8 @@ describe('createOrcadGateway', () => {
       'gitUnstage',
       'gitCommit',
       'gitPush',
+      'hostedReviewEligibility',
+      'hostedReviewCreate',
       'worktreeRemove',
       'listWorktrees',
       'listRepos',
