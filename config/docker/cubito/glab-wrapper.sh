@@ -8,7 +8,7 @@ if [ "${1:-}" = "auth" ] && [ "${2:-}" = "status" ] \
   cfg="${GLAB_CONFIG_DIR:-${XDG_CONFIG_HOME:-${HOME:-/nonexistent}/.config}/glab-cli}"
   configured=""
   for f in "$cfg/config.yml" "$cfg/hosts.yml"; do
-    if [ -f "$f" ] && grep -Eqi 'token|oauth' "$f"; then
+    if [ -f "$f" ] && grep -Eqi '^[[:space:]]*(token|job_token|oauth_token):[[:space:]]*[^[:space:]#]' "$f"; then
       configured=1
     fi
   done

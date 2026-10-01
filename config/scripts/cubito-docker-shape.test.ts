@@ -177,7 +177,7 @@ describe('glab wrapper', () => {
     expect(runtimeStage).toMatch(/glab-wrapper\.sh \/usr\/local\/bin\/glab/)
   })
 
-  function run(args: string[], env: Record<string, string>, withConfig: boolean) {
+  function run(args: string[], env: Record<string, string>, withConfig: boolean | string) {
     const dir = mkdtempSync(join(tmpdir(), 'glab-wrapper-'))
     const real = join(dir, 'glab-real')
     writeFileSync(real, '#!/bin/sh\necho "REAL $*"\n')
@@ -187,7 +187,9 @@ describe('glab wrapper', () => {
     if (withConfig) {
       writeFileSync(
         join(home, '.config', 'glab-cli', 'config.yml'),
-        'hosts:\n  gitlab.example.com:\n    token: abc\n'
+        typeof withConfig === 'string'
+          ? withConfig
+          : 'hosts:\n  gitlab.example.com:\n    token: abc\n'
       )
     }
     return spawnSync('sh', [wrapper, ...args], {
@@ -222,6 +224,15 @@ describe('glab wrapper', () => {
 
   it('execs the real glab when a config file lists hosts', () => {
     expect(run(['auth', 'status'], {}, true).stdout).toContain('REAL auth status')
+  })
+
+  // Why: any real glab run writes a default config whose comments and empty keys mention tokens.
+  it('still answers offline when the config is only glab defaults', () => {
+    const defaults =
+      'hosts:\n  gitlab.com:\n    # Your GitLab access token. To get one, read the docs.\n    token:\n    job_token:\n    # OAuth application client ID.\n    client_id:\n'
+    const r = run(['auth', 'status'], {}, defaults)
+    expect(r.stdout).not.toContain('REAL')
+    expect(r.status).not.toBe(0)
   })
 
   it('passes every other command through untouched', () => {
