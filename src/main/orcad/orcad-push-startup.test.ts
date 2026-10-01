@@ -14,6 +14,8 @@ const state = vi.hoisted(() => ({
   controller: null as RuntimeMobileNotificationController | null,
   registry: null as DeviceRegistry | null,
   rpcStarted: false,
+  automationStart: vi.fn(),
+  automationStop: vi.fn(),
   browserProvider: vi.fn(async () => null),
   register: vi.fn(async () => ({ ok: true, registrationId: 'headless-registration' })),
   send: vi.fn(async () => ({ ok: true, results: [] }))
@@ -28,6 +30,9 @@ vi.mock('./orcad-instance-lock', () => ({ acquireOrcadInstanceLock: () => ({ rel
 vi.mock('./orcad-daemon-supervision', () => ({
   startOrcadDaemon: async () => {},
   stopOrcadDaemon: async () => {}
+}))
+vi.mock('./orcad-automation-service', () => ({
+  createOrcadAutomationService: () => ({ start: state.automationStart, stop: state.automationStop })
 }))
 vi.mock('./orcad-health', () => ({ collectOrcadHealth: async () => ({}) }))
 vi.mock('../daemon/daemon-init', () => ({ daemonOwnsFreshPersistentPtys: () => false }))
@@ -72,7 +77,9 @@ vi.mock('../runtime/orca-runtime', () => ({
       return 'headless-runtime'
     }
     rehydrateClientHostedBrowserPages() {}
-    async refreshRestoredOrchestrationAuthority() {}
+    async refreshRestoredOrchestrationAuthority() {
+      expect(state.automationStart).not.toHaveBeenCalled()
+    }
     async reconcileLegacyWorkerTerminals() {}
     setMobilePushRegistrar(
       registrar: Parameters<RuntimeMobileNotificationController['setPushRegistrar']>[0]
@@ -175,6 +182,18 @@ it('starts push after RPC identity is available and stops dispatch on shutdown',
   expect(await state.controller.registerPushDevice({} as never)).toMatchObject({
     registered: false
   })
+})
+
+it('starts automations after recovery and stops them on shutdown', async () => {
+  state.root = mkdtempSync(join(tmpdir(), 'orca-headless-automations-'))
+  state.controller = new RuntimeMobileNotificationController()
+  state.registry = new DeviceRegistry(state.root)
+  const { startOrcad } = await import('./orcad-entry')
+  const host = await startOrcad({ noPairing: true, json: true })
+  expect(state.automationStart).toHaveBeenCalledTimes(1)
+  expect(state.automationStop).not.toHaveBeenCalled()
+  await host.stop()
+  expect(state.automationStop).toHaveBeenCalledTimes(1)
 })
 
 it('releases admission when host setup fails before a runtime exists', async () => {

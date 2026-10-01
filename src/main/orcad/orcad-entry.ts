@@ -150,7 +150,10 @@ async function startOrcadRuntime(
   let uninstallHookStatusRepublish = (): void => {}
   let uninstallObservedStatusIdentity = (): void => {}
   let uninstallAgentAttentionNotifier = (): void => {}
+  let stopAutomationService = (): void => {}
   registerCleanup(async () => {
+    // Why first: no scheduled run may dispatch while the RPC server and store are going down.
+    stopAutomationService()
     try {
       await rpc?.stop()
     } finally {
@@ -329,6 +332,13 @@ async function startOrcadRuntime(
 
   await runtime.refreshRestoredOrchestrationAuthority()
   await runtime.reconcileLegacyWorkerTerminals()
+
+  // Why after recovery: a due run dispatches into terminals and worktrees that must already
+  // be reconciled. Without this, `orca automations` CRUD works but nothing ever fires.
+  const { createOrcadAutomationService } = await import('./orcad-automation-service')
+  const automationService = createOrcadAutomationService(profileStore, runtime)
+  automationService.start()
+  stopAutomationService = () => automationService.stop()
 
   // Recovery binds terminal and dispatch identities; only now can startup observations be fenced.
   observedStatusCapture.attach(runtime)

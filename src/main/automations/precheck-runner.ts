@@ -2,7 +2,8 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import type { ClientChannel } from 'ssh2'
 import type { AutomationPrecheck, AutomationPrecheckResult } from '../../shared/automations-types'
 import { MAX_AUTOMATION_PRECHECK_OUTPUT_CHARS } from '../../shared/automation-precheck'
-import { getSshConnectionManager } from '../ipc/ssh'
+// Why the registry and not ipc/ssh: ipc/ssh imports Electron, and this module is on the orcad import graph.
+import { getSshConnectionManager } from '../ssh/ssh-target-registry'
 import { shellEscape } from '../ssh/ssh-connection-utils'
 import { admitSelfInitiatedTreeKill } from '../own-chromium-tree-kill-guard'
 
