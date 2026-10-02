@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process'
+import { ciShardFlags } from './unit-test-shard-ci-flags.mjs'
 import { toVitestExcludeFlags } from './unit-test-shard-excludes.mjs'
 
 // Single entry point for the CI unit shard and the local honest gate (`pnpm test:ci-shard`).
@@ -19,6 +20,7 @@ const result = spawnSync(
     '--config',
     'config/vitest.config.ts',
     ...toVitestExcludeFlags(),
+    ...ciShardFlags(process.env),
     ...forwardedArguments
   ],
   { stdio: 'inherit' }
