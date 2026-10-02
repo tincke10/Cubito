@@ -9,6 +9,15 @@ import { describe, expect, it } from 'vitest'
 // data/worktree root — never the real Orca profile or workspace dir.
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..')
+const envExample = readFileSync(join(REPO_ROOT, '.env.example'), 'utf8')
+const readmeText = readFileSync(join(REPO_ROOT, 'README.md'), 'utf8')
+
+// Why: `.env.example` is the setup surface; entries stay commented so an unset value is never passed as "".
+function expectDocumentedEnv(name: string): void {
+  expect(envExample).toMatch(new RegExp(`^# ${name}=`, 'm'))
+  expect(envExample).not.toMatch(new RegExp(`^${name}=`, 'm'))
+  expect(readmeText).toContain(`\`${name}\``)
+}
 
 type ComposeFile = {
   services: Record<
@@ -144,15 +153,14 @@ describe('git host CLIs and tokens', () => {
     expect(entrypoint).not.toMatch(/echo[^\n]*\$\{?(GH_TOKEN|GITLAB_TOKEN)/)
   })
 
-  it('documents pull-and-run, the build-from-source override and the public package step', () => {
-    expect(readme).toContain('docker compose up\n')
+  it('documents pull-and-run and the build-from-source override', () => {
+    expect(readme).toContain('docker compose up -d')
     expect(readme).toContain('docker compose -f compose.yaml -f compose.build.yaml up --build')
-    expect(readme).toContain('make the `cubito` package public')
   })
 
-  it('documents the token passthrough in the Docker README', () => {
-    expect(readme).toContain('export GH_TOKEN=')
-    expect(readme).toContain('export GITLAB_TOKEN=')
+  it('documents the token passthrough in .env.example and the README', () => {
+    expectDocumentedEnv('GH_TOKEN')
+    expectDocumentedEnv('GITLAB_TOKEN')
   })
 })
 
@@ -423,13 +431,14 @@ describe('container user', () => {
     )
   })
 
-  it('documents sealing credentials at rest with CUBITO_SECRET_KEY in the Docker README', () => {
-    expect(readme).toContain('export CUBITO_SECRET_KEY=')
+  it('documents sealing credentials at rest with CUBITO_SECRET_KEY', () => {
+    expectDocumentedEnv('CUBITO_SECRET_KEY')
     expect(readme).toContain('openssl rand -base64 32')
   })
 
-  it('documents the bypass opt-in in the Docker README', () => {
-    expect(readme).toContain('export CUBITO_AGENT_BYPASS=accept')
+  it('documents the bypass opt-in', () => {
+    expectDocumentedEnv('CUBITO_AGENT_BYPASS')
+    expect(envExample).toContain('# CUBITO_AGENT_BYPASS=accept')
   })
 
   it('documents exec commands as the node user so logins and clones land where agents run', () => {
@@ -442,7 +451,6 @@ describe('agent git identity', () => {
   const compose = parse(readFileSync(join(REPO_ROOT, 'compose.yaml'), 'utf8')) as ComposeFile
   const env = compose.services.cubito.environment ?? {}
   const entrypoint = readFileSync(join(REPO_ROOT, 'config/docker/cubito/entrypoint.sh'), 'utf8')
-  const readme = readFileSync(join(REPO_ROOT, 'README.md'), 'utf8')
 
   it('passes the commit identity through from the host without storing a value', () => {
     expect(env.CUBITO_GIT_NAME).toBeNull()
@@ -465,8 +473,8 @@ describe('agent git identity', () => {
     expect(entrypoint).toMatch(/CUBITO_GIT_NAME and CUBITO_GIT_EMAIL.*>&2/)
   })
 
-  it('documents taking the identity from the host git config', () => {
-    expect(readme).toContain('export CUBITO_GIT_NAME="$(git config user.name)"')
-    expect(readme).toContain('export CUBITO_GIT_EMAIL="$(git config user.email)"')
+  it('documents the commit identity agents need', () => {
+    expectDocumentedEnv('CUBITO_GIT_NAME')
+    expectDocumentedEnv('CUBITO_GIT_EMAIL')
   })
 })
