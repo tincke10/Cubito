@@ -62,6 +62,14 @@ export const UNIT_TEST_SHARD_EXCLUDES = [
     why: "upstream's renderer xterm patch tooling reads pnpm 12 lockfiles and addon-image; Cubito pins pnpm 10 and ships no renderer"
   },
   {
+    path: 'src/**/*.electron.test.ts',
+    why: "upstream's Electron browser-pane and asar tests; Cubito ships no Electron, and they flake headless"
+  },
+  {
+    path: 'src/main/ssh/ssh-relay-endpoint-incumbent-shell.integration.test.ts',
+    why: 'real-socket SSH relay probe that flakes on CI; headless orcad never wires SSH'
+  },
+  {
     path: 'tests/cross-version-wire/**',
     why: 'long-running cross-version checkout fixtures, run separately'
   }
