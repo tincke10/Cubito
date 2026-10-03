@@ -2,8 +2,7 @@ import type { SpawnAgent } from '../../application/ports/runtime-gateway'
 import type { FanOutFormViewModel, FanOutRunningViewModel } from './fan-out-view-model'
 import { createFanOutGateList } from './fan-out-gate-list-element'
 import { t } from '../../application/i18n/translate'
-
-const AGENT_OPTIONS: readonly SpawnAgent[] = ['none', 'claude']
+import { AGENT_OPTIONS, agentOptionLabel } from './spawn-agent-options'
 
 export type FanOutFormHandle = {
   readonly element: HTMLElement
@@ -38,7 +37,7 @@ export function createFanOutForm(doc: Document = document): FanOutFormHandle {
   agentSelect.className = 'cubito-fanout-form__field cubito-fanout-form__field--agent'
   for (const agent of AGENT_OPTIONS) {
     const option = doc.createElement('option')
-    option.textContent = agent
+    option.textContent = agentOptionLabel(agent)
     ;(option as unknown as HTMLOptionElement).value = agent
     agentSelect.appendChild(option)
   }

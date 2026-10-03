@@ -3,6 +3,8 @@ export const enSpawn = {
   'spawn.radial.fanOut': 'fan-out',
   'spawn.radial.terminal': 'terminal',
   'spawn.radial.archive': 'archive',
+  'spawn.agent.none': 'none',
+  'spawn.agent.claude': 'claude',
   'spawn.title': 'spawn child · {from}',
   'spawn.submit': 'create worktree',
   'spawn.submitting': 'creating…',

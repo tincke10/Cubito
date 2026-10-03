@@ -5,6 +5,8 @@ export const esSpawn: Record<keyof typeof enSpawn, string> = {
   'spawn.radial.fanOut': 'fan-out',
   'spawn.radial.terminal': 'terminal',
   'spawn.radial.archive': 'archivar',
+  'spawn.agent.none': 'ninguno',
+  'spawn.agent.claude': 'claude',
   'spawn.title': 'spawn hijo · {from}',
   'spawn.submit': 'crear worktree',
   'spawn.submitting': 'creando…',

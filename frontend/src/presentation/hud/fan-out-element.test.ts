@@ -84,6 +84,17 @@ const countInputOf = (root: FakeElement): FakeElement =>
   root.children.find((c) => c.tagName === 'INPUT' && c.className.includes('count'))!
 
 describe('createFanOutForm — form view', () => {
+  it('labels every agent option with localized copy while keeping the values', () => {
+    const form = createFanOutForm(createFakeDocument())
+    const select = (form.element as unknown as FakeElement).children.find(
+      (c) => c.tagName === 'SELECT'
+    )!
+    expect(select.children.map((o) => [o.value, o.textContent])).toEqual([
+      ['none', 'ninguno'],
+      ['claude', 'claude']
+    ])
+  })
+
   it('apply() renders the form title and hides it in the running view', () => {
     const form = createFanOutForm(createFakeDocument())
     const root = form.element as unknown as FakeElement

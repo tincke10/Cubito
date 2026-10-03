@@ -1,6 +1,6 @@
 import { t } from '../../application/i18n/translate'
+import { AGENT_OPTIONS, agentOptionLabel } from './spawn-agent-options'
 import type { SpawnFormFields } from '../../application/spawn-menu-model'
-import type { SpawnAgent } from '../../application/ports/runtime-gateway'
 import type { SpawnFormViewModel } from './spawn-view-model'
 
 export type SpawnFormField = keyof SpawnFormFields
@@ -26,8 +26,6 @@ export type SpawnFormHandle = {
   dispose(): void
 }
 
-const AGENT_OPTIONS: readonly SpawnAgent[] = ['none', 'claude']
-
 /**
  * HUD-anchored spawn form (design Area 3/mockup Spawn.dc.html) — a fixed `<div>` panel, built
  * like keyboard-bar.ts with an injectable `doc` for unit testing. Owns its own keydown listener
@@ -48,7 +46,7 @@ export function createSpawnForm(doc: Document = document): SpawnFormHandle {
   agentSelect.className = 'cubito-spawn-form__field cubito-spawn-form__field--agent'
   for (const agent of AGENT_OPTIONS) {
     const option = doc.createElement('option')
-    option.textContent = agent
+    option.textContent = agentOptionLabel(agent)
     ;(option as unknown as HTMLOptionElement).value = agent
     agentSelect.appendChild(option)
   }
