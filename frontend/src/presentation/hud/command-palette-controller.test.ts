@@ -111,6 +111,7 @@ function setup(selectedId: string | null = 'a', connected = true) {
   const fileWorkspace = { openPicker: vi.fn() }
   const hud = { appendChild: vi.fn() }
   const handles: FakeHandle[] = []
+  const switchLanguage = vi.fn()
   const deps: CommandPaletteControllerDeps = {
     store,
     heights,
@@ -123,10 +124,21 @@ function setup(selectedId: string | null = 'a', connected = true) {
       return h
     },
     hud,
-    platform: LINUX
+    platform: LINUX,
+    language: { switchTo: switchLanguage }
   }
   const controller = createCommandPaletteController(deps)
-  return { store, heights, terminal, worktreeDelete, fileWorkspace, hud, handles, controller }
+  return {
+    store,
+    heights,
+    terminal,
+    worktreeDelete,
+    fileWorkspace,
+    hud,
+    handles,
+    controller,
+    switchLanguage
+  }
 }
 
 const openAndMount = (setupResult: ReturnType<typeof setup>): void => {
@@ -328,6 +340,14 @@ describe('createCommandPaletteController', () => {
       setupResult.handles[0]!.emitActivate('open-file')
       expect(setupResult.store.get().commandPalette.view).toBe('closed')
       expect(setupResult.fileWorkspace.openPicker).toHaveBeenCalledWith('a')
+    })
+
+    it('switch-language asks for the OTHER language than the active one, closing the palette first', () => {
+      const setupResult = setup(null, false) // always available: no selection, not connected
+      openAndMount(setupResult)
+      setupResult.handles[0]!.emitActivate('switch-language')
+      expect(setupResult.store.get().commandPalette.view).toBe('closed')
+      expect(setupResult.switchLanguage).toHaveBeenCalledWith('en') // pinned language is es
     })
 
     it('activating a currently-disabled command no-ops entirely (guard, belt-and-suspenders)', () => {

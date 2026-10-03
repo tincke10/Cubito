@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { setActiveLanguage } from './i18n/translate'
 import { commandCatalog, toCommandAvailability } from './command-catalog'
 import type { CommandAvailability, CommandId } from './command-catalog'
 import type { SceneState } from './scene-store'
@@ -50,7 +51,7 @@ describe('commandCatalog', () => {
   const mac = commandCatalog({ isMac: true })
   const other = commandCatalog({ isMac: false })
 
-  it('orders the 11 commands per the proposal', () => {
+  it('orders the 13 commands per the proposal', () => {
     expect(mac.map((c) => c.id)).toEqual([
       'focus',
       'fit-all',
@@ -63,7 +64,8 @@ describe('commandCatalog', () => {
       'open-diff',
       'open-compare',
       'delete-worktree',
-      'open-file'
+      'open-file',
+      'switch-language'
     ])
   })
 
@@ -133,6 +135,7 @@ describe('commandCatalog', () => {
     ['open-file', avail({ hasSelection: true, isConnected: true }), true],
     ['open-file', avail({ hasSelection: true, isConnected: false }), false],
     ['open-file', avail({ hasSelection: false, isConnected: true }), false],
+    ['switch-language', avail(), true],
     ['open-compare', avail({ hasRunningCamada: true }), true],
     ['open-compare', avail({ hasRunningCamada: false }), false],
     // selection/connection are irrelevant to open-compare — only hasRunningCamada gates it.
@@ -208,5 +211,21 @@ describe('toCommandAvailability', () => {
         })
       ).hasRunningCamada
     ).toBe(true)
+  })
+})
+
+describe('switch-language command', () => {
+  afterEach(() => setActiveLanguage('es'))
+
+  it('labels the target language in its own tongue and never needs a connection', () => {
+    setActiveLanguage('es')
+    expect(findCommand(commandCatalog({ isMac: true }), 'switch-language')).toMatchObject({
+      label: 'Language: English',
+      keybindingHint: '—'
+    })
+    setActiveLanguage('en')
+    expect(findCommand(commandCatalog({ isMac: true }), 'switch-language').label).toBe(
+      'Idioma: Español'
+    )
   })
 })

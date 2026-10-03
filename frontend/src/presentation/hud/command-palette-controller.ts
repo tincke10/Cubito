@@ -11,6 +11,8 @@ import type {
 } from '../input/keyboard-controller'
 import type { CameraHeightController } from '../input/camera-height-controller'
 import { fanOutMemberIds } from '../../application/fan-out-model'
+import type { Language } from '../../application/i18n/language'
+import { activeLanguage } from '../../application/i18n/translate'
 
 export type CommandPaletteControllerDeps = {
   store: SceneStore
@@ -21,6 +23,7 @@ export type CommandPaletteControllerDeps = {
   createElement: () => CommandPaletteHandle
   hud: { appendChild(element: unknown): void }
   platform: { isMac: boolean }
+  language: { switchTo(language: Language): void }
 }
 
 export type CommandPaletteController = {
@@ -105,6 +108,9 @@ export function createCommandPaletteController(
     'open-file': () => {
       const selectedId = store.get().selection.selectedId
       if (selectedId !== null) fileWorkspace.openPicker(selectedId)
+    },
+    'switch-language': () => {
+      deps.language.switchTo(activeLanguage() === 'en' ? 'es' : 'en')
     }
   }
 

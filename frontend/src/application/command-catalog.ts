@@ -1,4 +1,5 @@
 import type { SceneState } from './scene-store'
+import { t } from './i18n/translate'
 
 export type CommandId =
   | 'focus'
@@ -13,6 +14,7 @@ export type CommandId =
   | 'open-compare'
   | 'delete-worktree'
   | 'open-file'
+  | 'switch-language'
 
 export type CommandAvailability = {
   readonly hasSelection: boolean
@@ -110,5 +112,11 @@ export const commandCatalog = (platform: { isMac: boolean }): readonly PaletteCo
     label: 'abrir archivo',
     keybindingHint: 'o',
     isAvailable: (a) => a.hasSelection && a.isConnected
+  },
+  {
+    id: 'switch-language',
+    label: t('palette.switchLanguage'),
+    keybindingHint: '—',
+    isAvailable: () => true
   }
 ]

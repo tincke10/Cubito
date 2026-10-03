@@ -53,6 +53,8 @@ import { needsRemeasure } from './presentation/scene/canvas-box-remeasure'
 import type { CanvasBox } from './presentation/scene/canvas-box-remeasure'
 import { sceneSelectedId } from './application/compare-view-model'
 import { fanOutParentId } from './application/fan-out-model'
+import { switchLanguage } from './application/i18n/language-preference'
+import { activeLanguage, setActiveLanguage } from './application/i18n/translate'
 import { applyCssTheme } from './presentation/theme/css-theme'
 import { FOCUS_DURATION_MS } from './presentation/theme/scene-metrics'
 import { paletteFor } from './presentation/theme/scene-palette'
@@ -233,6 +235,8 @@ if (
 }
 const hudElement: HTMLElement = hud
 
+setActiveLanguage(activeLanguage()) // syncs <html lang> with the resolved language
+
 const theme: Theme = 'dark'
 const palette = paletteFor(theme)
 applyCssTheme(document.documentElement, palette)
@@ -381,7 +385,8 @@ const commandPaletteController = createCommandPaletteController({
   fileWorkspace: fileWorkspaceBinder,
   createElement: createCommandPalette,
   hud: hudElement,
-  platform
+  platform,
+  language: { switchTo: switchLanguage }
 })
 
 // Click-away exit: only a mousedown that lands directly on the WebGL canvas counts as
