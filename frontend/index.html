@@ -1389,12 +1389,14 @@
       :root {
         --cubito-diff-composer-h: 176px;
         --cubito-diff-composer-review-h: 380px;
+        /* #keyboard-bar is fixed bottom-left: bottom offset + chip height, kept clear of the composer. */
+        --cubito-keyboard-bar-h: 40px;
       }
       #diff .cubito-diff-rail {
-        height: calc(100% - var(--cubito-diff-composer-h));
+        height: calc(100% - var(--cubito-diff-composer-h) - var(--cubito-keyboard-bar-h));
       }
       #diff:has(.cubito-source-control--review) .cubito-diff-rail {
-        height: calc(100% - var(--cubito-diff-composer-review-h));
+        height: calc(100% - var(--cubito-diff-composer-review-h) - var(--cubito-keyboard-bar-h));
       }
       .cubito-source-control--review {
         height: var(--cubito-diff-composer-review-h);
@@ -1446,7 +1448,7 @@
       .cubito-source-control {
         position: absolute;
         left: 0;
-        bottom: 0;
+        bottom: var(--cubito-keyboard-bar-h);
         width: 240px;
         height: var(--cubito-diff-composer-h);
         box-sizing: border-box;
