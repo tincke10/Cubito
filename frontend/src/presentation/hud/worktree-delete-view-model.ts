@@ -1,4 +1,4 @@
-import { t } from '../../application/i18n/translate'
+import { t, tn } from '../../application/i18n/translate'
 import type { WorktreeDeleteView } from '../../application/worktree-delete-flow'
 
 export type WorktreeDeletePanelModel = {
@@ -38,17 +38,9 @@ export function worktreeDeletePanelModel(view: WorktreeDeleteView): WorktreeDele
   const lines: string[] = []
   if (view.dirtyFiles === 'loading') lines.push(t('delete.loading'))
   else if (view.dirtyFiles === 'unknown') lines.push(t('delete.unknown'))
-  else if (view.dirtyFiles > 0)
-    lines.push(
-      t(view.dirtyFiles === 1 ? 'delete.dirtyOne' : 'delete.dirtyMany', { count: view.dirtyFiles })
-    )
+  else if (view.dirtyFiles > 0) lines.push(tn('delete.dirty', view.dirtyFiles))
   else lines.push(t('delete.clean'))
-  if (view.liveTerminals > 0)
-    lines.push(
-      t(view.liveTerminals === 1 ? 'delete.terminalsOne' : 'delete.terminalsMany', {
-        count: view.liveTerminals
-      })
-    )
+  if (view.liveTerminals > 0) lines.push(tn('delete.terminals', view.liveTerminals))
   if (
     view.agentStatus === 'working' ||
     view.agentStatus === 'blocked' ||
@@ -56,12 +48,7 @@ export function worktreeDeletePanelModel(view: WorktreeDeleteView): WorktreeDele
   )
     lines.push(t('delete.agentActive', { status: view.agentStatus }))
   if (view.children.length > 0)
-    lines.push(
-      t(view.children.length === 1 ? 'delete.childrenOne' : 'delete.childrenMany', {
-        count: view.children.length,
-        names: view.children.join(', ')
-      })
-    )
+    lines.push(tn('delete.children', view.children.length, { names: view.children.join(', ') }))
   return {
     visible: true,
     title: t('delete.title', { branch: view.branch }),

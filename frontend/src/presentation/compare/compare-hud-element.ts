@@ -3,7 +3,7 @@ import { createKeyboardBar } from '../hud/keyboard-bar'
 import type { ConnectionDotTone } from '../hud/hud-model'
 import type { KeyboardBarHandle } from '../hud/keyboard-bar'
 import type { ConnectionState } from '../../application/scene-store'
-import { t } from '../../application/i18n/translate'
+import { t, tn } from '../../application/i18n/translate'
 
 /** Tone -> CSS custom property (mirrors diff-hud-element.ts's own private DOT_VAR table). */
 const DOT_VAR: Record<ConnectionDotTone, string> = {
@@ -65,7 +65,7 @@ export function createCompareHud(doc: Document = document): CompareHudHandle {
       connectionDot.style.backgroundColor = `var(${DOT_VAR[connectionDotColor(model.connection)]})`
       connectionText.textContent = connectionLabel(model.connection)
       winnerLine.textContent = t('compare.hudWinner', {
-        count: model.membersCount,
+        children: tn('compare.children', model.membersCount),
         winner: model.winnerLabel ?? t('compare.noWinner')
       })
     },

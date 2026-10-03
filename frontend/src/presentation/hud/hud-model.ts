@@ -1,5 +1,5 @@
 import { countNodeStates } from '../theme/node-state'
-import { t } from '../../application/i18n/translate'
+import { t, tn } from '../../application/i18n/translate'
 import type { MessageKey } from '../../application/i18n/messages/en'
 import type { ConnectionState, SceneState } from '../../application/scene-store'
 import type { TerminalsState } from '../../application/terminal-session-model'
@@ -125,8 +125,11 @@ export const hudText = (repo: HudModel['repo'], counters: HudModel['counters']):
   repo:
     repo === null
       ? t('hud.noRepo')
-      : t('hud.repoLine', { name: repo.displayName, count: repo.nodeCount }),
-  countersPrefix: t('hud.countersPrefix', { total: counters.total, working: counters.working }),
+      : t('hud.repoLine', { name: repo.displayName, nodes: tn('hud.nodes', repo.nodeCount) }),
+  countersPrefix: t('hud.countersPrefix', {
+    nodes: tn('hud.nodes', counters.total),
+    agents: tn('hud.activeAgents', counters.working)
+  }),
   countersWaiting: t('hud.countersWaiting', { count: counters['waiting-input'] })
 })
 

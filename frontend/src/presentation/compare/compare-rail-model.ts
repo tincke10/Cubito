@@ -3,7 +3,7 @@ import type { CompareChildLoad } from '../../application/compare-child-load'
 import { hudCountsOfFiles } from '../../application/diff-view-model'
 import type { DiffRailStatus } from '../../application/diff-view-model'
 import { shortBranchName } from '../hud/node-label-model'
-import { t } from '../../application/i18n/translate'
+import { t, tn } from '../../application/i18n/translate'
 
 export type CompareRailRow = {
   childId: WorktreeId
@@ -47,7 +47,10 @@ export function compareRailViewModel(input: CompareRailInput): readonly CompareR
       childId,
       label: shortBranchName(full),
       title: full,
-      statText: t('compare.railStats', counts),
+      statText: t('compare.railStats', {
+        ...counts,
+        files: tn('compare.railFiles', counts.files)
+      }),
       status,
       focused,
       isWinner,

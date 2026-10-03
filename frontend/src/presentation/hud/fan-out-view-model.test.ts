@@ -139,7 +139,7 @@ describe('fanOutViewModel — running', () => {
     }
     expect(noFailures.counters).not.toContain('error')
     expect(withFailure.counters).toBe(
-      '0 trabajando · 0 esperando · 1 naciendo · 0 listo · 0 compuertas · 0 preguntas · 1 error'
+      '0 trabajando · 0 esperando · 1 naciendo · 0 listos · 0 compuertas · 0 preguntas · 1 error'
     )
   })
 })
@@ -156,7 +156,7 @@ describe('fanOutViewModel — running — decision visibility (Change C-EXTENDED
     )
     if (model?.view !== 'running') throw new Error('expected running')
     expect(model.counters).toBe(
-      '2 trabajando · 1 esperando · 1 naciendo · 1 listo · 2 compuertas · 1 preguntas'
+      '2 trabajando · 1 esperando · 1 naciendo · 1 listo · 2 compuertas · 1 pregunta'
     )
   })
 

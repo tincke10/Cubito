@@ -4,7 +4,7 @@ import type { ConnectionDotTone } from '../hud/hud-model'
 import type { KeyboardBarHandle } from '../hud/keyboard-bar'
 import type { ConnectionState } from '../../application/scene-store'
 import type { DiffHudCounts } from '../../application/diff-view-model'
-import { t } from '../../application/i18n/translate'
+import { t, tn } from '../../application/i18n/translate'
 
 /** Tone -> CSS custom property (mirrors system-hud-element.ts's own private DOT_VAR table). */
 const DOT_VAR: Record<ConnectionDotTone, string> = {
@@ -65,7 +65,7 @@ export function createDiffHud(doc: Document = document): DiffHudHandle {
       connectionText.textContent = connectionLabel(model.connection)
       modeLine.textContent = t('diff.hudMode', { branch: model.branch })
       countsLine.textContent = t('diff.hudCounts', {
-        files: model.counts.files,
+        files: tn('diff.files', model.counts.files),
         added: model.counts.added,
         removed: model.counts.removed
       })

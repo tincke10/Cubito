@@ -61,7 +61,7 @@ describe('compareRailViewModel', () => {
         }
       })
     )
-    expect(rows[0]!.statText).toBe('1 archivos · +3 −1')
+    expect(rows[0]!.statText).toBe('1 archivo · +3 −1')
     expect(rows[1]!.statText).toBe('0 archivos · +0 −0')
   })
 

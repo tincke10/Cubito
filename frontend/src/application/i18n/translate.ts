@@ -38,3 +38,11 @@ export const interpolate = (template: string, params?: MessageParams): string =>
 export function t(key: MessageKey, params?: MessageParams): string {
   return interpolate(dictionaries[activeLanguage()][key], params)
 }
+
+type PluralKey = MessageKey extends infer K ? (K extends `${infer Base}.one` ? Base : never) : never
+
+/** Plural message: resolves `<key>.one` / `<key>.other` by the active language's rule; `{count}` is injected. */
+export function tn(key: PluralKey, count: number, params?: MessageParams): string {
+  const category = new Intl.PluralRules(activeLanguage()).select(count) === 'one' ? 'one' : 'other'
+  return t(`${key}.${category}` as MessageKey, { count, ...params })
+}

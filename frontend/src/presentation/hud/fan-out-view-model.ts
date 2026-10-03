@@ -13,7 +13,7 @@ import { fanOutBatchFailures } from '../../application/fan-out-batch-failures'
 import type { FanOutBatchFailure } from '../../application/fan-out-batch-failures'
 import { pendingGatesViewModel, pendingQuestionsViewModel } from './fan-out-decision-view-model'
 import type { FanOutGateViewModel, FanOutQuestionViewModel } from './fan-out-decision-view-model'
-import { t } from '../../application/i18n/translate'
+import { t, tn } from '../../application/i18n/translate'
 
 export type FanOutStepperViewModel = {
   readonly value: number
@@ -57,13 +57,11 @@ const countersLine = (slice: Extract<FanOutSlice, { view: 'running' }>): string 
     working: counts.working,
     waiting: counts.waitingInput,
     spawning: counts.naciendo,
-    ready: counts.created,
-    gates: decision.gateCount,
-    questions: decision.questionCount
+    ready: tn('fanout.ready', counts.created),
+    gates: tn('fanout.gates', decision.gateCount),
+    questions: tn('fanout.questions', decision.questionCount)
   })
-  return counts.failed > 0
-    ? `${base} · ${t('fanout.countersFailedTail', { count: counts.failed })}`
-    : base
+  return counts.failed > 0 ? `${base} · ${tn('fanout.countersFailedTail', counts.failed)}` : base
 }
 
 const formTitle = (parentId: string, graph: WorktreeGraph | null): string => {

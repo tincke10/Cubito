@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { activeLanguage, interpolate, setActiveLanguage, t } from './translate'
+import { activeLanguage, interpolate, setActiveLanguage, t, tn } from './translate'
 
 afterEach(() => setActiveLanguage('es'))
 
@@ -20,6 +20,18 @@ describe('t', () => {
     expect(t('palette.switchLanguage')).toBe('Idioma: Español')
     setActiveLanguage('es')
     expect(t('palette.switchLanguage')).toBe('Language: English')
+  })
+})
+
+describe('tn', () => {
+  it('picks the .one or .other message by the active language plural rule and injects {count}', () => {
+    setActiveLanguage('es')
+    expect(tn('hud.activeAgents', 1)).toBe('1 agente activo')
+    expect(tn('hud.activeAgents', 0)).toBe('0 agentes activos')
+    expect(tn('hud.activeAgents', 3)).toBe('3 agentes activos')
+    setActiveLanguage('en')
+    expect(tn('hud.activeAgents', 1)).toBe('1 active agent')
+    expect(tn('hud.activeAgents', 2)).toBe('2 active agents')
   })
 })
 

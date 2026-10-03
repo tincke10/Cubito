@@ -97,7 +97,7 @@ describe('createSystemHud', () => {
       source: 'poll'
     })
     expect(countersLineOf(rootOf(hud)).children[1]!.textContent).toBe(
-      ' · 0 endpoints tocados · 5 nuevo'
+      ' · 0 endpoints tocados · 5 nuevos'
     )
   })
 

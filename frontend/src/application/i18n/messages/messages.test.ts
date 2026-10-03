@@ -16,6 +16,16 @@ describe('dictionaries', () => {
     }
   })
 
+  it('every plural base has both .one and .other in both languages', () => {
+    for (const dictionary of [en, es] as Record<string, string>[]) {
+      for (const key of Object.keys(dictionary)) {
+        const [, base, form] = /^(.*)\.(one|other)$/.exec(key) ?? []
+        if (base)
+          expect(dictionary, key).toHaveProperty(`${base}.${form === 'one' ? 'other' : 'one'}`)
+      }
+    }
+  })
+
   it('es keeps the same {placeholders} as en for every key', () => {
     for (const key of Object.keys(en) as (keyof typeof en)[]) {
       expect(placeholders(es[key]), key).toEqual(placeholders(en[key]))

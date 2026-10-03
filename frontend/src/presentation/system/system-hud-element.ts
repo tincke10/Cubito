@@ -1,5 +1,5 @@
 import { SCENE_MODE_SWITCHER_CHIPS, connectionDotColor, connectionLabel } from '../hud/hud-model'
-import { t } from '../../application/i18n/translate'
+import { t, tn } from '../../application/i18n/translate'
 import { createKeyboardBar } from '../hud/keyboard-bar'
 import type { ConnectionDotTone } from '../hud/hud-model'
 import type { KeyboardBarHandle } from '../hud/keyboard-bar'
@@ -77,8 +77,8 @@ export function createSystemHud(doc: Document = document): SystemHudHandle {
       connectionText.textContent = connectionLabel(model.connection)
       modeLine.textContent = `${model.branch} · ${t('system.modeSuffix')}`
       countersRest.textContent = t('system.counters', {
-        touched: model.counts.tocados,
-        created: model.counts.nuevo
+        touched: tn('system.touched', model.counts.tocados),
+        created: tn('system.created', model.counts.nuevo)
       })
       root.dataset.source = model.source
     },

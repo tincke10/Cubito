@@ -3,7 +3,11 @@ import type { enSystem } from '../en/system'
 export const esSystem: Record<keyof typeof enSystem, string> = {
   'system.modeSuffix': 'sistema en vivo',
   'system.editing': 'claude editando',
-  'system.counters': ' · {touched} endpoints tocados · {created} nuevo',
+  'system.counters': ' · {touched} · {created}',
+  'system.touched.one': '{count} endpoint tocado',
+  'system.touched.other': '{count} endpoints tocados',
+  'system.created.one': '{count} nuevo',
+  'system.created.other': '{count} nuevos',
   'system.feedTitle': 'actividad del agente',
   'system.feedTyping': 'escribiendo …',
   'system.feedEmpty': 'aún no hay actividad',

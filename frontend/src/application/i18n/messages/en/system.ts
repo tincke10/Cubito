@@ -1,7 +1,11 @@
 export const enSystem = {
   'system.modeSuffix': 'live system',
   'system.editing': 'claude editing',
-  'system.counters': ' · {touched} endpoints touched · {created} new',
+  'system.counters': ' · {touched} · {created}',
+  'system.touched.one': '{count} endpoint touched',
+  'system.touched.other': '{count} endpoints touched',
+  'system.created.one': '{count} new',
+  'system.created.other': '{count} new',
   'system.feedTitle': 'agent activity',
   'system.feedTyping': 'typing …',
   'system.feedEmpty': 'no activity yet',
