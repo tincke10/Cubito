@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createSystemLiveDriver, SYSTEM_ARC } from './system-live-driver'
+import { createSystemLiveDriver, systemArc } from './system-live-driver'
+import { setActiveLanguage } from './i18n/translate'
 import type { SystemLiveDriverDeps } from './system-live-driver'
 import { createSceneStore } from './scene-store'
 import type { SceneStore } from './scene-store'
@@ -53,7 +54,7 @@ describe('createSystemLiveDriver', () => {
     vi.useRealTimers()
   })
 
-  it('start() dispatches open, seeds the graph via apply-delta from the port, then plays SYSTEM_ARC beats in order at the right delays', async () => {
+  it('start() dispatches open, seeds the graph via apply-delta from the port, then plays systemArc() beats in order at the right delays', async () => {
     const graph = seedGraph()
     const port = fakePort(graph)
     const driver = createSystemLiveDriver(makeDeps(port))
@@ -76,7 +77,7 @@ describe('createSystemLiveDriver', () => {
       delta: { op: 'add-edge', edge: graph.edges[0] }
     })
 
-    for (const beat of SYSTEM_ARC) {
+    for (const beat of systemArc()) {
       await vi.advanceTimersByTimeAsync(beat.delayMs)
       for (const action of beat.actions) {
         expect(dispatchSpy).toHaveBeenCalledWith(action)
@@ -89,7 +90,7 @@ describe('createSystemLiveDriver', () => {
     const driver = createSystemLiveDriver(makeDeps(fakePort()))
     driver.start('POST /auth/retry')
     await vi.advanceTimersByTimeAsync(0)
-    await vi.advanceTimersByTimeAsync(SYSTEM_ARC[0]!.delayMs)
+    await vi.advanceTimersByTimeAsync(systemArc()[0]!.delayMs)
     const callsBeforeStop = dispatchSpy.mock.calls.length
 
     driver.stop()
@@ -103,15 +104,15 @@ describe('createSystemLiveDriver', () => {
     const driver = createSystemLiveDriver(makeDeps(fakePort()))
     driver.start('POST /auth/retry')
     await vi.advanceTimersByTimeAsync(0)
-    await vi.advanceTimersByTimeAsync(SYSTEM_ARC[0]!.delayMs)
+    await vi.advanceTimersByTimeAsync(systemArc()[0]!.delayMs)
     driver.stop()
 
     dispatchSpy.mockClear()
     driver.start('POST /auth/retry')
     expect(dispatchSpy).toHaveBeenCalledWith({ type: 'open', nodeId: 'POST /auth/retry' })
     await vi.advanceTimersByTimeAsync(0)
-    await vi.advanceTimersByTimeAsync(SYSTEM_ARC[0]!.delayMs)
-    for (const action of SYSTEM_ARC[0]!.actions) {
+    await vi.advanceTimersByTimeAsync(systemArc()[0]!.delayMs)
+    for (const action of systemArc()[0]!.actions) {
       expect(dispatchSpy).toHaveBeenCalledWith(action)
     }
   })
@@ -133,7 +134,7 @@ describe('createSystemLiveDriver', () => {
     const setIntervalSpy = vi.spyOn(globalThis, 'setInterval')
     const driver = createSystemLiveDriver(makeDeps(fakePort()))
     driver.start('POST /auth/retry')
-    const totalDelay = SYSTEM_ARC.reduce((sum, beat) => sum + beat.delayMs, 0)
+    const totalDelay = systemArc().reduce((sum, beat) => sum + beat.delayMs, 0)
     await vi.advanceTimersByTimeAsync(totalDelay + 1)
     expect(setIntervalSpy).not.toHaveBeenCalled()
     driver.stop()
@@ -143,11 +144,24 @@ describe('createSystemLiveDriver', () => {
   it('no dispatch after the arc naturally ends — the last beat is not replayed', async () => {
     const driver = createSystemLiveDriver(makeDeps(fakePort()))
     driver.start('POST /auth/retry')
-    const totalDelay = SYSTEM_ARC.reduce((sum, beat) => sum + beat.delayMs, 0)
+    const totalDelay = systemArc().reduce((sum, beat) => sum + beat.delayMs, 0)
     await vi.advanceTimersByTimeAsync(totalDelay)
     const callsAtArcEnd = dispatchSpy.mock.calls.length
     await vi.advanceTimersByTimeAsync(50_000)
     expect(dispatchSpy.mock.calls.length).toBe(callsAtArcEnd)
     driver.stop()
+  })
+})
+
+describe('systemArc (en)', () => {
+  afterEach(() => setActiveLanguage('es'))
+
+  it('localizes the demo feed rows', () => {
+    setActiveLanguage('en')
+    const texts = systemArc().flatMap((beat) =>
+      beat.actions.flatMap((a) => (a.type === 'append-feed' ? [a.row.text] : []))
+    )
+    expect(texts).toContain('read src/routes/auth.ts')
+    expect(texts).toContain('ran pnpm test auth.retry')
   })
 })

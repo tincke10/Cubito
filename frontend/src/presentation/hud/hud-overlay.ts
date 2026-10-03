@@ -7,8 +7,6 @@ const DOT_VAR: Record<ConnectionDotTone, string> = {
   amberDim: '--cubito-amber-dim'
 }
 
-const REPO_PLACEHOLDER = 'sin repositorio'
-
 const inert = (element: HTMLElement): HTMLElement => {
   element.style.pointerEvents = 'none'
   return element
@@ -57,13 +55,9 @@ export function createHudOverlay(doc: Document = document): HudOverlayHandle {
       connectionDot.style.backgroundColor = `var(${DOT_VAR[model.connection.dotColor]})`
       connectionText.textContent = model.connection.label
 
-      repoLine.textContent =
-        model.repo === null
-          ? REPO_PLACEHOLDER
-          : `${model.repo.displayName} · ${model.repo.nodeCount} nodos`
-
-      countersPrefix.textContent = `${model.counters.total} nodos · ${model.counters.working} agentes activos · `
-      countersWaiting.textContent = `${model.counters['waiting-input']} esperando input`
+      repoLine.textContent = model.text.repo
+      countersPrefix.textContent = model.text.countersPrefix
+      countersWaiting.textContent = model.text.countersWaiting
     },
     dispose() {
       root.remove()

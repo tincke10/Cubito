@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createRepoSetupSavedSignal } from './repo-setup-saved'
-import { NO_SETUP_HINT, createSetupHintTracker } from './repo-setup-hint'
+import { createSetupHintTracker, noSetupHint } from './repo-setup-hint'
 
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
 
@@ -16,7 +16,7 @@ describe('createSetupHintTracker', () => {
     const tracker = createSetupHintTracker({ probe: async () => null, onChange })
     tracker.ensure('id:r1')
     await flush()
-    expect(tracker.hint('id:r1')).toBe(NO_SETUP_HINT)
+    expect(tracker.hint('id:r1')).toBe(noSetupHint())
     expect(onChange).toHaveBeenCalledTimes(1)
   })
 
@@ -75,7 +75,7 @@ describe('createSetupHintTracker', () => {
     })
     tracker.ensure('id:r1')
     await flush()
-    expect(tracker.hint('id:r1')).toBe(NO_SETUP_HINT)
+    expect(tracker.hint('id:r1')).toBe(noSetupHint())
     command = 'pnpm install'
     signal.emit()
     expect(tracker.hint('id:r1')).toBeNull()

@@ -6,12 +6,15 @@
  */
 import { parsePairingCode, type PairingOffer } from '../infrastructure/rpc/pairing-offer'
 import { pairingRejectionReason } from './connection-reason'
+import { t } from './i18n/translate'
 
-export type PairingEntryDecision = { kind: 'connect'; offer: PairingOffer } | { kind: 'demo'; reason: string }
+export type PairingEntryDecision =
+  | { kind: 'connect'; offer: PairingOffer }
+  | { kind: 'demo'; reason: string }
 
 export function decidePairingEntry(fragment: string | null): PairingEntryDecision {
   if (fragment === null) {
-    return { kind: 'demo', reason: 'modo demo' }
+    return { kind: 'demo', reason: t('connection.demoMode') }
   }
   const parsed = parsePairingCode(fragment)
   if (!parsed.ok) {

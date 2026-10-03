@@ -1,3 +1,4 @@
+import { t } from '../../application/i18n/translate'
 import type {
   TerminalPlacement,
   TerminalSessionStatus,
@@ -22,8 +23,6 @@ export type TerminalPanelModel = {
   tone: { connector: PanelTone; surface: PanelTone; border: PanelTone }
 }
 
-const FALLBACK_TITLE = 'shell'
-
 /**
  * Pure render model for the in-scene/HUD terminal panel (design Area 6). Bytes never flow
  * through here — this only projects lifecycle/placement metadata from the terminals slice.
@@ -40,12 +39,16 @@ export function terminalPanelModel(state: TerminalsState): TerminalPanelModel | 
 
   const tabs = tabStreamIds.map((streamId) => ({
     streamId,
-    label: state.sessions.get(streamId)?.title ?? FALLBACK_TITLE
+    label: state.sessions.get(streamId)?.title ?? t('terminal.fallbackTitle')
   }))
 
   return {
     nodeId: panel.nodeId,
-    header: `terminal ${panel.sessionIndex + 1}/${tabStreamIds.length} · ${activeSession.title ?? FALLBACK_TITLE}`,
+    header: t('terminal.header', {
+      index: panel.sessionIndex + 1,
+      total: tabStreamIds.length,
+      title: activeSession.title ?? t('terminal.fallbackTitle')
+    }),
     placement: panel.placement,
     focused: panel.focused,
     connectorVisible: panel.placement === 'scene',

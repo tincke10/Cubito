@@ -1,3 +1,4 @@
+import { t } from '../../application/i18n/translate'
 import type { SpawnFormFields } from '../../application/spawn-menu-model'
 import type { SpawnAgent } from '../../application/ports/runtime-gateway'
 import type { SpawnFormViewModel } from './spawn-view-model'
@@ -63,7 +64,7 @@ export function createSpawnForm(doc: Document = document): SpawnFormHandle {
 
   const cancelButton = doc.createElement('button')
   cancelButton.className = 'cubito-spawn-form__cancel'
-  cancelButton.textContent = 'cancelar'
+  cancelButton.textContent = t('spawn.cancel')
 
   const errorLine = doc.createElement('div')
   errorLine.className = 'cubito-spawn-form__error'
@@ -73,7 +74,7 @@ export function createSpawnForm(doc: Document = document): SpawnFormHandle {
 
   const hint = doc.createElement('div')
   hint.className = 'cubito-spawn-form__hint'
-  hint.textContent = '⏎ crear · esc cancelar'
+  hint.textContent = t('spawn.hint')
 
   for (const child of [
     title,

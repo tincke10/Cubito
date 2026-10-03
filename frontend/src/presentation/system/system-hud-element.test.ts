@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { setActiveLanguage } from '../../application/i18n/translate'
 import { createSystemHud } from './system-hud-element'
 import type { ConnectionState } from '../../application/scene-store'
 
@@ -52,6 +53,24 @@ const countersLineOf = (root: FakeElement) => root.children[2]!
 const connected = (runtimeId = '4f2a9c'): ConnectionState => ({ state: 'connected', runtimeId })
 
 describe('createSystemHud', () => {
+  afterEach(() => setActiveLanguage('es'))
+
+  it('renders the English mode, editing label and counters when the language is en', () => {
+    setActiveLanguage('en')
+    created = []
+    const hud = createSystemHud(createFakeDocument())
+    hud.apply({
+      connection: connected(),
+      branch: 'cubito/auth-retry',
+      counts: { tocados: 2, nuevo: 1 },
+      source: 'stream'
+    })
+    const root = rootOf(hud)
+    expect(modeLineOf(root).textContent).toBe('cubito/auth-retry · live system')
+    expect(countersLineOf(root).children[0]!.textContent).toBe('claude editing')
+    expect(countersLineOf(root).children[1]!.textContent).toBe(' · 2 endpoints touched · 1 new')
+  })
+
   it('renders the three HUD lines with the expected text', () => {
     created = []
     const hud = createSystemHud(createFakeDocument())

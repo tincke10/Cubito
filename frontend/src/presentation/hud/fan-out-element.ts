@@ -1,6 +1,7 @@
 import type { SpawnAgent } from '../../application/ports/runtime-gateway'
 import type { FanOutFormViewModel, FanOutRunningViewModel } from './fan-out-view-model'
 import { createFanOutGateList } from './fan-out-gate-list-element'
+import { t } from '../../application/i18n/translate'
 
 const AGENT_OPTIONS: readonly SpawnAgent[] = ['none', 'claude']
 
@@ -47,11 +48,11 @@ export function createFanOutForm(doc: Document = document): FanOutFormHandle {
 
   const submitButton = doc.createElement('button')
   submitButton.className = 'cubito-fanout-form__submit'
-  submitButton.textContent = 'lanzar camada'
+  submitButton.textContent = t('fanout.submit')
 
   const cancelButton = doc.createElement('button')
   cancelButton.className = 'cubito-fanout-form__cancel'
-  cancelButton.textContent = 'cancelar'
+  cancelButton.textContent = t('fanout.cancel')
 
   const title = doc.createElement('div')
   title.className = 'cubito-fanout-form__title'

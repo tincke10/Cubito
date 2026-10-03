@@ -1,5 +1,6 @@
 import type { FanOutGateViewModel, FanOutQuestionViewModel } from './fan-out-decision-view-model'
 import { resolveSpawnFormKey } from './spawn-form-element'
+import { t } from '../../application/i18n/translate'
 
 export type FanOutGateListModel = {
   readonly gates: readonly FanOutGateViewModel[]
@@ -83,7 +84,7 @@ export function createFanOutGateList(doc: Document = document): FanOutGateListHa
       await callback(id, value)
     } catch (err) {
       submit.disabled = false
-      error.textContent = err instanceof Error ? err.message : 'no se pudo enviar'
+      error.textContent = err instanceof Error ? err.message : t('fanout.rowSubmitFailed')
       error.style.display = ''
     }
   }
@@ -113,7 +114,7 @@ export function createFanOutGateList(doc: Document = document): FanOutGateListHa
 
     const submit = doc.createElement('button')
     submit.className = 'cubito-decision-row__submit'
-    submit.textContent = 'resolver'
+    submit.textContent = t('fanout.gateResolve')
 
     const error = doc.createElement('div')
     error.className = 'cubito-decision-row__error'
@@ -143,7 +144,7 @@ export function createFanOutGateList(doc: Document = document): FanOutGateListHa
 
     const submit = doc.createElement('button')
     submit.className = 'cubito-decision-row__submit'
-    submit.textContent = 'responder'
+    submit.textContent = t('fanout.questionAnswer')
 
     const error = doc.createElement('div')
     error.className = 'cubito-decision-row__error'

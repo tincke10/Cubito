@@ -1,3 +1,4 @@
+import { t } from '../../application/i18n/translate'
 import type { SpawnMenuSlice } from '../../application/spawn-menu-model'
 import type { SpawnAgent } from '../../application/ports/runtime-gateway'
 import type { WorktreeGraph } from '../../domain/worktree-graph/types'
@@ -11,11 +12,11 @@ export type SpawnChip = {
 }
 
 /** SPAWN-002/fan-out wave 5: "spawn hijo" and "fan-out" are in scope — terminal/archivar render inert. */
-const RADIAL_CHIPS: readonly SpawnChip[] = [
-  { key: 's', label: 'spawn hijo', tone: 'active' },
-  { key: 'F', label: 'fan-out', tone: 'active' },
-  { key: 't', label: 'terminal', tone: 'disabled' },
-  { key: 'a', label: 'archivar', tone: 'disabled' }
+const radialChips = (): readonly SpawnChip[] => [
+  { key: 's', label: t('spawn.radial.child'), tone: 'active' },
+  { key: 'F', label: t('spawn.radial.fanOut'), tone: 'active' },
+  { key: 't', label: t('spawn.radial.terminal'), tone: 'disabled' },
+  { key: 'a', label: t('spawn.radial.archive'), tone: 'disabled' }
 ]
 
 export type SpawnRadialViewModel = { readonly view: 'radial'; readonly chips: readonly SpawnChip[] }
@@ -48,7 +49,7 @@ export function spawnViewModel(
   setupHint: string | null = null
 ): SpawnViewModel {
   if (slice.view === 'closed') return null
-  if (slice.view === 'radial') return { view: 'radial', chips: RADIAL_CHIPS }
+  if (slice.view === 'radial') return { view: 'radial', chips: radialChips() }
 
   const submitting = slice.status === 'submitting'
   const parentBranch =
@@ -57,12 +58,12 @@ export function spawnViewModel(
 
   return {
     view: 'form',
-    title: `spawn hijo · ${fromParentLabel(parentBranch)}`,
+    title: t('spawn.title', { from: fromParentLabel(parentBranch) }),
     name: { value: slice.fields.name, enabled: !submitting },
     agent: { value: slice.fields.agent, enabled: !submitting },
     baseBranch: { value: slice.fields.baseBranch, enabled: !submitting },
     prompt: { value: slice.fields.prompt, enabled: agentActive && !submitting },
-    submitLabel: submitting ? 'creando…' : 'crear worktree',
+    submitLabel: submitting ? t('spawn.submitting') : t('spawn.submit'),
     submitEnabled: slice.fields.name.trim() !== '' && !submitting,
     errorMessage: slice.status === 'error' ? (slice.errorMessage ?? 'error') : null,
     setupHint

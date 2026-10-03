@@ -13,6 +13,7 @@ import { fanOutBatchFailures } from '../../application/fan-out-batch-failures'
 import type { FanOutBatchFailure } from '../../application/fan-out-batch-failures'
 import { pendingGatesViewModel, pendingQuestionsViewModel } from './fan-out-decision-view-model'
 import type { FanOutGateViewModel, FanOutQuestionViewModel } from './fan-out-decision-view-model'
+import { t } from '../../application/i18n/translate'
 
 export type FanOutStepperViewModel = {
   readonly value: number
@@ -47,18 +48,29 @@ export type FanOutRunningViewModel = {
 
 export type FanOutViewModel = FanOutFormViewModel | FanOutRunningViewModel | null
 
-/** Mockup line order: trabajando · esperando · naciendo · listo · compuertas · preguntas, then
+/** Mockup line order: working · waiting · spawning · ready · gates · questions, then
  *  an error tail if any failed. Gate/question counts are run-level aggregates (Change C-EXTENDED). */
 const countersLine = (slice: Extract<FanOutSlice, { view: 'running' }>): string => {
   const counts = fanOutCounts(slice)
   const decision = fanOutDecisionCounts(slice)
-  const base = `${counts.working} trabajando · ${counts.waitingInput} esperando · ${counts.naciendo} naciendo · ${counts.created} listo · ${decision.gateCount} compuertas · ${decision.questionCount} preguntas`
-  return counts.failed > 0 ? `${base} · ${counts.failed} error` : base
+  const base = t('fanout.counters', {
+    working: counts.working,
+    waiting: counts.waitingInput,
+    spawning: counts.naciendo,
+    ready: counts.created,
+    gates: decision.gateCount,
+    questions: decision.questionCount
+  })
+  return counts.failed > 0
+    ? `${base} · ${t('fanout.countersFailedTail', { count: counts.failed })}`
+    : base
 }
 
 const formTitle = (parentId: string, graph: WorktreeGraph | null): string => {
   const parent = graph?.nodes.get(parentId)
-  return parent ? `fan-out · ${fromParentLabel(parent.branch)}` : 'fan-out'
+  return parent
+    ? t('fanout.title', { parent: fromParentLabel(parent.branch) })
+    : t('fanout.titleBare')
 }
 
 /**
@@ -90,7 +102,7 @@ export function fanOutViewModel(
   const visibility = slice.decisionVisibility ?? emptyDecisionVisibility()
   return {
     view: 'running',
-    callout: `fan-out · ${slice.fields.count} × ${slice.fields.agent}`,
+    callout: t('fanout.callout', { count: slice.fields.count, agent: slice.fields.agent }),
     counters: countersLine(slice),
     gates: pendingGatesViewModel(visibility),
     questions: pendingQuestionsViewModel(visibility),

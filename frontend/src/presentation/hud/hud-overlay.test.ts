@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { createHudOverlay } from './hud-overlay'
+import { hudText } from './hud-model'
 import type { HudModel } from './hud-model'
 
 type FakeElement = {
@@ -49,7 +50,13 @@ const everyStyle = (
   predicate: (style: Record<string, string>) => boolean
 ): boolean => predicate(el.style) && el.children.every((child) => everyStyle(child, predicate))
 
-const fixture = (overrides: Partial<HudModel> = {}): HudModel => ({
+const fixture = (overrides: Partial<HudModel> = {}): HudModel => {
+  const model = baseFixture(overrides)
+  return { ...model, text: overrides.text ?? hudText(model.repo, model.counters) }
+}
+
+const baseFixture = (overrides: Partial<HudModel>): HudModel => ({
+  text: { repo: '', countersPrefix: '', countersWaiting: '' },
   connection: { label: 'conectado · runtime 4f2a9c', dotColor: 'accent' },
   repo: { displayName: 'Cubito', nodeCount: 4 },
   counters: {

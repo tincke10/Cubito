@@ -1,0 +1,16 @@
+export const enSystem = {
+  'system.modeSuffix': 'live system',
+  'system.editing': 'claude editing',
+  'system.counters': ' · {touched} endpoints touched · {created} new',
+  'system.feedTitle': 'agent activity',
+  'system.feedTyping': 'typing …',
+  'system.feedEmpty': 'no activity yet',
+  'system.demoNote': 'created by claude',
+  'system.demoReadAuthRoute': 'read src/routes/auth.ts',
+  'system.demoReadAuthService': 'read src/services/auth.service.ts',
+  'system.demoEditing': 'editing POST /auth/retry',
+  'system.demoNewEndpoint': 'new endpoint POST /auth/refresh',
+  'system.demoRan': 'ran pnpm test auth.retry',
+  'system.demoTestsPass': '✓ 8/8 tests passing',
+  'system.demoDiff': 'Δ +73 −14 vs main'
+} as const

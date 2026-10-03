@@ -1,6 +1,5 @@
 import type { DiffRailRow } from './diff-rail-model'
-
-const EMPTY_TEXT = 'sin cambios'
+import { t } from '../../application/i18n/translate'
 
 const buildRow = (
   doc: Document,
@@ -81,7 +80,7 @@ export function createDiffRail(doc: Document = document): DiffRailHandle {
       if (rows.length === 0) {
         const empty = doc.createElement('div')
         empty.className = 'cubito-diff-rail__empty'
-        empty.textContent = EMPTY_TEXT
+        empty.textContent = t('diff.railEmpty')
         root.appendChild(empty)
         return
       }

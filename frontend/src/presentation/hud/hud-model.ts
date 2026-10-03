@@ -1,4 +1,6 @@
 import { countNodeStates } from '../theme/node-state'
+import { t } from '../../application/i18n/translate'
+import type { MessageKey } from '../../application/i18n/messages/en'
 import type { ConnectionState, SceneState } from '../../application/scene-store'
 import type { TerminalsState } from '../../application/terminal-session-model'
 import type { WorktreeGraph } from '../../domain/worktree-graph/types'
@@ -8,40 +10,52 @@ export type ConnectionDotTone = 'accent' | 'amber' | 'amberDim'
 
 export type HudChip = { key: string; description: string }
 
+/** Lazy description: resolved per read, so module-level chip lists never freeze a language. */
+const chip = (key: string, messageKey: MessageKey): HudChip => ({
+  key,
+  get description() {
+    return t(messageKey)
+  }
+})
+
 /** The [g][x][d][c][t] switcher every scene-replacing mode (sistema/diff/compare) renders in its
  *  own keyboard bar — one list so a new mode's chip lands in all of them at once. */
 export const SCENE_MODE_SWITCHER_CHIPS: readonly HudChip[] = [
-  { key: 'g', description: 'grafo de worktrees' },
-  { key: 'x', description: 'sistema en vivo' },
-  { key: 'd', description: 'diff' },
-  { key: 'c', description: 'comparar la camada' },
-  { key: 't', description: 'terminal' }
+  chip('g', 'keys.worktreeGraph'),
+  chip('x', 'keys.liveSystem'),
+  chip('d', 'keys.diff'),
+  chip('c', 'keys.compareLitter'),
+  chip('t', 'keys.terminal')
 ]
 
 /** Compare's bar: the litter-navigation chip first, then the shared mode switcher. Winner and
  *  merge stay mouse-only (design C4), so no chip claims Enter or m. */
 export const COMPARE_CHIPS: readonly HudChip[] = [
-  { key: 'h l', description: 'hijo anterior / siguiente' },
+  chip('h l', 'keys.prevNextChild'),
   ...SCENE_MODE_SWITCHER_CHIPS
 ]
+
+/** Localized copy for the repo/counters lines — the DOM writer may not import application/*. */
+export type HudText = { repo: string; countersPrefix: string; countersWaiting: string }
 
 export type HudModel = {
   connection: { label: string; dotColor: ConnectionDotTone }
   repo: { displayName: string; nodeCount: number } | null
   counters: ReturnType<typeof countNodeStates>
+  text: HudText
   chips: readonly HudChip[]
 }
 
 export const connectionLabel = (connection: ConnectionState): string => {
   switch (connection.state) {
     case 'connecting':
-      return 'conectando…'
+      return t('hud.connecting')
     case 'connected':
-      return `conectado · runtime ${connection.runtimeId}`
+      return t('hud.connected', { runtimeId: connection.runtimeId })
     case 'reconnecting':
-      return `reconectando… · intento ${connection.attempt}`
+      return t('hud.reconnecting', { attempt: connection.attempt })
     case 'down':
-      return `desconectado · ${connection.reason}`
+      return t('hud.disconnected', { reason: connection.reason })
   }
 }
 
@@ -63,22 +77,22 @@ export const connectionDotColor = (connection: ConnectionState): ConnectionDotTo
 const terminalChips = (terminals: TerminalsState, selectedId: unknown): readonly HudChip[] => {
   const panel = terminals.activePanel
   if (!panel) {
-    return selectedId === null ? [] : [{ key: 't', description: 'terminal' }]
+    return selectedId === null ? [] : [chip('t', 'keys.terminal')]
   }
   const tabs = terminals.byNode.get(panel.nodeId) ?? []
   if (panel.placement === 'scene') {
-    const chips: HudChip[] = [{ key: 'p', description: 'pin' }]
+    const chips: HudChip[] = [chip('p', 'keys.pin')]
     if (tabs.length > 1) {
-      chips.push({ key: '⇥', description: 'otra terminal' })
+      chips.push(chip('⇥', 'keys.otherTerminal'))
     }
-    chips.push({ key: 'Ctrl+]', description: 'salir' })
+    chips.push(chip('Ctrl+]', 'keys.exit'))
     return chips
   }
-  const chips: HudChip[] = [{ key: 'esc', description: 'cerrar panel' }]
+  const chips: HudChip[] = [chip('esc', 'keys.closePanel')]
   if (tabs.length > 1) {
-    chips.push({ key: '⇥', description: 'otra terminal' })
+    chips.push(chip('⇥', 'keys.otherTerminal'))
   }
-  chips.push({ key: 'p', description: 'escena' })
+  chips.push(chip('p', 'keys.scene'))
   return chips
 }
 
@@ -99,22 +113,34 @@ const activeRepoLine = (state: SceneState): HudModel['repo'] => {
 }
 
 const chipsFor = (platform: { isMac: boolean }): readonly HudChip[] => [
-  { key: 'hjkl', description: 'navegar' },
-  { key: 'f', description: 'foco' },
-  { key: 'v', description: 'general · ver todo' },
-  { key: 's', description: 'spawn' },
-  { key: platform.isMac ? '⌘K' : 'Ctrl+K', description: 'paleta' },
-  { key: platform.isMac ? '⌘P' : 'Ctrl+P', description: 'proyectos' }
+  chip('hjkl', 'keys.navigate'),
+  chip('f', 'keys.focus'),
+  chip('v', 'keys.overview'),
+  chip('s', 'keys.spawn'),
+  chip(platform.isMac ? '⌘K' : 'Ctrl+K', 'keys.palette'),
+  chip(platform.isMac ? '⌘P' : 'Ctrl+P', 'keys.projects')
 ]
 
+export const hudText = (repo: HudModel['repo'], counters: HudModel['counters']): HudText => ({
+  repo:
+    repo === null
+      ? t('hud.noRepo')
+      : t('hud.repoLine', { name: repo.displayName, count: repo.nodeCount }),
+  countersPrefix: t('hud.countersPrefix', { total: counters.total, working: counters.working }),
+  countersWaiting: t('hud.countersWaiting', { count: counters['waiting-input'] })
+})
+
 export function hudModel(state: SceneState, platform: { isMac: boolean }): HudModel {
+  const repo = activeRepoLine(state)
+  const counters = countNodeStates(state.graph)
   return {
     connection: {
       label: connectionLabel(state.connection),
       dotColor: connectionDotColor(state.connection)
     },
-    repo: activeRepoLine(state),
-    counters: countNodeStates(state.graph),
+    repo,
+    counters,
+    text: hudText(repo, counters),
     chips: [...chipsFor(platform), ...terminalChips(state.terminals, state.selection.selectedId)]
   }
 }

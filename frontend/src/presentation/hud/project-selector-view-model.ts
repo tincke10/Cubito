@@ -1,3 +1,4 @@
+import { t } from '../../application/i18n/translate'
 import type { ProjectSelectorSlice, RepoKind } from '../../application/project-selector-model'
 import type { ReposSlice } from '../../application/repos-model'
 import type { RepoSummary } from '../../application/ports/runtime-gateway'
@@ -58,7 +59,7 @@ export function projectSelectorViewModel(
       path: slice.path,
       kind: slice.kind,
       setup: slice.setup ?? '',
-      submitLabel: submitting ? 'agregando…' : 'agregar repo',
+      submitLabel: submitting ? t('projects.submitting') : t('projects.submit'),
       submitEnabled: slice.path.trim() !== '' && !submitting,
       errorMessage: slice.status === 'error' ? (slice.errorMessage ?? 'error') : null
     }

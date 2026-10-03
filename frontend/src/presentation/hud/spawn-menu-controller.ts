@@ -1,3 +1,4 @@
+import { t } from '../../application/i18n/translate'
 import type { Vec3 } from '../camera/camera-framing'
 import type { WorktreeGraph, WorktreeId } from '../../domain/worktree-graph/types'
 import type { SpawnMenuAction, SpawnMenuSlice } from '../../application/spawn-menu-model'
@@ -133,7 +134,7 @@ export function createSpawnMenuController(deps: SpawnMenuControllerDeps): SpawnM
     if (slice.fields.name.trim() === '') return
     deps.dispatch({ type: 'submit' })
     if (slice.repoSelector === null) {
-      deps.dispatch({ type: 'submit-error', message: 'repositorio aún no resuelto' })
+      deps.dispatch({ type: 'submit-error', message: t('spawn.repoUnresolved') })
       return
     }
     const input = {

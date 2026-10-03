@@ -1,5 +1,6 @@
 import type { WorktreeNode } from '../../domain/worktree-graph/types'
 import type { NodeDecorations, NodeState } from '../theme/node-state'
+import { t } from '../../application/i18n/translate'
 
 /** Semantic tone names only — the DOM writer maps these to CSS classes reading `cssVarsFor` custom properties. */
 export type LabelTone = 'accent' | 'primary' | 'dim' | 'faint' | 'amber' | 'amberDim' | 'info'
@@ -17,7 +18,9 @@ const REFS_HEADS_PREFIX = 'refs/heads/'
 /** `refs/heads/feature-x` → `feature-x`; anything else passes through unchanged. */
 /** "desde <short>" for a form anchored on a parent branch; null parent = the repo root. */
 export const fromParentLabel = (parentBranch: string | null): string =>
-  parentBranch !== null ? `desde ${shortBranchName(parentBranch)}` : 'desde raíz'
+  parentBranch !== null
+    ? t('hud.fromParent', { branch: shortBranchName(parentBranch) })
+    : t('hud.fromRoot')
 
 export const shortBranchName = (branch: string): string =>
   branch.startsWith(REFS_HEADS_PREFIX) ? branch.slice(REFS_HEADS_PREFIX.length) : branch
@@ -31,10 +34,10 @@ const secondaryFor = (
   decorations: NodeDecorations
 ): LabelLine | null => {
   if (state === 'working') {
-    return { text: 'agente · trabajando', tone: 'info' }
+    return { text: t('hud.agentWorking'), tone: 'info' }
   }
   if (state === 'waiting-input') {
-    return { text: 'agente · esperando input', tone: 'amber' }
+    return { text: t('hud.agentWaiting'), tone: 'amber' }
   }
   if (state === 'dirty' && decorations.diffLabel !== null) {
     return {
@@ -65,8 +68,8 @@ export function nodeLabelModel(
     callout:
       state === 'waiting-input'
         ? {
-            title: { text: 'esperando input', tone: 'amber' },
-            hint: { text: 'revisá el agente para continuar', tone: 'amberDim' }
+            title: { text: t('hud.calloutWaiting'), tone: 'amber' },
+            hint: { text: t('hud.calloutHint'), tone: 'amberDim' }
           }
         : null,
     visible

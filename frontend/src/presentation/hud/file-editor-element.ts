@@ -2,6 +2,7 @@ import { createTwoStepButton } from './two-step-button'
 import { indentUnitFor, insertIndent } from './file-editor-indent'
 import { isIndentKey, isSaveChord } from './file-editor-keys'
 import type { FileEditorPanelModel } from './file-editor-view-model'
+import { t } from '../../application/i18n/translate'
 
 export type FileEditorHandle = {
   readonly root: HTMLElement
@@ -44,10 +45,10 @@ export function createFileEditor(
   const title = el('span', 'cubito-file-editor__title')
   const dirtyMark = el('span', 'cubito-file-editor__dirty')
   dirtyMark.textContent = '●'
-  dirtyMark.title = 'cambios sin guardar'
+  dirtyMark.title = t('editor.unsavedMark')
   const badge = el('span', 'cubito-file-editor__badge')
-  const save = button('cubito-file-editor__save', 'guardar')
-  const close = button('cubito-file-editor__close', 'cerrar')
+  const save = button('cubito-file-editor__save', t('editor.save'))
+  const close = button('cubito-file-editor__close', t('editor.close'))
   for (const child of [title, dirtyMark, badge, save, close]) header.appendChild(child)
   const text = doc.createElement('textarea')
   text.className = 'cubito-file-editor__text'
@@ -65,7 +66,7 @@ export function createFileEditor(
   const discardBar = el('div', 'cubito-file-editor__bar')
   const discardText = el('span', 'cubito-file-editor__bar-text')
   const discard = createTwoStepButton(doc, 'cubito-file-editor__bar-action')
-  const keepEditing = button('cubito-file-editor__close', 'seguir editando')
+  const keepEditing = button('cubito-file-editor__close', t('editor.keepEditing'))
   for (const child of [discardText, discard.element, keepEditing]) discardBar.appendChild(child)
 
   for (const child of [header, text, message, notice, conflictBar, discardBar]) {

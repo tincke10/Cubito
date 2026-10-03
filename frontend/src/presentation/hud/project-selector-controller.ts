@@ -1,3 +1,4 @@
+import { t } from '../../application/i18n/translate'
 import type {
   ProjectSelectorAction,
   ProjectSelectorSlice
@@ -94,9 +95,13 @@ export function createProjectSelectorController(
       await gateway.setRepoSetupCommand(`id:${target.id}`, trimmed)
       setupRepo = { ...target, command: trimmed === '' ? null : trimmed }
       repoSetupSaved.emit()
-      showSetup('guardado')
+      showSetup(t('projects.setupSaved'))
     } catch (error) {
-      showSetup(`error: ${error instanceof Error ? error.message : 'no se pudo guardar'}`)
+      showSetup(
+        t('projects.setupError', {
+          message: error instanceof Error ? error.message : t('projects.setupSaveFailed')
+        })
+      )
     }
   }
 
@@ -125,7 +130,7 @@ export function createProjectSelectorController(
           ? { type: 'submit-add-ok' }
           : {
               type: 'submit-add-error',
-              message: `repo agregado, pero el setup no se guardó: ${setupError}`
+              message: t('projects.addedSetupFailed', { error: setupError })
             }
       )
     } catch (error) {

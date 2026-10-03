@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  AUTH_REQUIRED_MESSAGE,
+  authRequiredMessage,
   blockedReasonText,
   reviewKindName,
   reviewPrimaryAction
@@ -86,10 +86,10 @@ describe('reviewPrimaryAction', () => {
 
 describe('copy', () => {
   it('explains auth for Docker and native hosts', () => {
-    expect(AUTH_REQUIRED_MESSAGE).toContain('GH_TOKEN')
-    expect(AUTH_REQUIRED_MESSAGE).toContain('GITLAB_TOKEN')
-    expect(AUTH_REQUIRED_MESSAGE).toContain('gh auth login')
-    expect(AUTH_REQUIRED_MESSAGE).toContain('glab auth login')
+    expect(authRequiredMessage()).toContain('GH_TOKEN')
+    expect(authRequiredMessage()).toContain('GITLAB_TOKEN')
+    expect(authRequiredMessage()).toContain('gh auth login')
+    expect(authRequiredMessage()).toContain('glab auth login')
   })
 
   it('maps known blocked reasons and falls back to null', () => {

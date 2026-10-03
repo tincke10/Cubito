@@ -1,4 +1,5 @@
 import type { SourceControlModel } from './source-control-view-model'
+import { t } from '../../application/i18n/translate'
 
 export type SourceControlComposerHandle = {
   readonly root: HTMLElement
@@ -11,8 +12,6 @@ export type SourceControlComposerHandle = {
   dispose(): void
 }
 
-const PLACEHOLDER = 'mensaje de commit'
-
 /** Commit composer under the diff rail: staged summary, message box, commit + push, last result. */
 export function createSourceControlComposer(doc: Document = document): SourceControlComposerHandle {
   const root = doc.createElement('div')
@@ -21,7 +20,7 @@ export function createSourceControlComposer(doc: Document = document): SourceCon
   status.className = 'cubito-source-control__status'
   const message = doc.createElement('textarea')
   message.className = 'cubito-source-control__message'
-  message.placeholder = PLACEHOLDER
+  message.placeholder = t('sourceControl.commitPlaceholder')
   message.rows = 3
   const actions = doc.createElement('div')
   actions.className = 'cubito-source-control__actions'
@@ -45,17 +44,17 @@ export function createSourceControlComposer(doc: Document = document): SourceCon
   const reviewTitle = doc.createElement('input')
   reviewTitle.type = 'text'
   reviewTitle.className = 'cubito-source-control__review-title'
-  reviewTitle.placeholder = 'título'
+  reviewTitle.placeholder = t('sourceControl.reviewTitlePlaceholder')
   const reviewBody = doc.createElement('textarea')
   reviewBody.className = 'cubito-source-control__review-body'
-  reviewBody.placeholder = 'descripción'
+  reviewBody.placeholder = t('sourceControl.reviewBodyPlaceholder')
   reviewBody.rows = 3
   const draftRow = doc.createElement('label')
   draftRow.className = 'cubito-source-control__draft'
   const draft = doc.createElement('input')
   draft.type = 'checkbox'
   const draftText = doc.createElement('span')
-  draftText.textContent = 'borrador'
+  draftText.textContent = t('sourceControl.draft')
   draftRow.appendChild(draft)
   draftRow.appendChild(draftText)
   const reviewForm = doc.createElement('div')
@@ -79,7 +78,7 @@ export function createSourceControlComposer(doc: Document = document): SourceCon
   reviewResultLink.className = 'cubito-source-control__result-link'
   reviewResultLink.target = '_blank'
   reviewResultLink.rel = 'noopener noreferrer'
-  reviewResultLink.textContent = 'abrir'
+  reviewResultLink.textContent = t('sourceControl.openResult')
   review.appendChild(reviewForm)
   review.appendChild(reviewBlocked)
   review.appendChild(reviewButton)

@@ -1,6 +1,7 @@
 import type { RepoSetupSavedSignal } from './repo-setup-saved'
+import { t } from './i18n/translate'
 
-export const NO_SETUP_HINT = 'sin setup: el worktree nace sin dependencias (configuralo en ⌘P)'
+export const noSetupHint = (): string => t('spawn.noSetupHint')
 
 export type SetupHintTracker = {
   /** The hint text once `repoSelector` probed as setup-less; null while unknown or configured. */
@@ -29,7 +30,7 @@ export function createSetupHintTracker(deps: {
   deps.invalidations?.subscribe(invalidate)
   return {
     hint(repoSelector) {
-      return repoSelector !== null && missing.get(repoSelector) === true ? NO_SETUP_HINT : null
+      return repoSelector !== null && missing.get(repoSelector) === true ? noSetupHint() : null
     },
     ensure(repoSelector) {
       if (repoSelector === null || missing.has(repoSelector) || inflight.has(repoSelector)) return

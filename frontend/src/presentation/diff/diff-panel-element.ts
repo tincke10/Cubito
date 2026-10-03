@@ -1,11 +1,5 @@
 import type { DiffPanelLineView, DiffPanelView } from './diff-panel-model'
-
-const LOADING_TEXT = 'cargando…'
-const IDLE_TEXT = 'elegí un archivo'
-const BINARY_TEXT = 'archivo binario · sin vista de diff'
-const DELETED_TEXT = 'eliminado'
-const TRUNCATED_TEXT = 'diff recortado (límite de contenido)'
-const ERROR_FALLBACK_TEXT = 'error al cargar el diff'
+import { t } from '../../application/i18n/translate'
 
 const buildLineRow = (doc: Document, line: DiffPanelLineView): HTMLElement => {
   const row = doc.createElement('div')
@@ -61,7 +55,7 @@ export function createDiffPanel(doc: Document = document): DiffPanelHandle {
           for (const line of vm.lines) lines.appendChild(buildLineRow(doc, line))
           element.appendChild(lines)
           if (vm.truncated) {
-            element.appendChild(buildHint(doc, 'cubito-diff-panel__truncated', TRUNCATED_TEXT))
+            element.appendChild(buildHint(doc, 'cubito-diff-panel__truncated', t('diff.truncated')))
           }
           break
         }
@@ -70,19 +64,19 @@ export function createDiffPanel(doc: Document = document): DiffPanelHandle {
             buildHint(
               doc,
               'cubito-diff-panel__binary',
-              vm.deleted ? `${BINARY_TEXT} · ${DELETED_TEXT}` : BINARY_TEXT
+              vm.deleted ? `${t('diff.binary')} · ${t('diff.deleted')}` : t('diff.binary')
             )
           )
           break
         case 'loading':
-          element.appendChild(buildHint(doc, 'cubito-diff-panel__loading', LOADING_TEXT))
+          element.appendChild(buildHint(doc, 'cubito-diff-panel__loading', t('diff.loading')))
           break
         case 'idle':
-          element.appendChild(buildHint(doc, 'cubito-diff-panel__idle', IDLE_TEXT))
+          element.appendChild(buildHint(doc, 'cubito-diff-panel__idle', t('diff.idle')))
           break
         case 'error':
           element.appendChild(
-            buildHint(doc, 'cubito-diff-panel__error', vm.message ?? ERROR_FALLBACK_TEXT)
+            buildHint(doc, 'cubito-diff-panel__error', vm.message ?? t('diff.loadError'))
           )
           break
       }

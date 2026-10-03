@@ -4,6 +4,7 @@ import {
   reviewPrimaryAction
 } from '../../application/hosted-review-presentation'
 import type { ReviewPrimaryAction } from '../../application/hosted-review-presentation'
+import { t } from '../../application/i18n/translate'
 
 export type ReviewModel = {
   primary: ReviewPrimaryAction
@@ -30,18 +31,18 @@ export type SourceControlModel = {
   review: ReviewModel | null
 }
 
-const HIDDEN: SourceControlModel = {
+const hiddenModel = (): SourceControlModel => ({
   visible: false,
   statusLine: '',
   message: '',
-  commitLabel: 'commit',
+  commitLabel: t('sourceControl.commit'),
   commitDisabled: true,
-  pushLabel: 'push',
+  pushLabel: t('sourceControl.push'),
   pushDisabled: true,
   messageDisabled: true,
   notice: null,
   review: null
-}
+})
 
 function reviewModel(view: Extract<SourceControlView, { phase: 'ready' }>): ReviewModel | null {
   const { review } = view
@@ -63,17 +64,22 @@ function reviewModel(view: Extract<SourceControlView, { phase: 'ready' }>): Revi
   }
 }
 
-/** Pure projection of the source-control flow into composer copy (Spanish, like the HUD). */
+/** Pure projection of the source-control flow into composer copy (localized). */
 export function sourceControlModel(view: SourceControlView): SourceControlModel {
-  if (view.phase === 'hidden') return HIDDEN
-  const sync = view.hasUpstream ? `↑${view.ahead} ↓${view.behind}` : 'sin upstream'
+  if (view.phase === 'hidden') return hiddenModel()
+  const sync = view.hasUpstream ? `↑${view.ahead} ↓${view.behind}` : t('sourceControl.noUpstream')
   return {
     visible: true,
-    statusLine: `${view.stagedCount} en stage · ${sync}`,
+    statusLine: t('sourceControl.status', { count: view.stagedCount, sync }),
     message: view.message,
-    commitLabel: view.busy === 'commit' ? 'commiteando…' : 'commit',
+    commitLabel: view.busy === 'commit' ? t('sourceControl.committing') : t('sourceControl.commit'),
     commitDisabled: !view.canCommit,
-    pushLabel: view.busy === 'push' ? 'pusheando…' : view.hasUpstream ? 'push' : 'publicar rama',
+    pushLabel:
+      view.busy === 'push'
+        ? t('sourceControl.pushing')
+        : view.hasUpstream
+          ? t('sourceControl.push')
+          : t('sourceControl.publishBranch'),
     pushDisabled: !view.canPush,
     messageDisabled: view.busy !== null,
     notice: view.notice,

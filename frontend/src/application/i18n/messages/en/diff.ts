@@ -1,0 +1,19 @@
+export const enDiff = {
+  'diff.loading': 'loading…',
+  'diff.idle': 'pick a file',
+  'diff.binary': 'binary file · no diff view',
+  'diff.deleted': 'deleted',
+  'diff.truncated': 'diff truncated (content limit)',
+  'diff.loadError': 'failed to load the diff',
+  'diff.railEmpty': 'no changes',
+  'diff.hudMode': '{branch} · diff',
+  'diff.hudCounts': '{files} files · +{added} −{removed} vs base',
+  'diff.originBorn': 'newborn',
+  'diff.originUncommitted': 'uncommitted',
+  'diff.unstage': 'unstage',
+  'diff.stageRest': 'stage the rest',
+  'diff.stage': 'stage',
+  'diff.baseInvalid': 'invalid base',
+  'diff.unbornHead': 'branch has no commits',
+  'diff.noMergeBase': 'no common ancestor with the base'
+} as const

@@ -1,3 +1,4 @@
+import { t } from '../../application/i18n/translate'
 import { createTwoStepButton } from './two-step-button'
 import type { WorktreeDeletePanelModel } from './worktree-delete-view-model'
 
@@ -8,8 +9,6 @@ export type WorktreeDeletePanelHandle = {
   onCancel(cb: () => void): void
   dispose(): void
 }
-
-const CANCEL_LABEL = 'cancelar'
 
 /** Centered in-app confirm (no browser dialogs): backdrop + card with the removal summary. */
 export function createWorktreeDeletePanel(doc: Document = document): WorktreeDeletePanelHandle {
@@ -31,7 +30,7 @@ export function createWorktreeDeletePanel(doc: Document = document): WorktreeDel
   const cancel = doc.createElement('button')
   cancel.type = 'button'
   cancel.className = 'cubito-worktree-delete__cancel'
-  cancel.textContent = CANCEL_LABEL
+  cancel.textContent = t('delete.cancel')
   actions.appendChild(action.element)
   actions.appendChild(cancel)
   card.appendChild(title)

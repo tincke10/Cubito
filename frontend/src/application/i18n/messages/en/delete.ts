@@ -1,0 +1,21 @@
+export const enDelete = {
+  'delete.blockedTitle': '{branch} is the main worktree',
+  'delete.blockedLine': "The repo's main worktree cannot be deleted.",
+  'delete.loading': 'checking uncommitted changes…',
+  'delete.unknown': 'could not read git status: there may be changes',
+  'delete.dirtyOne': '{count} file with uncommitted changes',
+  'delete.dirtyMany': '{count} files with uncommitted changes',
+  'delete.clean': 'no uncommitted changes',
+  'delete.terminalsOne': '{count} live terminal will be closed',
+  'delete.terminalsMany': '{count} live terminals will be closed',
+  'delete.agentActive': 'an agent is active ({status})',
+  'delete.childrenOne': 'has {count} child worktree: {names}',
+  'delete.childrenMany': 'has {count} child worktrees: {names}',
+  'delete.title': 'Delete {branch}',
+  'delete.force': 'force delete',
+  'delete.confirmForce': 'confirm force',
+  'delete.busy': 'deleting…',
+  'delete.action': 'delete',
+  'delete.confirm': 'confirm deletion',
+  'delete.cancel': 'cancel'
+} as const

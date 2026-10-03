@@ -3,6 +3,7 @@ import type { CompareChildLoad } from '../../application/compare-child-load'
 import { hudCountsOfFiles } from '../../application/diff-view-model'
 import type { DiffRailStatus } from '../../application/diff-view-model'
 import { shortBranchName } from '../hud/node-label-model'
+import { t } from '../../application/i18n/translate'
 
 export type CompareRailRow = {
   childId: WorktreeId
@@ -26,9 +27,6 @@ export type CompareRailInput = {
   branchLabelFor: (childId: WorktreeId) => string
 }
 
-const WINNER_LABEL = 'ganador'
-const PICK_WINNER_LABEL = 'elegir ganador'
-
 const railCssClass = (status: DiffRailStatus, focused: boolean, isWinner: boolean): string =>
   `compare-rail__row compare-rail__row--${status}` +
   (focused ? ' compare-rail__row--focused' : '') +
@@ -49,12 +47,12 @@ export function compareRailViewModel(input: CompareRailInput): readonly CompareR
       childId,
       label: shortBranchName(full),
       title: full,
-      statText: `${counts.files} archivos · +${counts.added} −${counts.removed}`,
+      statText: t('compare.railStats', counts),
       status,
       focused,
       isWinner,
       cssClass: railCssClass(status, focused, isWinner),
-      winnerToggleLabel: isWinner ? WINNER_LABEL : PICK_WINNER_LABEL
+      winnerToggleLabel: isWinner ? t('compare.winner') : t('compare.pickWinner')
     }
   })
 }

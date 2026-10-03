@@ -41,53 +41,58 @@ export const toCommandAvailability = (state: SceneState): CommandAvailability =>
 /** Static, ordered ⌘K catalog (proposal order). Pure and deterministic given platform — the one
  *  platform-variant hint (open-projects) resolves here instead of through DOM/env lookups. */
 export const commandCatalog = (platform: { isMac: boolean }): readonly PaletteCommand[] => [
-  { id: 'focus', label: 'foco', keybindingHint: 'f', isAvailable: (a) => a.hasSelection },
+  {
+    id: 'focus',
+    label: t('palette.focus'),
+    keybindingHint: 'f',
+    isAvailable: (a) => a.hasSelection
+  },
   {
     id: 'fit-all',
-    label: 'general · ver todo',
+    label: t('palette.fitAll'),
     keybindingHint: 'v',
     isAvailable: () => true
   },
   {
     id: 'open-terminal',
-    label: 'abrir terminal',
+    label: t('palette.openTerminal'),
     keybindingHint: 't',
     isAvailable: (a) => a.hasSelection && a.isConnected
   },
   {
     id: 'open-spawn',
-    label: 'spawn worktree',
+    label: t('palette.openSpawn'),
     keybindingHint: 's',
     isAvailable: (a) => a.isConnected
   },
   {
     id: 'open-projects',
-    label: 'proyectos',
+    label: t('palette.projects'),
     keybindingHint: platform.isMac ? '⌘P' : 'Ctrl+P',
     isAvailable: () => true
   },
   {
     id: 'add-repo',
-    label: 'agregar repo',
+    label: t('palette.addRepo'),
     keybindingHint: '—',
     isAvailable: (a) => a.isConnected
   },
   {
     id: 'fan-out',
-    label: 'fan-out',
+    label: t('palette.fanOut'),
     keybindingHint: '—',
     isAvailable: (a) => a.hasSelection && a.isConnected
   },
   {
     id: 'open-system',
-    label: 'sistema en vivo',
+    label: t('palette.openSystem'),
     keybindingHint: 'x',
     // Unlike open-terminal, no isConnected gate — the demo graph stub works offline.
     isAvailable: (a) => a.hasSelection
   },
   {
     id: 'open-diff',
-    label: 'diff',
+    label: t('palette.openDiff'),
     keybindingHint: 'd',
     // Mirrors open-system: hasSelection only — the demo gateway's gitBranchCompare stub
     // resolves offline too, so no isConnected gate.
@@ -95,21 +100,21 @@ export const commandCatalog = (platform: { isMac: boolean }): readonly PaletteCo
   },
   {
     id: 'open-compare',
-    label: 'comparar la camada',
+    label: t('palette.openCompare'),
     keybindingHint: 'c',
     // Anchor is the running camada, not selection — hasSelection is irrelevant here.
     isAvailable: (a) => a.hasRunningCamada
   },
   {
     id: 'delete-worktree',
-    label: 'eliminar worktree',
+    label: t('palette.deleteWorktree'),
     keybindingHint: '⌫',
     // The confirm panel itself explains why the primary worktree is refused.
     isAvailable: (a) => a.hasSelection && a.isConnected
   },
   {
     id: 'open-file',
-    label: 'abrir archivo',
+    label: t('palette.openFile'),
     keybindingHint: 'o',
     isAvailable: (a) => a.hasSelection && a.isConnected
   },

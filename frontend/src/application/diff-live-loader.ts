@@ -6,6 +6,7 @@ import { mergeFileDiffEntriesWithOrigin, type FileDiffOrigin } from './system-gr
 import { composeBaseToWorkingTree } from './diff-panel-content-compose'
 import type { DiffFileContent, RuntimeGateway } from './ports/runtime-gateway'
 import type { SceneStore } from './scene-store'
+import { t } from './i18n/translate'
 
 /** Only the methods diff mode needs — narrow like the other controller ports. */
 export type DiffLiveLoaderGatewayPort = Pick<
@@ -178,11 +179,11 @@ function messageOf(error: unknown): string {
 export function railErrorMessageFor(status: string): string {
   switch (status) {
     case 'invalid-base':
-      return 'base inválida'
+      return t('diff.baseInvalid')
     case 'unborn-head':
-      return 'rama sin commits'
+      return t('diff.unbornHead')
     case 'no-merge-base':
-      return 'sin ancestro común con la base'
+      return t('diff.noMergeBase')
     default:
       return status
   }

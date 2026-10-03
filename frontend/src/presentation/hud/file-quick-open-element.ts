@@ -1,5 +1,6 @@
 import { resolveProjectSelectorKey } from './project-selector-element'
 import type { FileQuickOpenPanelModel } from './file-quick-open-view-model'
+import { t } from '../../application/i18n/translate'
 
 export type FileQuickOpenHandle = {
   readonly root: HTMLElement
@@ -26,7 +27,7 @@ export function createFileQuickOpen(doc: Document = document): FileQuickOpenHand
   card.className = 'cubito-file-quick-open__card'
   const query = doc.createElement('input')
   query.className = 'cubito-file-quick-open__query'
-  query.placeholder = 'abrir archivo…'
+  query.placeholder = t('quickopen.placeholder')
   const status = doc.createElement('div')
   status.className = 'cubito-file-quick-open__status'
   const rows = doc.createElement('div')
@@ -73,7 +74,7 @@ export function createFileQuickOpen(doc: Document = document): FileQuickOpenHand
           .join(' ')
         const name = doc.createElement('span')
         name.className = 'cubito-file-quick-open__name'
-        name.textContent = row.binary ? `${row.name} (binario)` : row.name
+        name.textContent = row.binary ? t('quickopen.binaryName', { name: row.name }) : row.name
         const folder = doc.createElement('span')
         folder.className = 'cubito-file-quick-open__folder'
         folder.textContent = row.folder

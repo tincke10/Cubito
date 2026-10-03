@@ -1,4 +1,5 @@
 import type { FileQuickOpenView } from '../../application/file-quick-open-flow'
+import { t } from '../../application/i18n/translate'
 
 export type FileQuickOpenRow = {
   path: string
@@ -27,11 +28,11 @@ const HIDDEN: FileQuickOpenPanelModel = {
 
 function statusTextOf(view: Extract<FileQuickOpenView, { phase: 'open' }>): string | null {
   if (view.error !== null || view.rows.length > 0) return null
-  if (view.searching) return 'buscando…'
-  return view.query.trim() === '' ? 'escribe parte del nombre o de la ruta' : 'sin resultados'
+  if (view.searching) return t('quickopen.searching')
+  return view.query.trim() === '' ? t('quickopen.hint') : t('quickopen.noResults')
 }
 
-/** Pure projection of the quick-open flow into panel copy (Spanish, like the rest of the HUD). */
+/** Pure projection of the quick-open flow into panel copy (localized via t()). */
 export function fileQuickOpenPanelModel(view: FileQuickOpenView): FileQuickOpenPanelModel {
   if (view.phase === 'closed') return HIDDEN
   return {

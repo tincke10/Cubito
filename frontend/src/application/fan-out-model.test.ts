@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   FANOUT_PLACEHOLDER_PREFIX,
-  FANOUT_PROMPT_REQUIRED_MESSAGE,
+  fanOutPromptRequiredMessage,
   MAX_FANOUT,
   MIN_FANOUT,
   clampFanOutCount,
@@ -250,7 +250,7 @@ describe('reduceFanOut — submit', () => {
     }
     const slice = reduceFanOut(agentNoPrompt, { type: 'submit', mutationIds: ['m1'] })
     expect(slice.view).toBe('form')
-    expect((slice as { errorMessage?: string }).errorMessage).toBe(FANOUT_PROMPT_REQUIRED_MESSAGE)
+    expect((slice as { errorMessage?: string }).errorMessage).toBe(fanOutPromptRequiredMessage())
   })
 
   it('runs when an agent is chosen and the prompt has text', () => {
@@ -292,7 +292,7 @@ describe('fanOutSubmitBlocker', () => {
   it('blocks a blank prompt only when an agent is chosen', () => {
     expect(
       fanOutSubmitBlocker({ ...validForm, fields: { count: 3, agent: 'claude', prompt: '' } })
-    ).toBe(FANOUT_PROMPT_REQUIRED_MESSAGE)
+    ).toBe(fanOutPromptRequiredMessage())
     expect(
       fanOutSubmitBlocker({ ...validForm, fields: { count: 3, agent: 'none', prompt: '' } })
     ).toBeNull()

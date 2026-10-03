@@ -1,4 +1,5 @@
 import { SCENE_MODE_SWITCHER_CHIPS, connectionDotColor, connectionLabel } from '../hud/hud-model'
+import { t } from '../../application/i18n/translate'
 import { createKeyboardBar } from '../hud/keyboard-bar'
 import type { ConnectionDotTone } from '../hud/hud-model'
 import type { KeyboardBarHandle } from '../hud/keyboard-bar'
@@ -12,8 +13,6 @@ const DOT_VAR: Record<ConnectionDotTone, string> = {
   amber: '--cubito-amber',
   amberDim: '--cubito-amber-dim'
 }
-
-const MODE_SUFFIX = 'sistema en vivo'
 
 export type SystemHudModel = {
   connection: ConnectionState
@@ -57,7 +56,7 @@ export function createSystemHud(doc: Document = document): SystemHudHandle {
   countersLine.className = 'cubito-hud__line'
   const editingLabel = doc.createElement('span')
   editingLabel.className = 'cubito-system-hud__label'
-  editingLabel.textContent = 'claude editando'
+  editingLabel.textContent = t('system.editing')
   const countersRest = doc.createElement('span')
   countersLine.appendChild(editingLabel)
   countersLine.appendChild(countersRest)
@@ -76,8 +75,11 @@ export function createSystemHud(doc: Document = document): SystemHudHandle {
     apply(model: SystemHudModel) {
       connectionDot.style.backgroundColor = `var(${DOT_VAR[connectionDotColor(model.connection)]})`
       connectionText.textContent = connectionLabel(model.connection)
-      modeLine.textContent = `${model.branch} · ${MODE_SUFFIX}`
-      countersRest.textContent = ` · ${model.counts.tocados} endpoints tocados · ${model.counts.nuevo} nuevo`
+      modeLine.textContent = `${model.branch} · ${t('system.modeSuffix')}`
+      countersRest.textContent = t('system.counters', {
+        touched: model.counts.tocados,
+        created: model.counts.nuevo
+      })
       root.dataset.source = model.source
     },
     dispose() {

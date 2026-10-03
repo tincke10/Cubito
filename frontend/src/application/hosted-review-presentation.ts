@@ -1,8 +1,8 @@
 import type { HostedReviewEligibility } from './ports/runtime-gateway'
+import type { MessageKey } from './i18n/messages/en'
+import { t } from './i18n/translate'
 
-export const AUTH_REQUIRED_MESSAGE =
-  'Autenticación requerida: en Docker exportá GH_TOKEN / GITLAB_TOKEN y reiniciá el contenedor; ' +
-  'en una instalación nativa corré gh auth login / glab auth login.'
+export const authRequiredMessage = (): string => t('review.authRequired')
 
 /** Short noun per provider; an unknown provider stays neutral instead of guessing PR vs MR. */
 export function reviewKindName(provider: string): string {
@@ -11,24 +11,25 @@ export function reviewKindName(provider: string): string {
   return 'review'
 }
 
-const BLOCKED_COPY: Record<string, string> = {
-  dirty: 'hay cambios sin commitear',
-  detached_head: 'HEAD desacoplado: no hay rama',
-  default_branch: 'estás en la rama por defecto',
-  no_upstream: 'la rama no está publicada',
-  needs_push: 'hay commits sin pushear',
-  needs_sync: 'la rama está atrás del remoto',
-  auth_required: AUTH_REQUIRED_MESSAGE,
-  fork_head_unsupported: 'las ramas de fork no están soportadas',
-  unsupported_provider: 'este proveedor no permite crear reviews desde acá',
-  existing_review: 'ya existe un review para esta rama',
-  base_not_on_remote: 'la rama base no existe en el remoto: publicá el padre primero'
+const BLOCKED_COPY_KEYS: Record<string, MessageKey> = {
+  dirty: 'review.blocked.dirty',
+  detached_head: 'review.blocked.detached_head',
+  default_branch: 'review.blocked.default_branch',
+  no_upstream: 'review.blocked.no_upstream',
+  needs_push: 'review.blocked.needs_push',
+  needs_sync: 'review.blocked.needs_sync',
+  auth_required: 'review.authRequired',
+  fork_head_unsupported: 'review.blocked.fork_head_unsupported',
+  unsupported_provider: 'review.blocked.unsupported_provider',
+  existing_review: 'review.blocked.existing_review',
+  base_not_on_remote: 'review.blocked.base_not_on_remote'
 }
 
 /** Unknown reasons from a newer host are shown verbatim rather than hidden. */
 export function blockedReasonText(reason: string | null): string | null {
   if (reason === null) return null
-  return BLOCKED_COPY[reason] ?? reason
+  const key = BLOCKED_COPY_KEYS[reason]
+  return key === undefined ? reason : t(key)
 }
 
 export type ReviewPrimaryAction = {
@@ -49,18 +50,23 @@ export function reviewPrimaryAction(
     case 'commit':
       return { kind: 'commit', label: 'commit', disabled: false }
     case 'publish':
-      return { kind: 'publish', label: 'publicar', disabled: false }
+      return { kind: 'publish', label: t('review.publish'), disabled: false }
     case 'push':
       return { kind: 'push', label: 'push', disabled: false }
     case 'sync':
       return { kind: 'sync', label: 'sync', disabled: false }
     case 'authenticate':
-      return { kind: 'authenticate', label: 'autenticar', disabled: false }
+      return { kind: 'authenticate', label: t('review.authenticate'), disabled: false }
     case 'open_existing_review': {
       const review = eligibility.review
       if (review) {
         const suffix = review.number === undefined ? '' : ` #${review.number}`
-        return { kind: 'open', label: `abrir ${kind}${suffix}`, disabled: false, href: review.url }
+        return {
+          kind: 'open',
+          label: t('review.open', { kind, number: suffix }),
+          disabled: false,
+          href: review.url
+        }
       }
       break
     }
@@ -70,7 +76,7 @@ export function reviewPrimaryAction(
   }
   return {
     kind: 'create',
-    label: creating ? 'creando…' : `crear ${kind}`,
+    label: creating ? t('review.creating') : t('review.create', { kind }),
     disabled: creating || !eligibility.canCreate
   }
 }

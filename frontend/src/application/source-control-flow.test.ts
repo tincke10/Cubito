@@ -11,7 +11,7 @@ import type {
   HostedReviewEligibility,
   SourceControlStatus
 } from './ports/runtime-gateway'
-import { AUTH_REQUIRED_MESSAGE } from './hosted-review-presentation'
+import { authRequiredMessage } from './hosted-review-presentation'
 
 const eligibility = (over: Partial<HostedReviewEligibility> = {}): HostedReviewEligibility => ({
   provider: 'github',
@@ -371,7 +371,7 @@ describe('source control flow — review', () => {
     await flow.open('r::/w')
     await flow.reviewPrimary()
     expect(reviewOf(flow.view())).toMatchObject({
-      result: { tone: 'error', text: AUTH_REQUIRED_MESSAGE }
+      result: { tone: 'error', text: authRequiredMessage() }
     })
   })
 
@@ -411,7 +411,7 @@ describe('source control flow — review', () => {
     })
     await auth.flow.open('r::/w')
     await auth.flow.reviewPrimary()
-    expect(ready(auth.flow.view()).notice?.text).toBe(AUTH_REQUIRED_MESSAGE)
+    expect(ready(auth.flow.view()).notice?.text).toBe(authRequiredMessage())
 
     const commit = setup({ eligibility: eligibility({ canCreate: false, nextAction: 'commit' }) })
     await commit.flow.open('r::/w')

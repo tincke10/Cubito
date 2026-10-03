@@ -1,4 +1,5 @@
 import type { FileEditorView } from '../../application/file-editor-flow'
+import { t } from '../../application/i18n/translate'
 
 type TwoStepLabels = { idle: string; confirm: string; busy: string }
 
@@ -38,30 +39,29 @@ const HIDDEN: FileEditorPanelModel = {
   discard: null
 }
 
-const BADGES = { truncated: 'truncado, solo lectura', binary: 'binario, solo lectura' } as const
+const badgeOf = (reason: 'truncated' | 'binary'): string =>
+  t(reason === 'truncated' ? 'editor.badgeTruncated' : 'editor.badgeBinary')
 
-const CONFLICT_MESSAGES = {
-  changed: 'el archivo cambió en disco desde que lo abriste',
-  unverifiable: 'no se pudo verificar el archivo en disco'
-} as const
+const conflictMessageOf = (reason: 'changed' | 'unverifiable'): string =>
+  t(reason === 'changed' ? 'editor.conflictChanged' : 'editor.conflictUnverifiable')
 
-/** Pure projection of the file view into panel copy (Spanish, like the rest of the HUD). */
+/** Pure projection of the file view into panel copy (localized via t()). */
 export function fileEditorPanelModel(view: FileEditorView): FileEditorPanelModel {
   if (view.phase === 'closed') return HIDDEN
   const message =
     view.status === 'loading'
-      ? 'cargando…'
+      ? t('editor.loading')
       : view.error !== null
         ? view.error
         : view.readOnly === 'binary'
-          ? 'archivo binario: no se puede mostrar'
+          ? t('editor.binaryNotice')
           : null
   const readOnly = view.status !== 'ready' || view.readOnly !== null
   return {
     visible: true,
     title: view.path,
     text: view.content,
-    badge: view.readOnly === null ? null : BADGES[view.readOnly],
+    badge: view.readOnly === null ? null : badgeOf(view.readOnly),
     readOnly,
     dirty: view.dirty,
     saveEnabled: !readOnly && view.dirty && !view.saving && view.conflict === null,
@@ -71,23 +71,23 @@ export function fileEditorPanelModel(view: FileEditorView): FileEditorPanelModel
       view.conflict === null
         ? null
         : {
-            message: CONFLICT_MESSAGES[view.conflict.reason],
+            message: conflictMessageOf(view.conflict.reason),
             reload: {
-              idle: 'recargar',
-              confirm: 'confirmar recargar (pierdes tus cambios)',
-              busy: 'recargando…'
+              idle: t('editor.reload'),
+              confirm: t('editor.reloadConfirm'),
+              busy: t('editor.reloadBusy')
             },
             overwrite: {
-              idle: 'sobrescribir',
-              confirm: 'confirmar sobrescribir',
-              busy: 'guardando…'
+              idle: t('editor.overwrite'),
+              confirm: t('editor.overwriteConfirm'),
+              busy: t('editor.overwriteBusy')
             },
             busy: view.saving || view.reloading
           },
     discard: view.confirmDiscard
       ? {
-          message: 'hay cambios sin guardar',
-          labels: { idle: 'descartar cambios', confirm: 'confirmar descartar', busy: '' }
+          message: t('editor.discardMessage'),
+          labels: { idle: t('editor.discard'), confirm: t('editor.discardConfirm'), busy: '' }
         }
       : null
   }

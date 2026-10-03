@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { agentActivityToFeedRow } from './agent-activity-to-feed'
+import { setActiveLanguage } from './i18n/translate'
 import type { AgentActivityEvent } from './ports/runtime-gateway'
 
 const pad = (n: number): string => n.toString().padStart(2, '0')
@@ -61,5 +62,22 @@ describe('agentActivityToFeedRow', () => {
     const midnightish = new Date(2026, 0, 1, 1, 2, 3).getTime()
     const row = agentActivityToFeedRow(baseEvent({ at: midnightish }))
     expect(row.time).toBe('01:02:03')
+  })
+})
+
+const row = (kind: 'read' | 'edit' | 'create' | 'run') =>
+  agentActivityToFeedRow({ seq: 1, at: 0, kind, target: 'x' } as never).text
+
+describe('agentActivityToFeedRow (en)', () => {
+  afterEach(() => setActiveLanguage('es'))
+
+  it('uses English verbs', () => {
+    setActiveLanguage('en')
+    expect([row('read'), row('edit'), row('create'), row('run')]).toEqual([
+      'read x',
+      'editing x',
+      'new x',
+      'ran x'
+    ])
   })
 })

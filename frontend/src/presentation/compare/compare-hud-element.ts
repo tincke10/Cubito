@@ -3,6 +3,7 @@ import { createKeyboardBar } from '../hud/keyboard-bar'
 import type { ConnectionDotTone } from '../hud/hud-model'
 import type { KeyboardBarHandle } from '../hud/keyboard-bar'
 import type { ConnectionState } from '../../application/scene-store'
+import { t } from '../../application/i18n/translate'
 
 /** Tone -> CSS custom property (mirrors diff-hud-element.ts's own private DOT_VAR table). */
 const DOT_VAR: Record<ConnectionDotTone, string> = {
@@ -10,9 +11,6 @@ const DOT_VAR: Record<ConnectionDotTone, string> = {
   amber: '--cubito-amber',
   amberDim: '--cubito-amber-dim'
 }
-
-const MODE_SUFFIX = 'comparar la camada'
-const NO_WINNER_TEXT = 'sin elegir'
 
 export type CompareHudModel = {
   connection: ConnectionState
@@ -48,7 +46,7 @@ export function createCompareHud(doc: Document = document): CompareHudHandle {
 
   const modeLine = doc.createElement('div')
   modeLine.className = 'cubito-hud__line'
-  modeLine.textContent = MODE_SUFFIX
+  modeLine.textContent = t('compare.hudMode')
 
   const winnerLine = doc.createElement('div')
   winnerLine.className = 'cubito-hud__line'
@@ -66,7 +64,10 @@ export function createCompareHud(doc: Document = document): CompareHudHandle {
     apply(model: CompareHudModel) {
       connectionDot.style.backgroundColor = `var(${DOT_VAR[connectionDotColor(model.connection)]})`
       connectionText.textContent = connectionLabel(model.connection)
-      winnerLine.textContent = `${model.membersCount} hijos · ganador: ${model.winnerLabel ?? NO_WINNER_TEXT}`
+      winnerLine.textContent = t('compare.hudWinner', {
+        count: model.membersCount,
+        winner: model.winnerLabel ?? t('compare.noWinner')
+      })
     },
     dispose() {
       root.remove()

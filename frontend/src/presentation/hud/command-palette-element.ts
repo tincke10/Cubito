@@ -1,3 +1,4 @@
+import { t } from '../../application/i18n/translate'
 import type { CommandId } from '../../application/command-catalog'
 import type { CommandPaletteRow, CommandPaletteViewModel } from './command-palette-view-model'
 
@@ -55,7 +56,7 @@ export function createCommandPalette(doc: Document = document): CommandPaletteHa
 
   const queryInput = doc.createElement('input')
   queryInput.className = 'cubito-command-palette__query'
-  ;(queryInput as unknown as HTMLInputElement).placeholder = 'escribí un comando…'
+  ;(queryInput as unknown as HTMLInputElement).placeholder = t('palette.queryPlaceholder')
 
   header.appendChild(prompt)
   header.appendChild(queryInput)
@@ -65,7 +66,7 @@ export function createCommandPalette(doc: Document = document): CommandPaletteHa
 
   const footer = doc.createElement('div')
   footer.className = 'cubito-command-palette__footer'
-  footer.textContent = '↑↓ navegar · ⏎ ejecutar · esc cerrar'
+  footer.textContent = t('palette.footer')
 
   panel.appendChild(header)
   panel.appendChild(rows)

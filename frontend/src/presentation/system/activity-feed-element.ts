@@ -1,9 +1,7 @@
 import type { ActivityFeedRowView } from './activity-feed-model'
+import { t } from '../../application/i18n/translate'
 
-const TITLE = 'actividad del agente'
-const FOOTER_LABEL = 'escribiendo …'
 const FOOTER_CURSOR_GLYPH = '▮'
-const PLACEHOLDER_TEXT = 'aún no hay actividad'
 
 const buildRow = (doc: Document, row: ActivityFeedRowView): HTMLElement => {
   const rowElement = doc.createElement('div')
@@ -64,7 +62,7 @@ export function createActivityFeed(doc: Document = document): ActivityFeedHandle
 
   const title = doc.createElement('div')
   title.className = 'cubito-activity-feed__title'
-  title.textContent = TITLE
+  title.textContent = t('system.feedTitle')
 
   const subtitle = doc.createElement('div')
   subtitle.className = 'cubito-activity-feed__subtitle'
@@ -84,14 +82,14 @@ export function createActivityFeed(doc: Document = document): ActivityFeedHandle
 
   const footerLabel = doc.createElement('span')
   footerLabel.className = 'cubito-activity-feed__footer-label'
-  footerLabel.textContent = FOOTER_LABEL
+  footerLabel.textContent = t('system.feedTyping')
 
   footer.appendChild(cursor)
   footer.appendChild(footerLabel)
 
   const placeholder = doc.createElement('div')
   placeholder.className = 'cubito-activity-feed__placeholder'
-  placeholder.textContent = PLACEHOLDER_TEXT
+  placeholder.textContent = t('system.feedEmpty')
   placeholder.hidden = true
 
   root.appendChild(header)

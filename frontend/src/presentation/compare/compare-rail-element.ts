@@ -1,6 +1,6 @@
 import type { CompareRailRow } from './compare-rail-model'
 
-const EMPTY_TEXT = 'sin litter'
+import { t } from '../../application/i18n/translate'
 
 const buildRow = (
   doc: Document,
@@ -64,7 +64,7 @@ export function createCompareRail(doc: Document = document): CompareRailHandle {
       if (rows.length === 0) {
         const empty = doc.createElement('div')
         empty.className = 'cubito-compare-rail__empty'
-        empty.textContent = EMPTY_TEXT
+        empty.textContent = t('compare.railEmpty')
         root.appendChild(empty)
         return
       }

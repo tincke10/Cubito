@@ -1,3 +1,4 @@
+import { t } from '../../application/i18n/translate'
 import type {
   ProjectSelectorListViewModel,
   ProjectSelectorAddFormViewModel
@@ -85,7 +86,7 @@ export function createProjectSelector(doc: Document = document): ProjectSelector
 
   const addRow = doc.createElement('div')
   addRow.className = 'cubito-project-selector__row cubito-project-selector__row--add'
-  addRow.textContent = '+ agregar repo'
+  addRow.textContent = t('projects.addRow')
 
   listSection.appendChild(queryInput)
   listSection.appendChild(rows)
@@ -101,7 +102,7 @@ export function createProjectSelector(doc: Document = document): ProjectSelector
     'cubito-project-selector__field cubito-project-selector__field--setup'
   const setupSaveButton = doc.createElement('button')
   setupSaveButton.className = 'cubito-project-selector__cancel'
-  setupSaveButton.textContent = 'guardar setup'
+  setupSaveButton.textContent = t('projects.saveSetup')
   setupSection.appendChild(setupLabel)
   setupSection.appendChild(setupCommandInput)
   setupSection.appendChild(setupSaveButton)
@@ -113,12 +114,11 @@ export function createProjectSelector(doc: Document = document): ProjectSelector
   const pathInput = doc.createElement('input')
   pathInput.className = 'cubito-project-selector__field cubito-project-selector__field--path'
 
-  pathInput.placeholder = 'ruta del repo en la máquina de orcad, ej. /repos/mi-repo'
+  pathInput.placeholder = t('projects.pathPlaceholder')
 
   const pathHelp = doc.createElement('div')
   pathHelp.className = 'cubito-project-selector__notice'
-  pathHelp.textContent =
-    'La ruta se resuelve en la máquina donde corre orcad. En Docker, dentro del contenedor: /repos/…'
+  pathHelp.textContent = t('projects.pathHelp')
 
   const kindSelect = doc.createElement('select')
   kindSelect.className = 'cubito-project-selector__field cubito-project-selector__field--kind'
@@ -131,14 +131,14 @@ export function createProjectSelector(doc: Document = document): ProjectSelector
 
   const setupInput = doc.createElement('input')
   setupInput.className = 'cubito-project-selector__field cubito-project-selector__field--setup'
-  setupInput.placeholder = 'comando de setup (opcional), ej. pnpm install'
+  setupInput.placeholder = t('projects.setupPlaceholder')
 
   const submitButton = doc.createElement('button')
   submitButton.className = 'cubito-project-selector__submit'
 
   const cancelButton = doc.createElement('button')
   cancelButton.className = 'cubito-project-selector__cancel'
-  cancelButton.textContent = 'cancelar'
+  cancelButton.textContent = t('projects.cancel')
 
   const errorLine = doc.createElement('div')
   errorLine.className = 'cubito-project-selector__error'
@@ -271,11 +271,11 @@ export function createProjectSelector(doc: Document = document): ProjectSelector
       setupSection.style.display = model === null ? 'none' : ''
       if (model === null) return
       const shared = model.sharedCommand ?? null
-      const sharedText = shared === null ? '' : ` · orca.yaml (solo lectura): ${shared}`
-      setupLabel.textContent = `setup de ${model.repoName}${sharedText}${model.message === '' ? '' : ` · ${model.message}`}`
+      const sharedText = shared === null ? '' : t('projects.setupShared', { command: shared })
+      setupLabel.textContent = `${t('projects.setupFor', { repo: model.repoName })}${sharedText}${model.message === '' ? '' : ` · ${model.message}`}`
       setupCommandInput.value = model.command ?? ''
       setupCommandInput.placeholder =
-        shared === null ? 'sin setup (ej. pnpm install)' : 'sin override local (aplica orca.yaml)'
+        shared === null ? t('projects.setupNone') : t('projects.setupNoOverride')
     },
     onSetupSave(callback) {
       setupSaveCallback = callback

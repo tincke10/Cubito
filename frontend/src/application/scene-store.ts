@@ -1,3 +1,4 @@
+import { t } from './i18n/translate'
 import { activateIsland, selectNode } from './island-focus'
 import type { IslandFocus, IslandSelections } from './island-focus'
 import { emptyWorktreeGraph } from '../domain/worktree-graph/types'
@@ -84,7 +85,7 @@ export type SceneStore = {
 const initialSceneState = (): SceneState => ({
   graph: emptyWorktreeGraph(),
   sync: { state: 'idle' },
-  connection: { state: 'down', reason: 'not connected' },
+  connection: { state: 'down', reason: t('connection.notConnected') },
   selection: { selectedId: null },
   terminals: emptyTerminalsState(),
   spawnMenu: emptySpawnMenuSlice(),

@@ -24,13 +24,21 @@ describe('decidePairingEntry', () => {
     const fragment = encodeOffer(validOfferShape)
     expect(decidePairingEntry(fragment)).toEqual({
       kind: 'connect',
-      offer: { v: 2, endpoint: validOfferShape.endpoint, deviceToken: validOfferShape.deviceToken, publicKeyB64: validOfferShape.publicKeyB64 }
+      offer: {
+        v: 2,
+        endpoint: validOfferShape.endpoint,
+        deviceToken: validOfferShape.deviceToken,
+        publicKeyB64: validOfferShape.publicKeyB64
+      }
     })
   })
 
   it('falls back to demo mode with pairing por relay no soportado for a relay-bearing offer (CO-405)', () => {
     const fragment = encodeOffer({ ...validOfferShape, relay: { v: 1 } })
-    expect(decidePairingEntry(fragment)).toEqual({ kind: 'demo', reason: 'pairing por relay no soportado' })
+    expect(decidePairingEntry(fragment)).toEqual({
+      kind: 'demo',
+      reason: 'pairing por relay no soportado'
+    })
   })
 
   const rejectionCases: Array<{ name: string; fragment: string; reason: string }> = [
@@ -40,7 +48,11 @@ describe('decidePairingEntry', () => {
       fragment: `orca://notpair?code=${encodeOffer(validOfferShape)}`,
       reason: 'código de pairing inválido'
     },
-    { name: 'malformed_code', fragment: 'not-valid!!!base64===', reason: 'código de pairing inválido' },
+    {
+      name: 'malformed_code',
+      fragment: 'not-valid!!!base64===',
+      reason: 'código de pairing inválido'
+    },
     {
       name: 'not_json',
       fragment: bytesToBase64(new TextEncoder().encode('not json at all'))
@@ -49,10 +61,18 @@ describe('decidePairingEntry', () => {
         .replace(/=+$/, ''),
       reason: 'código de pairing inválido'
     },
-    { name: 'unsupported_version', fragment: encodeOffer({ ...validOfferShape, v: 3 }), reason: 'versión de pairing no soportada' },
+    {
+      name: 'unsupported_version',
+      fragment: encodeOffer({ ...validOfferShape, v: 3 }),
+      reason: 'versión de pairing no soportada'
+    },
     {
       name: 'missing_field',
-      fragment: encodeOffer({ v: 2, endpoint: validOfferShape.endpoint, publicKeyB64: validOfferShape.publicKeyB64 }),
+      fragment: encodeOffer({
+        v: 2,
+        endpoint: validOfferShape.endpoint,
+        publicKeyB64: validOfferShape.publicKeyB64
+      }),
       reason: 'código de pairing inválido'
     }
   ]

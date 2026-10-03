@@ -1,7 +1,8 @@
 import type { WorktreeId } from '../domain/worktree-graph/types'
 import { resolveBaseRef } from '../domain/worktree-graph/resolve-base-ref'
 import { shortBranchName } from '../presentation/hud/node-label-model'
-import { AUTH_REQUIRED_MESSAGE, reviewKindName } from './hosted-review-presentation'
+import { authRequiredMessage, reviewKindName } from './hosted-review-presentation'
+import { t } from './i18n/translate'
 import type {
   HostedReviewEligibility,
   RuntimeGateway,
@@ -231,11 +232,13 @@ export function createSourceControlFlow(deps: SourceControlFlowDeps): SourceCont
       if (created.ok) {
         result = {
           tone: 'ok',
-          text: `${kind}${created.number === undefined ? '' : ` #${created.number}`} creado`,
+          text: t('review.created', {
+            ref: `${kind}${created.number === undefined ? '' : ` #${created.number}`}`
+          }),
           href: created.url
         }
       } else if (created.code === 'auth_required') {
-        result = { tone: 'error', text: AUTH_REQUIRED_MESSAGE }
+        result = { tone: 'error', text: authRequiredMessage() }
       } else {
         result = {
           tone: 'error',
@@ -310,14 +313,17 @@ export function createSourceControlFlow(deps: SourceControlFlowDeps): SourceCont
         const result = await gateway.gitCommit(view.nodeId, view.message.trim())
         if (!result.success) return { tone: 'error', text: result.error }
         patch({ message: '' })
-        return { tone: 'ok', text: 'commit creado' }
+        return { tone: 'ok', text: t('sourceControl.commitCreated') }
       })
     },
     push() {
       if (current.phase !== 'ready' || !current.canPush) return Promise.resolve()
       return run('push', async (view) => {
         await gateway.gitPush(view.nodeId, view.hasUpstream ? {} : { publish: true })
-        return { tone: 'ok', text: view.hasUpstream ? 'push realizado' : 'rama publicada' }
+        return {
+          tone: 'ok',
+          text: view.hasUpstream ? t('sourceControl.pushed') : t('sourceControl.branchPublished')
+        }
       })
     },
     setReviewForm(form) {
@@ -330,7 +336,7 @@ export function createSourceControlFlow(deps: SourceControlFlowDeps): SourceCont
           if (current.canCommit) await this.commit()
           else
             patch({
-              notice: { tone: 'error', text: 'stageá archivos y escribí un mensaje para commitear' }
+              notice: { tone: 'error', text: t('sourceControl.needsStageAndMessage') }
             })
           return
         case 'publish':
@@ -341,12 +347,12 @@ export function createSourceControlFlow(deps: SourceControlFlowDeps): SourceCont
           patch({
             notice: {
               tone: 'error',
-              text: 'la rama está atrás del remoto: hacé pull o rebase en la terminal'
+              text: t('sourceControl.behindRemote')
             }
           })
           return
         case 'authenticate':
-          patch({ notice: { tone: 'error', text: AUTH_REQUIRED_MESSAGE } })
+          patch({ notice: { tone: 'error', text: authRequiredMessage() } })
           return
         case null:
         default:

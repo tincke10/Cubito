@@ -1,5 +1,6 @@
 import type { CompareMergeState } from '../../application/compare-view-model'
 import { createTwoStepButton } from '../hud/two-step-button'
+import { t } from '../../application/i18n/translate'
 
 export type CompareMergeActionModel = {
   /** Hidden until a winner is picked — merge never implies picking one. */
@@ -20,32 +21,24 @@ export type CompareMergeActionHandle = {
   dispose(): void
 }
 
-const IDLE_LABEL = 'mergear ganador'
-const CONFIRM_LABEL = 'confirmar merge'
-const RUNNING_LABEL = 'mergeando…'
-const UNSUPPORTED_LABEL = 'no soportado'
-const CONFLICT_HEADING = 'Conflicto — sin cambios aplicados:'
-const SYNC_LABEL = 'sincronizar el padre'
-
 /** R1: the merge is headless — it moves the parent branch ref but never touches the parent
  *  worktree's working tree, so the merged changes look uncommitted there until synced. */
 const cleanText = (commitOid: string): string =>
-  `Mergeado al padre (${commitOid.slice(0, 7)}). Sincronizá el worktree padre ` +
-  '(reset/checkout) para ver los cambios.'
+  t('compare.mergedClean', { oid: commitOid.slice(0, 7) })
 
 /** v3-2: per-status copy for the opt-in parent working-tree sync outcome. */
 const workingTreeText = (
   workingTree: NonNullable<Extract<CompareMergeState, { phase: 'clean' }>['workingTree']>
 ): string => {
-  if (workingTree.status === 'synced') return 'padre sincronizado.'
-  if (workingTree.status === 'skipped') return 'padre no sincronizado: tiene cambios sin commitear.'
-  return `padre no sincronizado: ${workingTree.message}`
+  if (workingTree.status === 'synced') return t('compare.parentSynced')
+  if (workingTree.status === 'skipped') return t('compare.parentSkipped')
+  return t('compare.parentSyncFailed', { message: workingTree.message })
 }
 
 /** Copy for the background parent setup-hook re-run triggered by changed package manifests. */
 const dependencySetupText = (
   _setup: NonNullable<Extract<CompareMergeState, { phase: 'clean' }>['dependencySetup']>
-): string => 'reinstalando dependencias del padre en segundo plano (setup).'
+): string => t('compare.reinstalling')
 
 /**
  * Compare mode's winner-merge action (Change E) — a real interactive `<button>` (the keyboard-bar
@@ -66,7 +59,7 @@ export function createCompareMergeAction(doc: Document = document): CompareMerge
   syncCheckbox.type = 'checkbox'
   syncCheckbox.className = 'cubito-compare-merge__sync'
   const syncText = doc.createElement('span')
-  syncText.textContent = SYNC_LABEL
+  syncText.textContent = t('compare.syncParent')
   syncRow.appendChild(syncCheckbox)
   syncRow.appendChild(syncText)
 
@@ -106,7 +99,7 @@ export function createCompareMergeAction(doc: Document = document): CompareMerge
       const heading = doc.createElement('div')
       heading.className =
         'compare-merge-action__result-line compare-merge-action__result-line--conflict'
-      heading.textContent = CONFLICT_HEADING
+      heading.textContent = t('compare.conflict')
       result.appendChild(heading)
       const list = doc.createElement('ul')
       list.className = 'compare-merge-action__conflict-list'
@@ -135,9 +128,9 @@ export function createCompareMergeAction(doc: Document = document): CompareMerge
       capable = model.capable
       twoStep.apply({
         labels: {
-          idle: capable ? IDLE_LABEL : UNSUPPORTED_LABEL,
-          confirm: capable ? CONFIRM_LABEL : UNSUPPORTED_LABEL,
-          busy: RUNNING_LABEL
+          idle: capable ? t('compare.merge') : t('compare.mergeUnsupported'),
+          confirm: capable ? t('compare.mergeConfirm') : t('compare.mergeUnsupported'),
+          busy: t('compare.merging')
         },
         busy: model.merge.phase === 'running',
         disabled: !capable

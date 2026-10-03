@@ -1,5 +1,6 @@
 import type { WorktreeId } from '../domain/worktree-graph/types'
 import type { FilePathMatch, RuntimeGateway } from './ports/runtime-gateway'
+import { t } from './i18n/translate'
 
 export type FileQuickOpenGatewayPort = Pick<RuntimeGateway, 'filesSearchPaths'>
 
@@ -72,7 +73,7 @@ export function createFileQuickOpenFlow(deps: FileQuickOpenDeps): FileQuickOpenF
           ...current,
           searching: false,
           rows: [],
-          error: `búsqueda fallida: ${messageOf(error)}`
+          error: t('quickopen.searchFailed', { reason: messageOf(error) })
         })
       }
       return

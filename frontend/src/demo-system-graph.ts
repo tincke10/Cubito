@@ -2,7 +2,7 @@ import { buildSystemGraph } from './domain/system-graph/build-system-graph'
 import type { SystemGraphPort } from './application/ports/system-graph-port'
 
 // Sistema en vivo (design: VistaSistema.dc.html) demo stub — a fixed router->endpoint->service->db
-// chain whose ids match SYSTEM_ARC's beats ('router', 'POST /auth/retry') so the scripted arc
+// chain whose ids match systemArc's beats ('router', 'POST /auth/retry') so the scripted arc
 // (edits/creates/tests the endpoint) engages against real graph nodes. Extracted out of main.ts
 // (max-lines ratchet), mirrors main.ts's own inline `demoRecords` in spirit.
 export const demoSystemGraph: SystemGraphPort = {

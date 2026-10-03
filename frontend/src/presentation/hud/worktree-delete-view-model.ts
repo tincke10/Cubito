@@ -1,3 +1,4 @@
+import { t } from '../../application/i18n/translate'
 import type { WorktreeDeleteView } from '../../application/worktree-delete-flow'
 
 export type WorktreeDeletePanelModel = {
@@ -23,9 +24,6 @@ const HIDDEN: WorktreeDeletePanelModel = {
   cancelDisabled: false
 }
 
-const plural = (count: number, one: string, many: string): string =>
-  `${count} ${count === 1 ? one : many}`
-
 /** Pure projection of the delete flow into panel copy (Spanish, like the rest of the HUD). */
 export function worktreeDeletePanelModel(view: WorktreeDeleteView): WorktreeDeletePanelModel {
   if (view.phase === 'idle') return HIDDEN
@@ -33,40 +31,46 @@ export function worktreeDeletePanelModel(view: WorktreeDeleteView): WorktreeDele
     return {
       ...HIDDEN,
       visible: true,
-      title: `${view.branch} es el worktree principal`,
-      lines: ['El worktree principal del repo no se puede eliminar.']
+      title: t('delete.blockedTitle', { branch: view.branch }),
+      lines: [t('delete.blockedLine')]
     }
   }
   const lines: string[] = []
-  if (view.dirtyFiles === 'loading') lines.push('revisando cambios sin commitear…')
-  else if (view.dirtyFiles === 'unknown')
-    lines.push('no se pudo leer el estado git: puede haber cambios')
+  if (view.dirtyFiles === 'loading') lines.push(t('delete.loading'))
+  else if (view.dirtyFiles === 'unknown') lines.push(t('delete.unknown'))
   else if (view.dirtyFiles > 0)
     lines.push(
-      `${plural(view.dirtyFiles, 'archivo con cambios', 'archivos con cambios')} sin commitear`
+      t(view.dirtyFiles === 1 ? 'delete.dirtyOne' : 'delete.dirtyMany', { count: view.dirtyFiles })
     )
-  else lines.push('sin cambios sin commitear')
+  else lines.push(t('delete.clean'))
   if (view.liveTerminals > 0)
-    lines.push(`${plural(view.liveTerminals, 'terminal viva', 'terminales vivas')} se van a cerrar`)
+    lines.push(
+      t(view.liveTerminals === 1 ? 'delete.terminalsOne' : 'delete.terminalsMany', {
+        count: view.liveTerminals
+      })
+    )
   if (
     view.agentStatus === 'working' ||
     view.agentStatus === 'blocked' ||
     view.agentStatus === 'waiting-input'
   )
-    lines.push(`hay un agente activo (${view.agentStatus})`)
+    lines.push(t('delete.agentActive', { status: view.agentStatus }))
   if (view.children.length > 0)
     lines.push(
-      `tiene ${plural(view.children.length, 'worktree hijo', 'worktrees hijos')}: ${view.children.join(', ')}`
+      t(view.children.length === 1 ? 'delete.childrenOne' : 'delete.childrenMany', {
+        count: view.children.length,
+        names: view.children.join(', ')
+      })
     )
   return {
     visible: true,
-    title: `Eliminar ${view.branch}`,
+    title: t('delete.title', { branch: view.branch }),
     lines,
     error: view.error,
     showAction: true,
     actionLabels: view.forceOffered
-      ? { idle: 'forzar eliminación', confirm: 'confirmar forzar', busy: 'eliminando…' }
-      : { idle: 'eliminar', confirm: 'confirmar eliminación', busy: 'eliminando…' },
+      ? { idle: t('delete.force'), confirm: t('delete.confirmForce'), busy: t('delete.busy') }
+      : { idle: t('delete.action'), confirm: t('delete.confirm'), busy: t('delete.busy') },
     busy: view.removing,
     cancelDisabled: view.removing
   }

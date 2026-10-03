@@ -1,7 +1,7 @@
 import { cubeNameFor } from './fan-out-model'
 import type { FanOutSlice } from './fan-out-model'
+import { t } from './i18n/translate'
 
-const FANOUT_CHILD_FAILURE_FALLBACK_MESSAGE = 'no se pudo crear el cubo'
 const FANOUT_CHILD_FAILURE_SUMMARY_MAX_LENGTH = 160
 const FATAL_LINE_PATTERN = /^(fatal|error):/i
 
@@ -13,7 +13,7 @@ export function summarizeChildFailure(message: string): string {
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line.length > 0)
-  if (lines.length === 0) return FANOUT_CHILD_FAILURE_FALLBACK_MESSAGE
+  if (lines.length === 0) return t('fanout.childFailureFallback')
   const fatalLines = lines.filter((line) => FATAL_LINE_PATTERN.test(line))
   const chosen = fatalLines.length > 0 ? fatalLines[fatalLines.length - 1]! : lines[0]!
   return chosen.length > FANOUT_CHILD_FAILURE_SUMMARY_MAX_LENGTH

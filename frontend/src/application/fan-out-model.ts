@@ -14,6 +14,7 @@ import {
   withQuestions,
   type DecisionVisibility
 } from './fan-out-decision-visibility'
+import { t } from './i18n/translate'
 
 export const MIN_FANOUT = 2
 export const MAX_FANOUT = 8
@@ -191,21 +192,21 @@ function openForm(slice: FanOutSlice, parentId: WorktreeId): FanOutSlice {
   }
 }
 
-export const FANOUT_PROMPT_REQUIRED_MESSAGE = 'escribí qué tiene que hacer la camada'
-export const FANOUT_REPO_UNRESOLVED_MESSAGE = 'repositorio aún no resuelto'
+export const fanOutPromptRequiredMessage = (): string => t('fanout.promptRequired')
+export const fanOutRepoUnresolvedMessage = (): string => t('fanout.repoUnresolved')
 
 /** Why a submit can't proceed (form view only), or null. Shared by the reducer and the
  *  controller's pre-flight so the batch never starts on a form the reducer would reject. */
 export function fanOutSubmitBlocker(slice: FanOutSlice): string | null {
   if (slice.view !== 'form') return null
   if (slice.fields.count < MIN_FANOUT || slice.fields.count > MAX_FANOUT) {
-    return `la camada tiene entre ${MIN_FANOUT} y ${MAX_FANOUT} cubos`
+    return t('fanout.countRange', { min: MIN_FANOUT, max: MAX_FANOUT })
   }
-  if (slice.repoSelector === null) return FANOUT_REPO_UNRESOLVED_MESSAGE
+  if (slice.repoSelector === null) return fanOutRepoUnresolvedMessage()
   // Why: with an agent, the prompt IS the workers' task spec — a blank one used to ship the
   // placeholder "Camada de N cubos", and lease workers got dispatched with nothing to do.
   if (slice.fields.agent !== 'none' && slice.fields.prompt.trim() === '') {
-    return FANOUT_PROMPT_REQUIRED_MESSAGE
+    return fanOutPromptRequiredMessage()
   }
   return null
 }
@@ -215,7 +216,7 @@ function startSubmit(slice: FanOutSlice, mutationIds: readonly string[]): FanOut
   const blocker = fanOutSubmitBlocker(slice)
   // The explicit null re-check only narrows repoSelector for TS; the blocker already rejects it.
   if (blocker !== null || slice.repoSelector === null) {
-    return { ...slice, errorMessage: blocker ?? FANOUT_REPO_UNRESOLVED_MESSAGE }
+    return { ...slice, errorMessage: blocker ?? fanOutRepoUnresolvedMessage() }
   }
   const batch: FanOutBatchEntry[] = mutationIds.map((mutationId) => ({
     mutationId,

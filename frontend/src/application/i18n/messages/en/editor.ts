@@ -1,0 +1,23 @@
+export const enEditor = {
+  'editor.badgeTruncated': 'truncated, read-only',
+  'editor.badgeBinary': 'binary, read-only',
+  'editor.conflictChanged': 'the file changed on disk since you opened it',
+  'editor.conflictUnverifiable': 'could not verify the file on disk',
+  'editor.loading': 'loading…',
+  'editor.binaryNotice': 'binary file: cannot be displayed',
+  'editor.reload': 'reload',
+  'editor.reloadConfirm': 'confirm reload (you lose your changes)',
+  'editor.reloadBusy': 'reloading…',
+  'editor.overwrite': 'overwrite',
+  'editor.overwriteConfirm': 'confirm overwrite',
+  'editor.overwriteBusy': 'saving…',
+  'editor.discardMessage': 'you have unsaved changes',
+  'editor.discard': 'discard changes',
+  'editor.discardConfirm': 'confirm discard',
+  'editor.saveFailed': 'could not save: {reason}',
+  'editor.saved': 'saved',
+  'editor.unsavedMark': 'unsaved changes',
+  'editor.save': 'save',
+  'editor.close': 'close',
+  'editor.keepEditing': 'keep editing'
+} as const

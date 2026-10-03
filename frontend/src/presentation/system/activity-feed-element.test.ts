@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { setActiveLanguage } from '../../application/i18n/translate'
 import { createActivityFeed } from './activity-feed-element'
 import type { ActivityFeedRowView } from './activity-feed-model'
 
@@ -54,11 +55,23 @@ const row = (
 })
 
 describe('createActivityFeed', () => {
+  afterEach(() => setActiveLanguage('es'))
+
   it('renders the static title and footer label on construction', () => {
     const feed = createActivityFeed(createFakeDocument())
     const root = rootOf(feed)
     expect(headerOf(root).children[0]!.textContent).toBe('actividad del agente')
     expect(footerOf(root).children[1]!.textContent).toBe('escribiendo …')
+  })
+
+  it('renders the English title, footer and empty placeholder when the language is en', () => {
+    setActiveLanguage('en')
+    const feed = createActivityFeed(createFakeDocument())
+    const root = rootOf(feed)
+    feed.apply([])
+    expect(headerOf(root).children[0]!.textContent).toBe('agent activity')
+    expect(footerOf(root).children[1]!.textContent).toBe('typing …')
+    expect(placeholderOf(root).textContent).toBe('no activity yet')
   })
 
   it('apply() renders one row per entry, in order', () => {

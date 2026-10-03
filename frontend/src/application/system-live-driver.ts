@@ -1,6 +1,7 @@
 import type { SceneStore } from './scene-store'
 import type { SystemViewAction } from './system-view-model'
 import type { SystemGraphPort } from './ports/system-graph-port'
+import { t } from './i18n/translate'
 
 export type SystemArcBeat = { delayMs: number; actions: readonly SystemViewAction[] }
 
@@ -8,13 +9,13 @@ export type SystemArcBeat = { delayMs: number; actions: readonly SystemViewActio
  * Scripted demo arc for the "sistema en vivo" mockup — node ids/labels match the seed graph
  * a `SystemGraphPort` implementation is expected to return for the focused node.
  */
-export const SYSTEM_ARC: readonly SystemArcBeat[] = [
+export const systemArc = (): readonly SystemArcBeat[] => [
   {
     delayMs: 900,
     actions: [
       {
         type: 'append-feed',
-        row: { id: 'feed-1', time: '10:32', kind: 'read', text: 'leyó src/routes/auth.ts' }
+        row: { id: 'feed-1', time: '10:32', kind: 'read', text: t('system.demoReadAuthRoute') }
       }
     ]
   },
@@ -27,7 +28,7 @@ export const SYSTEM_ARC: readonly SystemArcBeat[] = [
           id: 'feed-2',
           time: '10:32',
           kind: 'read',
-          text: 'leyó src/services/auth.service.ts'
+          text: t('system.demoReadAuthService')
         }
       }
     ]
@@ -55,7 +56,7 @@ export const SYSTEM_ARC: readonly SystemArcBeat[] = [
           id: 'feed-3',
           time: '10:33',
           kind: 'edit',
-          text: 'editando POST /auth/retry',
+          text: t('system.demoEditing'),
           highlighted: true
         }
       }
@@ -75,7 +76,7 @@ export const SYSTEM_ARC: readonly SystemArcBeat[] = [
             method: 'POST',
             state: 'naciendo',
             diff: { added: 21, removed: 0 },
-            note: 'creado por claude'
+            note: t('system.demoNote')
           }
         }
       },
@@ -89,7 +90,7 @@ export const SYSTEM_ARC: readonly SystemArcBeat[] = [
           id: 'feed-4',
           time: '10:34',
           kind: 'create',
-          text: 'nuevo endpoint POST /auth/refresh'
+          text: t('system.demoNewEndpoint')
         }
       }
     ]
@@ -99,7 +100,7 @@ export const SYSTEM_ARC: readonly SystemArcBeat[] = [
     actions: [
       {
         type: 'append-feed',
-        row: { id: 'feed-5', time: '10:35', kind: 'run', text: 'corrió pnpm test auth.retry' }
+        row: { id: 'feed-5', time: '10:35', kind: 'run', text: t('system.demoRan') }
       }
     ]
   },
@@ -108,7 +109,7 @@ export const SYSTEM_ARC: readonly SystemArcBeat[] = [
     actions: [
       {
         type: 'append-feed',
-        row: { id: 'feed-6', time: '10:35', kind: 'pass', text: '✓ 8/8 tests verdes' }
+        row: { id: 'feed-6', time: '10:35', kind: 'pass', text: t('system.demoTestsPass') }
       },
       {
         type: 'apply-delta',
@@ -121,7 +122,7 @@ export const SYSTEM_ARC: readonly SystemArcBeat[] = [
     actions: [
       {
         type: 'append-feed',
-        row: { id: 'feed-7', time: '10:36', kind: 'diff', text: 'Δ +73 −14 contra main' }
+        row: { id: 'feed-7', time: '10:36', kind: 'diff', text: t('system.demoDiff') }
       }
     ]
   }
@@ -137,7 +138,7 @@ export type SystemLiveDriverDeps = {
 export type SystemLiveDriver = { start(nodeId: string): void; stop(): void }
 
 /**
- * Opens the system view, seeds its graph from the port, then plays `SYSTEM_ARC` beat-by-beat on
+ * Opens the system view, seeds its graph from the port, then plays `systemArc()` beat-by-beat on
  * a chained-`setTimeout` loop (never `setInterval`, mirroring live-worktree-sync.ts). `stop()`
  * only halts the timer — dispatching `close` is the owning controller's call, not this driver's.
  */
@@ -162,7 +163,7 @@ export function createSystemLiveDriver(deps: SystemLiveDriverDeps): SystemLiveDr
 
   function playBeat(index: number): void {
     if (stopped) return
-    const beat = SYSTEM_ARC[index]
+    const beat = systemArc()[index]
     if (!beat) return // arc finished — no further scheduling
     timerHandle = setTimer(() => {
       timerHandle = null

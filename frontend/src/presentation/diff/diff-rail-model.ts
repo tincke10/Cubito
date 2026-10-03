@@ -1,5 +1,6 @@
 import type { DiffFileRow } from '../../application/diff-view-model'
 import type { StageState } from '../../application/source-control-flow'
+import { t } from '../../application/i18n/translate'
 
 export type DiffRailStage = { state: StageState; glyph: string; label: string }
 
@@ -26,17 +27,17 @@ const HAS_WORKING_COMPONENT = new Set(['working', 'both'])
 const railCssClass = (status: string, selected: boolean, hasWorkingComponent: boolean): string =>
   `diff-rail__row diff-rail__row--${status}${hasWorkingComponent ? ' diff-rail__row--wt' : ''}${selected ? ' diff-rail__row--selected' : ''}`
 
-const STAGE_PRESENTATION: Record<StageState, { glyph: string; label: string }> = {
-  staged: { glyph: '●', label: 'quitar del stage' },
-  partial: { glyph: '◐', label: 'stagear el resto' },
-  unstaged: { glyph: '○', label: 'stagear' }
+const stagePresentation = (state: StageState): { glyph: string; label: string } => {
+  if (state === 'staged') return { glyph: '●', label: t('diff.unstage') }
+  if (state === 'partial') return { glyph: '◐', label: t('diff.stageRest') }
+  return { glyph: '○', label: t('diff.stage') }
 }
 
 const originTextFor = (file: DiffFileRow): string | undefined =>
   file.origin !== undefined && HAS_WORKING_COMPONENT.has(file.origin)
     ? NACIENDO_STATUSES.has(file.status)
-      ? 'naciendo'
-      : 'sin commitear'
+      ? t('diff.originBorn')
+      : t('diff.originUncommitted')
     : undefined
 
 /** Pure projection of the diff rail's file list, selection-aware. No DOM. */
@@ -60,7 +61,7 @@ export function diffRailViewModel(
       ...(originText === undefined ? {} : { originText }),
       ...(stageState === undefined
         ? {}
-        : { stage: { state: stageState, ...STAGE_PRESENTATION[stageState] } })
+        : { stage: { state: stageState, ...stagePresentation(stageState) } })
     }
   })
 }

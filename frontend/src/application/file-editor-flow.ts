@@ -1,5 +1,6 @@
 import type { WorktreeId } from '../domain/worktree-graph/types'
 import type { FileStamp, RuntimeGateway } from './ports/runtime-gateway'
+import { t } from './i18n/translate'
 
 export type FileEditorGatewayPort = Pick<RuntimeGateway, 'filesRead' | 'filesStat' | 'filesWrite'>
 
@@ -118,12 +119,12 @@ export function createFileEditorFlow(deps: FileEditorDeps): FileEditorFlow {
         ? gateway.filesWrite(nodeId, path, content, hostId)
         : gateway.filesWrite(nodeId, path, content))
     } catch (error) {
-      patch({ saving: false, error: `no se pudo guardar: ${messageOf(error)}` })
+      patch({ saving: false, error: t('editor.saveFailed', { reason: messageOf(error) }) })
       return
     }
     baseline = await stampOrNull(nodeId, path)
     savedContent = content
-    patch({ saving: false, notice: 'guardado', conflict: null })
+    patch({ saving: false, notice: t('editor.saved'), conflict: null })
     deps.onSaved(nodeId, path)
   }
 
