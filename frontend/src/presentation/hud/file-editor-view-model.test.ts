@@ -85,7 +85,7 @@ describe('fileEditorPanelModel', () => {
     const model = fileEditorPanelModel(view({ dirty: true, conflict: { reason: 'changed' } }))
     expect(model.conflict).toMatchObject({
       message: 'el archivo cambió en disco desde que lo abriste',
-      reload: { idle: 'recargar', confirm: 'confirmar recargar (pierdes tus cambios)' },
+      reload: { idle: 'recargar', confirm: 'confirmar recargar (perdés tus cambios)' },
       overwrite: { idle: 'sobrescribir', confirm: 'confirmar sobrescribir' },
       busy: false
     })

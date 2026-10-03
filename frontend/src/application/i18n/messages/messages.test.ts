@@ -26,6 +26,12 @@ describe('dictionaries', () => {
     }
   })
 
+  it('es uses voseo, never tuteo imperatives or conjugations', () => {
+    const tuteo =
+      /\b(escribe|elige|configura|exporta|abre|usa|pulsa|selecciona|puedes|tienes|pierdes|vuelve)\b/i
+    for (const [key, value] of Object.entries(es)) expect(value, key).not.toMatch(tuteo)
+  })
+
   it('es keeps the same {placeholders} as en for every key', () => {
     for (const key of Object.keys(en) as (keyof typeof en)[]) {
       expect(placeholders(es[key]), key).toEqual(placeholders(en[key]))

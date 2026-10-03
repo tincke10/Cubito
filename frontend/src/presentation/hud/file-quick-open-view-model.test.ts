@@ -23,7 +23,7 @@ describe('fileQuickOpenPanelModel', () => {
   it('hints at what to type when there is no query', () => {
     expect(fileQuickOpenPanelModel(view())).toMatchObject({
       visible: true,
-      statusText: 'escribe parte del nombre o de la ruta'
+      statusText: 'escribí parte del nombre o de la ruta'
     })
   })
 

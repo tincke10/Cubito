@@ -8,7 +8,7 @@ export const esEditor: Record<keyof typeof enEditor, string> = {
   'editor.loading': 'cargando…',
   'editor.binaryNotice': 'archivo binario: no se puede mostrar',
   'editor.reload': 'recargar',
-  'editor.reloadConfirm': 'confirmar recargar (pierdes tus cambios)',
+  'editor.reloadConfirm': 'confirmar recargar (perdés tus cambios)',
   'editor.reloadBusy': 'recargando…',
   'editor.overwrite': 'sobrescribir',
   'editor.overwriteConfirm': 'confirmar sobrescribir',

@@ -9,6 +9,7 @@ import {
   connectionFailureReason,
   pairingRejectionReason
 } from '../../application/connection-reason'
+import { decidePairingEntry } from '../../application/pairing-entry-decision'
 import { setActiveLanguage } from '../../application/i18n/translate'
 import { emptyWorktreeGraph } from '../../domain/worktree-graph/types'
 import { emptyTerminalsState } from '../../application/terminal-session-model'
@@ -201,8 +202,10 @@ describe('command palette, banner and connection reasons in English', () => {
   })
 
   it('shows the demo banner and failure reasons in English', () => {
-    expect(demoBannerText('demo mode')).toBe(
-      'DEMO MODE — sample data, not connected to orcad (demo mode). Open the pairing URL to connect.'
+    setActiveLanguage('en')
+    expect(decidePairingEntry(null)).toEqual({ kind: 'demo', reason: 'no pairing URL' })
+    expect(demoBannerText('no pairing URL')).toBe(
+      'DEMO MODE — sample data, not connected to orcad (no pairing URL). Open the pairing URL to connect.'
     )
     expect(pairingRejectionReason('too_long')).toBe('invalid pairing code')
     expect(connectionFailureReason('unauthorized')).toBe('orcad rejected the token')

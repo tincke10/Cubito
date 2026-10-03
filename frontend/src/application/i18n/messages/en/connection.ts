@@ -6,7 +6,7 @@ export const enConnection = {
   'connection.unresponsive': 'orcad is not responding',
   'connection.invalidResponse': 'invalid response from orcad',
   'connection.notConnected': 'not connected',
-  'connection.demoMode': 'demo mode',
+  'connection.demoMode': 'no pairing URL',
   'connection.demoBanner':
     'DEMO MODE — sample data, not connected to orcad ({reason}). Open the pairing URL to connect.'
 } as const

@@ -8,7 +8,7 @@ export const esConnection: Record<keyof typeof enConnection, string> = {
   'connection.unresponsive': 'orcad no responde',
   'connection.invalidResponse': 'respuesta inválida de orcad',
   'connection.notConnected': 'sin conexión',
-  'connection.demoMode': 'modo demo',
+  'connection.demoMode': 'sin URL de pairing',
   'connection.demoBanner':
     'MODO DEMO — datos de ejemplo, sin conexión a orcad ({reason}). Abrí la URL de pairing para conectar.'
 }

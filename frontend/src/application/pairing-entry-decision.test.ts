@@ -17,7 +17,7 @@ const validOfferShape = {
 
 describe('decidePairingEntry', () => {
   it('falls back to demo mode when there is no pairing fragment', () => {
-    expect(decidePairingEntry(null)).toEqual({ kind: 'demo', reason: 'modo demo' })
+    expect(decidePairingEntry(null)).toEqual({ kind: 'demo', reason: 'sin URL de pairing' })
   })
 
   it('connects when the fragment carries a valid offer', () => {
