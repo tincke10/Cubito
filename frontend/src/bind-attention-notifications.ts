@@ -1,5 +1,6 @@
 import { createAttentionNotificationController } from './application/attention-notification-controller'
 import type { LiveSyncConnection } from './application/live-worktree-sync'
+import { localizeAttentionNotification } from './application/attention-notification-copy'
 import type { AttentionNotification } from './application/ports/attention-notification-port'
 
 export type AttentionNotificationBinder = { bind(connection: LiveSyncConnection): void }
@@ -11,8 +12,10 @@ export function createAttentionNotificationBinder(sinks: {
 }): AttentionNotificationBinder {
   const controller = createAttentionNotificationController({
     show: (notification) => {
-      sinks.toast(notification)
-      sinks.os(notification)
+      // Why: both sinks render the title, so localize once before fanning out.
+      const localized = localizeAttentionNotification(notification)
+      sinks.toast(localized)
+      sinks.os(localized)
     }
   })
   return {

@@ -48,4 +48,16 @@ describe('attention notification binder', () => {
     const binder = createAttentionNotificationBinder({ toast: vi.fn(), os: vi.fn() })
     expect(() => binder.bind({} as LiveSyncConnection)).not.toThrow()
   })
+
+  it('hands both sinks the title localized from agentState, body untouched', () => {
+    const toast = vi.fn()
+    const os = vi.fn()
+    const binder = createAttentionNotificationBinder({ toast, os })
+    const fake = fakePort()
+    binder.bind({ attentionNotifications: fake.port } as unknown as LiveSyncConnection)
+    fake.push({ ...note, title: 'wt - Claude needs input', body: 'Pick a branch' })
+    const expected = { ...note, title: 'wt - Claude necesita tu respuesta', body: 'Pick a branch' }
+    expect(toast).toHaveBeenCalledWith(expected)
+    expect(os).toHaveBeenCalledWith(expected)
+  })
 })
