@@ -4,6 +4,25 @@ All notable changes to Cubito are documented here. The format follows [Keep a Ch
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-05
+
+### Added
+
+- English and Spanish UI. English is the default; a browser set to Spanish opens in Spanish, and the command palette (`Cmd/Ctrl+K`) switches language, remembered per browser.
+- Agent attention notifications are worded in the active language.
+
+### Fixed
+
+- Count-based labels pluralize correctly (no more "1 agentes activos").
+- The agent selector in the spawn and fan-out forms shows a localized "none".
+- The diff view's review button is no longer covered by the keyboard bar on short windows.
+- The demo-mode banner no longer repeats "demo mode".
+- Spanish copy uses one register (voseo) throughout.
+
+### Security
+
+- `.env` and `.env.*` are excluded from the Docker build context, so local tokens cannot end up in an image layer.
+
 ## [0.1.0] - 2026-10-01
 
 First public release: a spatial frontend over ORCA's headless engine, published as the multi-arch image `ghcr.io/tincke10/cubito` (amd64, arm64) plus a macOS install from source.
@@ -30,5 +49,6 @@ First public release: a spatial frontend over ORCA's headless engine, published 
 - The published port binds `127.0.0.1` only.
 - Egress audited: no contact with Orca cloud services, no analytics, no updater; `glab` answers offline when unconfigured, the push gateway is not started, and Claude Code's auto-updater is disabled in the image.
 
-[Unreleased]: https://github.com/tincke10/Cubito/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/tincke10/Cubito/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/tincke10/Cubito/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/tincke10/Cubito/releases/tag/v0.1.0
