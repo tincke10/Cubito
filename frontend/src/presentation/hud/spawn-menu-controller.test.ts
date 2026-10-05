@@ -354,7 +354,7 @@ describe('createSpawnMenuController', () => {
 
     expect(dispatch).toHaveBeenCalledWith({
       type: 'submit-error',
-      message: 'no se pudo crear el worktree\u001fconexión perdida'
+      message: { lead: 'no se pudo crear el worktree', detail: 'conexión perdida' }
     })
     expect(refetch).not.toHaveBeenCalled()
   })
@@ -369,7 +369,10 @@ describe('createSpawnMenuController', () => {
     await flush()
 
     expect(gateway.createWorktree).not.toHaveBeenCalled()
-    expect(dispatch).toHaveBeenCalledWith({ type: 'submit-error', message: expect.any(String) })
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'submit-error',
+      message: { lead: expect.any(String), detail: null }
+    })
   })
 
   it('positions the radial menu object from nodeCenter on tick()', () => {

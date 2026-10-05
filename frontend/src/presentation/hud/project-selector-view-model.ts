@@ -1,4 +1,6 @@
 import { t } from '../../application/i18n/translate'
+import { plainFailure } from '../../application/i18n/user-facing-error'
+import type { FailureMessage } from '../../application/i18n/user-facing-error'
 import type { ProjectSelectorSlice, RepoKind } from '../../application/project-selector-model'
 import type { ReposSlice } from '../../application/repos-model'
 import type { RepoSummary } from '../../application/ports/runtime-gateway'
@@ -25,7 +27,7 @@ export type ProjectSelectorAddFormViewModel = {
   readonly setup: string
   readonly submitLabel: string
   readonly submitEnabled: boolean
-  readonly errorMessage: string | null
+  readonly errorMessage: FailureMessage | null
 }
 
 export type ProjectSelectorViewModel =
@@ -61,7 +63,8 @@ export function projectSelectorViewModel(
       setup: slice.setup ?? '',
       submitLabel: submitting ? t('projects.submitting') : t('projects.submit'),
       submitEnabled: slice.path.trim() !== '' && !submitting,
-      errorMessage: slice.status === 'error' ? (slice.errorMessage ?? t('failure.unknown')) : null
+      errorMessage:
+        slice.status === 'error' ? (slice.errorMessage ?? plainFailure(t('failure.unknown'))) : null
     }
   }
   const filtered = repos.list.filter((repo) => matchesQuery(repo, slice.query))

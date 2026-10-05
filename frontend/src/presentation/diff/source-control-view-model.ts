@@ -1,4 +1,8 @@
-import type { ReviewResult, SourceControlView } from '../../application/source-control-flow'
+import type {
+  ReviewResult,
+  SourceControlNotice,
+  SourceControlView
+} from '../../application/source-control-flow'
 import {
   blockedReasonText,
   reviewPrimaryAction
@@ -27,7 +31,7 @@ export type SourceControlModel = {
   pushLabel: string
   pushDisabled: boolean
   messageDisabled: boolean
-  notice: { tone: 'ok' | 'error'; text: string } | null
+  notice: SourceControlNotice | null
   review: ReviewModel | null
 }
 

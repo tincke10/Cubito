@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { joinFailure } from '../application/i18n/user-facing-error'
+import { plainFailure } from '../application/i18n/user-facing-error'
 import { renderFailureText } from './failure-text-element'
 
 type Node = {
@@ -28,18 +28,14 @@ const doc = { createElement: (tag: string) => node(tag) } as unknown as Document
 describe('renderFailureText', () => {
   it('writes a lone lead as plain text', () => {
     const el = node()
-    renderFailureText(doc, el as unknown as HTMLElement, 'no se pudo')
+    renderFailureText(doc, el as unknown as HTMLElement, plainFailure('no se pudo'))
     expect(el.textContent).toBe('no se pudo')
     expect(el.children).toEqual([])
   })
 
   it('puts the lead in the element and the engine detail in a muted child', () => {
     const el = node()
-    renderFailureText(
-      doc,
-      el as unknown as HTMLElement,
-      joinFailure({ lead: 'no se pudo', detail: 'fatal: x' })
-    )
+    renderFailureText(doc, el as unknown as HTMLElement, { lead: 'no se pudo', detail: 'fatal: x' })
     expect(el.textContent).toBe('no se pudo')
     expect(el.children).toHaveLength(1)
     expect(el.children[0]).toMatchObject({
@@ -50,12 +46,7 @@ describe('renderFailureText', () => {
 
   it('prepends the prefix to the lead and replaces the previous detail', () => {
     const el = node()
-    renderFailureText(
-      doc,
-      el as unknown as HTMLElement,
-      joinFailure({ lead: 'a', detail: 'b' }),
-      'p · '
-    )
+    renderFailureText(doc, el as unknown as HTMLElement, { lead: 'a', detail: 'b' }, 'p · ')
     expect(el.textContent).toBe('p · a')
   })
 })

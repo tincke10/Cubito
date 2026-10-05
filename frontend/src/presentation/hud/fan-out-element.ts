@@ -158,7 +158,7 @@ export function createFanOutForm(doc: Document = document): FanOutFormHandle {
         promptArea.value = model.prompt.value
         promptArea.disabled = !model.prompt.enabled
         submitButton.disabled = !model.submitEnabled
-        renderFailureText(doc, errorLine, model.errorMessage ?? '')
+        renderFailureText(doc, errorLine, model.errorMessage)
         errorLine.style.display = model.errorMessage === null ? 'none' : ''
         setupNotice.textContent = model.setupHint ?? ''
         setupNotice.style.display = model.setupHint === null ? 'none' : ''

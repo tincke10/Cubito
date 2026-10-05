@@ -2,6 +2,7 @@ import type { WorktreeId } from '../domain/worktree-graph/types'
 import type { DiffFileRow, DiffPanelState, DiffRailStatus } from './diff-view-model'
 import { toPanelState } from './diff-view-model'
 import type { DiffFileContent } from './ports/runtime-gateway'
+import type { FailureMessage } from './i18n/user-facing-error'
 
 /** Split out of compare-view-model.ts (max-lines) — one litter child's diff-shaped load. Reuses
  *  diff mode's types verbatim; keyed by childId at the compareView reducer's call site, so this
@@ -9,7 +10,7 @@ import type { DiffFileContent } from './ports/runtime-gateway'
 export type CompareChildLoad = {
   baseRef: string
   status: DiffRailStatus
-  errorMessage?: string
+  errorMessage?: FailureMessage
   compare: { headOid: string; mergeBase: string } | null
   files: readonly DiffFileRow[]
   selectedPath: string | null
@@ -33,9 +34,9 @@ export type CompareChildLoadAction =
       compare: { headOid: string; mergeBase: string }
       files: readonly DiffFileRow[]
     }
-  | { type: 'child-rail-error'; childId: WorktreeId; message?: string }
+  | { type: 'child-rail-error'; childId: WorktreeId; message?: FailureMessage }
   | { type: 'child-panel-loaded'; childId: WorktreeId; path: string; content: DiffFileContent }
-  | { type: 'child-panel-error'; childId: WorktreeId; path: string; message?: string }
+  | { type: 'child-panel-error'; childId: WorktreeId; path: string; message?: FailureMessage }
 
 export function reduceCompareChildLoad(
   load: CompareChildLoad,

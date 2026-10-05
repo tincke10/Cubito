@@ -15,6 +15,8 @@ import {
   type DecisionVisibility
 } from './fan-out-decision-visibility'
 import { t } from './i18n/translate'
+import { plainFailure } from './i18n/user-facing-error'
+import type { FailureMessage } from './i18n/user-facing-error'
 
 export const MIN_FANOUT = 2
 export const MAX_FANOUT = 8
@@ -38,7 +40,7 @@ export type FanOutBatchEntry = {
   dispatchId: string | null
   taskId: string | null
   /** Present only when the failing call reported a real message (`child-failed`'s `message`). */
-  errorMessage?: string
+  errorMessage?: FailureMessage
 }
 
 /** closed → form (anchored to a node) → running (batch in flight) → closed. */
@@ -49,7 +51,7 @@ export type FanOutSlice =
       parentId: WorktreeId
       fields: FanOutFormFields
       repoSelector: string | null
-      errorMessage?: string
+      errorMessage?: FailureMessage
     }
   | {
       view: 'running'
@@ -74,9 +76,9 @@ export type FanOutAction =
   | { type: 'update-prompt'; prompt: string }
   | { type: 'set-repo-selector'; repoSelector: string }
   | { type: 'submit'; mutationIds: readonly string[] }
-  | { type: 'form-error'; message: string }
+  | { type: 'form-error'; message: FailureMessage }
   | { type: 'child-created'; mutationId: string; worktreeId: WorktreeId }
-  | { type: 'child-failed'; mutationId: string; message?: string }
+  | { type: 'child-failed'; mutationId: string; message?: FailureMessage }
   | { type: 'member-status'; worktreeId: WorktreeId; status: AgentStatus }
   | { type: 'run-created'; runId: string }
   | { type: 'child-dispatched'; mutationId: string; dispatchId: string; taskId: string }
@@ -127,7 +129,7 @@ export function reduceFanOut(slice: FanOutSlice, action: FanOutAction): FanOutSl
             batch: withEntry(slice.batch, action.mutationId, (e) => ({
               ...e,
               failed: true,
-              ...(action.message ? { errorMessage: action.message } : {})
+              ...(action.message === undefined ? {} : { errorMessage: action.message })
             }))
           }
         : slice
@@ -216,7 +218,7 @@ function startSubmit(slice: FanOutSlice, mutationIds: readonly string[]): FanOut
   const blocker = fanOutSubmitBlocker(slice)
   // The explicit null re-check only narrows repoSelector for TS; the blocker already rejects it.
   if (blocker !== null || slice.repoSelector === null) {
-    return { ...slice, errorMessage: blocker ?? fanOutRepoUnresolvedMessage() }
+    return { ...slice, errorMessage: plainFailure(blocker ?? fanOutRepoUnresolvedMessage()) }
   }
   const batch: FanOutBatchEntry[] = mutationIds.map((mutationId) => ({
     mutationId,

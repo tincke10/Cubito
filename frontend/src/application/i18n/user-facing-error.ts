@@ -2,7 +2,10 @@ import type { MessageKey } from './messages/en'
 import { t } from './translate'
 
 /** Localized "what failed" plus the engine's own message, never translated (searchable). */
-export type UserFacingError = { lead: string; detail: string | null }
+export type FailureMessage = { lead: string; detail: string | null }
+
+/** A failure with no engine detail (our own copy). */
+export const plainFailure = (lead: string): FailureMessage => ({ lead, detail: null })
 
 export type FailureAction = MessageKey extends infer K
   ? K extends `failure.action.${infer A}`
@@ -41,25 +44,9 @@ export function describeFailure(
   action: FailureAction,
   error: unknown,
   code?: string
-): UserFacingError {
+): FailureMessage {
   const codeKey = CODE_LEADS[code ?? codeOf(error) ?? '']
   const lead = t(codeKey ?? `failure.action.${action}`)
   const detail = messageOf(error).trim()
   return { lead, detail: detail === '' || detail === lead ? null : detail }
 }
-
-// Why: lets existing `string` view-model fields carry both lines; git stderr may hold any newline.
-const SEPARATOR = '\u001f'
-
-export const joinFailure = ({ lead, detail }: UserFacingError): string =>
-  detail === null ? lead : `${lead}${SEPARATOR}${detail}`
-
-export function splitFailureText(text: string): UserFacingError {
-  const at = text.indexOf(SEPARATOR)
-  return at === -1
-    ? { lead: text, detail: null }
-    : { lead: text.slice(0, at), detail: text.slice(at + 1) }
-}
-
-export const failureText = (action: FailureAction, error: unknown, code?: string): string =>
-  joinFailure(describeFailure(action, error, code))

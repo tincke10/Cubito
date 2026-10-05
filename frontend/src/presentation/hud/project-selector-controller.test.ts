@@ -1,3 +1,4 @@
+import { plainFailure } from '../../application/i18n/user-facing-error'
 import { describe, expect, it, vi } from 'vitest'
 import { createProjectSelectorController } from './project-selector-controller'
 import { repoSetupSaved } from '../../application/repo-setup-saved'
@@ -186,7 +187,7 @@ describe('createProjectSelectorController — repo setup', () => {
       repoName: 'A',
       command: 'pnpm install',
       sharedCommand: null,
-      message: ''
+      message: null
     })
   })
 
@@ -235,7 +236,7 @@ describe('createProjectSelectorController — repo setup', () => {
       repoName: 'A',
       command: 'pnpm install',
       sharedCommand: null,
-      message: 'guardado'
+      message: plainFailure('guardado')
     })
   })
 
@@ -258,7 +259,9 @@ describe('createProjectSelectorController — repo setup', () => {
     selectors[0]!.emitSetupSave('x')
     await flush()
     expect(selectors[0]!.applySetup).toHaveBeenLastCalledWith(
-      expect.objectContaining({ message: expect.stringContaining('boom') })
+      expect.objectContaining({
+        message: { lead: 'no se pudo guardar el setup', detail: 'boom' }
+      })
     )
   })
 
@@ -288,7 +291,7 @@ describe('createProjectSelectorController — repo setup', () => {
     expect(refetch).toHaveBeenCalledOnce()
     expect(dispatch).toHaveBeenCalledWith({
       type: 'submit-add-error',
-      message: 'repo agregado, pero no se guardó el setup\u001fboom'
+      message: { lead: 'repo agregado, pero no se guardó el setup', detail: 'boom' }
     })
     expect(dispatch).not.toHaveBeenCalledWith({ type: 'submit-add-ok' })
   })
@@ -446,7 +449,7 @@ describe('createProjectSelectorController', () => {
 
     expect(dispatch).toHaveBeenCalledWith({
       type: 'submit-add-error',
-      message: 'no se pudo agregar el proyecto\u001fno es un repo git'
+      message: { lead: 'no se pudo agregar el proyecto', detail: 'no es un repo git' }
     })
     expect(refetch).not.toHaveBeenCalled()
     expect(reposDispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'set-active' }))

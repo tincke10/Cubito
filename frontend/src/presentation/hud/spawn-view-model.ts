@@ -1,4 +1,6 @@
 import { t } from '../../application/i18n/translate'
+import { plainFailure } from '../../application/i18n/user-facing-error'
+import type { FailureMessage } from '../../application/i18n/user-facing-error'
 import type { SpawnMenuSlice } from '../../application/spawn-menu-model'
 import type { SpawnAgent } from '../../application/ports/runtime-gateway'
 import type { WorktreeGraph } from '../../domain/worktree-graph/types'
@@ -32,7 +34,7 @@ export type SpawnFormViewModel = {
   readonly prompt: SpawnFieldViewModel
   readonly submitLabel: string
   readonly submitEnabled: boolean
-  readonly errorMessage: string | null
+  readonly errorMessage: FailureMessage | null
   /** Non-blocking note shown when the target repo has no setup command; null otherwise. */
   readonly setupHint: string | null
 }
@@ -65,7 +67,8 @@ export function spawnViewModel(
     prompt: { value: slice.fields.prompt, enabled: agentActive && !submitting },
     submitLabel: submitting ? t('spawn.submitting') : t('spawn.submit'),
     submitEnabled: slice.fields.name.trim() !== '' && !submitting,
-    errorMessage: slice.status === 'error' ? (slice.errorMessage ?? t('failure.unknown')) : null,
+    errorMessage:
+      slice.status === 'error' ? (slice.errorMessage ?? plainFailure(t('failure.unknown'))) : null,
     setupHint
   }
 }

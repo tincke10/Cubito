@@ -1,6 +1,7 @@
 import type { WorktreeId } from '../domain/worktree-graph/types'
 import type { DiffFileContent } from './ports/runtime-gateway'
 import type { FileDiffOrigin } from './system-graph-file-diff'
+import type { FailureMessage } from './i18n/user-facing-error'
 
 export type DiffRailStatus = 'loading' | 'ready' | 'empty' | 'error'
 
@@ -19,7 +20,7 @@ export type DiffPanelState =
   | { kind: 'loading' }
   | { kind: 'text'; originalContent: string; modifiedContent: string; truncated: boolean }
   | { kind: 'binary'; modifiedDeleted?: boolean }
-  | { kind: 'error'; message?: string }
+  | { kind: 'error'; message?: FailureMessage }
 
 /** closed → open (anchored to a node+baseRef; rail/panel fill in via rail-loaded/panel-loaded). */
 export type DiffViewSlice =
@@ -30,7 +31,7 @@ export type DiffViewSlice =
       baseRef: string
       compare: { headOid: string; mergeBase: string } | null
       status: DiffRailStatus
-      errorMessage?: string
+      errorMessage?: FailureMessage
       files: readonly DiffFileRow[]
       selectedPath: string | null
       panel: DiffPanelState
@@ -40,16 +41,16 @@ export const emptyDiffViewSlice = (): DiffViewSlice => ({ view: 'closed' })
 
 export type DiffViewAction =
   | { type: 'open'; nodeId: WorktreeId; baseRef: string }
-  | { type: 'open-error'; message?: string }
+  | { type: 'open-error'; message?: FailureMessage }
   | {
       type: 'rail-loaded'
       compare: { headOid: string; mergeBase: string }
       files: readonly DiffFileRow[]
     }
-  | { type: 'rail-error'; message?: string }
+  | { type: 'rail-error'; message?: FailureMessage }
   | { type: 'select'; path: string }
   | { type: 'panel-loaded'; path: string; content: DiffFileContent }
-  | { type: 'panel-error'; path: string; message?: string }
+  | { type: 'panel-error'; path: string; message?: FailureMessage }
   | { type: 'close' }
 
 export function reduceDiffView(slice: DiffViewSlice, action: DiffViewAction): DiffViewSlice {

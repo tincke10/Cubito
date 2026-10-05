@@ -1,7 +1,8 @@
 import type { WorktreeId } from '../domain/worktree-graph/types'
 import { shortBranchName } from '../presentation/hud/node-label-model'
 import type { RuntimeGateway } from './ports/runtime-gateway'
-import { failureText } from './i18n/user-facing-error'
+import { describeFailure } from './i18n/user-facing-error'
+import type { FailureMessage } from './i18n/user-facing-error'
 import type { SceneStore } from './scene-store'
 
 export type WorktreeDeleteGatewayPort = Pick<RuntimeGateway, 'worktreeRemove' | 'gitStatus'>
@@ -20,7 +21,7 @@ export type WorktreeDeleteView =
       agentStatus: string | null
       children: readonly string[]
       removing: boolean
-      error: string | null
+      error: FailureMessage | null
       /** Set after a non-forced attempt failed; the next confirm sends force. */
       forceOffered: boolean
     }
@@ -127,7 +128,7 @@ export function createWorktreeDeleteFlow(deps: WorktreeDeleteFlowDeps): Worktree
         // with force; it still needs its own explicit confirm.
         patchOpen(nodeId, {
           removing: false,
-          error: failureText('worktreeDelete', error),
+          error: describeFailure('worktreeDelete', error),
           forceOffered: true
         })
         return

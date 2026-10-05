@@ -1,7 +1,7 @@
 import type { FanOutGateViewModel, FanOutQuestionViewModel } from './fan-out-decision-view-model'
 import { resolveSpawnFormKey } from './spawn-form-element'
 import { t } from '../../application/i18n/translate'
-import { failureText } from '../../application/i18n/user-facing-error'
+import { describeFailure } from '../../application/i18n/user-facing-error'
 import { renderFailureText } from '../failure-text-element'
 
 export type FanOutGateListModel = {
@@ -86,7 +86,7 @@ export function createFanOutGateList(doc: Document = document): FanOutGateListHa
       await callback(id, value)
     } catch (err) {
       submit.disabled = false
-      renderFailureText(doc, error, failureText('fanOutRowSubmit', err))
+      renderFailureText(doc, error, describeFailure('fanOutRowSubmit', err))
       error.style.display = ''
     }
   }

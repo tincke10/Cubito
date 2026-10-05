@@ -4,7 +4,7 @@ import type { RuntimeGateway } from './ports/runtime-gateway'
 import type { SceneStore } from './scene-store'
 import { railErrorMessageFor } from './diff-live-loader'
 import { t } from './i18n/translate'
-import { failureText } from './i18n/user-facing-error'
+import { describeFailure, plainFailure } from './i18n/user-facing-error'
 
 /** Only the methods compare mode needs — narrow like diff-live-loader.ts's own gateway port. */
 export type CompareLiveLoaderGatewayPort = Pick<
@@ -52,7 +52,11 @@ export function createCompareLiveLoader(deps: CompareLiveLoaderDeps): CompareLiv
   async function loadChildRail(childId: WorktreeId): Promise<void> {
     const baseRef = resolveBaseRef(deps.store.get().graph, childId)
     if (baseRef === null) {
-      dispatch({ type: 'child-rail-error', childId, message: t('diff.noBaseRef', { id: childId }) })
+      dispatch({
+        type: 'child-rail-error',
+        childId,
+        message: plainFailure(t('diff.noBaseRef', { id: childId }))
+      })
       return
     }
     try {
@@ -62,7 +66,7 @@ export function createCompareLiveLoader(deps: CompareLiveLoaderDeps): CompareLiv
         dispatch({
           type: 'child-rail-error',
           childId,
-          message: railErrorMessageFor(compare.status)
+          message: plainFailure(railErrorMessageFor(compare.status))
         })
         return
       }
@@ -79,7 +83,11 @@ export function createCompareLiveLoader(deps: CompareLiveLoaderDeps): CompareLiv
       })
     } catch (error) {
       if (stopped || !isLiveMember(childId)) return
-      dispatch({ type: 'child-rail-error', childId, message: failureText('compareRail', error) })
+      dispatch({
+        type: 'child-rail-error',
+        childId,
+        message: describeFailure('compareRail', error)
+      })
     }
   }
 
@@ -103,7 +111,7 @@ export function createCompareLiveLoader(deps: CompareLiveLoaderDeps): CompareLiv
         type: 'child-panel-error',
         childId,
         path,
-        message: failureText('diffPanel', error)
+        message: describeFailure('diffPanel', error)
       })
     }
   }

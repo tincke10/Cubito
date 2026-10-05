@@ -1,3 +1,4 @@
+import { plainFailure } from '../../application/i18n/user-facing-error'
 import { describe, expect, it } from 'vitest'
 import { diffPanelViewModel } from './diff-panel-model'
 import type { DiffPanelState } from '../../application/diff-view-model'
@@ -12,9 +13,9 @@ describe('diffPanelViewModel', () => {
   })
 
   it('maps error with a message through', () => {
-    expect(diffPanelViewModel({ kind: 'error', message: 'boom' })).toEqual({
+    expect(diffPanelViewModel({ kind: 'error', message: plainFailure('boom') })).toEqual({
       kind: 'error',
-      message: 'boom'
+      message: plainFailure('boom')
     })
   })
 

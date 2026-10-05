@@ -1,5 +1,6 @@
 import type { FileQuickOpenView } from '../../application/file-quick-open-flow'
 import { t } from '../../application/i18n/translate'
+import type { FailureMessage } from '../../application/i18n/user-facing-error'
 
 export type FileQuickOpenRow = {
   path: string
@@ -15,7 +16,7 @@ export type FileQuickOpenPanelModel = {
   rows: readonly FileQuickOpenRow[]
   /** Hint/progress line shown under the input; null once there are rows to look at. */
   statusText: string | null
-  error: string | null
+  error: FailureMessage | null
 }
 
 const HIDDEN: FileQuickOpenPanelModel = {

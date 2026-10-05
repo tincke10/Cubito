@@ -108,7 +108,7 @@ describe('fetchWorkingTreeEntries', () => {
 
     expect(result).toEqual({
       outcome: 'failed',
-      message: 'no se pudo leer el estado de git\u001fboom'
+      message: { lead: 'no se pudo leer el estado de git', detail: 'boom' }
     })
   })
 })

@@ -1,7 +1,7 @@
 import { cubeNameFor, fanOutObjectiveText, reduceFanOut } from './fan-out-model'
 import type { FanOutAction, FanOutSlice } from './fan-out-model'
 import type { RuntimeGateway } from './ports/runtime-gateway'
-import { failureText } from './i18n/user-facing-error'
+import { describeFailure } from './i18n/user-facing-error'
 
 /** listRepos/createWorktree + the 3 lease verbs — everything the lease submit loop calls. */
 export type FanOutLeaseGatewayPort = Pick<
@@ -63,7 +63,7 @@ export async function runCamadaLeaseSubmit(
       })
       worktreeId = worktree.worktreeId
     } catch (err) {
-      const message = failureText('fanOutChild', err)
+      const message = describeFailure('fanOutChild', err)
       localSlice = apply(localSlice, deps, { type: 'child-failed', mutationId, message })
       continue
     }
@@ -89,7 +89,7 @@ export async function runCamadaLeaseSubmit(
         taskId: task.taskId
       })
     } catch (err) {
-      const message = failureText('fanOutDispatch', err)
+      const message = describeFailure('fanOutDispatch', err)
       localSlice = apply(localSlice, deps, { type: 'child-failed', mutationId, message })
     }
   }

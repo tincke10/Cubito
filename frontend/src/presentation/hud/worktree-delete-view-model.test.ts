@@ -1,3 +1,4 @@
+import { plainFailure } from '../../application/i18n/user-facing-error'
 import { describe, expect, it } from 'vitest'
 import { worktreeDeletePanelModel } from './worktree-delete-view-model'
 import type { WorktreeDeleteView } from '../../application/worktree-delete-flow'
@@ -47,9 +48,11 @@ describe('worktree delete panel model', () => {
   })
 
   it('switches to forzar copy after a failed attempt and shows the error', () => {
-    const model = worktreeDeletePanelModel(open({ forceOffered: true, error: 'dirty' }))
+    const model = worktreeDeletePanelModel(
+      open({ forceOffered: true, error: plainFailure('dirty') })
+    )
     expect(model.actionLabels.idle).toBe('forzar eliminación')
-    expect(model.error).toBe('dirty')
+    expect(model.error).toEqual(plainFailure('dirty'))
   })
 
   it('disables cancel and marks busy while removing', () => {

@@ -343,7 +343,10 @@ describe('createFanOutController', () => {
     forms[0]!.emitSubmit()
     await flush()
     expect(gateway.createWorktree).not.toHaveBeenCalled()
-    expect(dispatch).toHaveBeenCalledWith({ type: 'form-error', message: expect.any(String) })
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'form-error',
+      message: { lead: expect.any(String), detail: null }
+    })
   })
 
   it('submit: generates N distinct mutation ids and dispatches submit first', async () => {
@@ -416,7 +419,7 @@ describe('createFanOutController', () => {
     expect(dispatch).toHaveBeenCalledWith({
       type: 'child-failed',
       mutationId: 'mutation-1',
-      message: 'no se pudo crear este worktree\u001fboom'
+      message: { lead: 'no se pudo crear este worktree', detail: 'boom' }
     })
     expect(dispatch).toHaveBeenCalledWith({
       type: 'child-created',
@@ -550,7 +553,10 @@ describe('createFanOutController — lease path (Change B)', () => {
     forms[0]!.emitSubmit()
     await flush()
 
-    expect(dispatch).toHaveBeenCalledWith({ type: 'form-error', message: expect.any(String) })
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'form-error',
+      message: { lead: expect.any(String), detail: null }
+    })
     expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'submit' }))
     expect(leasePlanner).not.toHaveBeenCalled()
     expect(gateway.createWorktree).not.toHaveBeenCalled()

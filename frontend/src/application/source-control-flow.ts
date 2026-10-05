@@ -3,7 +3,8 @@ import { resolveBaseRef } from '../domain/worktree-graph/resolve-base-ref'
 import { shortBranchName } from '../presentation/hud/node-label-model'
 import { authRequiredMessage, reviewKindName } from './hosted-review-presentation'
 import { t } from './i18n/translate'
-import { failureText } from './i18n/user-facing-error'
+import { describeFailure, plainFailure } from './i18n/user-facing-error'
+import type { FailureMessage } from './i18n/user-facing-error'
 import type { FailureAction } from './i18n/user-facing-error'
 import type {
   HostedReviewEligibility,
@@ -25,9 +26,9 @@ export type SourceControlGatewayPort = Pick<
 
 export type StageState = 'staged' | 'partial' | 'unstaged'
 export type SourceControlBusy = 'stage' | 'commit' | 'push'
-export type SourceControlNotice = { tone: 'ok' | 'error'; text: string }
+export type SourceControlNotice = { tone: 'ok' | 'error'; message: FailureMessage }
 
-export type ReviewResult = { tone: 'ok' | 'error'; text: string; href?: string }
+export type ReviewResult = { tone: 'ok' | 'error'; message: FailureMessage; href?: string }
 
 /** `unavailable`: no remote/provider answer; the commit and push controls still work. */
 export type ReviewState =
@@ -237,20 +238,22 @@ export function createSourceControlFlow(deps: SourceControlFlowDeps): SourceCont
       if (created.ok) {
         result = {
           tone: 'ok',
-          text: t('review.created', {
-            ref: `${kind}${created.number === undefined ? '' : ` #${created.number}`}`
-          }),
+          message: plainFailure(
+            t('review.created', {
+              ref: `${kind}${created.number === undefined ? '' : ` #${created.number}`}`
+            })
+          ),
           href: created.url
         }
       } else {
         result = {
           tone: 'error',
-          text: failureText('reviewCreate', created.error, created.code),
+          message: describeFailure('reviewCreate', created.error, created.code),
           ...(created.existingReview ? { href: created.existingReview.url } : {})
         }
       }
     } catch (error) {
-      result = { tone: 'error', text: failureText('reviewCreate', error) }
+      result = { tone: 'error', message: describeFailure('reviewCreate', error) }
     }
     if (ownGeneration !== generation) return
     patchReview({ creating: false, result })
@@ -269,7 +272,7 @@ export function createSourceControlFlow(deps: SourceControlFlowDeps): SourceCont
     try {
       notice = await action(current as Ready)
     } catch (error) {
-      notice = { tone: 'error', text: failureText(BUSY_FAILURE[busy], error) }
+      notice = { tone: 'error', message: describeFailure(BUSY_FAILURE[busy], error) }
     }
     if (ownGeneration !== generation) return
     patch({ busy: null, notice })
@@ -315,9 +318,9 @@ export function createSourceControlFlow(deps: SourceControlFlowDeps): SourceCont
       return run('commit', async (view) => {
         const result = await gateway.gitCommit(view.nodeId, view.message.trim())
         if (!result.success)
-          return { tone: 'error', text: failureText('sourceControlCommit', result.error) }
+          return { tone: 'error', message: describeFailure('sourceControlCommit', result.error) }
         patch({ message: '' })
-        return { tone: 'ok', text: t('sourceControl.commitCreated') }
+        return { tone: 'ok', message: plainFailure(t('sourceControl.commitCreated')) }
       })
     },
     push() {
@@ -326,7 +329,9 @@ export function createSourceControlFlow(deps: SourceControlFlowDeps): SourceCont
         await gateway.gitPush(view.nodeId, view.hasUpstream ? {} : { publish: true })
         return {
           tone: 'ok',
-          text: view.hasUpstream ? t('sourceControl.pushed') : t('sourceControl.branchPublished')
+          message: plainFailure(
+            view.hasUpstream ? t('sourceControl.pushed') : t('sourceControl.branchPublished')
+          )
         }
       })
     },
@@ -340,7 +345,10 @@ export function createSourceControlFlow(deps: SourceControlFlowDeps): SourceCont
           if (current.canCommit) await this.commit()
           else
             patch({
-              notice: { tone: 'error', text: t('sourceControl.needsStageAndMessage') }
+              notice: {
+                tone: 'error',
+                message: plainFailure(t('sourceControl.needsStageAndMessage'))
+              }
             })
           return
         case 'publish':
@@ -351,12 +359,12 @@ export function createSourceControlFlow(deps: SourceControlFlowDeps): SourceCont
           patch({
             notice: {
               tone: 'error',
-              text: t('sourceControl.behindRemote')
+              message: plainFailure(t('sourceControl.behindRemote'))
             }
           })
           return
         case 'authenticate':
-          patch({ notice: { tone: 'error', text: authRequiredMessage() } })
+          patch({ notice: { tone: 'error', message: plainFailure(authRequiredMessage()) } })
           return
         case null:
         default:

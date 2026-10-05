@@ -1,3 +1,4 @@
+import { plainFailure } from './i18n/user-facing-error'
 import { describe, expect, it } from 'vitest'
 import {
   diffHudCounts,
@@ -60,19 +61,27 @@ describe('reduceDiffView — open/close', () => {
 
 describe('reduceDiffView — open-error / rail-error', () => {
   it('open-error marks the rail errored with a message', () => {
-    const slice = reduceDiffView(openSlice(), { type: 'open-error', message: 'unknown base ref' })
-    expect(slice).toEqual(openSlice({ status: 'error', errorMessage: 'unknown base ref' }))
+    const slice = reduceDiffView(openSlice(), {
+      type: 'open-error',
+      message: plainFailure('unknown base ref')
+    })
+    expect(slice).toEqual(
+      openSlice({ status: 'error', errorMessage: plainFailure('unknown base ref') })
+    )
   })
 
   it('rail-error marks the rail errored with a message', () => {
-    const slice = reduceDiffView(openSlice(), { type: 'rail-error', message: 'git failed' })
-    expect(slice).toEqual(openSlice({ status: 'error', errorMessage: 'git failed' }))
+    const slice = reduceDiffView(openSlice(), {
+      type: 'rail-error',
+      message: plainFailure('git failed')
+    })
+    expect(slice).toEqual(openSlice({ status: 'error', errorMessage: plainFailure('git failed') }))
   })
 
   it('is a no-op when closed', () => {
     const closed = emptyDiffViewSlice()
-    expect(reduceDiffView(closed, { type: 'open-error', message: 'x' })).toBe(closed)
-    expect(reduceDiffView(closed, { type: 'rail-error', message: 'x' })).toBe(closed)
+    expect(reduceDiffView(closed, { type: 'open-error', message: plainFailure('x') })).toBe(closed)
+    expect(reduceDiffView(closed, { type: 'rail-error', message: plainFailure('x') })).toBe(closed)
   })
 })
 
@@ -177,10 +186,13 @@ describe('reduceDiffView — panel-error', () => {
     const slice = reduceDiffView(selected, {
       type: 'panel-error',
       path: 'src/auth.ts',
-      message: 'boom'
+      message: plainFailure('boom')
     })
     expect(slice).toEqual(
-      openSlice({ selectedPath: 'src/auth.ts', panel: { kind: 'error', message: 'boom' } })
+      openSlice({
+        selectedPath: 'src/auth.ts',
+        panel: { kind: 'error', message: plainFailure('boom') }
+      })
     )
   })
 

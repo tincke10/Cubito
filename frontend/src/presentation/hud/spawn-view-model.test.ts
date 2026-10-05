@@ -1,3 +1,4 @@
+import { plainFailure } from '../../application/i18n/user-facing-error'
 import { describe, expect, it } from 'vitest'
 import { spawnViewModel } from './spawn-view-model'
 import { emptySpawnMenuSlice } from '../../application/spawn-menu-model'
@@ -140,12 +141,12 @@ describe('spawnViewModel — form', () => {
       formSlice({
         fields: { name: 'x', baseBranch: '', agent: 'none', prompt: '' },
         status: 'error',
-        errorMessage: 'la conexión falló'
+        errorMessage: plainFailure('la conexión falló')
       }),
       emptyWorktreeGraph()
     )
     if (model?.view !== 'form') throw new Error('expected form')
-    expect(model.errorMessage).toBe('la conexión falló')
+    expect(model.errorMessage).toEqual(plainFailure('la conexión falló'))
     expect(model.name.enabled).toBe(true)
     expect(model.submitEnabled).toBe(true)
   })

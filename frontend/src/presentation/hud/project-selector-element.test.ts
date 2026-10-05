@@ -1,3 +1,4 @@
+import { plainFailure } from '../../application/i18n/user-facing-error'
 import { describe, expect, it, vi } from 'vitest'
 import { createProjectSelector, resolveProjectSelectorKey } from './project-selector-element'
 import type { ProjectSelectorPanelModel } from './project-selector-element'
@@ -159,14 +160,19 @@ describe('createProjectSelector — setup', () => {
     const section = setupSectionOf(rootOf(selector))
     selector.applySetup(null)
     expect(section.style.display).toBe('none')
-    selector.applySetup({ repoName: 'Cubito', command: 'pnpm install', message: '' })
+    selector.applySetup({ repoName: 'Cubito', command: 'pnpm install', message: plainFailure('') })
     expect(section.style.display).toBe('')
     expect(section.children[0]!.textContent).toContain('Cubito')
     expect(section.children[1]!.value).toBe('pnpm install')
-    selector.applySetup({ repoName: 'Cubito', command: null, message: '' })
+    selector.applySetup({ repoName: 'Cubito', command: null, message: plainFailure('') })
     expect(section.children[1]!.value).toBe('')
     expect(section.children[1]!.placeholder).toContain('sin setup')
-    selector.applySetup({ repoName: 'Cubito', command: null, sharedCommand: 'pnpm i', message: '' })
+    selector.applySetup({
+      repoName: 'Cubito',
+      command: null,
+      sharedCommand: 'pnpm i',
+      message: plainFailure('')
+    })
     expect(section.children[0]!.textContent).toContain('orca.yaml')
     expect(section.children[0]!.textContent).toContain('pnpm i')
     expect(section.children[1]!.placeholder).not.toContain('sin setup')
@@ -185,7 +191,7 @@ describe('createProjectSelector — setup', () => {
         rows: [{ repoId: 'r1', displayName: 'A', path: '/a', active: true, highlighted: true }]
       })
     )
-    selector.applySetup({ repoName: 'A', command: null, message: '' })
+    selector.applySetup({ repoName: 'A', command: null, message: plainFailure('') })
     const section = setupSectionOf(rootOf(selector))
     const input = section.children[1]!
     input.value = 'pnpm install'
@@ -253,7 +259,7 @@ describe('createProjectSelector', () => {
 
   it('shows the add-form error message when present, hides it when absent', () => {
     const selector = createProjectSelector(createFakeDocument())
-    selector.apply(formModel({ errorMessage: 'no es un repo git' }))
+    selector.apply(formModel({ errorMessage: plainFailure('no es un repo git') }))
     const root = rootOf(selector)
     expect(errorLineOf(root).textContent).toBe('no es un repo git')
     expect(errorLineOf(root).style.display).toBe('')

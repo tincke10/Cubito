@@ -1,3 +1,4 @@
+import type { FailureMessage } from './i18n/user-facing-error'
 import { t } from './i18n/translate'
 import { activateIsland, selectNode } from './island-focus'
 import type { IslandFocus, IslandSelections } from './island-focus'
@@ -28,7 +29,7 @@ export type SyncStatus =
   | { state: 'idle' }
   | { state: 'syncing' }
   | { state: 'synced'; at: number }
-  | { state: 'error'; code: string; message: string }
+  | { state: 'error'; code: string; message: FailureMessage }
 
 export type ConnectionState =
   | { state: 'connecting' }

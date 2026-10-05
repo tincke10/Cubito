@@ -143,7 +143,7 @@ describe('runCamadaLeaseSubmit — error branches', () => {
     expect(dispatch).toHaveBeenCalledWith({
       type: 'child-failed',
       mutationId: 'm1',
-      message: 'no se pudo crear este worktree\u001fboom'
+      message: { lead: 'no se pudo crear este worktree', detail: 'boom' }
     })
     expect(result.localSlice).toMatchObject({
       batch: [
@@ -151,7 +151,7 @@ describe('runCamadaLeaseSubmit — error branches', () => {
           mutationId: 'm1',
           worktreeId: null,
           failed: true,
-          errorMessage: 'no se pudo crear este worktree\u001fboom'
+          errorMessage: { lead: 'no se pudo crear este worktree', detail: 'boom' }
         },
         { mutationId: 'm2', worktreeId: 'wt-m2' }
       ]
@@ -170,7 +170,7 @@ describe('runCamadaLeaseSubmit — error branches', () => {
     expect(dispatch).toHaveBeenCalledWith({
       type: 'child-failed',
       mutationId: 'm1',
-      message: 'no se pudo despachar la tarea al agente\u001fboom'
+      message: { lead: 'no se pudo despachar la tarea al agente', detail: 'boom' }
     })
     expect(result.localSlice).toMatchObject({
       batch: [
@@ -180,7 +180,7 @@ describe('runCamadaLeaseSubmit — error branches', () => {
           failed: true,
           dispatchId: null,
           taskId: null,
-          errorMessage: 'no se pudo despachar la tarea al agente\u001fboom'
+          errorMessage: { lead: 'no se pudo despachar la tarea al agente', detail: 'boom' }
         }
       ]
     })

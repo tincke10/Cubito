@@ -1,3 +1,4 @@
+import { plainFailure } from './i18n/user-facing-error'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDiffLiveLoader } from './diff-live-loader'
 import type { DiffLiveLoaderGatewayPort } from './diff-live-loader'
@@ -199,7 +200,10 @@ describe('createDiffLiveLoader', () => {
     })
     const slice = store.get().diffView
     if (slice.view === 'open') {
-      expect(slice.errorMessage).toBe('no se pudo comparar la rama con su base\u001fboom')
+      expect(slice.errorMessage).toEqual({
+        lead: 'no se pudo comparar la rama con su base',
+        detail: 'boom'
+      })
     }
     loader.stop()
   })
@@ -218,7 +222,7 @@ describe('createDiffLiveLoader', () => {
     })
     const slice = store.get().diffView
     if (slice.view === 'open') {
-      expect(slice.errorMessage).toBe('sin ancestro común con la base')
+      expect(slice.errorMessage).toEqual(plainFailure('sin ancestro común con la base'))
       expect(slice.files).toEqual([])
     }
     loader.stop()
@@ -242,7 +246,7 @@ describe('createDiffLiveLoader', () => {
     })
     const slice = store.get().diffView
     if (slice.view === 'open') {
-      expect(slice.errorMessage).toBe(message)
+      expect(slice.errorMessage).toEqual(plainFailure(message))
     }
     loader.stop()
   })
@@ -565,7 +569,7 @@ describe('createDiffLiveLoader', () => {
     })
     const slice = store.get().diffView
     if (slice.view === 'open' && slice.panel.kind === 'error') {
-      expect(slice.panel.message).toBe('falló la carga del diff\u001fnope')
+      expect(slice.panel.message).toEqual({ lead: 'falló la carga del diff', detail: 'nope' })
     }
     loader.stop()
   })

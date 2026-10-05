@@ -1,11 +1,12 @@
 import { t, tn } from '../../application/i18n/translate'
+import type { FailureMessage } from '../../application/i18n/user-facing-error'
 import type { WorktreeDeleteView } from '../../application/worktree-delete-flow'
 
 export type WorktreeDeletePanelModel = {
   visible: boolean
   title: string
   lines: readonly string[]
-  error: string | null
+  error: FailureMessage | null
   /** Hidden for the primary worktree: there is nothing to confirm. */
   showAction: boolean
   actionLabels: { idle: string; confirm: string; busy: string }

@@ -1,3 +1,4 @@
+import { plainFailure } from './i18n/user-facing-error'
 import { describe, expect, it } from 'vitest'
 import { emptyProjectSelectorSlice, reduceProjectSelector } from './project-selector-model'
 import type { ProjectSelectorSlice } from './project-selector-model'
@@ -156,7 +157,7 @@ describe('reduceProjectSelector', () => {
       path: '/x',
       kind: 'git',
       status: 'error',
-      errorMessage: 'boom'
+      errorMessage: plainFailure('boom')
     }
     const next = reduceProjectSelector(slice, { type: 'submit-add' })
     expect(next).toEqual({ view: 'add-form', path: '/x', kind: 'git', status: 'submitting' })
@@ -196,19 +197,24 @@ describe('reduceProjectSelector', () => {
       status: 'submitting'
     }
     expect(
-      reduceProjectSelector(slice, { type: 'submit-add-error', message: 'not a git repo' })
+      reduceProjectSelector(slice, {
+        type: 'submit-add-error',
+        message: plainFailure('not a git repo')
+      })
     ).toEqual({
       view: 'add-form',
       path: '/x',
       kind: 'git',
       status: 'error',
-      errorMessage: 'not a git repo'
+      errorMessage: plainFailure('not a git repo')
     })
   })
 
   it('submit-add-error is a no-op outside the add-form view', () => {
     const closed = emptyProjectSelectorSlice()
-    expect(reduceProjectSelector(closed, { type: 'submit-add-error', message: 'x' })).toBe(closed)
+    expect(
+      reduceProjectSelector(closed, { type: 'submit-add-error', message: plainFailure('x') })
+    ).toBe(closed)
   })
 
   it('back-to-list returns a fresh list view from the add-form', () => {
@@ -217,7 +223,7 @@ describe('reduceProjectSelector', () => {
       path: '/x',
       kind: 'git',
       status: 'error',
-      errorMessage: 'e'
+      errorMessage: plainFailure('e')
     }
     expect(reduceProjectSelector(slice, { type: 'back-to-list' })).toEqual({
       view: 'open',

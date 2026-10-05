@@ -1,6 +1,7 @@
 import type { WorktreeId } from '../domain/worktree-graph/types'
 import type { FilePathMatch, RuntimeGateway } from './ports/runtime-gateway'
-import { failureText } from './i18n/user-facing-error'
+import { describeFailure } from './i18n/user-facing-error'
+import type { FailureMessage } from './i18n/user-facing-error'
 
 export type FileQuickOpenGatewayPort = Pick<RuntimeGateway, 'filesSearchPaths'>
 
@@ -13,7 +14,7 @@ export type FileQuickOpenView =
       rows: readonly FilePathMatch[]
       highlighted: number
       searching: boolean
-      error: string | null
+      error: FailureMessage | null
     }
 
 export type FileQuickOpenFlow = {
@@ -70,7 +71,7 @@ export function createFileQuickOpenFlow(deps: FileQuickOpenDeps): FileQuickOpenF
           ...current,
           searching: false,
           rows: [],
-          error: failureText('quickOpenSearch', error)
+          error: describeFailure('quickOpenSearch', error)
         })
       }
       return

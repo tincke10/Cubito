@@ -7,7 +7,7 @@ import { composeBaseToWorkingTree } from './diff-panel-content-compose'
 import type { DiffFileContent, RuntimeGateway } from './ports/runtime-gateway'
 import type { SceneStore } from './scene-store'
 import { t } from './i18n/translate'
-import { failureText } from './i18n/user-facing-error'
+import { describeFailure, plainFailure } from './i18n/user-facing-error'
 
 /** Only the methods diff mode needs — narrow like the other controller ports. */
 export type DiffLiveLoaderGatewayPort = Pick<
@@ -78,7 +78,7 @@ export function createDiffLiveLoader(deps: DiffLiveLoaderDeps): DiffLiveLoader {
         return
       }
       case 'not-ready':
-        dispatch({ type: 'rail-error', message: railErrorMessageFor(result.status) })
+        dispatch({ type: 'rail-error', message: plainFailure(railErrorMessageFor(result.status)) })
         return
       case 'failed':
         dispatch({ type: 'rail-error', message: result.message })
@@ -129,7 +129,7 @@ export function createDiffLiveLoader(deps: DiffLiveLoaderDeps): DiffLiveLoader {
       const slice = deps.store.get().diffView
       if (slice.view !== 'open' || slice.focusedNodeId !== nodeId || slice.selectedPath !== path)
         return
-      dispatch({ type: 'panel-error', path, message: failureText('diffPanel', error) })
+      dispatch({ type: 'panel-error', path, message: describeFailure('diffPanel', error) })
     }
   }
 
@@ -148,7 +148,7 @@ export function createDiffLiveLoader(deps: DiffLiveLoaderDeps): DiffLiveLoader {
       stopped = false
       const baseRef = resolveBaseRef(deps.store.get().graph, nodeId)
       if (baseRef === null) {
-        dispatch({ type: 'open-error', message: t('diff.noBaseRef', { id: nodeId }) })
+        dispatch({ type: 'open-error', message: plainFailure(t('diff.noBaseRef', { id: nodeId })) })
         return
       }
       dispatch({ type: 'open', nodeId, baseRef })

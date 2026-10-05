@@ -12,7 +12,7 @@ import type {
   SourceControlStatus
 } from './ports/runtime-gateway'
 import { authRequiredMessage } from './hosted-review-presentation'
-import { failureText } from './i18n/user-facing-error'
+import { describeFailure } from './i18n/user-facing-error'
 import { setActiveLanguage } from './i18n/translate'
 
 const eligibility = (over: Partial<HostedReviewEligibility> = {}): HostedReviewEligibility => ({
@@ -166,11 +166,12 @@ describe('source control flow', () => {
     await flow.toggleStage('b.ts')
     expect(ready(flow.view()).notice).toEqual({
       tone: 'error',
-      text: failureText('sourceControlStage', 'index.lock exists')
+      message: describeFailure('sourceControlStage', 'index.lock exists')
     })
-    expect(failureText('sourceControlStage', 'index.lock exists')).toBe(
-      'no se pudo actualizar el stage\u001findex.lock exists'
-    )
+    expect(describeFailure('sourceControlStage', 'index.lock exists')).toEqual({
+      lead: 'no se pudo actualizar el stage',
+      detail: 'index.lock exists'
+    })
   })
 
   it('commit needs a message and staged files', async () => {
@@ -205,7 +206,7 @@ describe('source control flow', () => {
     expect(view.message).toBe('feat: x')
     expect(view.notice).toEqual({
       tone: 'error',
-      text: failureText('sourceControlCommit', 'hook failed')
+      message: describeFailure('sourceControlCommit', 'hook failed')
     })
   })
 
@@ -250,7 +251,7 @@ describe('source control flow', () => {
     expect(ready(flow.view()).busy).toBeNull()
     expect(ready(flow.view()).notice).toEqual({
       tone: 'error',
-      text: failureText('sourceControlPush', 'rejected (non-fast-forward)')
+      message: describeFailure('sourceControlPush', 'rejected (non-fast-forward)')
     })
   })
 
@@ -384,7 +385,7 @@ describe('source control flow — review', () => {
     expect(reviewOf(flow.view())).toMatchObject({
       result: {
         tone: 'error',
-        text: `${authRequiredMessage()}\u001fgh: not logged in`
+        message: { lead: authRequiredMessage(), detail: 'gh: not logged in' }
       }
     })
   })
@@ -404,13 +405,14 @@ describe('source control flow — review', () => {
     expect(reviewOf(flow.view())).toMatchObject({ result: { href: 'https://x/3' } })
     await flow.reviewPrimary()
     expect(reviewOf(flow.view())).toMatchObject({
-      result: { text: 'el proveedor rechazó el pedido\u001ftitle too long' }
+      result: { message: { lead: 'el proveedor rechazó el pedido', detail: 'title too long' } }
     })
     setActiveLanguage('en')
     try {
-      expect(failureText('reviewCreate', 'title too long', 'validation')).toBe(
-        'the provider rejected the request\u001ftitle too long'
-      )
+      expect(describeFailure('reviewCreate', 'title too long', 'validation')).toEqual({
+        lead: 'the provider rejected the request',
+        detail: 'title too long'
+      })
     } finally {
       setActiveLanguage('es')
     }
@@ -428,14 +430,14 @@ describe('source control flow — review', () => {
     const sync = setup({ eligibility: eligibility({ canCreate: false, nextAction: 'sync' }) })
     await sync.flow.open('r::/w')
     await sync.flow.reviewPrimary()
-    expect(ready(sync.flow.view()).notice?.text).toMatch(/pull|rebase/)
+    expect(ready(sync.flow.view()).notice?.message.lead).toMatch(/pull|rebase/)
 
     const auth = setup({
       eligibility: eligibility({ canCreate: false, nextAction: 'authenticate' })
     })
     await auth.flow.open('r::/w')
     await auth.flow.reviewPrimary()
-    expect(ready(auth.flow.view()).notice?.text).toBe(authRequiredMessage())
+    expect(ready(auth.flow.view()).notice?.message.lead).toBe(authRequiredMessage())
 
     const commit = setup({ eligibility: eligibility({ canCreate: false, nextAction: 'commit' }) })
     await commit.flow.open('r::/w')

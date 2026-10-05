@@ -123,7 +123,10 @@ describe('worktree delete flow', () => {
     flow.request('r::/a')
     await flow.confirm()
     const failed = open(flow.view())
-    expect(failed.error).toBe('no se pudo borrar el worktree\u001fcontains modified files')
+    expect(failed.error).toEqual({
+      lead: 'no se pudo borrar el worktree',
+      detail: 'contains modified files'
+    })
     expect(failed.forceOffered).toBe(true)
     expect(failed.removing).toBe(false)
     await flow.confirm()

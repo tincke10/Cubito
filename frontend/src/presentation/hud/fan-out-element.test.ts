@@ -1,3 +1,4 @@
+import { plainFailure } from '../../application/i18n/user-facing-error'
 import { describe, expect, it, vi } from 'vitest'
 import { createFanOutForm } from './fan-out-element'
 import type { FanOutFormViewModel, FanOutRunningViewModel } from './fan-out-view-model'
@@ -215,7 +216,7 @@ describe('createFanOutForm — form view', () => {
 
   it('shows the error message when present', () => {
     const form = createFanOutForm(createFakeDocument())
-    form.apply(formModel({ errorMessage: 'a repo must be selected' }))
+    form.apply(formModel({ errorMessage: plainFailure('a repo must be selected') }))
     const root = form.element as unknown as FakeElement
     const errorEl = root.children.find((c) => c.className.includes('error'))!
     expect(errorEl.textContent).toBe('a repo must be selected')
@@ -251,8 +252,8 @@ describe('createFanOutForm — running view — per-child failures', () => {
     form.apply(
       runningModel({
         failures: [
-          { mutationId: 'm1', label: 'camada-m1', message: 'network unreachable' },
-          { mutationId: 'm3', label: 'camada-m3', message: 'timeout' }
+          { mutationId: 'm1', label: 'camada-m1', message: plainFailure('network unreachable') },
+          { mutationId: 'm3', label: 'camada-m3', message: plainFailure('timeout') }
         ]
       })
     )
@@ -269,7 +270,7 @@ describe('createFanOutForm — running view — per-child failures', () => {
     const form = createFanOutForm(createFakeDocument())
     form.apply(
       runningModel({
-        failures: [{ mutationId: 'm1', label: 'camada-m1', message: 'boom' }]
+        failures: [{ mutationId: 'm1', label: 'camada-m1', message: plainFailure('boom') }]
       })
     )
     form.apply(runningModel({ failures: [] }))

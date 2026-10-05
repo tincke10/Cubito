@@ -1,3 +1,4 @@
+import { plainFailure } from './i18n/user-facing-error'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createCompareLiveLoader } from './compare-live-loader'
 import type { CompareLiveLoaderGatewayPort } from './compare-live-loader'
@@ -188,9 +189,10 @@ describe('createCompareLiveLoader', () => {
       expect(slice.view === 'open' && slice.childLoads['repo::child-b']?.status).toBe('ready')
     })
     const slice = store.get().compareView
-    expect(slice.view === 'open' && slice.childLoads['repo::child-a']?.errorMessage).toBe(
-      'no se pudieron cargar los cambios de esta rama\u001fboom'
-    )
+    expect(slice.view === 'open' && slice.childLoads['repo::child-a']?.errorMessage).toEqual({
+      lead: 'no se pudieron cargar los cambios de esta rama',
+      detail: 'boom'
+    })
     loader.stop()
   })
 
@@ -208,8 +210,8 @@ describe('createCompareLiveLoader', () => {
       expect(slice.view === 'open' && slice.childLoads['repo::child-a']?.status).toBe('error')
     })
     const slice = store.get().compareView
-    expect(slice.view === 'open' && slice.childLoads['repo::child-a']?.errorMessage).toBe(
-      'sin ancestro común con la base'
+    expect(slice.view === 'open' && slice.childLoads['repo::child-a']?.errorMessage).toEqual(
+      plainFailure('sin ancestro común con la base')
     )
     loader.stop()
   })
@@ -304,7 +306,10 @@ describe('createCompareLiveLoader', () => {
     })
     const slice = store.get().compareView
     const panel = slice.view === 'open' ? slice.childLoads['repo::child-a']?.panel : undefined
-    expect(panel).toMatchObject({ kind: 'error', message: 'falló la carga del diff\u001fnope' })
+    expect(panel).toMatchObject({
+      kind: 'error',
+      message: { lead: 'falló la carga del diff', detail: 'nope' }
+    })
     loader.stop()
   })
 

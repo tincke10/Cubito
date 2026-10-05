@@ -95,9 +95,10 @@ describe('file quick-open flow', () => {
     flow.open('w')
     flow.setQuery('a')
     await vi.advanceTimersByTimeAsync(100)
-    expect(open(flow.view()).error).toBe(
-      "falló la búsqueda\u001fOrca's bundled search tool (ripgrep) could not start."
-    )
+    expect(open(flow.view()).error).toEqual({
+      lead: 'falló la búsqueda',
+      detail: "Orca's bundled search tool (ripgrep) could not start."
+    })
     expect(open(flow.view()).searching).toBe(false)
   })
 

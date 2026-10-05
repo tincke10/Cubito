@@ -1,5 +1,5 @@
 import type { WorktreeGraph, WorktreeId } from '../../domain/worktree-graph/types'
-import { failureText } from '../../application/i18n/user-facing-error'
+import { describeFailure, plainFailure } from '../../application/i18n/user-facing-error'
 import {
   fanOutRepoUnresolvedMessage,
   emptyFanOutSlice,
@@ -173,7 +173,7 @@ export function createFanOutController(deps: FanOutControllerDeps): FanOutContro
         })
         deps.dispatch({ type: 'child-created', mutationId, worktreeId: result.worktreeId })
       } catch (err) {
-        const message = failureText('fanOutChild', err)
+        const message = describeFailure('fanOutChild', err)
         localSlice = reduceFanOut(localSlice, { type: 'child-failed', mutationId, message })
         deps.dispatch({ type: 'child-failed', mutationId, message })
       }
@@ -187,7 +187,10 @@ export function createFanOutController(deps: FanOutControllerDeps): FanOutContro
     const blocker = fanOutSubmitBlocker(slice)
     // The explicit null re-check only narrows repoSelector for TS; the blocker already rejects it.
     if (blocker !== null || slice.repoSelector === null) {
-      deps.dispatch({ type: 'form-error', message: blocker ?? fanOutRepoUnresolvedMessage() })
+      deps.dispatch({
+        type: 'form-error',
+        message: plainFailure(blocker ?? fanOutRepoUnresolvedMessage())
+      })
       return
     }
     const repoSelector = slice.repoSelector

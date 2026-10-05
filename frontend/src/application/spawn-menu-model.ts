@@ -1,5 +1,6 @@
 import type { WorktreeId } from '../domain/worktree-graph/types'
 import type { CreateWorktreeInput, SpawnAgent } from './ports/runtime-gateway'
+import type { FailureMessage } from './i18n/user-facing-error'
 
 export type SpawnFormFields = {
   name: string
@@ -26,7 +27,7 @@ export type SpawnMenuSlice =
       parentId: WorktreeId | null
       fields: SpawnFormFields
       status: SpawnMenuStatus
-      errorMessage?: string
+      errorMessage?: FailureMessage
       repoSelector: string | null
     }
 
@@ -40,7 +41,7 @@ export type SpawnMenuAction =
   | { type: 'set-repo-selector'; repoSelector: string }
   | { type: 'submit' }
   | { type: 'submit-ok' }
-  | { type: 'submit-error'; message: string }
+  | { type: 'submit-error'; message: FailureMessage }
   | { type: 'cancel' }
 
 export function reduceSpawnMenu(slice: SpawnMenuSlice, action: SpawnMenuAction): SpawnMenuSlice {

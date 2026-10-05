@@ -9,6 +9,7 @@ import type { SpawnAgent } from '../../application/ports/runtime-gateway'
 import { emptyDecisionVisibility } from '../../application/fan-out-decision-visibility'
 import type { WorktreeGraph } from '../../domain/worktree-graph/types'
 import { fromParentLabel } from './node-label-model'
+import type { FailureMessage } from '../../application/i18n/user-facing-error'
 import { fanOutBatchFailures } from '../../application/fan-out-batch-failures'
 import type { FanOutBatchFailure } from '../../application/fan-out-batch-failures'
 import { pendingGatesViewModel, pendingQuestionsViewModel } from './fan-out-decision-view-model'
@@ -32,7 +33,7 @@ export type FanOutFormViewModel = {
   readonly agent: FanOutAgentViewModel
   readonly prompt: FanOutFieldViewModel
   readonly submitEnabled: boolean
-  readonly errorMessage: string | null
+  readonly errorMessage: FailureMessage | null
   /** Non-blocking note shown when the target repo has no setup command; null otherwise. */
   readonly setupHint: string | null
 }

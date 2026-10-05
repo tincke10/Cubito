@@ -1,3 +1,4 @@
+import type { FailureMessage } from './i18n/user-facing-error'
 export type RepoKind = 'git' | 'folder'
 export type ProjectSelectorStatus = 'idle' | 'submitting' | 'error'
 
@@ -12,7 +13,7 @@ export type ProjectSelectorSlice =
       /** Optional setup command persisted as the repo's setup hook right after add. */
       setup?: string
       status: ProjectSelectorStatus
-      errorMessage?: string
+      errorMessage?: FailureMessage
     }
 
 export const emptyProjectSelectorSlice = (): ProjectSelectorSlice => ({ view: 'closed' })
@@ -28,7 +29,7 @@ export type ProjectSelectorAction =
   | { type: 'update-add-field'; field: 'path' | 'kind' | 'setup'; value: string }
   | { type: 'submit-add' }
   | { type: 'submit-add-ok' }
-  | { type: 'submit-add-error'; message: string }
+  | { type: 'submit-add-error'; message: FailureMessage }
   | { type: 'back-to-list' }
 
 export function reduceProjectSelector(

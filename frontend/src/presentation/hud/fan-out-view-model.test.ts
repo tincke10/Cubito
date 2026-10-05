@@ -1,3 +1,4 @@
+import { plainFailure } from '../../application/i18n/user-facing-error'
 import { describe, expect, it } from 'vitest'
 import { fanOutViewModel } from './fan-out-view-model'
 import { emptyWorktreeGraph } from '../../domain/worktree-graph/types'
@@ -83,9 +84,11 @@ describe('fanOutViewModel — form', () => {
   })
 
   it('passes the slice errorMessage through verbatim', () => {
-    const model = fanOutViewModel(formSlice({ errorMessage: 'a repo must be selected' }))
+    const model = fanOutViewModel(
+      formSlice({ errorMessage: plainFailure('a repo must be selected') })
+    )
     if (model?.view !== 'form') throw new Error('expected form')
-    expect(model.errorMessage).toBe('a repo must be selected')
+    expect(model.errorMessage).toEqual(plainFailure('a repo must be selected'))
   })
 })
 
@@ -178,7 +181,7 @@ describe('fanOutViewModel — running — per-child failures', () => {
             failed: true,
             dispatchId: null,
             taskId: null,
-            errorMessage: 'network unreachable'
+            errorMessage: plainFailure('network unreachable')
           },
           { mutationId: 'm2', worktreeId: 'w3', failed: false, dispatchId: null, taskId: null }
         ],
@@ -187,7 +190,7 @@ describe('fanOutViewModel — running — per-child failures', () => {
     )
     if (model?.view !== 'running') throw new Error('expected running')
     expect(model.failures).toEqual([
-      { mutationId: 'm1', label: 'camada-m1', message: 'network unreachable' }
+      { mutationId: 'm1', label: 'camada-m1', message: plainFailure('network unreachable') }
     ])
   })
 

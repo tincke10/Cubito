@@ -1,3 +1,4 @@
+import { plainFailure } from './i18n/user-facing-error'
 import { describe, expect, it } from 'vitest'
 import { emptyCompareChildLoad, reduceCompareChildLoad } from './compare-child-load'
 import type { CompareChildLoad } from './compare-child-load'
@@ -55,12 +56,12 @@ describe('reduceCompareChildLoad — child-rail-loaded / child-rail-error', () =
     const load = reduceCompareChildLoad(emptyCompareChildLoad(), {
       type: 'child-rail-error',
       childId: CHILD_ID,
-      message: 'sin ancestro común con la base'
+      message: plainFailure('sin ancestro común con la base')
     })
     expect(load).toEqual({
       ...emptyCompareChildLoad(),
       status: 'error',
-      errorMessage: 'sin ancestro común con la base'
+      errorMessage: plainFailure('sin ancestro común con la base')
     })
   })
 })
@@ -114,9 +115,9 @@ describe('reduceCompareChildLoad — select-file / child-panel-loaded / child-pa
       type: 'child-panel-error',
       childId: CHILD_ID,
       path: 'src/auth.ts',
-      message: 'boom'
+      message: plainFailure('boom')
     })
-    expect(load.panel).toEqual({ kind: 'error', message: 'boom' })
+    expect(load.panel).toEqual({ kind: 'error', message: plainFailure('boom') })
   })
 
   it('ignores a stale child-panel-error for a path that is no longer selected', () => {

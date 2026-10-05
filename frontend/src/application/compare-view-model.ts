@@ -7,6 +7,7 @@ import type {
 import type { DiffFileRow } from './diff-view-model'
 import { emptyCompareChildLoad, reduceCompareChildLoad } from './compare-child-load'
 import type { CompareChildLoad, CompareChildLoadAction } from './compare-child-load'
+import type { FailureMessage } from './i18n/user-facing-error'
 
 export type { CompareChildLoad }
 
@@ -22,7 +23,7 @@ export type CompareMergeState =
       dependencySetup?: ParentDependencySetupResult
     }
   | { phase: 'conflict'; files: readonly string[] }
-  | { phase: 'error'; message: string }
+  | { phase: 'error'; message: FailureMessage }
 
 const idleMerge = (): CompareMergeState => ({ phase: 'idle' })
 
@@ -50,9 +51,9 @@ export type CompareViewAction =
       compare: { headOid: string; mergeBase: string }
       files: readonly DiffFileRow[]
     }
-  | { type: 'child-rail-error'; childId: WorktreeId; message?: string }
+  | { type: 'child-rail-error'; childId: WorktreeId; message?: FailureMessage }
   | { type: 'child-panel-loaded'; childId: WorktreeId; path: string; content: DiffFileContent }
-  | { type: 'child-panel-error'; childId: WorktreeId; path: string; message?: string }
+  | { type: 'child-panel-error'; childId: WorktreeId; path: string; message?: FailureMessage }
   | { type: 'set-winner'; winnerId: WorktreeId | null }
   | { type: 'merge-start' }
   | {
@@ -62,7 +63,7 @@ export type CompareViewAction =
       dependencySetup?: ParentDependencySetupResult
     }
   | { type: 'merge-conflict'; files: readonly string[] }
-  | { type: 'merge-error'; message: string }
+  | { type: 'merge-error'; message: FailureMessage }
   | { type: 'merge-reset' }
   | { type: 'close' }
 

@@ -1,3 +1,4 @@
+import { plainFailure } from '../../application/i18n/user-facing-error'
 import { describe, expect, it } from 'vitest'
 import { projectSelectorViewModel } from './project-selector-view-model'
 import type { ProjectSelectorSlice } from '../../application/project-selector-model'
@@ -140,10 +141,10 @@ describe('projectSelectorViewModel', () => {
         path: '/abs/path',
         kind: 'git',
         status: 'error',
-        errorMessage: 'no es un repo git'
+        errorMessage: plainFailure('no es un repo git')
       },
       reposSlice([])
     )
-    expect(errored).toMatchObject({ errorMessage: 'no es un repo git' })
+    expect(errored).toMatchObject({ errorMessage: plainFailure('no es un repo git') })
   })
 })

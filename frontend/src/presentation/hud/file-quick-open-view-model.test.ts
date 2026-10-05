@@ -1,3 +1,4 @@
+import { plainFailure } from '../../application/i18n/user-facing-error'
 import { describe, expect, it } from 'vitest'
 import { fileQuickOpenPanelModel } from './file-quick-open-view-model'
 import type { FileQuickOpenView } from '../../application/file-quick-open-flow'
@@ -50,9 +51,11 @@ describe('fileQuickOpenPanelModel', () => {
       'buscando…'
     )
     expect(fileQuickOpenPanelModel(view({ query: 'a' })).statusText).toBe('sin resultados')
-    expect(fileQuickOpenPanelModel(view({ query: 'a', error: 'boom' }))).toMatchObject({
+    expect(
+      fileQuickOpenPanelModel(view({ query: 'a', error: plainFailure('boom') }))
+    ).toMatchObject({
       statusText: null,
-      error: 'boom'
+      error: plainFailure('boom')
     })
   })
 })

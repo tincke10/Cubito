@@ -1,3 +1,4 @@
+import { plainFailure } from '../../application/i18n/user-facing-error'
 import { describe, expect, it } from 'vitest'
 import { fileEditorPanelModel } from './file-editor-view-model'
 import type { FileEditorView } from '../../application/file-editor-flow'
@@ -35,7 +36,9 @@ describe('fileEditorPanelModel', () => {
   })
 
   it('says it is loading', () => {
-    expect(fileEditorPanelModel(view({ status: 'loading', content: '' })).message).toBe('cargando…')
+    expect(fileEditorPanelModel(view({ status: 'loading', content: '' })).message).toEqual(
+      plainFailure('cargando…')
+    )
   })
 
   it('makes a truncated file visibly read-only', () => {
@@ -49,13 +52,15 @@ describe('fileEditorPanelModel', () => {
     expect(fileEditorPanelModel(view({ readOnly: 'binary', content: '' }))).toMatchObject({
       badge: 'binario, solo lectura',
       readOnly: true,
-      message: 'archivo binario: no se puede mostrar'
+      message: plainFailure('archivo binario: no se puede mostrar')
     })
   })
 
   it('surfaces a read error and keeps the pane read-only', () => {
-    expect(fileEditorPanelModel(view({ status: 'error', error: 'ENOENT' }))).toMatchObject({
-      message: 'ENOENT',
+    expect(
+      fileEditorPanelModel(view({ status: 'error', error: plainFailure('ENOENT') }))
+    ).toMatchObject({
+      message: plainFailure('ENOENT'),
       readOnly: true
     })
   })
@@ -75,9 +80,9 @@ describe('fileEditorPanelModel', () => {
   it('shows a saved notice and a save error under the text', () => {
     expect(fileEditorPanelModel(view({ notice: 'guardado' })).notice).toBe('guardado')
     expect(
-      fileEditorPanelModel(view({ dirty: true, error: 'no se pudo guardar: EACCES' }))
+      fileEditorPanelModel(view({ dirty: true, error: plainFailure('no se pudo guardar: EACCES') }))
     ).toMatchObject({
-      message: 'no se pudo guardar: EACCES'
+      message: plainFailure('no se pudo guardar: EACCES')
     })
   })
 

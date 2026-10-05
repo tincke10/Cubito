@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { setActiveLanguage } from './translate'
-import { describeFailure, failureText, joinFailure, splitFailureText } from './user-facing-error'
+import { describeFailure, plainFailure } from './user-facing-error'
 
 afterEach(() => setActiveLanguage('es'))
 
@@ -75,23 +75,8 @@ describe('describeFailure', () => {
   })
 })
 
-describe('failure text encoding', () => {
-  it('round-trips lead and detail, multi-line detail included', () => {
-    const text = joinFailure({ lead: 'no se pudo', detail: 'fatal: a\nerror: b' })
-    expect(splitFailureText(text)).toEqual({ lead: 'no se pudo', detail: 'fatal: a\nerror: b' })
-  })
-
-  it('treats text without a detail as a lone lead', () => {
-    expect(splitFailureText('hola')).toEqual({ lead: 'hola', detail: null })
-    expect(splitFailureText(joinFailure({ lead: 'hola', detail: null }))).toEqual({
-      lead: 'hola',
-      detail: null
-    })
-  })
-
-  it('failureText composes describeFailure and joinFailure', () => {
-    expect(splitFailureText(failureText('workingTree', 'x'))).toEqual(
-      describeFailure('workingTree', 'x')
-    )
+describe('plainFailure', () => {
+  it('is a lead with no engine detail', () => {
+    expect(plainFailure('hola')).toEqual({ lead: 'hola', detail: null })
   })
 })

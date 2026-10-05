@@ -1,3 +1,4 @@
+import { plainFailure } from './i18n/user-facing-error'
 import { describe, expect, it } from 'vitest'
 import {
   FANOUT_PLACEHOLDER_PREFIX,
@@ -250,7 +251,9 @@ describe('reduceFanOut — submit', () => {
     }
     const slice = reduceFanOut(agentNoPrompt, { type: 'submit', mutationIds: ['m1'] })
     expect(slice.view).toBe('form')
-    expect((slice as { errorMessage?: string }).errorMessage).toBe(fanOutPromptRequiredMessage())
+    expect((slice as { errorMessage?: unknown }).errorMessage).toEqual(
+      plainFailure(fanOutPromptRequiredMessage())
+    )
   })
 
   it('runs when an agent is chosen and the prompt has text', () => {
@@ -316,13 +319,13 @@ describe('reduceFanOut — form-error', () => {
       fields: { count: 3, agent: 'none', prompt: '' },
       repoSelector: null
     }
-    const slice = reduceFanOut(formSlice, { type: 'form-error', message: 'boom' })
-    expect((slice as { errorMessage?: string }).errorMessage).toBe('boom')
+    const slice = reduceFanOut(formSlice, { type: 'form-error', message: plainFailure('boom') })
+    expect((slice as { errorMessage?: unknown }).errorMessage).toEqual(plainFailure('boom'))
   })
 
   it('is a no-op outside the form view', () => {
     const closed = emptyFanOutSlice()
-    expect(reduceFanOut(closed, { type: 'form-error', message: 'boom' })).toBe(closed)
+    expect(reduceFanOut(closed, { type: 'form-error', message: plainFailure('boom') })).toBe(closed)
   })
 })
 

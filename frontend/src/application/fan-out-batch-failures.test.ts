@@ -1,8 +1,8 @@
+import { plainFailure } from './i18n/user-facing-error'
 import { describe, expect, it } from 'vitest'
 import { reduceFanOut } from './fan-out-model'
 import type { FanOutBatchEntry, FanOutSlice } from './fan-out-model'
 import { fanOutBatchFailures, summarizeChildFailure } from './fan-out-batch-failures'
-import { joinFailure } from './i18n/user-facing-error'
 
 const runningSliceWithBatch = (batch: readonly FanOutBatchEntry[]): FanOutSlice => ({
   view: 'running',
@@ -22,7 +22,7 @@ describe('reduceFanOut — child-failed carries an error message', () => {
     const next = reduceFanOut(slice, {
       type: 'child-failed',
       mutationId: 'm1',
-      message: 'network unreachable'
+      message: plainFailure('network unreachable')
     })
     expect((next as { batch: readonly FanOutBatchEntry[] }).batch).toEqual([
       {
@@ -31,7 +31,7 @@ describe('reduceFanOut — child-failed carries an error message', () => {
         failed: true,
         dispatchId: null,
         taskId: null,
-        errorMessage: 'network unreachable'
+        errorMessage: plainFailure('network unreachable')
       }
     ])
   })
@@ -41,16 +41,6 @@ describe('reduceFanOut — child-failed carries an error message', () => {
       { mutationId: 'm1', worktreeId: null, failed: false, dispatchId: null, taskId: null }
     ])
     const next = reduceFanOut(slice, { type: 'child-failed', mutationId: 'm1' })
-    expect((next as { batch: readonly FanOutBatchEntry[] }).batch).toEqual([
-      { mutationId: 'm1', worktreeId: null, failed: true, dispatchId: null, taskId: null }
-    ])
-  })
-
-  it('omits errorMessage when the action carries an empty-string message', () => {
-    const slice = runningSliceWithBatch([
-      { mutationId: 'm1', worktreeId: null, failed: false, dispatchId: null, taskId: null }
-    ])
-    const next = reduceFanOut(slice, { type: 'child-failed', mutationId: 'm1', message: '' })
     expect((next as { batch: readonly FanOutBatchEntry[] }).batch).toEqual([
       { mutationId: 'm1', worktreeId: null, failed: true, dispatchId: null, taskId: null }
     ])
@@ -77,7 +67,7 @@ describe('fanOutBatchFailures', () => {
         failed: true,
         dispatchId: null,
         taskId: null,
-        errorMessage: 'boom'
+        errorMessage: plainFailure('boom')
       },
       { mutationId: 'm2', worktreeId: 'w2', failed: false, dispatchId: null, taskId: null },
       {
@@ -86,12 +76,12 @@ describe('fanOutBatchFailures', () => {
         failed: true,
         dispatchId: null,
         taskId: null,
-        errorMessage: 'timeout'
+        errorMessage: plainFailure('timeout')
       }
     ])
     expect(fanOutBatchFailures(slice)).toEqual([
-      { mutationId: 'm1', label: 'camada-m1', message: 'boom' },
-      { mutationId: 'm3', label: 'camada-m3', message: 'timeout' }
+      { mutationId: 'm1', label: 'camada-m1', message: plainFailure('boom') },
+      { mutationId: 'm3', label: 'camada-m3', message: plainFailure('timeout') }
     ])
   })
 
@@ -100,7 +90,7 @@ describe('fanOutBatchFailures', () => {
       { mutationId: 'm1', worktreeId: null, failed: true, dispatchId: null, taskId: null }
     ])
     expect(fanOutBatchFailures(slice)).toEqual([
-      { mutationId: 'm1', label: 'camada-m1', message: 'no se pudo crear el cubo' }
+      { mutationId: 'm1', label: 'camada-m1', message: plainFailure('no se pudo crear el cubo') }
     ])
   })
 
@@ -116,18 +106,18 @@ describe('fanOutBatchFailures', () => {
         failed: true,
         dispatchId: null,
         taskId: null,
-        errorMessage: joinFailure({ lead: 'no se pudo crear este worktree', detail: raw })
+        errorMessage: { lead: 'no se pudo crear este worktree', detail: raw }
       }
     ])
     expect(fanOutBatchFailures(slice)).toEqual([
       {
         mutationId: 'm1',
         label: 'camada-m1',
-        message: joinFailure({
+        message: {
           lead: 'no se pudo crear este worktree',
           detail:
             "fatal: could not create leading directories of '/Users/dev/repo/camada-abc123/.git': Permission denied"
-        })
+        }
       }
     ])
   })

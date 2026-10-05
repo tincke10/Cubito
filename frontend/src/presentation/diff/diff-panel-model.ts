@@ -1,3 +1,4 @@
+import type { FailureMessage } from '../../application/i18n/user-facing-error'
 import type { DiffPanelState } from '../../application/diff-view-model'
 import { computeLineDiff, type DiffLine } from './line-diff'
 
@@ -13,7 +14,7 @@ export type DiffPanelView =
   | { kind: 'binary'; deleted: boolean }
   | { kind: 'loading' }
   | { kind: 'idle' }
-  | { kind: 'error'; message?: string }
+  | { kind: 'error'; message?: FailureMessage }
 
 const LINE_CSS_CLASS: Record<DiffLine['kind'], string> = {
   ctx: 'diff-line--ctx',

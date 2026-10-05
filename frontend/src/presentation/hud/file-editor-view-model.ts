@@ -1,3 +1,5 @@
+import { plainFailure } from '../../application/i18n/user-facing-error'
+import type { FailureMessage } from '../../application/i18n/user-facing-error'
 import type { FileEditorView } from '../../application/file-editor-flow'
 import { t } from '../../application/i18n/translate'
 
@@ -14,7 +16,7 @@ export type FileEditorPanelModel = {
   dirty: boolean
   saveEnabled: boolean
   /** Status line below the text: loading, a read/save error or the binary notice. */
-  message: string | null
+  message: FailureMessage | null
   notice: string | null
   conflict: {
     message: string
@@ -50,11 +52,11 @@ export function fileEditorPanelModel(view: FileEditorView): FileEditorPanelModel
   if (view.phase === 'closed') return HIDDEN
   const message =
     view.status === 'loading'
-      ? t('editor.loading')
+      ? plainFailure(t('editor.loading'))
       : view.error !== null
         ? view.error
         : view.readOnly === 'binary'
-          ? t('editor.binaryNotice')
+          ? plainFailure(t('editor.binaryNotice'))
           : null
   const readOnly = view.status !== 'ready' || view.readOnly !== null
   return {

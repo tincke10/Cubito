@@ -1,5 +1,6 @@
 import { t } from '../../application/i18n/translate'
-import { failureText } from '../../application/i18n/user-facing-error'
+import { describeFailure, plainFailure } from '../../application/i18n/user-facing-error'
+import type { FailureMessage } from '../../application/i18n/user-facing-error'
 import type {
   ProjectSelectorAction,
   ProjectSelectorSlice
@@ -56,7 +57,7 @@ export function createProjectSelectorController(
   let setupRequestedFor: string | null = null
   let setupShown = false
 
-  const showSetup = (message = ''): void => {
+  const showSetup = (message: FailureMessage | null = null): void => {
     if (!element || !setupRepo) return
     setupShown = true
     element.applySetup({
@@ -96,9 +97,9 @@ export function createProjectSelectorController(
       await gateway.setRepoSetupCommand(`id:${target.id}`, trimmed)
       setupRepo = { ...target, command: trimmed === '' ? null : trimmed }
       repoSetupSaved.emit()
-      showSetup(t('projects.setupSaved'))
+      showSetup(plainFailure(t('projects.setupSaved')))
     } catch (error) {
-      showSetup(failureText('projectSetupSave', error))
+      showSetup(describeFailure('projectSetupSave', error))
     }
   }
 
@@ -127,11 +128,11 @@ export function createProjectSelectorController(
           ? { type: 'submit-add-ok' }
           : {
               type: 'submit-add-error',
-              message: failureText('projectSetupAfterAdd', setupError.cause)
+              message: describeFailure('projectSetupAfterAdd', setupError.cause)
             }
       )
     } catch (error) {
-      deps.dispatch({ type: 'submit-add-error', message: failureText('projectAdd', error) })
+      deps.dispatch({ type: 'submit-add-error', message: describeFailure('projectAdd', error) })
     }
   }
 

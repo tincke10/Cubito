@@ -1,7 +1,8 @@
 import type { WorktreeId } from '../domain/worktree-graph/types'
 import type { FileStamp, RuntimeGateway } from './ports/runtime-gateway'
 import { t } from './i18n/translate'
-import { failureText } from './i18n/user-facing-error'
+import { describeFailure } from './i18n/user-facing-error'
+import type { FailureMessage } from './i18n/user-facing-error'
 
 export type FileEditorGatewayPort = Pick<RuntimeGateway, 'filesRead' | 'filesStat' | 'filesWrite'>
 
@@ -22,7 +23,7 @@ type OpenView = {
   /** Reloading from disk after the user chose "recargar". */
   reloading: boolean
   notice: string | null
-  error: string | null
+  error: FailureMessage | null
   conflict: FileEditConflict | null
   confirmDiscard: boolean
 }
@@ -104,7 +105,7 @@ export function createFileEditorFlow(deps: FileEditorDeps): FileEditorFlow {
     } catch (error) {
       fields = isBinaryRefusal(error)
         ? { status: 'ready', readOnly: 'binary', content: '' }
-        : { status: 'error', error: failureText('editorRead', error) }
+        : { status: 'error', error: describeFailure('editorRead', error) }
     }
     if (own !== generation || !isStillOpen()) return
     baseline = stamp
@@ -120,7 +121,7 @@ export function createFileEditorFlow(deps: FileEditorDeps): FileEditorFlow {
         ? gateway.filesWrite(nodeId, path, content, hostId)
         : gateway.filesWrite(nodeId, path, content))
     } catch (error) {
-      patch({ saving: false, error: failureText('editorSave', error) })
+      patch({ saving: false, error: describeFailure('editorSave', error) })
       return
     }
     baseline = await stampOrNull(nodeId, path)

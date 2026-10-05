@@ -122,7 +122,7 @@ export function createFileEditor(
       save.disabled = !model.saveEnabled
       if (text.value !== model.text) text.value = model.text
       text.readOnly = model.readOnly
-      renderFailureText(doc, message, model.message ?? '')
+      renderFailureText(doc, message, model.message)
       toggle(message, model.message !== null)
       notice.textContent = model.notice ?? ''
       toggle(notice, model.notice !== null)

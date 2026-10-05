@@ -149,7 +149,7 @@ describe('syncWorktreeGraph', () => {
     expect(state.sync).toEqual({
       state: 'error',
       code: 'runtime_unavailable',
-      message: 'no se pudieron actualizar los worktrees\u001fboom'
+      message: { lead: 'no se pudieron actualizar los worktrees', detail: 'boom' }
     })
     expect(state.graph.nodes.size).toBe(2)
   })

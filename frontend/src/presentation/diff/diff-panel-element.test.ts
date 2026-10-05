@@ -1,3 +1,4 @@
+import { plainFailure } from '../../application/i18n/user-facing-error'
 import { describe, expect, it } from 'vitest'
 import { createDiffPanel } from './diff-panel-element'
 import type { DiffPanelView } from './diff-panel-model'
@@ -100,7 +101,7 @@ describe('createDiffPanel', () => {
 
   it('renders the error message when present', () => {
     const panel = createDiffPanel(createFakeDocument())
-    panel.apply({ kind: 'error', message: 'boom' })
+    panel.apply({ kind: 'error', message: plainFailure('boom') })
     expect(elementOf(panel).children[0]!.textContent).toBe('boom')
   })
 

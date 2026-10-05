@@ -140,7 +140,7 @@ describe('fetchBranchCompareEntries', () => {
 
     expect(result).toEqual({
       outcome: 'failed',
-      message: 'no se pudo comparar la rama con su base\u001fboom'
+      message: { lead: 'no se pudo comparar la rama con su base', detail: 'boom' }
     })
   })
 })

@@ -13,7 +13,7 @@ describe('engine failures in English', () => {
     )
     expect(result).toEqual({
       outcome: 'failed',
-      message: "couldn't read the git status\u001ffatal: not a git repository"
+      message: { lead: "couldn't read the git status", detail: 'fatal: not a git repository' }
     })
   })
 })

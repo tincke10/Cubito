@@ -1,7 +1,8 @@
 import type { CompareMergeState } from '../../application/compare-view-model'
 import { createTwoStepButton } from '../hud/two-step-button'
 import { t } from '../../application/i18n/translate'
-import { failureText } from '../../application/i18n/user-facing-error'
+import { describeFailure, plainFailure } from '../../application/i18n/user-facing-error'
+import type { FailureMessage } from '../../application/i18n/user-facing-error'
 import { renderFailureText } from '../failure-text-element'
 
 export type CompareMergeActionModel = {
@@ -31,10 +32,10 @@ const cleanText = (commitOid: string): string =>
 /** v3-2: per-status copy for the opt-in parent working-tree sync outcome. */
 const workingTreeText = (
   workingTree: NonNullable<Extract<CompareMergeState, { phase: 'clean' }>['workingTree']>
-): string => {
-  if (workingTree.status === 'synced') return t('compare.parentSynced')
-  if (workingTree.status === 'skipped') return t('compare.parentSkipped')
-  return failureText('parentSync', workingTree.message)
+): FailureMessage => {
+  if (workingTree.status === 'synced') return plainFailure(t('compare.parentSynced'))
+  if (workingTree.status === 'skipped') return plainFailure(t('compare.parentSkipped'))
+  return describeFailure('parentSync', workingTree.message)
 }
 
 /** Copy for the background parent setup-hook re-run triggered by changed package manifests. */
@@ -89,7 +90,9 @@ export function createCompareMergeAction(doc: Document = document): CompareMerge
       renderFailureText(
         doc,
         line,
-        merge.workingTree ? workingTreeText(merge.workingTree) : cleanText(merge.commitOid)
+        merge.workingTree
+          ? workingTreeText(merge.workingTree)
+          : plainFailure(cleanText(merge.commitOid))
       )
       result.appendChild(line)
       if (merge.dependencySetup) {

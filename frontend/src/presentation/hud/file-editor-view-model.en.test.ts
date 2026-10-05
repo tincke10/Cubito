@@ -1,3 +1,4 @@
+import { plainFailure } from '../../application/i18n/user-facing-error'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { fileEditorPanelModel } from './file-editor-view-model'
 import type { FileEditorView } from '../../application/file-editor-flow'
@@ -25,10 +26,12 @@ describe('fileEditorPanelModel (en)', () => {
   afterEach(() => setActiveLanguage('es'))
 
   it('words status, badge, conflict and discard copy in English', () => {
-    expect(fileEditorPanelModel(open({ status: 'loading' })).message).toBe('loading…')
+    expect(fileEditorPanelModel(open({ status: 'loading' })).message).toEqual(
+      plainFailure('loading…')
+    )
     const binary = fileEditorPanelModel(open({ readOnly: 'binary' }))
     expect(binary.badge).toBe('binary, read-only')
-    expect(binary.message).toBe('binary file: cannot be displayed')
+    expect(binary.message).toEqual(plainFailure('binary file: cannot be displayed'))
     const conflict = fileEditorPanelModel(open({ conflict: { reason: 'changed' } })).conflict
     expect(conflict?.message).toBe('the file changed on disk since you opened it')
     expect(conflict?.overwrite.idle).toBe('overwrite')

@@ -86,7 +86,7 @@ describe('sourceControlModel', () => {
   })
 
   it('carries the notice through', () => {
-    const notice = { tone: 'error', text: 'boom' } as const
+    const notice = { tone: 'error', message: { lead: 'boom', detail: null } } as const
     expect(sourceControlModel(ready({ notice })).notice).toEqual(notice)
   })
 
@@ -117,12 +117,22 @@ describe('sourceControlModel', () => {
     it('explains why creation is blocked and carries the result link', () => {
       const review = sourceControlModel(
         withReview(
-          { result: { tone: 'ok', text: 'MR #2 creado', href: 'https://x/2' } },
+          {
+            result: {
+              tone: 'ok',
+              message: { lead: 'MR #2 creado', detail: null },
+              href: 'https://x/2'
+            }
+          },
           { canCreate: false, blockedReason: 'default_branch' }
         )
       ).review!
       expect(review.blockedText).toMatch(/rama por defecto/)
-      expect(review.result).toEqual({ tone: 'ok', text: 'MR #2 creado', href: 'https://x/2' })
+      expect(review.result).toEqual({
+        tone: 'ok',
+        message: { lead: 'MR #2 creado', detail: null },
+        href: 'https://x/2'
+      })
     })
   })
 })

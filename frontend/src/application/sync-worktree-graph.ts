@@ -4,7 +4,7 @@ import { composeFanOutGraph } from './fan-out-model'
 import { applyPsStatusToGraph } from './worktree-ps-status-overlay'
 import type { SceneStore } from './scene-store'
 import type { RuntimeGateway } from './ports/runtime-gateway'
-import { failureText } from './i18n/user-facing-error'
+import { describeFailure } from './i18n/user-facing-error'
 
 /** The slice of RuntimeGateway one sync cycle needs. */
 export type SyncGatewayPort = Pick<RuntimeGateway, 'listWorktrees' | 'listRepos' | 'listWorktreePs'>
@@ -48,7 +48,7 @@ export async function syncWorktreeGraph(
       typeof error === 'object' && error !== null && 'code' in error
         ? String((error as { code: unknown }).code)
         : 'unknown'
-    const message = failureText('worktreeSync', error)
+    const message = describeFailure('worktreeSync', error)
     store.update({ sync: { state: 'error', code, message } })
   }
 

@@ -1,4 +1,5 @@
 import { t } from '../../application/i18n/translate'
+import type { FailureMessage } from '../../application/i18n/user-facing-error'
 import { renderFailureText } from '../failure-text-element'
 import type {
   ProjectSelectorListViewModel,
@@ -41,7 +42,7 @@ export type ProjectSelectorSetupModel = {
   readonly command: string | null
   /** Read-only command coming from orca.yaml; not editable or clearable from here. */
   readonly sharedCommand?: string | null
-  readonly message: string
+  readonly message: FailureMessage | null
 }
 
 export type ProjectSelectorHandle = {
@@ -265,7 +266,7 @@ export function createProjectSelector(doc: Document = document): ProjectSelector
       setupInput.value = model.setup
       submitButton.textContent = model.submitLabel
       submitButton.disabled = !model.submitEnabled
-      renderFailureText(doc, errorLine, model.errorMessage ?? '')
+      renderFailureText(doc, errorLine, model.errorMessage)
       errorLine.style.display = model.errorMessage === null ? 'none' : ''
     },
     applySetup(model) {
@@ -277,7 +278,7 @@ export function createProjectSelector(doc: Document = document): ProjectSelector
         doc,
         setupLabel,
         model.message,
-        `${t('projects.setupFor', { repo: model.repoName })}${sharedText}${model.message === '' ? '' : ' · '}`
+        `${t('projects.setupFor', { repo: model.repoName })}${sharedText}${model.message === null ? '' : ' · '}`
       )
       setupCommandInput.value = model.command ?? ''
       setupCommandInput.placeholder =

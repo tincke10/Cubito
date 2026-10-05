@@ -1,7 +1,8 @@
 import { cubeNameFor } from './fan-out-model'
 import type { FanOutSlice } from './fan-out-model'
 import { t } from './i18n/translate'
-import { joinFailure, splitFailureText } from './i18n/user-facing-error'
+import { plainFailure } from './i18n/user-facing-error'
+import type { FailureMessage } from './i18n/user-facing-error'
 
 const FANOUT_CHILD_FAILURE_SUMMARY_MAX_LENGTH = 160
 const FATAL_LINE_PATTERN = /^(fatal|error):/i
@@ -22,17 +23,18 @@ export function summarizeChildFailure(message: string): string {
     : chosen
 }
 
-function summarizedFailure(text: string): string {
-  const { lead, detail } = splitFailureText(text)
-  if (detail === null) return text.trim() === '' ? t('fanout.childFailureFallback') : lead
-  return joinFailure({ lead, detail: summarizeChildFailure(detail) })
+function summarizedFailure(failure: FailureMessage | undefined): FailureMessage {
+  if (failure === undefined) return plainFailure(t('fanout.childFailureFallback'))
+  return failure.detail === null
+    ? failure
+    : { lead: failure.lead, detail: summarizeChildFailure(failure.detail) }
 }
 
 /** One failed camada child for the running panel's failure list. */
 export type FanOutBatchFailure = {
   readonly mutationId: string
   readonly label: string
-  readonly message: string
+  readonly message: FailureMessage
 }
 
 /** Failed batch entries, in submit order, labeled with the child's generated worktree name. */
@@ -44,6 +46,6 @@ export function fanOutBatchFailures(slice: FanOutSlice): readonly FanOutBatchFai
       mutationId: entry.mutationId,
       label: cubeNameFor(entry.mutationId),
       // errorMessage keeps the raw engine text as the failure detail — only the display row gets summarized.
-      message: summarizedFailure(entry.errorMessage ?? '')
+      message: summarizedFailure(entry.errorMessage)
     }))
 }

@@ -1,3 +1,4 @@
+import { plainFailure } from './i18n/user-facing-error'
 import { describe, expect, it } from 'vitest'
 import {
   emptyCompareViewSlice,
@@ -194,8 +195,13 @@ describe('reduceCompareView — merge (Change E)', () => {
 
   it('merge-error sets phase to error with the message', () => {
     const running = reduceCompareView(openSlice(), { type: 'merge-start' })
-    const slice = reduceCompareView(running, { type: 'merge-error', message: 'host unavailable' })
-    expect(slice).toMatchObject({ merge: { phase: 'error', message: 'host unavailable' } })
+    const slice = reduceCompareView(running, {
+      type: 'merge-error',
+      message: plainFailure('host unavailable')
+    })
+    expect(slice).toMatchObject({
+      merge: { phase: 'error', message: plainFailure('host unavailable') }
+    })
   })
 
   it('merge-reset returns to idle from any phase', () => {
@@ -213,7 +219,9 @@ describe('reduceCompareView — merge (Change E)', () => {
     expect(reduceCompareView(closed, { type: 'merge-start' })).toBe(closed)
     expect(reduceCompareView(closed, { type: 'merge-clean', commitOid: 'x' })).toBe(closed)
     expect(reduceCompareView(closed, { type: 'merge-conflict', files: [] })).toBe(closed)
-    expect(reduceCompareView(closed, { type: 'merge-error', message: 'x' })).toBe(closed)
+    expect(reduceCompareView(closed, { type: 'merge-error', message: plainFailure('x') })).toBe(
+      closed
+    )
     expect(reduceCompareView(closed, { type: 'merge-reset' })).toBe(closed)
   })
 
@@ -250,12 +258,12 @@ describe('reduceCompareView — per-child load actions route by childId', () => 
     const slice = reduceCompareView(openSlice(), {
       type: 'child-rail-error',
       childId: 'w-child-2',
-      message: 'base inválida'
+      message: plainFailure('base inválida')
     })
     if (slice.view !== 'open') throw new Error('unreachable')
     expect(slice.childLoads['w-child-2']).toMatchObject({
       status: 'error',
-      errorMessage: 'base inválida'
+      errorMessage: plainFailure('base inválida')
     })
     expect(slice.childLoads['w-child-1']).toEqual(emptyCompareChildLoad())
   })
@@ -302,7 +310,7 @@ describe('reduceCompareView — per-child load actions route by childId', () => 
     const slice = reduceCompareView(before, {
       type: 'child-rail-error',
       childId: 'w-not-a-member',
-      message: 'x'
+      message: plainFailure('x')
     })
     expect(slice).toBe(before)
   })

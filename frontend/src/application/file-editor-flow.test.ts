@@ -91,7 +91,7 @@ describe('file editor flow — open', () => {
     await flow.open('w', 'gone.ts')
     expect(open(flow.view())).toMatchObject({
       status: 'error',
-      error: 'no se pudo abrir el archivo\u001fENOENT: no such file'
+      error: { lead: 'no se pudo abrir el archivo', detail: 'ENOENT: no such file' }
     })
   })
 
@@ -225,7 +225,7 @@ describe('file editor flow — edit and save', () => {
     expect(open(flow.view())).toMatchObject({
       dirty: true,
       saving: false,
-      error: 'no se pudo guardar el archivo\u001fEACCES'
+      error: { lead: 'no se pudo guardar el archivo', detail: 'EACCES' }
     })
   })
 

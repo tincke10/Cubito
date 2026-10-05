@@ -1,3 +1,4 @@
+import { plainFailure } from './i18n/user-facing-error'
 import { describe, expect, it } from 'vitest'
 import { emptySpawnMenuSlice, reduceSpawnMenu, toCreateWorktreeInput } from './spawn-menu-model'
 import type { SpawnFormFields, SpawnMenuSlice } from './spawn-menu-model'
@@ -102,7 +103,7 @@ describe('reduceSpawnMenu', () => {
       parentId: null,
       fields: formFields({ name: 'x' }),
       status: 'error',
-      errorMessage: 'boom',
+      errorMessage: plainFailure('boom'),
       repoSelector: 'id:repo-1'
     }
     const next = reduceSpawnMenu(slice, { type: 'submit' })
@@ -154,20 +155,23 @@ describe('reduceSpawnMenu', () => {
       status: 'submitting',
       repoSelector: null
     }
-    const next = reduceSpawnMenu(slice, { type: 'submit-error', message: 'network down' })
+    const next = reduceSpawnMenu(slice, {
+      type: 'submit-error',
+      message: plainFailure('network down')
+    })
     expect(next).toEqual({
       view: 'form',
       parentId: null,
       fields: formFields({ name: 'x' }),
       status: 'error',
-      errorMessage: 'network down',
+      errorMessage: plainFailure('network down'),
       repoSelector: null
     })
   })
 
   it('submit-error is a no-op outside the form view', () => {
     const slice = emptySpawnMenuSlice()
-    expect(reduceSpawnMenu(slice, { type: 'submit-error', message: 'x' })).toBe(slice)
+    expect(reduceSpawnMenu(slice, { type: 'submit-error', message: plainFailure('x') })).toBe(slice)
   })
 
   it('cancel closes from the radial view', () => {
@@ -184,7 +188,7 @@ describe('reduceSpawnMenu', () => {
       parentId: null,
       fields: formFields({ name: 'x' }),
       status: 'error',
-      errorMessage: 'boom',
+      errorMessage: plainFailure('boom'),
       repoSelector: null
     }
     expect(reduceSpawnMenu(slice, { type: 'cancel' })).toEqual({

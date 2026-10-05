@@ -129,7 +129,7 @@ export function createSpawnForm(doc: Document = document): SpawnFormHandle {
       promptArea.disabled = !model.prompt.enabled
       submitButton.textContent = model.submitLabel
       submitButton.disabled = !model.submitEnabled
-      renderFailureText(doc, errorLine, model.errorMessage ?? '')
+      renderFailureText(doc, errorLine, model.errorMessage)
       errorLine.style.display = model.errorMessage === null ? 'none' : ''
       setupNotice.textContent = model.setupHint ?? ''
       setupNotice.style.display = model.setupHint === null ? 'none' : ''

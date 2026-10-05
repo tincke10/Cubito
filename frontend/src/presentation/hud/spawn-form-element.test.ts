@@ -1,3 +1,4 @@
+import { plainFailure } from '../../application/i18n/user-facing-error'
 import { describe, expect, it, vi } from 'vitest'
 import { createSpawnForm, resolveSpawnFormKey } from './spawn-form-element'
 import type { SpawnFormViewModel } from './spawn-view-model'
@@ -216,7 +217,7 @@ describe('createSpawnForm', () => {
 
   it('shows the error message when present', () => {
     const form = createSpawnForm(createFakeDocument())
-    form.apply(idleModel({ errorMessage: 'la conexión falló' }))
+    form.apply(idleModel({ errorMessage: plainFailure('la conexión falló') }))
     const root = form.element as unknown as FakeElement
     const errorEl = root.children.find((c) => c.className.includes('error'))
     expect(errorEl?.textContent).toBe('la conexión falló')

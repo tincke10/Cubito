@@ -1,12 +1,13 @@
 import type { GitStatusRow, RuntimeGateway } from './ports/runtime-gateway'
-import { failureText } from './i18n/user-facing-error'
+import { describeFailure } from './i18n/user-facing-error'
+import type { FailureMessage } from './i18n/user-facing-error'
 
 /** Only the method a working-tree fetch needs — narrow like branch-compare-entries-fetch. */
 export type WorkingTreeEntriesGateway = Pick<RuntimeGateway, 'gitStatus'>
 
 export type WorkingTreeEntriesResult =
   | { outcome: 'ready'; entries: readonly GitStatusRow[] }
-  | { outcome: 'failed'; message: string }
+  | { outcome: 'failed'; message: FailureMessage }
 
 /** Precedence when git.status reports the same path twice (staged + unstaged areas). */
 const STATUS_PRECEDENCE = ['added', 'untracked', 'copied', 'renamed', 'modified'] as const
@@ -44,6 +45,6 @@ export async function fetchWorkingTreeEntries(
     const status = await gateway.gitStatus(worktree)
     return { outcome: 'ready', entries: collapseByPath(status.entries) }
   } catch (error) {
-    return { outcome: 'failed', message: failureText('workingTree', error) }
+    return { outcome: 'failed', message: describeFailure('workingTree', error) }
   }
 }

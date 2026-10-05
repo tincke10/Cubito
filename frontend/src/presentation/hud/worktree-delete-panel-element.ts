@@ -56,7 +56,7 @@ export function createWorktreeDeletePanel(doc: Document = document): WorktreeDel
         item.textContent = text
         lines.appendChild(item)
       }
-      renderFailureText(doc, error, model.error ?? '')
+      renderFailureText(doc, error, model.error)
       error.hidden = model.error === null
       action.element.hidden = !model.showAction
       action.apply({ labels: model.actionLabels, busy: model.busy, disabled: false })

@@ -1,3 +1,4 @@
+import { plainFailure } from '../../application/i18n/user-facing-error'
 import { describe, expect, it } from 'vitest'
 import { createCompareMergeAction } from './compare-merge-action-element'
 import type { CompareMergeActionModel } from './compare-merge-action-element'
@@ -211,14 +212,14 @@ describe('createCompareMergeAction', () => {
 
   it('renders the error message on error', () => {
     const action = createCompareMergeAction(createFakeDocument())
-    action.apply(model({ merge: { phase: 'error', message: 'host unavailable' } }))
+    action.apply(model({ merge: { phase: 'error', message: plainFailure('host unavailable') } }))
     const result = resultOf(rootOf(action))
     expect(result.children[0]!.textContent).toBe('host unavailable')
   })
 
   it('clears the result region back to idle/running', () => {
     const action = createCompareMergeAction(createFakeDocument())
-    action.apply(model({ merge: { phase: 'error', message: 'x' } }))
+    action.apply(model({ merge: { phase: 'error', message: plainFailure('x') } }))
     action.apply(model({ merge: idle }))
     expect(resultOf(rootOf(action)).children).toHaveLength(0)
   })
