@@ -1,6 +1,7 @@
 import { resolveProjectSelectorKey } from './project-selector-element'
 import type { FileQuickOpenPanelModel } from './file-quick-open-view-model'
 import { t } from '../../application/i18n/translate'
+import { renderFailureText } from '../failure-text-element'
 
 export type FileQuickOpenHandle = {
   readonly root: HTMLElement
@@ -60,7 +61,7 @@ export function createFileQuickOpen(doc: Document = document): FileQuickOpenHand
     apply(model) {
       root.hidden = !model.visible
       if (query.value !== model.query) query.value = model.query
-      status.textContent = model.error ?? model.statusText ?? ''
+      renderFailureText(doc, status, model.error ?? model.statusText ?? '')
       status.classList.toggle('cubito-file-quick-open__status--error', model.error !== null)
       status.hidden = model.error === null && model.statusText === null
       rows.replaceChildren()

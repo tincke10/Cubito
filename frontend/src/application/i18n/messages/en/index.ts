@@ -16,6 +16,7 @@ import { enSourcecontrol } from './sourcecontrol'
 import { enReview } from './review'
 import { enSystem } from './system'
 import { enActivity } from './activity'
+import { enFailure } from './failure'
 
 /** English is the source of truth for message keys; es must mirror it (see es/index.ts). */
 export const en = {
@@ -36,7 +37,8 @@ export const en = {
   ...enSourcecontrol,
   ...enReview,
   ...enSystem,
-  ...enActivity
+  ...enActivity,
+  ...enFailure
 } as const
 
 export type MessageKey = keyof typeof en

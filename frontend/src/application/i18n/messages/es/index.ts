@@ -17,6 +17,7 @@ import { esSourcecontrol } from './sourcecontrol'
 import { esReview } from './review'
 import { esSystem } from './system'
 import { esActivity } from './activity'
+import { esFailure } from './failure'
 
 export const es: Record<MessageKey, string> = {
   ...esPalette,
@@ -36,5 +37,6 @@ export const es: Record<MessageKey, string> = {
   ...esSourcecontrol,
   ...esReview,
   ...esSystem,
-  ...esActivity
+  ...esActivity,
+  ...esFailure
 }

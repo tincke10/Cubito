@@ -5,6 +5,5 @@ export const esQuickopen: Record<keyof typeof enQuickopen, string> = {
   'quickopen.searching': 'buscando…',
   'quickopen.hint': 'escribí parte del nombre o de la ruta',
   'quickopen.noResults': 'sin resultados',
-  'quickopen.binaryName': '{name} (binario)',
-  'quickopen.searchFailed': 'búsqueda fallida: {reason}'
+  'quickopen.binaryName': '{name} (binario)'
 }

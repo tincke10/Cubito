@@ -4,7 +4,7 @@ export const esPalette: Record<keyof typeof enPalette, string> = {
   'palette.focus': 'foco',
   'palette.fitAll': 'general · ver todo',
   'palette.openTerminal': 'abrir terminal',
-  'palette.openSpawn': 'spawn worktree',
+  'palette.openSpawn': 'crear worktree',
   'palette.projects': 'proyectos',
   'palette.addRepo': 'agregar repo',
   'palette.fanOut': 'fan-out',

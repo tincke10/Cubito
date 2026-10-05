@@ -3,6 +3,8 @@ import { resolveBaseRef } from '../domain/worktree-graph/resolve-base-ref'
 import { shortBranchName } from '../presentation/hud/node-label-model'
 import { authRequiredMessage, reviewKindName } from './hosted-review-presentation'
 import { t } from './i18n/translate'
+import { failureText } from './i18n/user-facing-error'
+import type { FailureAction } from './i18n/user-facing-error'
 import type {
   HostedReviewEligibility,
   RuntimeGateway,
@@ -88,8 +90,11 @@ export type SourceControlFlow = {
 
 type Ready = Extract<SourceControlView, { phase: 'ready' }>
 
-const messageOf = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error)
+const BUSY_FAILURE: Record<SourceControlBusy, FailureAction> = {
+  stage: 'sourceControlStage',
+  commit: 'sourceControlCommit',
+  push: 'sourceControlPush'
+}
 
 function stageStatesOf(entries: SourceControlStatus['entries']): Map<string, StageState> {
   const areas = new Map<string, { staged: boolean; unstaged: boolean }>()
@@ -237,17 +242,15 @@ export function createSourceControlFlow(deps: SourceControlFlowDeps): SourceCont
           }),
           href: created.url
         }
-      } else if (created.code === 'auth_required') {
-        result = { tone: 'error', text: authRequiredMessage() }
       } else {
         result = {
           tone: 'error',
-          text: created.error,
+          text: failureText('reviewCreate', created.error, created.code),
           ...(created.existingReview ? { href: created.existingReview.url } : {})
         }
       }
     } catch (error) {
-      result = { tone: 'error', text: messageOf(error) }
+      result = { tone: 'error', text: failureText('reviewCreate', error) }
     }
     if (ownGeneration !== generation) return
     patchReview({ creating: false, result })
@@ -266,7 +269,7 @@ export function createSourceControlFlow(deps: SourceControlFlowDeps): SourceCont
     try {
       notice = await action(current as Ready)
     } catch (error) {
-      notice = { tone: 'error', text: messageOf(error) }
+      notice = { tone: 'error', text: failureText(BUSY_FAILURE[busy], error) }
     }
     if (ownGeneration !== generation) return
     patch({ busy: null, notice })
@@ -311,7 +314,8 @@ export function createSourceControlFlow(deps: SourceControlFlowDeps): SourceCont
       if (current.phase !== 'ready' || !current.canCommit) return Promise.resolve()
       return run('commit', async (view) => {
         const result = await gateway.gitCommit(view.nodeId, view.message.trim())
-        if (!result.success) return { tone: 'error', text: result.error }
+        if (!result.success)
+          return { tone: 'error', text: failureText('sourceControlCommit', result.error) }
         patch({ message: '' })
         return { tone: 'ok', text: t('sourceControl.commitCreated') }
       })

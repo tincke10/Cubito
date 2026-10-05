@@ -12,6 +12,8 @@ import type {
   SourceControlStatus
 } from './ports/runtime-gateway'
 import { authRequiredMessage } from './hosted-review-presentation'
+import { failureText } from './i18n/user-facing-error'
+import { setActiveLanguage } from './i18n/translate'
 
 const eligibility = (over: Partial<HostedReviewEligibility> = {}): HostedReviewEligibility => ({
   provider: 'github',
@@ -162,7 +164,13 @@ describe('source control flow', () => {
     gateway.gitStage.mockRejectedValueOnce(new Error('index.lock exists'))
     await flow.open('r::/w')
     await flow.toggleStage('b.ts')
-    expect(ready(flow.view()).notice).toEqual({ tone: 'error', text: 'index.lock exists' })
+    expect(ready(flow.view()).notice).toEqual({
+      tone: 'error',
+      text: failureText('sourceControlStage', 'index.lock exists')
+    })
+    expect(failureText('sourceControlStage', 'index.lock exists')).toBe(
+      'no se pudo actualizar el stage\u001findex.lock exists'
+    )
   })
 
   it('commit needs a message and staged files', async () => {
@@ -195,7 +203,10 @@ describe('source control flow', () => {
     await flow.commit()
     const view = ready(flow.view())
     expect(view.message).toBe('feat: x')
-    expect(view.notice).toEqual({ tone: 'error', text: 'hook failed' })
+    expect(view.notice).toEqual({
+      tone: 'error',
+      text: failureText('sourceControlCommit', 'hook failed')
+    })
   })
 
   it('pushes plainly with an upstream and publishes without one', async () => {
@@ -239,7 +250,7 @@ describe('source control flow', () => {
     expect(ready(flow.view()).busy).toBeNull()
     expect(ready(flow.view()).notice).toEqual({
       tone: 'error',
-      text: 'rejected (non-fast-forward)'
+      text: failureText('sourceControlPush', 'rejected (non-fast-forward)')
     })
   })
 
@@ -361,7 +372,7 @@ describe('source control flow — review', () => {
     expect(gateway.hostedReviewCreate).not.toHaveBeenCalled()
   })
 
-  it('turns auth_required into the actionable message', async () => {
+  it('leads with the actionable message on auth_required and keeps the host error as detail', async () => {
     const { flow, gateway } = setup()
     gateway.hostedReviewCreate.mockResolvedValueOnce({
       ok: false,
@@ -371,11 +382,14 @@ describe('source control flow — review', () => {
     await flow.open('r::/w')
     await flow.reviewPrimary()
     expect(reviewOf(flow.view())).toMatchObject({
-      result: { tone: 'error', text: authRequiredMessage() }
+      result: {
+        tone: 'error',
+        text: `${authRequiredMessage()}\u001fgh: not logged in`
+      }
     })
   })
 
-  it('links the existing review on already_exists and shows other errors verbatim', async () => {
+  it('links the existing review on already_exists and leads other codes with their copy', async () => {
     const { flow, gateway } = setup()
     gateway.hostedReviewCreate
       .mockResolvedValueOnce({
@@ -389,7 +403,17 @@ describe('source control flow — review', () => {
     await flow.reviewPrimary()
     expect(reviewOf(flow.view())).toMatchObject({ result: { href: 'https://x/3' } })
     await flow.reviewPrimary()
-    expect(reviewOf(flow.view())).toMatchObject({ result: { text: 'title too long' } })
+    expect(reviewOf(flow.view())).toMatchObject({
+      result: { text: 'el proveedor rechazó el pedido\u001ftitle too long' }
+    })
+    setActiveLanguage('en')
+    try {
+      expect(failureText('reviewCreate', 'title too long', 'validation')).toBe(
+        'the provider rejected the request\u001ftitle too long'
+      )
+    } finally {
+      setActiveLanguage('es')
+    }
   })
 
   it('routes the primary button by nextAction', async () => {

@@ -80,7 +80,7 @@ describe('commandCatalog', () => {
       keybindingHint: 't'
     })
     expect(findCommand(mac, 'open-spawn')).toMatchObject({
-      label: 'spawn worktree',
+      label: 'crear worktree',
       keybindingHint: 's'
     })
     expect(findCommand(mac, 'add-repo')).toMatchObject({

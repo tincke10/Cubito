@@ -1,0 +1,35 @@
+import type { enFailure } from '../en/failure'
+
+export const esFailure: Record<keyof typeof enFailure, string> = {
+  'failure.unknown': 'algo salió mal',
+  'failure.action.workingTree': 'no se pudo leer el estado de git',
+  'failure.action.branchCompare': 'no se pudo comparar la rama con su base',
+  'failure.action.compareRail': 'no se pudieron cargar los cambios de esta rama',
+  'failure.action.diffPanel': 'falló la carga del diff',
+  'failure.action.quickOpenSearch': 'falló la búsqueda',
+  'failure.action.editorRead': 'no se pudo abrir el archivo',
+  'failure.action.editorSave': 'no se pudo guardar el archivo',
+  'failure.action.worktreeDelete': 'no se pudo borrar el worktree',
+  'failure.action.compareMerge': 'no se pudo mergear al ganador',
+  'failure.action.parentSync': 'el padre no se sincronizó',
+  'failure.action.sourceControlStage': 'no se pudo actualizar el stage',
+  'failure.action.sourceControlCommit': 'no se pudo crear el commit',
+  'failure.action.sourceControlPush': 'no se pudo hacer push de la rama',
+  'failure.action.reviewCreate': 'no se pudo crear la review',
+  'failure.action.worktreeSync': 'no se pudieron actualizar los worktrees',
+  'failure.action.fanOutChild': 'no se pudo crear este worktree',
+  'failure.action.fanOutRun': 'no se pudo iniciar la corrida',
+  'failure.action.fanOutRowSubmit': 'no se pudo enviar',
+  'failure.action.spawnCreate': 'no se pudo crear el worktree',
+  'failure.action.projectAdd': 'no se pudo agregar el proyecto',
+  'failure.action.projectSetupSave': 'no se pudo guardar el setup',
+  'failure.action.projectSetupAfterAdd': 'repo agregado, pero no se guardó el setup',
+  'failure.code.already_exists': 'ya existe una review para esta rama',
+  'failure.code.validation': 'el proveedor rechazó el pedido',
+  'failure.code.timeout': 'la operación excedió el tiempo de espera',
+  'failure.code.unknown_completion':
+    'no se pudo confirmar el resultado: revisá el proveedor antes de reintentar',
+  'failure.code.push_failed': 'no se pudo hacer push de la rama',
+  'failure.code.unsupported_provider': 'este proveedor no permite esta acción desde acá',
+  'failure.code.binary_file': 'los archivos binarios no se pueden abrir como texto'
+}

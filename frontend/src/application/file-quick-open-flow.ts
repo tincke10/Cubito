@@ -1,6 +1,6 @@
 import type { WorktreeId } from '../domain/worktree-graph/types'
 import type { FilePathMatch, RuntimeGateway } from './ports/runtime-gateway'
-import { t } from './i18n/translate'
+import { failureText } from './i18n/user-facing-error'
 
 export type FileQuickOpenGatewayPort = Pick<RuntimeGateway, 'filesSearchPaths'>
 
@@ -38,9 +38,6 @@ export type FileQuickOpenDeps = {
 const DEFAULT_DEBOUNCE_MS = 150
 const RESULT_LIMIT = 20
 
-const messageOf = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error)
-
 const wrap = (index: number, total: number): number => ((index % total) + total) % total
 
 export function createFileQuickOpenFlow(deps: FileQuickOpenDeps): FileQuickOpenFlow {
@@ -73,7 +70,7 @@ export function createFileQuickOpenFlow(deps: FileQuickOpenDeps): FileQuickOpenF
           ...current,
           searching: false,
           rows: [],
-          error: t('quickopen.searchFailed', { reason: messageOf(error) })
+          error: failureText('quickOpenSearch', error)
         })
       }
       return

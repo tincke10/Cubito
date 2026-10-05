@@ -1,5 +1,6 @@
 import type { SourceControlModel } from './source-control-view-model'
 import { t } from '../../application/i18n/translate'
+import { renderFailureText } from '../failure-text-element'
 
 export type SourceControlComposerHandle = {
   readonly root: HTMLElement
@@ -128,7 +129,7 @@ export function createSourceControlComposer(doc: Document = document): SourceCon
     reviewButton.disabled = model.primary.disabled
     reviewLink.textContent = model.primary.label
     if (model.primary.href !== undefined) reviewLink.href = model.primary.href
-    reviewResult.textContent = model.result?.text ?? ''
+    renderFailureText(doc, reviewResult, model.result?.text ?? '')
     reviewResult.className = `cubito-source-control__notice${model.result ? ` cubito-source-control__notice--${model.result.tone}` : ''}`
     reviewResultLink.hidden = model.result?.href === undefined
     if (model.result?.href !== undefined) reviewResultLink.href = model.result.href
@@ -146,7 +147,7 @@ export function createSourceControlComposer(doc: Document = document): SourceCon
       commit.disabled = model.commitDisabled
       push.textContent = model.pushLabel
       push.disabled = model.pushDisabled
-      notice.textContent = model.notice?.text ?? ''
+      renderFailureText(doc, notice, model.notice?.text ?? '')
       applyReview(model.review)
       notice.className = `cubito-source-control__notice${model.notice ? ` cubito-source-control__notice--${model.notice.tone}` : ''}`
     },
