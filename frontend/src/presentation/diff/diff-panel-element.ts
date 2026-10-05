@@ -1,5 +1,6 @@
 import type { DiffPanelLineView, DiffPanelView } from './diff-panel-model'
 import { t } from '../../application/i18n/translate'
+import { renderFailureText } from '../failure-text-element'
 
 const buildLineRow = (doc: Document, line: DiffPanelLineView): HTMLElement => {
   const row = doc.createElement('div')
@@ -75,9 +76,9 @@ export function createDiffPanel(doc: Document = document): DiffPanelHandle {
           element.appendChild(buildHint(doc, 'cubito-diff-panel__idle', t('diff.idle')))
           break
         case 'error':
-          element.appendChild(
-            buildHint(doc, 'cubito-diff-panel__error', vm.message ?? t('diff.loadError'))
-          )
+          const hint = buildHint(doc, 'cubito-diff-panel__error', '')
+          renderFailureText(doc, hint, vm.message ?? t('diff.loadError'))
+          element.appendChild(hint)
           break
       }
     },

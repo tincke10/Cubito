@@ -89,7 +89,10 @@ describe('file editor flow — open', () => {
       })
     })
     await flow.open('w', 'gone.ts')
-    expect(open(flow.view())).toMatchObject({ status: 'error', error: 'ENOENT: no such file' })
+    expect(open(flow.view())).toMatchObject({
+      status: 'error',
+      error: 'no se pudo abrir el archivo\u001fENOENT: no such file'
+    })
   })
 
   it('ignores a second open while a file is showing', async () => {
@@ -222,7 +225,7 @@ describe('file editor flow — edit and save', () => {
     expect(open(flow.view())).toMatchObject({
       dirty: true,
       saving: false,
-      error: 'no se pudo guardar: EACCES'
+      error: 'no se pudo guardar el archivo\u001fEACCES'
     })
   })
 

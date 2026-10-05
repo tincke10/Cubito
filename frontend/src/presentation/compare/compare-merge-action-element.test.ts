@@ -294,8 +294,11 @@ describe('createCompareMergeAction', () => {
       })
     )
     const result = resultOf(rootOf(action))
-    expect(result.children[0]!.textContent).toContain('padre no sincronizado')
-    expect(result.children[0]!.textContent).toContain('refusing to clobber x.txt')
+    expect(result.children[0]!.textContent).toBe('el padre no se sincronizó')
+    expect(result.children[0]!.children[0]).toMatchObject({
+      className: 'cubito-failure__detail',
+      textContent: 'refusing to clobber x.txt'
+    })
   })
 
   it('adds a background dependency-setup line only when started', () => {

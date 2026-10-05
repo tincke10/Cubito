@@ -149,7 +149,11 @@ describe('createFanOutGateList — gate rows', () => {
     await Promise.resolve()
     expect(submit.disabled).toBe(false)
     const error = findByClass(row!, 'cubito-decision-row__error')
-    expect(error.textContent).toBe('gate_not_pending')
+    expect(error.textContent).toBe('no se pudo enviar')
+    expect(error.children[0]).toMatchObject({
+      className: 'cubito-failure__detail',
+      textContent: 'gate_not_pending'
+    })
     expect(rowsOf(list)).toHaveLength(1)
   })
 

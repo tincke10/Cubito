@@ -7,6 +7,7 @@ import { composeBaseToWorkingTree } from './diff-panel-content-compose'
 import type { DiffFileContent, RuntimeGateway } from './ports/runtime-gateway'
 import type { SceneStore } from './scene-store'
 import { t } from './i18n/translate'
+import { failureText } from './i18n/user-facing-error'
 
 /** Only the methods diff mode needs — narrow like the other controller ports. */
 export type DiffLiveLoaderGatewayPort = Pick<
@@ -128,7 +129,7 @@ export function createDiffLiveLoader(deps: DiffLiveLoaderDeps): DiffLiveLoader {
       const slice = deps.store.get().diffView
       if (slice.view !== 'open' || slice.focusedNodeId !== nodeId || slice.selectedPath !== path)
         return
-      dispatch({ type: 'panel-error', path, message: messageOf(error) })
+      dispatch({ type: 'panel-error', path, message: failureText('diffPanel', error) })
     }
   }
 
@@ -147,7 +148,7 @@ export function createDiffLiveLoader(deps: DiffLiveLoaderDeps): DiffLiveLoader {
       stopped = false
       const baseRef = resolveBaseRef(deps.store.get().graph, nodeId)
       if (baseRef === null) {
-        dispatch({ type: 'open-error', message: `no base ref for ${nodeId}` })
+        dispatch({ type: 'open-error', message: t('diff.noBaseRef', { id: nodeId }) })
         return
       }
       dispatch({ type: 'open', nodeId, baseRef })
@@ -169,10 +170,6 @@ export function createDiffLiveLoader(deps: DiffLiveLoaderDeps): DiffLiveLoader {
 }
 
 type DiffCompareRef = { mergeBase: string; headOid: string }
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
-}
 
 /** Human copy for a non-'ready' BranchCompare status (git.branchCompare doesn't throw for these).
  *  Exported for compare-live-loader.ts (Change D) — reused verbatim, one wording for both modes. */

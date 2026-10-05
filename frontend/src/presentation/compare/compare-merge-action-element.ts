@@ -1,6 +1,8 @@
 import type { CompareMergeState } from '../../application/compare-view-model'
 import { createTwoStepButton } from '../hud/two-step-button'
 import { t } from '../../application/i18n/translate'
+import { failureText } from '../../application/i18n/user-facing-error'
+import { renderFailureText } from '../failure-text-element'
 
 export type CompareMergeActionModel = {
   /** Hidden until a winner is picked — merge never implies picking one. */
@@ -32,7 +34,7 @@ const workingTreeText = (
 ): string => {
   if (workingTree.status === 'synced') return t('compare.parentSynced')
   if (workingTree.status === 'skipped') return t('compare.parentSkipped')
-  return t('compare.parentSyncFailed', { message: workingTree.message })
+  return failureText('parentSync', workingTree.message)
 }
 
 /** Copy for the background parent setup-hook re-run triggered by changed package manifests. */
@@ -84,9 +86,11 @@ export function createCompareMergeAction(doc: Document = document): CompareMerge
     if (merge.phase === 'clean') {
       const line = doc.createElement('div')
       line.className = 'compare-merge-action__result-line compare-merge-action__result-line--clean'
-      line.textContent = merge.workingTree
-        ? workingTreeText(merge.workingTree)
-        : cleanText(merge.commitOid)
+      renderFailureText(
+        doc,
+        line,
+        merge.workingTree ? workingTreeText(merge.workingTree) : cleanText(merge.commitOid)
+      )
       result.appendChild(line)
       if (merge.dependencySetup) {
         const setupLine = doc.createElement('div')
@@ -112,7 +116,7 @@ export function createCompareMergeAction(doc: Document = document): CompareMerge
     } else if (merge.phase === 'error') {
       const line = doc.createElement('div')
       line.className = 'compare-merge-action__result-line compare-merge-action__result-line--error'
-      line.textContent = merge.message
+      renderFailureText(doc, line, merge.message)
       result.appendChild(line)
     }
   }

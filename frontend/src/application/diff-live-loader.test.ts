@@ -199,7 +199,7 @@ describe('createDiffLiveLoader', () => {
     })
     const slice = store.get().diffView
     if (slice.view === 'open') {
-      expect(slice.errorMessage).toBe('boom')
+      expect(slice.errorMessage).toBe('no se pudo comparar la rama con su base\u001fboom')
     }
     loader.stop()
   })
@@ -565,7 +565,7 @@ describe('createDiffLiveLoader', () => {
     })
     const slice = store.get().diffView
     if (slice.view === 'open' && slice.panel.kind === 'error') {
-      expect(slice.panel.message).toBe('nope')
+      expect(slice.panel.message).toBe('falló la carga del diff\u001fnope')
     }
     loader.stop()
   })

@@ -65,7 +65,7 @@ export function spawnViewModel(
     prompt: { value: slice.fields.prompt, enabled: agentActive && !submitting },
     submitLabel: submitting ? t('spawn.submitting') : t('spawn.submit'),
     submitEnabled: slice.fields.name.trim() !== '' && !submitting,
-    errorMessage: slice.status === 'error' ? (slice.errorMessage ?? 'error') : null,
+    errorMessage: slice.status === 'error' ? (slice.errorMessage ?? t('failure.unknown')) : null,
     setupHint
   }
 }

@@ -1,6 +1,7 @@
 import { resolveBaseRef } from '../domain/worktree-graph/resolve-base-ref'
 import type { WorktreeGraph, WorktreeId } from '../domain/worktree-graph/types'
 import type { GitStatusRow, RuntimeGateway } from './ports/runtime-gateway'
+import { failureText } from './i18n/user-facing-error'
 
 /** Only the method a branch-compare fetch needs — narrow like the other controller ports. */
 export type BranchCompareEntriesGateway = Pick<RuntimeGateway, 'gitBranchCompare'>
@@ -14,10 +15,6 @@ export type BranchCompareEntriesResult =
   | { outcome: 'no-base-ref' }
   | { outcome: 'not-ready'; status: string }
   | { outcome: 'failed'; message: string }
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
-}
 
 /**
  * Shared branch-compare fetch — extracted from diff-live-loader's loadRail so the system-view
@@ -43,6 +40,6 @@ export async function fetchBranchCompareEntries(
       entries: compare.entries
     }
   } catch (error) {
-    return { outcome: 'failed', message: messageOf(error) }
+    return { outcome: 'failed', message: failureText('branchCompare', error) }
   }
 }

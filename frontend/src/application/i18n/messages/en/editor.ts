@@ -14,7 +14,6 @@ export const enEditor = {
   'editor.discardMessage': 'you have unsaved changes',
   'editor.discard': 'discard changes',
   'editor.discardConfirm': 'confirm discard',
-  'editor.saveFailed': 'could not save: {reason}',
   'editor.saved': 'saved',
   'editor.unsavedMark': 'unsaved changes',
   'editor.save': 'save',

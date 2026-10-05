@@ -1,6 +1,7 @@
 import type { WorktreeId } from '../domain/worktree-graph/types'
 import type { FileStamp, RuntimeGateway } from './ports/runtime-gateway'
 import { t } from './i18n/translate'
+import { failureText } from './i18n/user-facing-error'
 
 export type FileEditorGatewayPort = Pick<RuntimeGateway, 'filesRead' | 'filesStat' | 'filesWrite'>
 
@@ -103,7 +104,7 @@ export function createFileEditorFlow(deps: FileEditorDeps): FileEditorFlow {
     } catch (error) {
       fields = isBinaryRefusal(error)
         ? { status: 'ready', readOnly: 'binary', content: '' }
-        : { status: 'error', error: messageOf(error) }
+        : { status: 'error', error: failureText('editorRead', error) }
     }
     if (own !== generation || !isStillOpen()) return
     baseline = stamp
@@ -119,7 +120,7 @@ export function createFileEditorFlow(deps: FileEditorDeps): FileEditorFlow {
         ? gateway.filesWrite(nodeId, path, content, hostId)
         : gateway.filesWrite(nodeId, path, content))
     } catch (error) {
-      patch({ saving: false, error: t('editor.saveFailed', { reason: messageOf(error) }) })
+      patch({ saving: false, error: failureText('editorSave', error) })
       return
     }
     baseline = await stampOrNull(nodeId, path)

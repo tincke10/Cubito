@@ -16,7 +16,6 @@ export const esEditor: Record<keyof typeof enEditor, string> = {
   'editor.discardMessage': 'hay cambios sin guardar',
   'editor.discard': 'descartar cambios',
   'editor.discardConfirm': 'confirmar descartar',
-  'editor.saveFailed': 'no se pudo guardar: {reason}',
   'editor.saved': 'guardado',
   'editor.unsavedMark': 'cambios sin guardar',
   'editor.save': 'guardar',

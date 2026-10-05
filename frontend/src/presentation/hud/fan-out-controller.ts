@@ -1,4 +1,5 @@
 import type { WorktreeGraph, WorktreeId } from '../../domain/worktree-graph/types'
+import { failureText } from '../../application/i18n/user-facing-error'
 import {
   fanOutRepoUnresolvedMessage,
   emptyFanOutSlice,
@@ -172,7 +173,7 @@ export function createFanOutController(deps: FanOutControllerDeps): FanOutContro
         })
         deps.dispatch({ type: 'child-created', mutationId, worktreeId: result.worktreeId })
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err)
+        const message = failureText('fanOutChild', err)
         localSlice = reduceFanOut(localSlice, { type: 'child-failed', mutationId, message })
         deps.dispatch({ type: 'child-failed', mutationId, message })
       }

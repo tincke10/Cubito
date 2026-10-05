@@ -18,7 +18,7 @@ export const esFailure: Record<keyof typeof enFailure, string> = {
   'failure.action.reviewCreate': 'no se pudo crear la review',
   'failure.action.worktreeSync': 'no se pudieron actualizar los worktrees',
   'failure.action.fanOutChild': 'no se pudo crear este worktree',
-  'failure.action.fanOutRun': 'no se pudo iniciar la corrida',
+  'failure.action.fanOutDispatch': 'no se pudo despachar la tarea al agente',
   'failure.action.fanOutRowSubmit': 'no se pudo enviar',
   'failure.action.spawnCreate': 'no se pudo crear el worktree',
   'failure.action.projectAdd': 'no se pudo agregar el proyecto',

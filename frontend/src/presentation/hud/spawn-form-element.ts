@@ -1,4 +1,5 @@
 import { t } from '../../application/i18n/translate'
+import { renderFailureText } from '../failure-text-element'
 import { AGENT_OPTIONS, agentOptionLabel } from './spawn-agent-options'
 import type { SpawnFormFields } from '../../application/spawn-menu-model'
 import type { SpawnFormViewModel } from './spawn-view-model'
@@ -128,7 +129,7 @@ export function createSpawnForm(doc: Document = document): SpawnFormHandle {
       promptArea.disabled = !model.prompt.enabled
       submitButton.textContent = model.submitLabel
       submitButton.disabled = !model.submitEnabled
-      errorLine.textContent = model.errorMessage ?? ''
+      renderFailureText(doc, errorLine, model.errorMessage ?? '')
       errorLine.style.display = model.errorMessage === null ? 'none' : ''
       setupNotice.textContent = model.setupHint ?? ''
       setupNotice.style.display = model.setupHint === null ? 'none' : ''

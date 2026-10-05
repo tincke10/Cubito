@@ -16,7 +16,7 @@ export const enFailure = {
   'failure.action.reviewCreate': "couldn't create the review",
   'failure.action.worktreeSync': "couldn't refresh the worktrees",
   'failure.action.fanOutChild': "couldn't create this worktree",
-  'failure.action.fanOutRun': "couldn't start the run",
+  'failure.action.fanOutDispatch': "couldn't dispatch the task to the agent",
   'failure.action.fanOutRowSubmit': 'could not send',
   'failure.action.spawnCreate': "couldn't create the worktree",
   'failure.action.projectAdd': "couldn't add the project",

@@ -2,6 +2,7 @@ import { fanOutMemberIds } from './fan-out-model'
 import type { FanOutSlice } from './fan-out-model'
 import type { CompareViewAction, CompareViewSlice } from './compare-view-model'
 import type { RuntimeGateway } from './ports/runtime-gateway'
+import { failureText } from './i18n/user-facing-error'
 
 export type CompareMergeGatewayPort = Pick<RuntimeGateway, 'gitMergeWinnerIntoParent'>
 
@@ -49,9 +50,6 @@ export async function runCompareMerge(
         : { type: 'merge-conflict', files: result.files }
     )
   } catch (error) {
-    deps.dispatch({
-      type: 'merge-error',
-      message: error instanceof Error ? error.message : String(error)
-    })
+    deps.dispatch({ type: 'merge-error', message: failureText('compareMerge', error) })
   }
 }

@@ -288,7 +288,7 @@ describe('createProjectSelectorController — repo setup', () => {
     expect(refetch).toHaveBeenCalledOnce()
     expect(dispatch).toHaveBeenCalledWith({
       type: 'submit-add-error',
-      message: expect.stringContaining('setup')
+      message: 'repo agregado, pero no se guardó el setup\u001fboom'
     })
     expect(dispatch).not.toHaveBeenCalledWith({ type: 'submit-add-ok' })
   })
@@ -446,7 +446,7 @@ describe('createProjectSelectorController', () => {
 
     expect(dispatch).toHaveBeenCalledWith({
       type: 'submit-add-error',
-      message: 'no es un repo git'
+      message: 'no se pudo agregar el proyecto\u001fno es un repo git'
     })
     expect(refetch).not.toHaveBeenCalled()
     expect(reposDispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'set-active' }))

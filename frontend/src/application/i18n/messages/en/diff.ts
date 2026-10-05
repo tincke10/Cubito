@@ -17,5 +17,6 @@ export const enDiff = {
   'diff.stage': 'stage',
   'diff.baseInvalid': 'invalid base',
   'diff.unbornHead': 'branch has no commits',
-  'diff.noMergeBase': 'no common ancestor with the base'
+  'diff.noMergeBase': 'no common ancestor with the base',
+  'diff.noBaseRef': 'no base ref for {id}'
 } as const

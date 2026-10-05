@@ -146,7 +146,11 @@ describe('syncWorktreeGraph', () => {
     })
     await syncWorktreeGraph(failing, store, () => 2)
     const state = store.get()
-    expect(state.sync).toEqual({ state: 'error', code: 'runtime_unavailable', message: 'boom' })
+    expect(state.sync).toEqual({
+      state: 'error',
+      code: 'runtime_unavailable',
+      message: 'no se pudieron actualizar los worktrees\u001fboom'
+    })
     expect(state.graph.nodes.size).toBe(2)
   })
 

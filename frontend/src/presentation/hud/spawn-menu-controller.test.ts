@@ -352,7 +352,10 @@ describe('createSpawnMenuController', () => {
     forms[0]!.emitSubmit()
     await flush()
 
-    expect(dispatch).toHaveBeenCalledWith({ type: 'submit-error', message: 'conexión perdida' })
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'submit-error',
+      message: 'no se pudo crear el worktree\u001fconexión perdida'
+    })
     expect(refetch).not.toHaveBeenCalled()
   })
 

@@ -1,4 +1,5 @@
 import { t } from '../../application/i18n/translate'
+import { renderFailureText } from '../failure-text-element'
 import { createTwoStepButton } from './two-step-button'
 import type { WorktreeDeletePanelModel } from './worktree-delete-view-model'
 
@@ -55,7 +56,7 @@ export function createWorktreeDeletePanel(doc: Document = document): WorktreeDel
         item.textContent = text
         lines.appendChild(item)
       }
-      error.textContent = model.error ?? ''
+      renderFailureText(doc, error, model.error ?? '')
       error.hidden = model.error === null
       action.element.hidden = !model.showAction
       action.apply({ labels: model.actionLabels, busy: model.busy, disabled: false })

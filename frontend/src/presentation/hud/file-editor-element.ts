@@ -3,6 +3,7 @@ import { indentUnitFor, insertIndent } from './file-editor-indent'
 import { isIndentKey, isSaveChord } from './file-editor-keys'
 import type { FileEditorPanelModel } from './file-editor-view-model'
 import { t } from '../../application/i18n/translate'
+import { renderFailureText } from '../failure-text-element'
 
 export type FileEditorHandle = {
   readonly root: HTMLElement
@@ -121,7 +122,7 @@ export function createFileEditor(
       save.disabled = !model.saveEnabled
       if (text.value !== model.text) text.value = model.text
       text.readOnly = model.readOnly
-      message.textContent = model.message ?? ''
+      renderFailureText(doc, message, model.message ?? '')
       toggle(message, model.message !== null)
       notice.textContent = model.notice ?? ''
       toggle(notice, model.notice !== null)

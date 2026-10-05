@@ -21,6 +21,5 @@ export const esFanout: Record<keyof typeof enFanout, string> = {
   'fanout.repoUnresolved': 'repositorio aún no resuelto',
   'fanout.childFailureFallback': 'no se pudo crear el cubo',
   'fanout.gateResolve': 'resolver',
-  'fanout.questionAnswer': 'responder',
-  'fanout.rowSubmitFailed': 'no se pudo enviar'
+  'fanout.questionAnswer': 'responder'
 }

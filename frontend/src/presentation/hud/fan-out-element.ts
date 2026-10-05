@@ -2,6 +2,7 @@ import type { SpawnAgent } from '../../application/ports/runtime-gateway'
 import type { FanOutFormViewModel, FanOutRunningViewModel } from './fan-out-view-model'
 import { createFanOutGateList } from './fan-out-gate-list-element'
 import { t } from '../../application/i18n/translate'
+import { renderFailureText } from '../failure-text-element'
 import { AGENT_OPTIONS, agentOptionLabel } from './spawn-agent-options'
 
 export type FanOutFormHandle = {
@@ -136,7 +137,7 @@ export function createFanOutForm(doc: Document = document): FanOutFormHandle {
     for (const failure of failures) {
       const row = doc.createElement('div')
       row.className = 'cubito-fanout-form__failure'
-      row.textContent = `${failure.label}: ${failure.message}`
+      renderFailureText(doc, row, failure.message, `${failure.label}: `)
       failuresList.appendChild(row)
     }
   }
@@ -157,7 +158,7 @@ export function createFanOutForm(doc: Document = document): FanOutFormHandle {
         promptArea.value = model.prompt.value
         promptArea.disabled = !model.prompt.enabled
         submitButton.disabled = !model.submitEnabled
-        errorLine.textContent = model.errorMessage ?? ''
+        renderFailureText(doc, errorLine, model.errorMessage ?? '')
         errorLine.style.display = model.errorMessage === null ? 'none' : ''
         setupNotice.textContent = model.setupHint ?? ''
         setupNotice.style.display = model.setupHint === null ? 'none' : ''

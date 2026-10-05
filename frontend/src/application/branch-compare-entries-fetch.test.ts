@@ -138,6 +138,9 @@ describe('fetchBranchCompareEntries', () => {
 
     const result = await fetchBranchCompareEntries(gateway, graphOf([main, child]), 'repo::child')
 
-    expect(result).toEqual({ outcome: 'failed', message: 'boom' })
+    expect(result).toEqual({
+      outcome: 'failed',
+      message: 'no se pudo comparar la rama con su base\u001fboom'
+    })
   })
 })

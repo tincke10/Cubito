@@ -1,4 +1,5 @@
 import { t } from '../../application/i18n/translate'
+import { failureText } from '../../application/i18n/user-facing-error'
 import type {
   ProjectSelectorAction,
   ProjectSelectorSlice
@@ -97,11 +98,7 @@ export function createProjectSelectorController(
       repoSetupSaved.emit()
       showSetup(t('projects.setupSaved'))
     } catch (error) {
-      showSetup(
-        t('projects.setupError', {
-          message: error instanceof Error ? error.message : t('projects.setupSaveFailed')
-        })
-      )
+      showSetup(failureText('projectSetupSave', error))
     }
   }
 
@@ -114,13 +111,13 @@ export function createProjectSelectorController(
       const repo = await gateway.addRepo({ path: slice.path, kind: slice.kind })
       deps.reposDispatch({ type: 'set-active', repoId: repo.id })
       const setup = slice.setup?.trim() ?? ''
-      let setupError: string | null = null
+      let setupError: { cause: unknown } | null = null
       if (setup !== '') {
         try {
           await gateway.setRepoSetupCommand(`id:${repo.id}`, setup)
           repoSetupSaved.emit()
         } catch (error) {
-          setupError = error instanceof Error ? error.message : 'error'
+          setupError = { cause: error }
         }
       }
       await deps.refetch()
@@ -130,14 +127,11 @@ export function createProjectSelectorController(
           ? { type: 'submit-add-ok' }
           : {
               type: 'submit-add-error',
-              message: t('projects.addedSetupFailed', { error: setupError })
+              message: failureText('projectSetupAfterAdd', setupError.cause)
             }
       )
     } catch (error) {
-      deps.dispatch({
-        type: 'submit-add-error',
-        message: error instanceof Error ? error.message : 'error'
-      })
+      deps.dispatch({ type: 'submit-add-error', message: failureText('projectAdd', error) })
     }
   }
 

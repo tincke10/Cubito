@@ -19,6 +19,5 @@ export const enFanout = {
   'fanout.repoUnresolved': 'repository not resolved yet',
   'fanout.childFailureFallback': 'could not create the cube',
   'fanout.gateResolve': 'resolve',
-  'fanout.questionAnswer': 'answer',
-  'fanout.rowSubmitFailed': 'could not send'
+  'fanout.questionAnswer': 'answer'
 } as const

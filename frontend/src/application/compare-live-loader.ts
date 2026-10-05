@@ -3,6 +3,8 @@ import type { WorktreeId } from '../domain/worktree-graph/types'
 import type { RuntimeGateway } from './ports/runtime-gateway'
 import type { SceneStore } from './scene-store'
 import { railErrorMessageFor } from './diff-live-loader'
+import { t } from './i18n/translate'
+import { failureText } from './i18n/user-facing-error'
 
 /** Only the methods compare mode needs — narrow like diff-live-loader.ts's own gateway port. */
 export type CompareLiveLoaderGatewayPort = Pick<
@@ -50,7 +52,7 @@ export function createCompareLiveLoader(deps: CompareLiveLoaderDeps): CompareLiv
   async function loadChildRail(childId: WorktreeId): Promise<void> {
     const baseRef = resolveBaseRef(deps.store.get().graph, childId)
     if (baseRef === null) {
-      dispatch({ type: 'child-rail-error', childId, message: `no base ref for ${childId}` })
+      dispatch({ type: 'child-rail-error', childId, message: t('diff.noBaseRef', { id: childId }) })
       return
     }
     try {
@@ -77,7 +79,7 @@ export function createCompareLiveLoader(deps: CompareLiveLoaderDeps): CompareLiv
       })
     } catch (error) {
       if (stopped || !isLiveMember(childId)) return
-      dispatch({ type: 'child-rail-error', childId, message: messageOf(error) })
+      dispatch({ type: 'child-rail-error', childId, message: failureText('compareRail', error) })
     }
   }
 
@@ -97,7 +99,12 @@ export function createCompareLiveLoader(deps: CompareLiveLoaderDeps): CompareLiv
       dispatch({ type: 'child-panel-loaded', childId, path, content })
     } catch (error) {
       if (stopped || selectedPathOf(childId) !== path) return
-      dispatch({ type: 'child-panel-error', childId, path, message: messageOf(error) })
+      dispatch({
+        type: 'child-panel-error',
+        childId,
+        path,
+        message: failureText('diffPanel', error)
+      })
     }
   }
 
@@ -123,8 +130,4 @@ export function createCompareLiveLoader(deps: CompareLiveLoaderDeps): CompareLiv
       gateway = newGateway
     }
   }
-}
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
 }

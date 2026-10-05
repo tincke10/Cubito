@@ -1,4 +1,5 @@
 import { t } from '../../application/i18n/translate'
+import { renderFailureText } from '../failure-text-element'
 import type {
   ProjectSelectorListViewModel,
   ProjectSelectorAddFormViewModel
@@ -264,7 +265,7 @@ export function createProjectSelector(doc: Document = document): ProjectSelector
       setupInput.value = model.setup
       submitButton.textContent = model.submitLabel
       submitButton.disabled = !model.submitEnabled
-      errorLine.textContent = model.errorMessage ?? ''
+      renderFailureText(doc, errorLine, model.errorMessage ?? '')
       errorLine.style.display = model.errorMessage === null ? 'none' : ''
     },
     applySetup(model) {
@@ -272,7 +273,12 @@ export function createProjectSelector(doc: Document = document): ProjectSelector
       if (model === null) return
       const shared = model.sharedCommand ?? null
       const sharedText = shared === null ? '' : t('projects.setupShared', { command: shared })
-      setupLabel.textContent = `${t('projects.setupFor', { repo: model.repoName })}${sharedText}${model.message === '' ? '' : ` · ${model.message}`}`
+      renderFailureText(
+        doc,
+        setupLabel,
+        model.message,
+        `${t('projects.setupFor', { repo: model.repoName })}${sharedText}${model.message === '' ? '' : ' · '}`
+      )
       setupCommandInput.value = model.command ?? ''
       setupCommandInput.placeholder =
         shared === null ? t('projects.setupNone') : t('projects.setupNoOverride')

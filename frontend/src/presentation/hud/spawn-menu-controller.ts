@@ -1,4 +1,5 @@
 import { t } from '../../application/i18n/translate'
+import { failureText } from '../../application/i18n/user-facing-error'
 import type { Vec3 } from '../camera/camera-framing'
 import type { WorktreeGraph, WorktreeId } from '../../domain/worktree-graph/types'
 import type { SpawnMenuAction, SpawnMenuSlice } from '../../application/spawn-menu-model'
@@ -147,10 +148,7 @@ export function createSpawnMenuController(deps: SpawnMenuControllerDeps): SpawnM
       await deps.refetch()
       deps.selectCreated?.(worktreeId)
     } catch (error) {
-      deps.dispatch({
-        type: 'submit-error',
-        message: error instanceof Error ? error.message : 'error'
-      })
+      deps.dispatch({ type: 'submit-error', message: failureText('spawnCreate', error) })
     }
   }
 

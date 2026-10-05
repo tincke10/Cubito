@@ -61,7 +61,7 @@ export function projectSelectorViewModel(
       setup: slice.setup ?? '',
       submitLabel: submitting ? t('projects.submitting') : t('projects.submit'),
       submitEnabled: slice.path.trim() !== '' && !submitting,
-      errorMessage: slice.status === 'error' ? (slice.errorMessage ?? 'error') : null
+      errorMessage: slice.status === 'error' ? (slice.errorMessage ?? t('failure.unknown')) : null
     }
   }
   const filtered = repos.list.filter((repo) => matchesQuery(repo, slice.query))

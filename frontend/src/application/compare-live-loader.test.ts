@@ -188,7 +188,9 @@ describe('createCompareLiveLoader', () => {
       expect(slice.view === 'open' && slice.childLoads['repo::child-b']?.status).toBe('ready')
     })
     const slice = store.get().compareView
-    expect(slice.view === 'open' && slice.childLoads['repo::child-a']?.errorMessage).toBe('boom')
+    expect(slice.view === 'open' && slice.childLoads['repo::child-a']?.errorMessage).toBe(
+      'no se pudieron cargar los cambios de esta rama\u001fboom'
+    )
     loader.stop()
   })
 
@@ -302,7 +304,7 @@ describe('createCompareLiveLoader', () => {
     })
     const slice = store.get().compareView
     const panel = slice.view === 'open' ? slice.childLoads['repo::child-a']?.panel : undefined
-    expect(panel).toMatchObject({ kind: 'error', message: 'nope' })
+    expect(panel).toMatchObject({ kind: 'error', message: 'falló la carga del diff\u001fnope' })
     loader.stop()
   })
 

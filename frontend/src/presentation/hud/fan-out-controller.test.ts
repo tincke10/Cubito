@@ -416,7 +416,7 @@ describe('createFanOutController', () => {
     expect(dispatch).toHaveBeenCalledWith({
       type: 'child-failed',
       mutationId: 'mutation-1',
-      message: 'boom'
+      message: 'no se pudo crear este worktree\u001fboom'
     })
     expect(dispatch).toHaveBeenCalledWith({
       type: 'child-created',

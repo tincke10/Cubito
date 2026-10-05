@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { reduceFanOut } from './fan-out-model'
 import type { FanOutBatchEntry, FanOutSlice } from './fan-out-model'
 import { fanOutBatchFailures, summarizeChildFailure } from './fan-out-batch-failures'
+import { joinFailure } from './i18n/user-facing-error'
 
 const runningSliceWithBatch = (batch: readonly FanOutBatchEntry[]): FanOutSlice => ({
   view: 'running',
@@ -115,15 +116,18 @@ describe('fanOutBatchFailures', () => {
         failed: true,
         dispatchId: null,
         taskId: null,
-        errorMessage: raw
+        errorMessage: joinFailure({ lead: 'no se pudo crear este worktree', detail: raw })
       }
     ])
     expect(fanOutBatchFailures(slice)).toEqual([
       {
         mutationId: 'm1',
         label: 'camada-m1',
-        message:
-          "fatal: could not create leading directories of '/Users/dev/repo/camada-abc123/.git': Permission denied"
+        message: joinFailure({
+          lead: 'no se pudo crear este worktree',
+          detail:
+            "fatal: could not create leading directories of '/Users/dev/repo/camada-abc123/.git': Permission denied"
+        })
       }
     ])
   })

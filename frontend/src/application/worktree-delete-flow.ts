@@ -1,6 +1,7 @@
 import type { WorktreeId } from '../domain/worktree-graph/types'
 import { shortBranchName } from '../presentation/hud/node-label-model'
 import type { RuntimeGateway } from './ports/runtime-gateway'
+import { failureText } from './i18n/user-facing-error'
 import type { SceneStore } from './scene-store'
 
 export type WorktreeDeleteGatewayPort = Pick<RuntimeGateway, 'worktreeRemove' | 'gitStatus'>
@@ -41,9 +42,6 @@ export type WorktreeDeleteFlow = {
   cancel(): boolean
   rebindGateway(gateway: WorktreeDeleteGatewayPort): void
 }
-
-const messageOf = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error)
 
 export function createWorktreeDeleteFlow(deps: WorktreeDeleteFlowDeps): WorktreeDeleteFlow {
   const { store } = deps
@@ -127,7 +125,11 @@ export function createWorktreeDeleteFlow(deps: WorktreeDeleteFlowDeps): Worktree
       } catch (error) {
         // Why: git's refusal text is not a stable code, so any failed plain attempt may be retried
         // with force; it still needs its own explicit confirm.
-        patchOpen(nodeId, { removing: false, error: messageOf(error), forceOffered: true })
+        patchOpen(nodeId, {
+          removing: false,
+          error: failureText('worktreeDelete', error),
+          forceOffered: true
+        })
         return
       }
       cleanUp(nodeId, parentId)

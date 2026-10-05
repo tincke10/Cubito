@@ -106,6 +106,9 @@ describe('fetchWorkingTreeEntries', () => {
 
     const result = await fetchWorkingTreeEntries(gateway, 'repo::main')
 
-    expect(result).toEqual({ outcome: 'failed', message: 'boom' })
+    expect(result).toEqual({
+      outcome: 'failed',
+      message: 'no se pudo leer el estado de git\u001fboom'
+    })
   })
 })

@@ -14,7 +14,6 @@ export const enCompare = {
     'Merged into the parent ({oid}). Sync the parent worktree (reset/checkout) to see the changes.',
   'compare.parentSynced': 'parent synced.',
   'compare.parentSkipped': 'parent not synced: it has uncommitted changes.',
-  'compare.parentSyncFailed': 'parent not synced: {message}',
   'compare.reinstalling': 'reinstalling the parent dependencies in the background (setup).',
   'compare.winner': 'winner',
   'compare.pickWinner': 'pick winner',

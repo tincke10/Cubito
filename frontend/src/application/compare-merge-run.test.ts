@@ -127,7 +127,7 @@ describe('runCompareMerge — error branch', () => {
     await runCompareMerge(openWithWinner(), runningFanOut(), { gateway, dispatch })
     expect(dispatch).toHaveBeenLastCalledWith({
       type: 'merge-error',
-      message: 'host unavailable'
+      message: 'no se pudo mergear al ganador\u001fhost unavailable'
     })
   })
 
@@ -136,7 +136,10 @@ describe('runCompareMerge — error branch', () => {
     gateway.gitMergeWinnerIntoParent.mockRejectedValueOnce('boom')
     const { dispatch } = setup(gateway)
     await runCompareMerge(openWithWinner(), runningFanOut(), { gateway, dispatch })
-    expect(dispatch).toHaveBeenLastCalledWith({ type: 'merge-error', message: 'boom' })
+    expect(dispatch).toHaveBeenLastCalledWith({
+      type: 'merge-error',
+      message: 'no se pudo mergear al ganador\u001fboom'
+    })
   })
 })
 

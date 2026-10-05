@@ -16,7 +16,6 @@ export const esCompare: Record<keyof typeof enCompare, string> = {
     'Mergeado al padre ({oid}). Sincronizá el worktree padre (reset/checkout) para ver los cambios.',
   'compare.parentSynced': 'padre sincronizado.',
   'compare.parentSkipped': 'padre no sincronizado: tiene cambios sin commitear.',
-  'compare.parentSyncFailed': 'padre no sincronizado: {message}',
   'compare.reinstalling': 'reinstalando dependencias del padre en segundo plano (setup).',
   'compare.winner': 'ganador',
   'compare.pickWinner': 'elegir ganador',

@@ -14,8 +14,5 @@ export const esProjects: Record<keyof typeof enProjects, string> = {
   'projects.setupShared': ' · orca.yaml (solo lectura): {command}',
   'projects.setupNone': 'sin setup (ej. pnpm install)',
   'projects.setupNoOverride': 'sin override local (aplica orca.yaml)',
-  'projects.setupSaved': 'guardado',
-  'projects.setupError': 'error: {message}',
-  'projects.setupSaveFailed': 'no se pudo guardar',
-  'projects.addedSetupFailed': 'repo agregado, pero el setup no se guardó: {error}'
+  'projects.setupSaved': 'guardado'
 }
