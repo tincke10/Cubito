@@ -2,7 +2,7 @@ import type { ConnectionState } from '../../application/scene-store'
 import type { CompareViewSlice } from '../../application/compare-view-model'
 import type { WorktreeId } from '../../domain/worktree-graph/types'
 import { compareRailViewModel } from './compare-rail-model'
-import { diffRailViewModel } from '../diff/diff-rail-model'
+import { diffRailFailure, diffRailViewModel } from '../diff/diff-rail-model'
 import { diffPanelViewModel } from '../diff/diff-panel-model'
 import { shortBranchName } from '../hud/node-label-model'
 import type { CompareRailHandle } from './compare-rail-element'
@@ -131,7 +131,10 @@ export function createCompareViewController(
           ? compareView.childLoads[compareView.focusedChildId]
           : undefined
       entry.fileRail.apply(
-        diffRailViewModel(focusedLoad?.files ?? [], focusedLoad?.selectedPath ?? null)
+        diffRailViewModel(focusedLoad?.files ?? [], focusedLoad?.selectedPath ?? null),
+        focusedLoad === undefined
+          ? null
+          : diffRailFailure(focusedLoad.status, focusedLoad.errorMessage)
       )
       entry.panel.apply(diffPanelViewModel(focusedLoad?.panel ?? { kind: 'idle' }))
 

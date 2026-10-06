@@ -59,6 +59,19 @@ describe('reduceDiffView — open/close', () => {
   })
 })
 
+describe('reduceDiffView — error is cleared by a successful reload', () => {
+  it('rail-loaded drops a stale errorMessage', () => {
+    const errored = openSlice({ status: 'error', errorMessage: plainFailure('boom') })
+    const next = reduceDiffView(errored, {
+      type: 'rail-loaded',
+      compare: { headOid: 'h', mergeBase: 'm' },
+      files: []
+    })
+    expect(next).toMatchObject({ status: 'empty' })
+    expect(next).not.toHaveProperty('errorMessage')
+  })
+})
+
 describe('reduceDiffView — open-error / rail-error', () => {
   it('open-error marks the rail errored with a message', () => {
     const slice = reduceDiffView(openSlice(), {

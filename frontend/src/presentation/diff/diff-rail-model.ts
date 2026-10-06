@@ -1,4 +1,6 @@
-import type { DiffFileRow } from '../../application/diff-view-model'
+import type { DiffFileRow, DiffRailStatus } from '../../application/diff-view-model'
+import { plainFailure } from '../../application/i18n/user-facing-error'
+import type { FailureMessage } from '../../application/i18n/user-facing-error'
 import type { StageState } from '../../application/source-control-flow'
 import { t } from '../../application/i18n/translate'
 
@@ -65,3 +67,10 @@ export function diffRailViewModel(
     }
   })
 }
+
+/** The failure the rail shows instead of its empty placeholder — null unless the load errored. */
+export const diffRailFailure = (
+  status: DiffRailStatus,
+  errorMessage: FailureMessage | undefined
+): FailureMessage | null =>
+  status === 'error' ? (errorMessage ?? plainFailure(t('failure.unknown'))) : null

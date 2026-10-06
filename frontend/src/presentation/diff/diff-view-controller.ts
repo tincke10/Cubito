@@ -2,7 +2,7 @@ import type { ConnectionState } from '../../application/scene-store'
 import { diffHudCounts } from '../../application/diff-view-model'
 import type { DiffViewSlice } from '../../application/diff-view-model'
 import type { StageState } from '../../application/source-control-flow'
-import { diffRailViewModel } from './diff-rail-model'
+import { diffRailFailure, diffRailViewModel } from './diff-rail-model'
 import { diffPanelViewModel } from './diff-panel-model'
 import type { DiffRailHandle } from './diff-rail-element'
 import type { DiffPanelHandle } from './diff-panel-element'
@@ -82,7 +82,10 @@ export function createDiffViewController(deps: DiffViewControllerDeps): DiffView
       const enteringNow = !mounted
       const entry = mounted ?? mount()
       if (enteringNow) deps.onEnter?.()
-      entry.rail.apply(diffRailViewModel(diffView.files, diffView.selectedPath, stageStates))
+      entry.rail.apply(
+        diffRailViewModel(diffView.files, diffView.selectedPath, stageStates),
+        diffRailFailure(diffView.status, diffView.errorMessage)
+      )
       entry.panel.apply(diffPanelViewModel(diffView.panel))
       entry.hud.apply({ connection, branch: branchLabel, counts: diffHudCounts(diffView) })
     },

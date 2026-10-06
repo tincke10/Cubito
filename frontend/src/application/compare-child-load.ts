@@ -43,13 +43,15 @@ export function reduceCompareChildLoad(
   action: CompareChildLoadAction
 ): CompareChildLoad {
   switch (action.type) {
-    case 'child-rail-loaded':
+    case 'child-rail-loaded': {
+      const { errorMessage: _stale, ...rest } = load
       return {
-        ...load,
+        ...rest,
         compare: action.compare,
         files: action.files,
         status: action.files.length === 0 ? 'empty' : 'ready'
       }
+    }
     case 'child-rail-error':
       return {
         ...load,

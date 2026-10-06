@@ -1,5 +1,7 @@
 import type { DiffRailRow } from './diff-rail-model'
 import { t } from '../../application/i18n/translate'
+import type { FailureMessage } from '../../application/i18n/user-facing-error'
+import { renderFailureText } from '../failure-text-element'
 
 const buildRow = (
   doc: Document,
@@ -55,7 +57,7 @@ const buildRow = (
 
 export type DiffRailHandle = {
   readonly root: HTMLElement
-  apply(rows: readonly DiffRailRow[]): void
+  apply(rows: readonly DiffRailRow[], failure?: FailureMessage | null): void
   onSelect(cb: (path: string) => void): void
   onStageToggle(cb: (path: string) => void): void
   dispose(): void
@@ -64,7 +66,7 @@ export type DiffRailHandle = {
 /**
  * Diff mode's left rail (file list) — mirrors activity-feed-element.ts's rebuild-on-apply
  * pattern. Row cssClass comes straight from diffRailViewModel, applied verbatim (already
- * encodes status + selected). Empty rows -> an empty-state placeholder, no row list.
+ * encodes status + selected). A failure replaces the list (an unread rail is not an empty one); empty rows -> placeholder.
  */
 export function createDiffRail(doc: Document = document): DiffRailHandle {
   const root = doc.createElement('div')
@@ -75,8 +77,15 @@ export function createDiffRail(doc: Document = document): DiffRailHandle {
 
   return {
     root,
-    apply(rows: readonly DiffRailRow[]) {
+    apply(rows: readonly DiffRailRow[], failure: FailureMessage | null = null) {
       root.replaceChildren()
+      if (failure !== null) {
+        const error = doc.createElement('div')
+        error.className = 'cubito-diff-rail__error'
+        renderFailureText(doc, error, failure)
+        root.appendChild(error)
+        return
+      }
       if (rows.length === 0) {
         const empty = doc.createElement('div')
         empty.className = 'cubito-diff-rail__empty'

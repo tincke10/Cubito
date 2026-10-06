@@ -78,15 +78,16 @@ export function reduceDiffView(slice: DiffViewSlice, action: DiffViewAction): Di
             ...(action.message === undefined ? {} : { errorMessage: action.message })
           }
         : slice
-    case 'rail-loaded':
-      return slice.view === 'open'
-        ? {
-            ...slice,
-            compare: action.compare,
-            files: action.files,
-            status: action.files.length === 0 ? 'empty' : 'ready'
-          }
-        : slice
+    case 'rail-loaded': {
+      if (slice.view !== 'open') return slice
+      const { errorMessage: _stale, ...rest } = slice
+      return {
+        ...rest,
+        compare: action.compare,
+        files: action.files,
+        status: action.files.length === 0 ? 'empty' : 'ready'
+      }
+    }
     case 'select':
       return slice.view === 'open'
         ? { ...slice, selectedPath: action.path, panel: { kind: 'loading' } }

@@ -68,6 +68,7 @@ const row = (
   isWinner: false,
   cssClass: 'compare-rail__row compare-rail__row--ready',
   winnerToggleLabel: 'elegir ganador',
+  failure: null,
   ...overrides
 })
 
@@ -110,6 +111,21 @@ describe('createCompareRail', () => {
     rail.apply([row({ childId: 'a', label: 'camada-x-1', title: 'refs/heads/camada-x-1' })])
     const rowEl = rootOf(rail).children[0]!
     expect(rowEl.children[0]!.title).toBe('refs/heads/camada-x-1')
+  })
+
+  it('renders a failed child as a failure line after the toggle, in place of nothing', () => {
+    const rail = createCompareRail(createFakeDocument())
+    rail.apply([
+      row({ childId: 'a', failure: { lead: 'no se pudo leer los cambios', detail: 'boom' } }),
+      row({ childId: 'b' })
+    ])
+    const [failed, ok] = rootOf(rail).children
+    expect(failed!.children).toHaveLength(4)
+    const line = failed!.children[3]!
+    expect(line.className).toBe('compare-rail__error')
+    expect(line.textContent).toBe('no se pudo leer los cambios')
+    expect(line.children[0]!.textContent).toBe('boom')
+    expect(ok!.children).toHaveLength(3)
   })
 
   it('calls onFocusChild with the clicked row childId', () => {

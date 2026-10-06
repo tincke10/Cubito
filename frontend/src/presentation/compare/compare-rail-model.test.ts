@@ -3,6 +3,7 @@ import { compareRailViewModel } from './compare-rail-model'
 import type { CompareRailInput } from './compare-rail-model'
 import { emptyCompareChildLoad } from '../../application/compare-child-load'
 import type { CompareChildLoad } from '../../application/compare-child-load'
+import { plainFailure } from '../../application/i18n/user-facing-error'
 import type { DiffFileRow } from '../../application/diff-view-model'
 
 const fileRow = (overrides: Partial<DiffFileRow> = {}): DiffFileRow => ({
@@ -97,4 +98,25 @@ describe('compareRailViewModel', () => {
       expect(rows[0]!.cssClass).toContain(`compare-rail__row--${status}`)
     }
   )
+
+  it('carries a failed child load as the row failure, null for the others', () => {
+    const failure = { lead: 'no se pudo leer', detail: 'boom' }
+    const rows = compareRailViewModel(
+      baseInput({
+        childLoads: {
+          'child-1': load({ status: 'error', errorMessage: failure }),
+          'child-2': load({ status: 'ready' })
+        }
+      })
+    )
+    expect(rows[0]!.failure).toBe(failure)
+    expect(rows[1]!.failure).toBeNull()
+  })
+
+  it('falls back to the localized unknown failure when an errored child stored none', () => {
+    const rows = compareRailViewModel(
+      baseInput({ childLoads: { 'child-1': load({ status: 'error' }), 'child-2': load() } })
+    )
+    expect(rows[0]!.failure).toEqual(plainFailure('algo salió mal'))
+  })
 })

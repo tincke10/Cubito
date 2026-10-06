@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { diffRailViewModel } from './diff-rail-model'
+import { diffRailFailure, diffRailViewModel } from './diff-rail-model'
+import { plainFailure } from '../../application/i18n/user-facing-error'
 import type { DiffFileRow } from '../../application/diff-view-model'
 
 const file = (overrides: Partial<DiffFileRow> & Pick<DiffFileRow, 'path'>): DiffFileRow => ({
@@ -131,5 +132,21 @@ describe('diffRailViewModel', () => {
     it('leaves rows untouched when no stage states are given', () => {
       expect(diffRailViewModel([wt('a.ts')], null)[0]!.stage).toBeUndefined()
     })
+  })
+})
+
+describe('diffRailFailure', () => {
+  it('is null unless the rail errored', () => {
+    expect(diffRailFailure('ready', undefined)).toBeNull()
+    expect(diffRailFailure('empty', plainFailure('x'))).toBeNull()
+  })
+
+  it('surfaces the stored failure when the rail errored', () => {
+    const failure = { lead: 'no se pudo leer', detail: 'boom' }
+    expect(diffRailFailure('error', failure)).toBe(failure)
+  })
+
+  it('falls back to the localized unknown failure when none was stored', () => {
+    expect(diffRailFailure('error', undefined)).toEqual({ lead: 'algo salió mal', detail: null })
   })
 })

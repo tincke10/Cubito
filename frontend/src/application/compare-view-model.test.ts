@@ -6,7 +6,7 @@ import {
   sceneSelectedId,
   stepCompareFocus
 } from './compare-view-model'
-import { emptyCompareChildLoad } from './compare-child-load'
+import { emptyCompareChildLoad, reduceCompareChildLoad } from './compare-child-load'
 import type { DiffFileRow } from './diff-view-model'
 
 const fileRow = (overrides: Partial<DiffFileRow> = {}): DiffFileRow => ({
@@ -252,6 +252,22 @@ describe('reduceCompareView — per-child load actions route by childId', () => 
     expect(slice.childLoads['w-child-2']).toBe(
       (before as Extract<typeof before, { view: 'open' }>).childLoads['w-child-2']
     )
+  })
+
+  it('child-rail-loaded drops a stale errorMessage on the reloaded child', () => {
+    const errored = {
+      ...emptyCompareChildLoad(),
+      status: 'error' as const,
+      errorMessage: plainFailure('boom')
+    }
+    const next = reduceCompareChildLoad(errored, {
+      type: 'child-rail-loaded',
+      childId: 'c1',
+      compare: { headOid: 'h', mergeBase: 'm' },
+      files: []
+    })
+    expect(next.status).toBe('empty')
+    expect(next).not.toHaveProperty('errorMessage')
   })
 
   it('child-rail-error is isolated per child (continue-on-error)', () => {

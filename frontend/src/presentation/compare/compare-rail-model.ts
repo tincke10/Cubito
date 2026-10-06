@@ -2,6 +2,8 @@ import type { WorktreeId } from '../../domain/worktree-graph/types'
 import type { CompareChildLoad } from '../../application/compare-child-load'
 import { hudCountsOfFiles } from '../../application/diff-view-model'
 import type { DiffRailStatus } from '../../application/diff-view-model'
+import { diffRailFailure } from '../diff/diff-rail-model'
+import type { FailureMessage } from '../../application/i18n/user-facing-error'
 import { shortBranchName } from '../hud/node-label-model'
 import { t, tn } from '../../application/i18n/translate'
 
@@ -16,6 +18,8 @@ export type CompareRailRow = {
   isWinner: boolean
   cssClass: string
   winnerToggleLabel: string
+  /** Set only when this child's rail load errored — shown instead of a misleading "0 files". */
+  failure: FailureMessage | null
 }
 
 export type CompareRailInput = {
@@ -55,7 +59,8 @@ export function compareRailViewModel(input: CompareRailInput): readonly CompareR
       focused,
       isWinner,
       cssClass: railCssClass(status, focused, isWinner),
-      winnerToggleLabel: isWinner ? t('compare.winner') : t('compare.pickWinner')
+      winnerToggleLabel: isWinner ? t('compare.winner') : t('compare.pickWinner'),
+      failure: diffRailFailure(status, load?.errorMessage)
     }
   })
 }

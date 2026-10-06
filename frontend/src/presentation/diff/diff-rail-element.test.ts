@@ -161,6 +161,24 @@ describe('createDiffRail', () => {
     expect(root.children[0]!.textContent).toBe('sin cambios')
   })
 
+  it('shows the failure instead of the empty placeholder when one is passed', () => {
+    const rail = createDiffRail(createFakeDocument())
+    rail.apply([], { lead: 'no se pudo leer los cambios', detail: 'boom' })
+    const root = rootOf(rail)
+    expect(root.children).toHaveLength(1)
+    const failure = root.children[0]!
+    expect(failure.className).toBe('cubito-diff-rail__error')
+    expect(failure.textContent).toBe('no se pudo leer los cambios')
+    expect(failure.children[0]!.textContent).toBe('boom')
+  })
+
+  it('goes back to the placeholder once the failure is cleared', () => {
+    const rail = createDiffRail(createFakeDocument())
+    rail.apply([], { lead: 'x', detail: null })
+    rail.apply([], null)
+    expect(rootOf(rail).children[0]!.textContent).toBe('sin cambios')
+  })
+
   it('re-applying replaces previous rows rather than accumulating them', () => {
     const rail = createDiffRail(createFakeDocument())
     rail.apply([row({ path: 'a.ts' })])

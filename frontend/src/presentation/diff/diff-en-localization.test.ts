@@ -3,7 +3,7 @@ import { setActiveLanguage } from '../../application/i18n/translate'
 import { createDiffHud } from './diff-hud-element'
 import { createDiffPanel } from './diff-panel-element'
 import { createSourceControlComposer } from './source-control-composer-element'
-import { diffRailViewModel } from './diff-rail-model'
+import { diffRailFailure, diffRailViewModel } from './diff-rail-model'
 import { sourceControlModel } from './source-control-view-model'
 import type { SourceControlView } from '../../application/source-control-flow'
 import { railErrorMessageFor } from '../../application/diff-live-loader'
@@ -83,6 +83,13 @@ describe('diff surfaces in English', () => {
 
   it('rail error reasons are English', () => {
     expect(railErrorMessageFor('no-merge-base')).toBe('no common ancestor with the base')
+  })
+
+  it('rail failure fallback is English', () => {
+    expect(diffRailFailure('error', undefined)).toEqual({
+      lead: 'something went wrong',
+      detail: null
+    })
   })
 
   it('composer placeholders and draft toggle are English', () => {

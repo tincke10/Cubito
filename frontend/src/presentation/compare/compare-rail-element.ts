@@ -1,6 +1,7 @@
 import type { CompareRailRow } from './compare-rail-model'
 
 import { t } from '../../application/i18n/translate'
+import { renderFailureText } from '../failure-text-element'
 
 const buildRow = (
   doc: Document,
@@ -33,6 +34,12 @@ const buildRow = (
   rowElement.appendChild(label)
   rowElement.appendChild(stat)
   rowElement.appendChild(winnerToggle)
+  if (row.failure !== null) {
+    const failure = doc.createElement('div')
+    failure.className = 'compare-rail__error'
+    renderFailureText(doc, failure, row.failure)
+    rowElement.appendChild(failure)
+  }
   rowElement.addEventListener('click', () => onFocus(row.childId))
   return rowElement
 }
