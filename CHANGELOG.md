@@ -4,6 +4,18 @@ All notable changes to Cubito are documented here. The format follows [Keep a Ch
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-06
+
+### Changed
+
+- Failures from the engine, git, `gh` and `glab` show a lead line in the active language plus the original technical message underneath, instead of raw English text.
+
+### Fixed
+
+- The diff and compare rails show a load failure instead of claiming there are no changes.
+- A failed worktree graph sync shows a notice in the HUD, which clears on the next successful sync.
+- The command palette's spawn entry reads "crear worktree" in Spanish.
+
 ## [0.1.1] - 2026-10-05
 
 ### Added
@@ -49,6 +61,7 @@ First public release: a spatial frontend over ORCA's headless engine, published 
 - The published port binds `127.0.0.1` only.
 - Egress audited: no contact with Orca cloud services, no analytics, no updater; `glab` answers offline when unconfigured, the push gateway is not started, and Claude Code's auto-updater is disabled in the image.
 
-[Unreleased]: https://github.com/tincke10/Cubito/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/tincke10/Cubito/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/tincke10/Cubito/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/tincke10/Cubito/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/tincke10/Cubito/releases/tag/v0.1.0
