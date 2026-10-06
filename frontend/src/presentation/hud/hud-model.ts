@@ -3,6 +3,7 @@ import { t, tn } from '../../application/i18n/translate'
 import type { MessageKey } from '../../application/i18n/messages/en'
 import type { ConnectionState, SceneState } from '../../application/scene-store'
 import type { TerminalsState } from '../../application/terminal-session-model'
+import type { FailureMessage } from '../../application/i18n/user-facing-error'
 import type { WorktreeGraph } from '../../domain/worktree-graph/types'
 
 /** Semantic palette token names — never raw hex; the DOM writer maps these to CSS vars. */
@@ -44,6 +45,8 @@ export type HudModel = {
   counters: ReturnType<typeof countNodeStates>
   text: HudText
   chips: readonly HudChip[]
+  /** Failed graph sync while connected — non-blocking line under the counters. */
+  syncNotice: FailureMessage | null
 }
 
 export const connectionLabel = (connection: ConnectionState): string => {
@@ -144,6 +147,11 @@ export function hudModel(state: SceneState, platform: { isMac: boolean }): HudMo
     repo,
     counters,
     text: hudText(repo, counters),
+    // Why: a down connection already says why nothing refreshes — don't stack a second line on it.
+    syncNotice:
+      state.sync.state === 'error' && state.connection.state === 'connected'
+        ? state.sync.message
+        : null,
     chips: [...chipsFor(platform), ...terminalChips(state.terminals, state.selection.selectedId)]
   }
 }

@@ -43,6 +43,35 @@ const baseState = (overrides: Partial<SceneState> = {}): SceneState => ({
 })
 
 describe('hudModel', () => {
+  describe('syncNotice', () => {
+    const failure = { lead: 'no se pudieron actualizar los worktrees', detail: 'boom' }
+    const failed = { state: 'error' as const, code: 'x', message: failure }
+
+    it('carries the sync failure while connected', () => {
+      const model = hudModel(
+        baseState({ sync: failed, connection: { state: 'connected', runtimeId: 'r' } }),
+        { isMac: true }
+      )
+      expect(model.syncNotice).toBe(failure)
+    })
+
+    it('is null once a later sync succeeded', () => {
+      const model = hudModel(
+        baseState({
+          sync: { state: 'synced', at: 1 },
+          connection: { state: 'connected', runtimeId: 'r' }
+        }),
+        { isMac: true }
+      )
+      expect(model.syncNotice).toBeNull()
+    })
+
+    it('is null while the connection line already reports the outage', () => {
+      const model = hudModel(baseState({ sync: failed }), { isMac: true })
+      expect(model.syncNotice).toBeNull()
+    })
+  })
+
   it('connection.label shows the connecting label', () => {
     const model = hudModel(baseState({ connection: { state: 'connecting' } }), { isMac: true })
     expect(model.connection.label).toBe('conectando…')

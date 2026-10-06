@@ -1,4 +1,5 @@
 import type { ConnectionDotTone, HudModel } from './hud-model'
+import { renderFailureText } from '../failure-text-element'
 
 /** Semantic tone → CSS custom property (kebab convention from theme/css-theme.ts's cssVarsFor). */
 const DOT_VAR: Record<ConnectionDotTone, string> = {
@@ -45,9 +46,14 @@ export function createHudOverlay(doc: Document = document): HudOverlayHandle {
   countersLine.appendChild(countersPrefix)
   countersLine.appendChild(countersWaiting)
 
+  const syncNoticeLine = inert(doc.createElement('div'))
+  syncNoticeLine.className = 'cubito-hud__line cubito-hud__line--notice'
+  syncNoticeLine.style.display = 'none'
+
   root.appendChild(connectionLine)
   root.appendChild(repoLine)
   root.appendChild(countersLine)
+  root.appendChild(syncNoticeLine)
 
   return {
     root,
@@ -58,6 +64,9 @@ export function createHudOverlay(doc: Document = document): HudOverlayHandle {
       repoLine.textContent = model.text.repo
       countersPrefix.textContent = model.text.countersPrefix
       countersWaiting.textContent = model.text.countersWaiting
+
+      renderFailureText(doc, syncNoticeLine, model.syncNotice)
+      syncNoticeLine.style.display = model.syncNotice === null ? 'none' : ''
     },
     dispose() {
       root.remove()

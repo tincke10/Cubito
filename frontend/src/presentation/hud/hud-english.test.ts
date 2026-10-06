@@ -10,6 +10,7 @@ import {
   pairingRejectionReason
 } from '../../application/connection-reason'
 import { decidePairingEntry } from '../../application/pairing-entry-decision'
+import { describeFailure } from '../../application/i18n/user-facing-error'
 import { setActiveLanguage } from '../../application/i18n/translate'
 import { emptyWorktreeGraph } from '../../domain/worktree-graph/types'
 import { emptyTerminalsState } from '../../application/terminal-session-model'
@@ -67,6 +68,21 @@ describe('HUD in English', () => {
     const text = hudText(null, { ...counters, total: 6, working: 2, 'waiting-input': 1 })
     expect(text.countersPrefix).toBe('6 nodes · 2 active agents · ')
     expect(text.countersWaiting).toBe('1 waiting for input')
+  })
+
+  it('words the sync failure notice in English', () => {
+    const model = hudModel(
+      state({
+        connection: { state: 'connected', runtimeId: 'r' },
+        sync: {
+          state: 'error',
+          code: 'x',
+          message: describeFailure('worktreeSync', new Error('boom'))
+        }
+      }),
+      { isMac: true }
+    )
+    expect(model.syncNotice).toEqual({ lead: "couldn't refresh the worktrees", detail: 'boom' })
   })
 
   it('describes the keyboard chips in English', () => {

@@ -70,15 +70,34 @@ const baseFixture = (overrides: Partial<HudModel>): HudModel => ({
     idle: 3
   },
   chips: [],
+  syncNotice: null,
   ...overrides
 })
 
 describe('createHudOverlay', () => {
-  it('renders exactly 3 lines: connection, repo, counters', () => {
+  it('renders 4 lines: connection, repo, counters, sync notice', () => {
     const overlay = createHudOverlay(createFakeDocument())
     overlay.apply(fixture())
     const root = overlay.root as unknown as FakeElement
-    expect(root.children).toHaveLength(3)
+    expect(root.children).toHaveLength(4)
+  })
+
+  it('hides the sync notice line when there is no failure', () => {
+    const overlay = createHudOverlay(createFakeDocument())
+    overlay.apply(fixture())
+    const notice = (overlay.root as unknown as FakeElement).children[3]!
+    expect(notice.style.display).toBe('none')
+  })
+
+  it('shows the sync failure as lead plus detail, and hides it again on recovery', () => {
+    const overlay = createHudOverlay(createFakeDocument())
+    overlay.apply(fixture({ syncNotice: { lead: 'no se pudieron actualizar', detail: 'boom' } }))
+    const notice = (overlay.root as unknown as FakeElement).children[3]!
+    expect(notice.style.display).toBe('')
+    expect(notice.textContent).toBe('no se pudieron actualizar')
+    expect(notice.children[0]!.textContent).toBe('boom')
+    overlay.apply(fixture())
+    expect(notice.style.display).toBe('none')
   })
 
   it('connection line shows a dot plus the connection label', () => {

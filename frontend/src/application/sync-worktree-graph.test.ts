@@ -154,6 +154,28 @@ describe('syncWorktreeGraph', () => {
     expect(state.graph.nodes.size).toBe(2)
   })
 
+  it('keeps the error visible while the retry is in flight (no error/syncing flicker)', async () => {
+    const store = createSceneStore()
+    await syncWorktreeGraph(
+      fakeGateway(async () => {
+        throw new Error('boom')
+      }),
+      store,
+      () => 1
+    )
+    let observed: string | null = null
+    await syncWorktreeGraph(
+      fakeGateway(async () => {
+        observed = store.get().sync.state
+        return records
+      }),
+      store,
+      () => 2
+    )
+    expect(observed).toBe('error')
+    expect(store.get().sync).toEqual({ state: 'synced', at: 2 })
+  })
+
   it('never calls store.set — only store.update', async () => {
     const store = createSceneStore()
     const setSpy = vi.spyOn(store, 'set')

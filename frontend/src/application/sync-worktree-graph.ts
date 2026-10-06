@@ -22,7 +22,8 @@ export async function syncWorktreeGraph(
   store: SceneStore,
   now: () => number = Date.now
 ): Promise<void> {
-  store.update({ sync: { state: 'syncing' } })
+  // Why: flipping error -> syncing -> error every poll would flash the HUD failure notice.
+  if (store.get().sync.state !== 'error') store.update({ sync: { state: 'syncing' } })
   const [worktreesResult, reposResult, psResult] = await Promise.allSettled([
     gateway.listWorktrees(),
     gateway.listRepos(),
