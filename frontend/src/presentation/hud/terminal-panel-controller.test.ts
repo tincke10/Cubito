@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { t } from '../../application/i18n/translate'
 import { createTerminalPanelController } from './terminal-panel-controller'
 import type { TerminalPanelControllerDeps } from './terminal-panel-controller'
 import { emptyTerminalsState, reduceTerminals } from '../../application/terminal-session-model'
@@ -381,7 +382,7 @@ describe('createTerminalPanelController', () => {
       )
     })
 
-    it('sets the session title to "agente" once attached to an agent-tagged pty', async () => {
+    it('sets the localized agent session title once attached to an agent-tagged pty', async () => {
       const { controller, port, dispatch } = setup()
       port.listTerminals = vi.fn(async () => [
         { handle: 'pty-agent', agentIdentity: 'claude', title: null, connected: true }
@@ -395,7 +396,7 @@ describe('createTerminalPanelController', () => {
         terminal: 'pty-agent',
         cols: 80,
         rows: 24,
-        title: 'agente'
+        title: t('terminal.agentTitle')
       })
     })
 

@@ -1,3 +1,4 @@
+import { t } from '../../application/i18n/translate'
 import type { Vec3 } from '../camera/camera-framing'
 import type { WorktreeId } from '../../domain/worktree-graph/types'
 import type {
@@ -155,7 +156,7 @@ export function createTerminalPanelController(
           spawnNewTerminal(entry, nodeId, streamId)
           return
         }
-        if (picked.agentIdentity) entry.attachedTitle = 'agente'
+        if (picked.agentIdentity) entry.attachedTitle = t('terminal.agentTitle')
         entry.handle = picked.handle
         port.subscribe(streamId, picked.handle, entry.panel.dimensions(), sinkFor(entry))
       },
