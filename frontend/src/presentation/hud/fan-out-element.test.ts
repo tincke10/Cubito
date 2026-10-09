@@ -252,17 +252,17 @@ describe('createFanOutForm — running view — per-child failures', () => {
     form.apply(
       runningModel({
         failures: [
-          { mutationId: 'm1', label: 'camada-m1', message: plainFailure('network unreachable') },
-          { mutationId: 'm3', label: 'camada-m3', message: plainFailure('timeout') }
+          { mutationId: 'm1', label: 'fanout-m1', message: plainFailure('network unreachable') },
+          { mutationId: 'm3', label: 'fanout-m3', message: plainFailure('timeout') }
         ]
       })
     )
     const root = form.element as unknown as FakeElement
     const failuresContainer = root.children.find((c) => c.className.includes('failures'))!
     expect(failuresContainer.children).toHaveLength(2)
-    expect(failuresContainer.children[0]!.textContent).toContain('camada-m1')
+    expect(failuresContainer.children[0]!.textContent).toContain('fanout-m1')
     expect(failuresContainer.children[0]!.textContent).toContain('network unreachable')
-    expect(failuresContainer.children[1]!.textContent).toContain('camada-m3')
+    expect(failuresContainer.children[1]!.textContent).toContain('fanout-m3')
     expect(failuresContainer.children[1]!.textContent).toContain('timeout')
   })
 
@@ -270,7 +270,7 @@ describe('createFanOutForm — running view — per-child failures', () => {
     const form = createFanOutForm(createFakeDocument())
     form.apply(
       runningModel({
-        failures: [{ mutationId: 'm1', label: 'camada-m1', message: plainFailure('boom') }]
+        failures: [{ mutationId: 'm1', label: 'fanout-m1', message: plainFailure('boom') }]
       })
     )
     form.apply(runningModel({ failures: [] }))

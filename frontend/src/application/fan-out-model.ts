@@ -239,9 +239,9 @@ function startSubmit(slice: FanOutSlice, mutationIds: readonly string[]): FanOut
   }
 }
 
-/** camada-<mutationId prefix> — the litter's worktree name and (Change B) lease task/worker displayName. */
+/** fanout-<mutationId prefix> (language-neutral: persisted git refs must not depend on UI language) — the litter's worktree name and (Change B) lease task/worker displayName. */
 export function cubeNameFor(mutationId: string): string {
-  return `camada-${mutationId.replace(/-/g, '').slice(0, 10)}`
+  return `fanout-${mutationId.replace(/-/g, '').slice(0, 10)}`
 }
 
 /** Run objective / task spec text (Change B lease path). No generated fallback on purpose: the

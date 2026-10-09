@@ -633,14 +633,14 @@ describe('toFanOutInputs', () => {
         repo: 'id:repo-a',
         parentWorktree: 'w1',
         clientMutationId: 'm1',
-        name: 'camada-m1',
+        name: 'fanout-m1',
         nameWasGenerated: true
       },
       {
         repo: 'id:repo-a',
         parentWorktree: 'w1',
         clientMutationId: 'm2',
-        name: 'camada-m2',
+        name: 'fanout-m2',
         nameWasGenerated: true
       }
     ])

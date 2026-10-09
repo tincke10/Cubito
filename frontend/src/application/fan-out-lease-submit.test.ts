@@ -67,7 +67,7 @@ describe('runCamadaLeaseSubmit — happy path', () => {
       repo: 'id:repo-a',
       parentWorktree: 'w1',
       clientMutationId: 'm1',
-      name: 'camada-m1',
+      name: 'fanout-m1',
       nameWasGenerated: true
     })
     expect(gateway.createWorktree.mock.calls[0]![0]).not.toHaveProperty('startupAgent')
@@ -76,13 +76,13 @@ describe('runCamadaLeaseSubmit — happy path', () => {
     expect(gateway.orchestrationTaskCreate).toHaveBeenNthCalledWith(1, {
       spec: 'fix the bug',
       run: 'run-1',
-      displayName: 'camada-m1'
+      displayName: 'fanout-m1'
     })
     expect(gateway.orchestrationWorkerStart).toHaveBeenNthCalledWith(1, {
       task: 'task-1',
       run: 'run-1',
       worktree: 'wt-m1',
-      displayName: 'camada-m1',
+      displayName: 'fanout-m1',
       agent: 'claude'
     })
 

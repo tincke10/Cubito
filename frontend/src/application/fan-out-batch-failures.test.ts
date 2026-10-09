@@ -80,8 +80,8 @@ describe('fanOutBatchFailures', () => {
       }
     ])
     expect(fanOutBatchFailures(slice)).toEqual([
-      { mutationId: 'm1', label: 'camada-m1', message: plainFailure('boom') },
-      { mutationId: 'm3', label: 'camada-m3', message: plainFailure('timeout') }
+      { mutationId: 'm1', label: 'fanout-m1', message: plainFailure('boom') },
+      { mutationId: 'm3', label: 'fanout-m3', message: plainFailure('timeout') }
     ])
   })
 
@@ -90,7 +90,7 @@ describe('fanOutBatchFailures', () => {
       { mutationId: 'm1', worktreeId: null, failed: true, dispatchId: null, taskId: null }
     ])
     expect(fanOutBatchFailures(slice)).toEqual([
-      { mutationId: 'm1', label: 'camada-m1', message: plainFailure('no se pudo crear el cubo') }
+      { mutationId: 'm1', label: 'fanout-m1', message: plainFailure('no se pudo crear el cubo') }
     ])
   })
 
@@ -112,7 +112,7 @@ describe('fanOutBatchFailures', () => {
     expect(fanOutBatchFailures(slice)).toEqual([
       {
         mutationId: 'm1',
-        label: 'camada-m1',
+        label: 'fanout-m1',
         message: {
           lead: 'no se pudo crear este worktree',
           detail:

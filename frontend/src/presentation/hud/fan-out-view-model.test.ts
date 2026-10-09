@@ -190,7 +190,7 @@ describe('fanOutViewModel — running — per-child failures', () => {
     )
     if (model?.view !== 'running') throw new Error('expected running')
     expect(model.failures).toEqual([
-      { mutationId: 'm1', label: 'camada-m1', message: plainFailure('network unreachable') }
+      { mutationId: 'm1', label: 'fanout-m1', message: plainFailure('network unreachable') }
     ])
   })
 
