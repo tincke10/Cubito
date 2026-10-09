@@ -4,6 +4,14 @@ All notable changes to Cubito are documented here. The format follows [Keep a Ch
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-10-09
+
+### Fixed
+
+- Fan-out children are named `fanout-<id>` instead of the Spanish `camada-<id>`; branch names no longer depend on the UI language. Existing `camada-*` worktrees keep working.
+- The in-scene terminal header reads "agent" in the English UI.
+- Node labels in the compare view sit below their cubes instead of overlapping them when the camera frames the litter up close.
+
 ## [0.1.2] - 2026-10-06
 
 ### Changed
@@ -61,7 +69,8 @@ First public release: a spatial frontend over ORCA's headless engine, published 
 - The published port binds `127.0.0.1` only.
 - Egress audited: no contact with Orca cloud services, no analytics, no updater; `glab` answers offline when unconfigured, the push gateway is not started, and Claude Code's auto-updater is disabled in the image.
 
-[Unreleased]: https://github.com/tincke10/Cubito/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/tincke10/Cubito/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/tincke10/Cubito/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/tincke10/Cubito/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/tincke10/Cubito/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/tincke10/Cubito/releases/tag/v0.1.0
