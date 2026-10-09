@@ -4,8 +4,19 @@ import type { WorktreeGraph, WorktreeId } from '../../domain/worktree-graph/type
 import { DEFAULT_CAMERA_HEIGHT } from '../camera/camera-pose'
 import type { CameraHeight } from '../camera/camera-pose'
 import type { Vec3 } from '../camera/camera-framing'
-import { labelBoxPx, labelRectAt, resolveLabelCollisions } from '../hud/label-collision-model'
-import type { LabelAnchorProjection, LabelBox, LabelCandidate } from '../hud/label-collision-model'
+import {
+  LABEL_OFFSET_Y_PX,
+  labelBoxPx,
+  labelDropPx,
+  labelRectAt,
+  resolveLabelCollisions
+} from '../hud/label-collision-model'
+import type {
+  LabelAnchorProjection,
+  LabelBox,
+  LabelCandidate,
+  ScreenAnchor
+} from '../hud/label-collision-model'
 import { labelPriorityAt, labelRenderOrder, labelVisibleAt } from '../hud/label-visibility-model'
 import { createNodeLabel } from '../hud/node-label-element'
 import type { NodeLabelHandle } from '../hud/node-label-element'
@@ -205,13 +216,27 @@ export function createGraphView(
     }
   }
 
+  /** Perspective-scaled drop from the projected height of one world-up unit at the anchor. */
+  const dropFor = (project: LabelAnchorProjection, ground: Vec3, anchor: ScreenAnchor): number => {
+    if (!resolution) return LABEL_OFFSET_Y_PX
+    const raised = project({ x: ground.x, y: ground.y + 1, z: ground.z })
+    return labelDropPx(Math.abs(raised.y - anchor.y), resolution.height)
+  }
+
   const resolveLabelOverlaps = (project: LabelAnchorProjection): void => {
     const candidates: LabelCandidate[] = []
     for (const [id, entry] of nodes) {
       if (!entry.policyVisible) continue
-      const anchor = project(entry.label.object.position)
+      const position = entry.label.object.position
+      const anchor = project(position)
       if (!anchor.visible) continue
-      candidates.push({ id, rect: labelRectAt(anchor, entry.box), priority: entry.priority })
+      const dropPx = dropFor(project, position, anchor)
+      entry.label.setDropPx(dropPx)
+      candidates.push({
+        id,
+        rect: labelRectAt(anchor, entry.box, dropPx),
+        priority: entry.priority
+      })
     }
     const nextHidden =
       candidates.length < 2

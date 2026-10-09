@@ -13,6 +13,8 @@ const TONE_VAR: Record<LabelTone, string> = {
   info: '--cubito-info'
 }
 
+const DROP_VAR = '--cubito-label-drop'
+
 type Line = { text: string; tone: LabelTone }
 
 const applyLine = (element: HTMLElement, line: Line | null): void => {
@@ -25,6 +27,8 @@ const applyLine = (element: HTMLElement, line: Line | null): void => {
 export type NodeLabelHandle = {
   readonly object: CSS2DObject
   apply(model: NodeLabelModel): void
+  /** Perspective-scaled drop below the anchor; the same value labelRectAt uses for collisions. */
+  setDropPx(px: number): void
   dispose(): void
 }
 
@@ -42,10 +46,10 @@ export function createNodeLabel(doc: Document = document): NodeLabelHandle {
   root.style.fontFamily = "'Fira Code', monospace"
 
   // CSS2DRenderer overwrites `root.style.transform` every frame to position the
-  // object on screen, so the mockup's fixed +26px-below-shadow offset lives on an
+  // object on screen, so the mockup's below-shadow drop (26px at isla, perspective-scaled) lives on an
   // inner wrapper instead — setting it on `root` would be clobbered each frame.
   const inner = doc.createElement('div')
-  inner.style.transform = `translate(0, ${LABEL_OFFSET_Y_PX}px)`
+  inner.style.transform = `translate(0, var(${DROP_VAR}, ${LABEL_OFFSET_Y_PX}px))`
   root.appendChild(inner)
 
   const primary = doc.createElement('div')
@@ -59,6 +63,7 @@ export function createNodeLabel(doc: Document = document): NodeLabelHandle {
   inner.appendChild(secondary)
   inner.appendChild(callout)
 
+  let lastDropPx: number | null = null
   const object = new CSS2DObject(root)
   // Anchor top-centre, not the CSS2DObject default centre — the root already lands
   // horizontally centred via translate(-50%, ...); centring again in `inner` was a
@@ -78,6 +83,13 @@ export function createNodeLabel(doc: Document = document): NodeLabelHandle {
         applyLine(calloutTitle, model.callout.title)
         applyLine(calloutHint, model.callout.hint)
       }
+    },
+    setDropPx(px: number) {
+      // Called every frame; skip sub-half-pixel changes so a steady camera costs no style writes.
+      const rounded = Math.round(px * 2) / 2
+      if (rounded === lastDropPx) return
+      lastDropPx = rounded
+      inner.style.setProperty(DROP_VAR, `${rounded}px`)
     },
     dispose() {
       root.remove()

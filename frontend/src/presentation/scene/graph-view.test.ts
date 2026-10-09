@@ -4,7 +4,7 @@ import { buildWorktreeGraph } from '../../domain/worktree-graph/build-graph'
 import type { RawWorktreeRecord } from '../../domain/worktree-graph/build-graph'
 import type { WorktreeGraph, WorktreeId } from '../../domain/worktree-graph/types'
 import type { CameraHeight } from '../camera/camera-pose'
-import { labelBoxPx } from '../hud/label-collision-model'
+import { LABEL_DROP_MAX_FACTOR, labelBoxPx } from '../hud/label-collision-model'
 import type { LabelAnchorProjection } from '../hud/label-collision-model'
 import type { NodeLabelModel } from '../hud/node-label-model'
 import type { NodeLabelHandle } from '../hud/node-label-element'
@@ -49,6 +49,7 @@ const baseGraph = (): WorktreeGraph =>
 const fakeLabel = (): NodeLabelHandle => ({
   object: new THREE.Object3D() as unknown as NodeLabelHandle['object'],
   apply: vi.fn(),
+  setDropPx: vi.fn(),
   dispose: vi.fn()
 })
 
@@ -462,6 +463,72 @@ describe('createGraphView', () => {
     expect(spy).toHaveBeenCalled()
     expect(h.scene.children).not.toContain(h.view.group)
     for (const label of h.labels) expect(label.dispose).toHaveBeenCalled()
+  })
+})
+
+/** Screen-space stub: anchor y = `anchorY(x)`, and one world-up unit spans `pxPerUnit(x)` px. */
+const scaledProjection = (
+  anchorY: (x: number) => number,
+  pxPerUnit: (x: number) => number
+): LabelAnchorProjection => {
+  return (ground) => ({
+    x: 400,
+    y: anchorY(ground.x) - ground.y * pxPerUnit(ground.x),
+    visible: true
+  })
+}
+
+describe('resolveLabelOverlaps drop scaling', () => {
+  const twoWorkingNodes = (h: Harness): void => {
+    h.view.setResolution(800, 900)
+    h.update(
+      graphOf(record('root', null, ['a']), record('a', 'root', [], { agentStatus: 'working' })),
+      null,
+      null,
+      'isla'
+    )
+  }
+
+  it('hands each label its own perspective-scaled drop and keeps the base drop when far away', () => {
+    const h = harness()
+    twoWorkingNodes(h)
+    const [rootLabel, aLabel] = h.labels as [NodeLabelHandle, NodeLabelHandle]
+
+    // 1px/unit everywhere is far below the isla calibration -> base 26px drop for all
+    h.view.resolveLabelOverlaps(
+      scaledProjection(
+        () => 0,
+        () => 1
+      )
+    )
+    expect(rootLabel.setDropPx).toHaveBeenLastCalledWith(26)
+    expect(aLabel.setDropPx).toHaveBeenLastCalledWith(26)
+
+    // 200px/unit is far above calibration -> clamped to the max factor
+    h.view.resolveLabelOverlaps(
+      scaledProjection(
+        () => 0,
+        () => 200
+      )
+    )
+    expect(rootLabel.setDropPx).toHaveBeenLastCalledWith(26 * LABEL_DROP_MAX_FACTOR)
+  })
+
+  it('collision rects use the scaled drop: a near label dropped further no longer overlaps', () => {
+    const h = harness()
+    twoWorkingNodes(h)
+    const [rootLabel, aLabel] = h.labels as [NodeLabelHandle, NodeLabelHandle]
+    const rootX = rootLabel.object.position.x
+    // root (priority 1) anchor y=100, far scale -> rect 126..142.
+    // a (priority 2) anchor y=60, near scale -> drop 65 -> rect 125..141: overlaps root -> root hidden.
+    // With a flat 26 drop a would sit at 86..102 and clear root, so hiding proves the scaled rect.
+    const near = scaledProjection(
+      (x) => (x === rootX ? 100 : 60),
+      (x) => (x === rootX ? 1 : 200)
+    )
+    h.view.resolveLabelOverlaps(near)
+    expect(rootLabel.object.visible).toBe(false)
+    expect(aLabel.object.visible).toBe(true)
   })
 })
 

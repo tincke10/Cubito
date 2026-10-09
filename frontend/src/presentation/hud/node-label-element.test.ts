@@ -4,7 +4,7 @@ import type { NodeLabelHandle } from './node-label-element'
 import type { NodeLabelModel } from './node-label-model'
 
 type FakeElement = {
-  readonly style: Record<string, string>
+  readonly style: Record<string, string> & { setProperty(name: string, value: string): void }
   readonly children: FakeElement[]
   className: string
   textContent: string
@@ -14,7 +14,11 @@ type FakeElement = {
 }
 
 const createFakeElement = (): FakeElement => ({
-  style: {},
+  style: {
+    setProperty(name: string, value: string) {
+      this[name] = value
+    }
+  } as FakeElement['style'],
   children: [],
   className: '',
   textContent: '',
@@ -97,7 +101,15 @@ describe('createNodeLabel', () => {
 
     expect(handle.object.center.x).toBe(0.5)
     expect(handle.object.center.y).toBe(0)
-    expect(innerOf(handle).style.transform).toBe('translate(0, 26px)')
+    expect(innerOf(handle).style.transform).toBe('translate(0, var(--cubito-label-drop, 26px))')
+  })
+
+  it('setDropPx writes the drop CSS variable the inner wrapper reads', () => {
+    const handle = createNodeLabel(createFakeDocument())
+
+    handle.setDropPx(48.5)
+
+    expect(innerOf(handle).style['--cubito-label-drop']).toBe('48.5px')
   })
 
   it('dispose() removes the root', () => {

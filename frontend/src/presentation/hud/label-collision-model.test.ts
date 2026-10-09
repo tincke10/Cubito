@@ -1,9 +1,13 @@
+import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
+import { CAMERA_HEIGHT_PRESETS } from '../theme/scene-metrics'
 import {
   LABEL_CHAR_ADVANCE_PX,
   LABEL_LINE_HEIGHT_PX,
   LABEL_OFFSET_Y_PX,
+  LABEL_DROP_MAX_FACTOR,
   labelBoxPx,
+  labelDropPx,
   labelRectAt,
   resolveLabelCollisions
 } from './label-collision-model'
@@ -63,6 +67,54 @@ describe('labelRectAt', () => {
     expect(rect.right).toBe(120)
     expect(rect.top).toBe(50 + LABEL_OFFSET_Y_PX)
     expect(rect.bottom).toBe(50 + LABEL_OFFSET_Y_PX + 20)
+  })
+})
+
+describe('labelRectAt with a scaled drop', () => {
+  it('uses the given drop for the top edge', () => {
+    const rect = labelRectAt({ x: 0, y: 10, visible: true }, { width: 40, height: 20 }, 52)
+    expect(rect.top).toBe(62)
+    expect(rect.bottom).toBe(82)
+  })
+})
+
+/** Independent oracle: project the isla look-at with a real three camera and measure 1 world-up unit. */
+const labelDropReference = (viewport: number): number => {
+  const { position, lookAt, fov } = CAMERA_HEIGHT_PRESETS.isla
+  const camera = new THREE.PerspectiveCamera(fov, 1, 0.1, 1000)
+  camera.position.set(position.x, position.y, position.z)
+  camera.lookAt(lookAt.x, lookAt.y, lookAt.z)
+  camera.updateMatrixWorld()
+  camera.updateProjectionMatrix()
+  const lowY = new THREE.Vector3(lookAt.x, 0, lookAt.z).project(camera).y
+  const highY = new THREE.Vector3(lookAt.x, 1, lookAt.z).project(camera).y
+  return Math.abs(highY - lowY) * (viewport / 2)
+}
+
+describe('labelDropPx', () => {
+  // Isla look-at scale for a 900px viewport, derived from the isla preset (see model constant).
+  const islaScale = (viewport: number): number => labelDropReference(viewport)
+
+  it('is within half a pixel of LABEL_OFFSET_Y_PX at the isla calibration scale', () => {
+    expect(labelDropPx(islaScale(900), 900)).toBeCloseTo(LABEL_OFFSET_Y_PX, 0)
+  })
+
+  it('never shrinks below LABEL_OFFSET_Y_PX when the camera is farther away (general)', () => {
+    expect(labelDropPx(islaScale(900) * 0.3, 900)).toBe(LABEL_OFFSET_Y_PX)
+  })
+
+  it('grows in proportion to how much closer the camera is (compare)', () => {
+    expect(labelDropPx(islaScale(900) * 2, 900)).toBeCloseTo(LABEL_OFFSET_Y_PX * 2, -1)
+  })
+
+  it('is clamped to LABEL_DROP_MAX_FACTOR times the base drop', () => {
+    expect(labelDropPx(islaScale(900) * 50, 900)).toBe(LABEL_OFFSET_Y_PX * LABEL_DROP_MAX_FACTOR)
+  })
+
+  it('falls back to the base drop for a degenerate projection', () => {
+    expect(labelDropPx(0, 900)).toBe(LABEL_OFFSET_Y_PX)
+    expect(labelDropPx(Number.NaN, 900)).toBe(LABEL_OFFSET_Y_PX)
+    expect(labelDropPx(100, 0)).toBe(LABEL_OFFSET_Y_PX)
   })
 })
 

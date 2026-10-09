@@ -1,13 +1,39 @@
+import { CAMERA_HEIGHT_PRESETS } from '../theme/scene-metrics'
 import type { NodeLabelModel } from './node-label-model'
 
 /** Mockup drop below the ground shadow (index.html node-label offset, design D1). */
 export const LABEL_OFFSET_Y_PX = 26
+/** Closest the drop may scale up to: bounds the label's distance from a very tightly framed node. */
+export const LABEL_DROP_MAX_FACTOR = 2.5
 /** Monospace advance for 'Fira Code'/SF Mono/Cascadia at 11px (index.html font-size). */
 export const LABEL_CHAR_ADVANCE_PX = 6.6
 /** 11px × 1.45 line-height (index.html .cubito-node-label). */
 export const LABEL_LINE_HEIGHT_PX = 15.95
 /** Dead band, both directions — kills flicker at a collision boundary with no timers. */
 export const LABEL_COLLISION_HYSTERESIS_PX = 4
+
+const ISLA_PRESET = CAMERA_HEIGHT_PRESETS.isla
+const ISLA_OFFSET = {
+  x: ISLA_PRESET.position.x - ISLA_PRESET.lookAt.x,
+  y: ISLA_PRESET.position.y - ISLA_PRESET.lookAt.y,
+  z: ISLA_PRESET.position.z - ISLA_PRESET.lookAt.z
+}
+const ISLA_DISTANCE = Math.hypot(ISLA_OFFSET.x, ISLA_OFFSET.y, ISLA_OFFSET.z)
+/** Screen px of one world-up unit at the isla look-at, per viewport-height px: the scale the
+ *  26px drop was calibrated at. cos(pitch) is the foreshortening of the vertical axis. */
+const ISLA_PX_PER_UNIT_PER_VIEWPORT_PX =
+  Math.hypot(ISLA_OFFSET.x, ISLA_OFFSET.z) /
+  ISLA_DISTANCE /
+  (2 * ISLA_DISTANCE * Math.tan((ISLA_PRESET.fov * Math.PI) / 360))
+
+/** Drop below the anchor, grown by how much closer than the isla calibration the camera is, so a
+ *  tight compare framing keeps the label clear of the (larger) cube. Never below the isla/general drop. */
+export function labelDropPx(pxPerUnit: number, viewportHeightPx: number): number {
+  const reference = ISLA_PX_PER_UNIT_PER_VIEWPORT_PX * viewportHeightPx
+  if (!(reference > 0) || !(pxPerUnit > 0)) return LABEL_OFFSET_Y_PX
+  const factor = Math.min(LABEL_DROP_MAX_FACTOR, Math.max(1, pxPerUnit / reference))
+  return LABEL_OFFSET_Y_PX * factor
+}
 
 export type LabelBox = { readonly width: number; readonly height: number }
 export type LabelRect = {
@@ -47,10 +73,14 @@ export function labelBoxPx(model: NodeLabelModel): LabelBox {
   }
 }
 
-/** Centred on the projected ground point, dropped LABEL_OFFSET_Y_PX below it. */
-export function labelRectAt(anchor: ScreenAnchor, box: LabelBox): LabelRect {
+/** Centred on the projected ground point, dropped `dropPx` below it (see labelDropPx). */
+export function labelRectAt(
+  anchor: ScreenAnchor,
+  box: LabelBox,
+  dropPx: number = LABEL_OFFSET_Y_PX
+): LabelRect {
   const left = anchor.x - box.width / 2
-  const top = anchor.y + LABEL_OFFSET_Y_PX
+  const top = anchor.y + dropPx
   return { left, top, right: left + box.width, bottom: top + box.height }
 }
 
